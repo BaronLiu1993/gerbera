@@ -1,0 +1,1 @@
+"""Generic Typer CLI package."""
