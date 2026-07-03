@@ -1,0 +1,8 @@
+{
+  "67f25dc7-be23-4dc5-90bd-8fd0d91eca47": {
+    "id": "67f25dc7-be23-4dc5-90bd-8fd0d91eca47",
+    "device": "/dev/cu.usbmodem11302",
+    "description": "BBC micro:bit CMSIS-DAP",
+    "hwid": "USB VID:PID=0D28:0204 SER=9901000052374e4500431009000000650000000097969901 LOCATION=1-1.3"
+  }
+}
