@@ -1,7 +1,7 @@
 [project]
-name = "railctl"
+name = "gerbera-cli"
 version = "0.1.0"
-description = "Serial device CLI and SDK scaffold."
+description = "Gerbera CLI."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -15,7 +15,7 @@ dev = [
 ]
 
 [project.scripts]
-railctl = "railctl.cli:run"
+gerbera-cli = "gerbera_cli.main:run"
 
 [build-system]
 requires = ["setuptools>=68"]

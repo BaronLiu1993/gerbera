@@ -8,11 +8,12 @@ from uuid import uuid4
 import serial.tools.list_ports as list_ports
 import typer
 
-from cli_app.config import get_settings
+from gerbera_cli.config import get_settings
 
 app = typer.Typer(help="Serial device detection commands.")
 
 DEVICE_MAP_PATH = Path("devices.json")
+
 
 def _available_devices() -> list[dict]:
     devices = []
@@ -67,10 +68,7 @@ def _render_selection_menu(
     typer.echo("Select devices with Enter. Move with Up/Down. Choose Continue when done.\n")
 
     for index, device in enumerate(devices):
-        is_selected = any(
-            selected["device"] == device["device"] and selected["hwid"] == device["hwid"]
-            for selected in selected_devices.values()
-        )
+        is_selected = device["id"] in selected_devices
         prefix = ">" if index == cursor else " "
         marker = "[x]" if is_selected else "[ ]"
         typer.echo(
@@ -84,8 +82,8 @@ def _render_selection_menu(
 
     if selected_devices:
         typer.echo("\nCurrent mapping:")
-        for alias, selected in selected_devices.items():
-            typer.echo(f"- {alias}: {selected['device']}")
+        for device_id, selected in selected_devices.items():
+            typer.echo(f"- {device_id}: {selected['device']}")
 
 
 def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
@@ -111,25 +109,10 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             return selected_devices
 
         chosen = devices[cursor]
-        existing_alias = next(
-            (
-                alias
-                for alias, selected in selected_devices.items()
-                if selected["device"] == chosen["device"] and selected["hwid"] == chosen["hwid"]
-            ),
-            None,
-        )
-
-        if existing_alias is not None:
-            del selected_devices[existing_alias]
+        if chosen["id"] in selected_devices:
             continue
 
-        typer.echo("\n")
-        alias = typer.prompt("Enter a name for this device").strip()
-        if not alias:
-            continue
-
-        selected_devices[alias] = {
+        selected_devices[chosen["id"]] = {
             "id": chosen["id"],
             "device": chosen["device"],
             "description": chosen["description"],

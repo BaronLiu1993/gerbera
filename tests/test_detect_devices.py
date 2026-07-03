@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from cli_app.commands import detect_devices
-from cli_app.main import app
+from gerbera_cli.commands import detect_devices
+from gerbera_cli.main import app
 
 
 runner = CliRunner()
@@ -50,7 +50,7 @@ def test_available_devices_collects_serial_metadata(monkeypatch) -> None:
     ]
 
 
-def test_select_devices_interactively_adds_and_removes_selection(monkeypatch) -> None:
+def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
     devices = [
         {
             "index": 0,
@@ -61,16 +61,21 @@ def test_select_devices_interactively_adds_and_removes_selection(monkeypatch) ->
         }
     ]
     key_presses = iter(["enter", "enter", "down", "enter"])
-    aliases = iter(["arduino"])
 
     monkeypatch.setattr(detect_devices, "_render_selection_menu", lambda *args: None)
     monkeypatch.setattr(detect_devices, "_read_menu_key", lambda: next(key_presses))
-    monkeypatch.setattr(detect_devices.typer, "prompt", lambda _: next(aliases))
     monkeypatch.setattr(detect_devices.typer, "echo", lambda *args, **kwargs: None)
 
     selected = detect_devices._select_devices_interactively(devices)
 
-    assert selected == {}
+    assert selected == {
+        "device-1": {
+            "id": "device-1",
+            "device": "/dev/cu.usbserial-1140",
+            "description": "USB Serial",
+            "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
+        }
+    }
 
 
 def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> None:
@@ -84,7 +89,7 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
         }
     ]
     selected_devices = {
-        "kitchen-light": {
+        "device-1": {
             "id": "device-1",
             "device": "/dev/cu.usbserial-1140",
             "description": "USB Serial",
@@ -115,5 +120,5 @@ def test_select_command_handles_no_devices(monkeypatch, tmp_path) -> None:
     result = runner.invoke(app, ["devices", "select", "--output", str(output_path)])
 
     assert result.exit_code == 0
-    assert "[cli-app] no serial devices detected" in result.stdout
+    assert "[gerbera-cli] no serial devices detected" in result.stdout
     assert not output_path.exists()

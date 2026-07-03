@@ -1,6 +1,6 @@
 import typer
 
-from cli_app.config import get_settings
+from gerbera_cli.config import get_settings
 
 app = typer.Typer(help="Example command group.")
 

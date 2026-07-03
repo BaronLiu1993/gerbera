@@ -1,19 +1,19 @@
-# railctl
+# gerbera-cli
 
-Minimal scaffold for a serial device CLI and SDK.
+Minimal scaffold for Gerbera CLI.
 
 ## Run
 
 ```bash
-python -m railctl.cli --help
+python -m gerbera_cli.main --help
 ```
 
 ## Structure
 
 ```text
-src/railctl/
-  core/          # device and registry primitives
+src/gerbera_cli/
   commands/      # Typer command groups
-  cli.py         # root Typer app
+  config.py      # app config
+  main.py        # root Typer app
 tests/           # test suite
 ```

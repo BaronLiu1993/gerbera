@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Settings:
-    app_name: str = "cli-app"
+    app_name: str = "gerbera-cli"
     debug: bool = False
 
 
