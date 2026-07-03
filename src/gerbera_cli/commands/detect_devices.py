@@ -15,18 +15,32 @@ app = typer.Typer(help="Serial device detection commands.")
 DEVICE_MAP_PATH = Path("devices.json")
 
 
+def _is_candidate_device(port) -> bool:
+    if not port.hwid or port.hwid.lower() == "n/a":
+        return False
+    if not port.device or not port.description:
+        return False
+    return True
+
+
 def _available_devices() -> list[dict]:
     devices = []
-    for index, port in enumerate(list_ports.comports()):
+
+    for port in list_ports.comports():
+        if not _is_candidate_device(port):
+            continue
+
         devices.append(
             {
-                "index": index,
-                "id": str(uuid4()),
                 "device": port.device,
                 "description": port.description,
                 "hwid": port.hwid,
             }
         )
+
+    for index, device in enumerate(devices):
+        device["index"] = index
+
     return devices
 
 
@@ -68,7 +82,10 @@ def _render_selection_menu(
     typer.echo("Select devices with Enter. Move with Up/Down. Choose Continue when done.\n")
 
     for index, device in enumerate(devices):
-        is_selected = device["id"] in selected_devices
+        is_selected = any(
+            selected["device"] == device["device"] and selected["hwid"] == device["hwid"]
+            for selected in selected_devices.values()
+        )
         prefix = ">" if index == cursor else " "
         marker = "[x]" if is_selected else "[ ]"
         typer.echo(
@@ -109,11 +126,15 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             return selected_devices
 
         chosen = devices[cursor]
-        if chosen["id"] in selected_devices:
+        if any(
+            selected["device"] == chosen["device"] and selected["hwid"] == chosen["hwid"]
+            for selected in selected_devices.values()
+        ):
             continue
 
-        selected_devices[chosen["id"]] = {
-            "id": chosen["id"],
+        device_id = str(uuid4())
+        selected_devices[device_id] = {
+            "id": device_id,
             "device": chosen["device"],
             "description": chosen["description"],
             "hwid": chosen["hwid"],
