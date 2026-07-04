@@ -24,27 +24,6 @@ def _is_candidate_device(port) -> bool:
     return True
 
 
-def _available_devices() -> list[dict]:
-    devices = []
-
-    for port in list_ports.comports():
-        if not _is_candidate_device(port):
-            continue
-
-        devices.append(
-            {
-                "device": port.device,
-                "description": port.description,
-                "hwid": port.hwid,
-            }
-        )
-
-    for index, device in enumerate(devices):
-        device["index"] = index
-
-    return devices
-
-
 def _print_devices(devices: list[dict]) -> None:
     for device in devices:
         typer.echo(
@@ -104,6 +83,27 @@ def _render_selection_menu(
             typer.echo(f"- {device_id}: {selected['device']}")
 
 
+def _available_devices() -> list[dict]:
+    devices = []
+
+    for port in list_ports.comports():
+        if not _is_candidate_device(port):
+            continue
+
+        devices.append(
+            {
+                "device": port.device,
+                "description": port.description,
+                "hwid": port.hwid,
+            }
+        )
+
+    for index, device in enumerate(devices):
+        device["index"] = index
+
+    return devices
+
+
 def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
     selected_devices: dict[str, dict] = {}
     cursor = 0
@@ -123,6 +123,9 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
         if key != "enter":
             continue
 
+        if cursor == len(devices):
+            return selected_devices
+
         chosen = devices[cursor]
         if any(
             selected["device"] == chosen["device"] and selected["hwid"] == chosen["hwid"]
@@ -136,7 +139,7 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             "device": chosen["device"],
             "description": chosen["description"],
             "hwid": chosen["hwid"],
-            "baud_rate": DEFAULT_BAUD_RATE
+            "baud_rate": DEFAULT_BAUD_RATE,
         }
 
 
@@ -150,7 +153,6 @@ def list_connected_devices() -> None:
         return
 
     _print_devices(devices)
-
 
 @app.command("select")
 def select_devices(output: Path = DEVICE_MAP_PATH) -> None:
