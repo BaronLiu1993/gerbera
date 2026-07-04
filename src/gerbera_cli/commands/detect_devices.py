@@ -3,8 +3,10 @@ from pathlib import Path
 import sys
 import termios
 import tty
+from typing import Optional
 from uuid import uuid4
 
+import serial
 import serial.tools.list_ports as list_ports
 import typer
 
@@ -13,6 +15,7 @@ from gerbera_cli.config import get_settings
 app = typer.Typer(help="Serial device detection commands.")
 
 DEVICE_MAP_PATH = Path("devices.json")
+DEFAULT_BAUD_RATE = 115200
 
 
 def _is_candidate_device(port) -> bool:
@@ -122,9 +125,6 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
         if key != "enter":
             continue
 
-        if cursor == len(devices):
-            return selected_devices
-
         chosen = devices[cursor]
         if any(
             selected["device"] == chosen["device"] and selected["hwid"] == chosen["hwid"]
@@ -138,6 +138,7 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             "device": chosen["device"],
             "description": chosen["description"],
             "hwid": chosen["hwid"],
+            "baud_rate": DEFAULT_BAUD_RATE
         }
 
 
