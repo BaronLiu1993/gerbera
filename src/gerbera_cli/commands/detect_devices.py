@@ -3,10 +3,8 @@ from pathlib import Path
 import sys
 import termios
 import tty
-from typing import Optional
 from uuid import uuid4
 
-import serial
 import serial.tools.list_ports as list_ports
 import typer
 
