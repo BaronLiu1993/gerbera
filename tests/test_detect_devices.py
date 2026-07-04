@@ -10,25 +10,51 @@ from gerbera_cli.main import app
 runner = CliRunner()
 
 
-def test_available_devices_collects_serial_metadata(monkeypatch) -> None:
-    fake_ports = [
-        SimpleNamespace(
-            device="/dev/cu.debug-console",
-            description="n/a",
-            hwid="n/a",
-        ),
-        SimpleNamespace(
-            device="/dev/cu.usbserial-1140",
-            description="USB Serial",
-            hwid="USB VID:PID=1A86:7523 LOCATION=1-1.4",
-        ),
-        SimpleNamespace(
-            device="/dev/cu.other",
-            description="Other Device",
-            hwid="OTHER HWID",
-        ),
-    ]
-    monkeypatch.setattr(detect_devices.list_ports, "comports", lambda: fake_ports)
+def test_available_devices_collects_arduino_cli_metadata(monkeypatch) -> None:
+    cli_payload = {
+        "detected_ports": [
+            {
+                "port": {
+                    "address": "/dev/cu.debug-console",
+                    "label": "/dev/cu.debug-console",
+                    "protocol": "serial",
+                    "protocol_label": "Serial Port",
+                    "properties": {},
+                }
+            },
+            {
+                "port": {
+                    "address": "/dev/cu.usbserial-1140",
+                    "label": "/dev/cu.usbserial-1140",
+                    "protocol": "serial",
+                    "protocol_label": "Serial Port (USB)",
+                    "properties": {
+                        "vid": "0x1A86",
+                        "pid": "0x7523",
+                        "serialNumber": "",
+                    },
+                }
+            },
+            {
+                "port": {
+                    "address": "/dev/cu.other",
+                    "label": "/dev/cu.other",
+                    "protocol": "serial",
+                    "protocol_label": "Serial Port (USB)",
+                    "properties": {
+                        "vid": "0x9999",
+                        "pid": "0x1111",
+                        "serialNumber": "abc123",
+                    },
+                }
+            },
+        ]
+    }
+    monkeypatch.setattr(
+        detect_devices.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps(cli_payload)),
+    )
 
     devices = detect_devices._available_devices()
 
@@ -36,14 +62,14 @@ def test_available_devices_collects_serial_metadata(monkeypatch) -> None:
         {
             "index": 0,
             "device": "/dev/cu.usbserial-1140",
-            "description": "USB Serial",
-            "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
+            "description": "Serial Port (USB)",
+            "hwid": "USB VID:PID=0x1A86:0x7523",
         },
         {
             "index": 1,
             "device": "/dev/cu.other",
-            "description": "Other Device",
-            "hwid": "OTHER HWID",
+            "description": "Serial Port (USB)",
+            "hwid": "USB VID:PID=0x9999:0x1111 SERIAL=abc123",
         },
     ]
 
@@ -51,45 +77,57 @@ def test_available_devices_collects_serial_metadata(monkeypatch) -> None:
 def test_candidate_device_requires_real_hwid() -> None:
     assert (
         detect_devices._is_candidate_device(
-            SimpleNamespace(
-                device="/dev/cu.usbserial-1140",
-                description="USB Serial",
-                hwid="USB VID:PID=1A86:7523 LOCATION=1-1.4",
-            )
+            {
+                "address": "/dev/cu.usbserial-1140",
+                "label": "/dev/cu.usbserial-1140",
+                "properties": {"vid": "0x1A86", "pid": "0x7523"},
+            }
         )
         is True
     )
     assert (
         detect_devices._is_candidate_device(
-            SimpleNamespace(
-                device="/dev/cu.debug-console",
-                description="n/a",
-                hwid="n/a",
-            )
+            {
+                "address": "/dev/cu.debug-console",
+                "label": "/dev/cu.debug-console",
+                "properties": {},
+            }
         )
         is False
     )
 
 
 def test_available_devices_keeps_duplicate_descriptions(monkeypatch) -> None:
-    fake_ports = [
-        SimpleNamespace(
-            device="/dev/cu.usbserial-1140",
-            description="USB Serial",
-            hwid="USB VID:PID=1A86:7523 LOCATION=1-1.4",
-        ),
-        SimpleNamespace(
-            device="/dev/cu.usbserial-1150",
-            description="USB Serial",
-            hwid="USB VID:PID=1A86:7523 LOCATION=1-1.8",
-        ),
-    ]
-    monkeypatch.setattr(detect_devices.list_ports, "comports", lambda: fake_ports)
+    cli_payload = {
+        "detected_ports": [
+            {
+                "port": {
+                    "address": "/dev/cu.usbserial-1140",
+                    "label": "/dev/cu.usbserial-1140",
+                    "protocol_label": "Serial Port (USB)",
+                    "properties": {"vid": "0x1A86", "pid": "0x7523"},
+                }
+            },
+            {
+                "port": {
+                    "address": "/dev/cu.usbserial-1150",
+                    "label": "/dev/cu.usbserial-1150",
+                    "protocol_label": "Serial Port (USB)",
+                    "properties": {"vid": "0x1A86", "pid": "0x7523"},
+                }
+            },
+        ]
+    }
+    monkeypatch.setattr(
+        detect_devices.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps(cli_payload)),
+    )
 
     devices = detect_devices._available_devices()
 
-    assert devices[0]["description"] == "USB Serial"
-    assert devices[1]["description"] == "USB Serial"
+    assert devices[0]["description"] == "Serial Port (USB)"
+    assert devices[1]["description"] == "Serial Port (USB)"
 
 
 def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
@@ -164,5 +202,5 @@ def test_select_command_handles_no_devices(monkeypatch, tmp_path) -> None:
     result = runner.invoke(app, ["devices", "select", "--output", str(output_path)])
 
     assert result.exit_code == 0
-    assert "[gerbera-cli] no serial devices detected" in result.stdout
+    assert "[gerbera-cli] no Arduino-compatible serial devices detected" in result.stdout
     assert not output_path.exists()

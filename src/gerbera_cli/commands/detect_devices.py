@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
+import subprocess
 import sys
 import termios
 import tty
 from uuid import uuid4
 
-import serial.tools.list_ports as list_ports
 import typer
 
 from gerbera_cli.config import get_settings
@@ -16,10 +16,11 @@ DEVICE_MAP_PATH = Path("devices.json")
 DEFAULT_BAUD_RATE = 115200
 
 
-def _is_candidate_device(port) -> bool:
-    if not port.hwid or port.hwid.lower() == "n/a":
+def _is_candidate_device(port: dict) -> bool:
+    properties = port.get("properties", {})
+    if not properties.get("vid") or not properties.get("pid"):
         return False
-    if not port.device or not port.description:
+    if not port.get("address") or not port.get("label"):
         return False
     return True
 
@@ -84,17 +85,30 @@ def _render_selection_menu(
 
 
 def _available_devices() -> list[dict]:
+    result = subprocess.run(
+        ["arduino-cli", "board", "list", "--format", "json"],
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
     devices = []
 
-    for port in list_ports.comports():
+    for entry in payload.get("detected_ports", []):
+        port = entry.get("port", {})
         if not _is_candidate_device(port):
             continue
 
+        properties = port.get("properties", {})
+        hwid = f"USB VID:PID={properties['vid']}:{properties['pid']}"
+        if properties.get("serialNumber"):
+            hwid = f"{hwid} SERIAL={properties['serialNumber']}"
+
         devices.append(
             {
-                "device": port.device,
-                "description": port.description,
-                "hwid": port.hwid,
+                "device": port["address"],
+                "description": port.get("protocol_label", port["label"]),
+                "hwid": hwid,
             }
         )
 
@@ -148,7 +162,7 @@ def select_devices(output: Path = DEVICE_MAP_PATH) -> None:
     devices = _available_devices()
 
     if not devices:
-        typer.echo(f"[{settings.app_name}] no serial devices detected")
+        typer.echo(f"[{settings.app_name}] no Arduino-compatible serial devices detected")
         return
 
     selected_devices = _select_devices_interactively(devices)
