@@ -142,18 +142,6 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             "baud_rate": DEFAULT_BAUD_RATE,
         }
 
-
-@app.command("list")
-def list_connected_devices() -> None:
-    settings = get_settings()
-    devices = _available_devices()
-
-    if not devices:
-        typer.echo(f"[{settings.app_name}] no serial devices detected")
-        return
-
-    _print_devices(devices)
-
 @app.command("select")
 def select_devices(output: Path = DEVICE_MAP_PATH) -> None:
     settings = get_settings()
