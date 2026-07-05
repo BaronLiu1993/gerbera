@@ -4,7 +4,7 @@ import typer
 
 from gerbera_cli.config import get_settings
 
-app = typer.Typer(help="Configure Arduino libraries.")
+app = typer.Typer(help="Configure Microcontroller libraries.")
 
 
 def _install_library(library_name: str) -> str:
