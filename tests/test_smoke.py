@@ -9,4 +9,4 @@ def test_help_renders() -> None:
     assert result.exit_code == 0
     assert "Gerbera CLI." in result.stdout
     assert "configure_libraries" in result.stdout
-    assert "connections" in result.stdout
+    assert "devices" in result.stdout

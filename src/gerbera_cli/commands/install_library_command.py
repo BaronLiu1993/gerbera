@@ -4,7 +4,7 @@ import typer
 
 from gerbera_cli.config import get_settings
 
-app = typer.Typer(help="Configure Microcontroller libraries.")
+install_library_command = typer.Typer(help="Configure Microcontroller libraries.")
 
 
 def _install_library(library_name: str) -> str:
@@ -17,7 +17,7 @@ def _install_library(library_name: str) -> str:
     return library_name
 
 
-@app.command("install")
+@install_library_command.command("install")
 def install_library(
     library_name: str = typer.Argument(..., help="Arduino library name to install."),
 ) -> None:

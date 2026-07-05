@@ -1,7 +1,11 @@
 import typer
 
-from gerbera_cli.commands.configure_libraries import app as configure_libraries_app
-from gerbera_cli.commands.detect_devices import app as detect_devices_app
+from gerbera_cli.commands.declare_devices_command import (
+    declare_devices_command,
+)
+from gerbera_cli.commands.install_library_command import (
+    install_library_command,
+)
 
 app = typer.Typer(
     help="Gerbera CLI.",
@@ -9,8 +13,8 @@ app = typer.Typer(
     add_completion=False,
 )
 
-app.add_typer(detect_devices_app, name="devices")
-app.add_typer(configure_libraries_app, name="configure_libraries")
+app.add_typer(declare_devices_command, name="declare_devices")
+app.add_typer(install_library_command, name="configure_libraries")
 
 
 def run() -> None:

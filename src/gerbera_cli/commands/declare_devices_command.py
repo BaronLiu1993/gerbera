@@ -1,16 +1,16 @@
 import json
 from pathlib import Path
+import subprocess
 import sys
 import termios
 import tty
 from uuid import uuid4
-import subprocess
 
 import typer
 
 from gerbera_cli.config import get_settings
 
-app = typer.Typer(help="Serial device detection commands.")
+declare_devices_command = typer.Typer(help="Serial device detection commands.")
 
 DEVICE_MAP_PATH = Path("devices.json")
 DEFAULT_BAUD_RATE = 115200
@@ -23,6 +23,7 @@ def _is_candidate_device(port: dict) -> bool:
     if not port.get("address") or not port.get("label"):
         return False
     return True
+
 
 def _read_menu_key() -> str:
     fd = sys.stdin.fileno()
@@ -151,7 +152,8 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             "baud_rate": DEFAULT_BAUD_RATE,
         }
 
-@app.command("select")
+
+@declare_devices_command.command("select")
 def select_devices(output: Path = DEVICE_MAP_PATH) -> None:
     settings = get_settings()
     devices = _available_devices()

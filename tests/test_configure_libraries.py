@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from gerbera_cli.commands import configure_libraries
+from gerbera_cli.commands import install_library_command
 from gerbera_cli.main import app
 
 
@@ -17,9 +17,9 @@ def test_install_library_runs_arduino_cli(monkeypatch) -> None:
         calls.append((command, kwargs))
         return SimpleNamespace(stdout="", stderr="")
 
-    monkeypatch.setattr(configure_libraries.subprocess, "run", fake_run)
+    monkeypatch.setattr(install_library_command.subprocess, "run", fake_run)
 
-    installed_library = configure_libraries._install_library("Adafruit NeoPixel")
+    installed_library = install_library_command._install_library("Adafruit NeoPixel")
 
     assert installed_library == "Adafruit NeoPixel"
     assert calls == [
@@ -37,7 +37,7 @@ def test_install_command_installs_library(monkeypatch) -> None:
         calls.append(library_name)
         return library_name
 
-    monkeypatch.setattr(configure_libraries, "_install_library", fake_install)
+    monkeypatch.setattr(install_library_command, "_install_library", fake_install)
 
     result = runner.invoke(app, ["configure_libraries", "install", "Adafruit NeoPixel"])
 
@@ -48,7 +48,7 @@ def test_install_command_installs_library(monkeypatch) -> None:
 
 def test_install_command_handles_cli_failure(monkeypatch) -> None:
     monkeypatch.setattr(
-        configure_libraries,
+        install_library_command,
         "_install_library",
         lambda library_name: (_ for _ in ()).throw(
             subprocess.CalledProcessError(

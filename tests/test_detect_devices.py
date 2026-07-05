@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from gerbera_cli.commands import detect_devices
+from gerbera_cli.commands import declare_devices_command
 from gerbera_cli.main import app
 
 
@@ -51,12 +51,12 @@ def test_available_devices_collects_arduino_cli_metadata(monkeypatch) -> None:
         ]
     }
     monkeypatch.setattr(
-        detect_devices.subprocess,
+        declare_devices_command.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps(cli_payload)),
     )
 
-    devices = detect_devices._available_devices()
+    devices = declare_devices_command._available_devices()
 
     assert devices == [
         {
@@ -80,7 +80,7 @@ def test_available_devices_collects_arduino_cli_metadata(monkeypatch) -> None:
 
 def test_candidate_device_requires_real_hwid() -> None:
     assert (
-        detect_devices._is_candidate_device(
+        declare_devices_command._is_candidate_device(
             {
                 "address": "/dev/cu.usbserial-1140",
                 "label": "/dev/cu.usbserial-1140",
@@ -90,7 +90,7 @@ def test_candidate_device_requires_real_hwid() -> None:
         is True
     )
     assert (
-        detect_devices._is_candidate_device(
+        declare_devices_command._is_candidate_device(
             {
                 "address": "/dev/cu.debug-console",
                 "label": "/dev/cu.debug-console",
@@ -123,12 +123,12 @@ def test_available_devices_keeps_duplicate_descriptions(monkeypatch) -> None:
         ]
     }
     monkeypatch.setattr(
-        detect_devices.subprocess,
+        declare_devices_command.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps(cli_payload)),
     )
 
-    devices = detect_devices._available_devices()
+    devices = declare_devices_command._available_devices()
 
     assert devices[0]["description"] == "Serial Port (USB)"
     assert devices[1]["description"] == "Serial Port (USB)"
@@ -146,12 +146,12 @@ def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
     key_presses = iter(["enter", "enter", "down", "enter"])
     uuid_values = iter(["generated-uuid"])
 
-    monkeypatch.setattr(detect_devices, "_render_selection_menu", lambda *args: None)
-    monkeypatch.setattr(detect_devices, "_read_menu_key", lambda: next(key_presses))
-    monkeypatch.setattr(detect_devices, "uuid4", lambda: next(uuid_values))
-    monkeypatch.setattr(detect_devices.typer, "echo", lambda *args, **kwargs: None)
+    monkeypatch.setattr(declare_devices_command, "_render_selection_menu", lambda *args: None)
+    monkeypatch.setattr(declare_devices_command, "_read_menu_key", lambda: next(key_presses))
+    monkeypatch.setattr(declare_devices_command, "uuid4", lambda: next(uuid_values))
+    monkeypatch.setattr(declare_devices_command.typer, "echo", lambda *args, **kwargs: None)
 
-    selected = detect_devices._select_devices_interactively(devices)
+    selected = declare_devices_command._select_devices_interactively(devices)
 
     assert selected == {
         "generated-uuid": {
@@ -190,9 +190,9 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
     }
     output_path = tmp_path / "devices.json"
 
-    monkeypatch.setattr(detect_devices, "_available_devices", lambda: devices)
+    monkeypatch.setattr(declare_devices_command, "_available_devices", lambda: devices)
     monkeypatch.setattr(
-        detect_devices,
+        declare_devices_command,
         "_select_devices_interactively",
         lambda incoming: selected_devices if incoming == devices else {},
     )
@@ -207,7 +207,7 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
 
 def test_select_command_handles_no_devices(monkeypatch, tmp_path) -> None:
     output_path = tmp_path / "devices.json"
-    monkeypatch.setattr(detect_devices, "_available_devices", lambda: [])
+    monkeypatch.setattr(declare_devices_command, "_available_devices", lambda: [])
 
     result = runner.invoke(app, ["devices", "select", "--output", str(output_path)])
 
