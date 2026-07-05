@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
-import subprocess
 import sys
 import termios
 import tty
 from uuid import uuid4
+import subprocess
 
 import typer
 
@@ -23,15 +23,6 @@ def _is_candidate_device(port: dict) -> bool:
     if not port.get("address") or not port.get("label"):
         return False
     return True
-
-
-def _print_devices(devices: list[dict]) -> None:
-    for device in devices:
-        typer.echo(
-            f"{device['index']}: {device['device']} | "
-            f"{device['description']} | {device['hwid']}"
-        )
-
 
 def _read_menu_key() -> str:
     fd = sys.stdin.fileno()
@@ -109,6 +100,8 @@ def _available_devices() -> list[dict]:
                 "device": port["address"],
                 "description": port.get("protocol_label", port["label"]),
                 "hwid": hwid,
+                "vid": properties["vid"],
+                "pid": properties["pid"],
             }
         )
 
@@ -153,6 +146,8 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             "device": chosen["device"],
             "description": chosen["description"],
             "hwid": chosen["hwid"],
+            "vid": chosen["vid"],
+            "pid": chosen["pid"],
             "baud_rate": DEFAULT_BAUD_RATE,
         }
 

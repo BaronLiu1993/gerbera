@@ -2,7 +2,7 @@ import subprocess
 
 class Flasher:
     @staticmethod
-    def flash(port: str, fqbn: str, sketch_path: str) -> None:
+    def flashCode(port: str, fqbn: str, sketch_path: str) -> None:
         subprocess.run([
             "arduino-cli", "compile",
             "--fqbn", fqbn,

@@ -64,12 +64,16 @@ def test_available_devices_collects_arduino_cli_metadata(monkeypatch) -> None:
             "device": "/dev/cu.usbserial-1140",
             "description": "Serial Port (USB)",
             "hwid": "USB VID:PID=0x1A86:0x7523",
+            "vid": "0x1A86",
+            "pid": "0x7523",
         },
         {
             "index": 1,
             "device": "/dev/cu.other",
             "description": "Serial Port (USB)",
             "hwid": "USB VID:PID=0x9999:0x1111 SERIAL=abc123",
+            "vid": "0x9999",
+            "pid": "0x1111",
         },
     ]
 
@@ -128,8 +132,6 @@ def test_available_devices_keeps_duplicate_descriptions(monkeypatch) -> None:
 
     assert devices[0]["description"] == "Serial Port (USB)"
     assert devices[1]["description"] == "Serial Port (USB)"
-
-
 def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
     devices = [
         {
@@ -137,6 +139,8 @@ def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
             "device": "/dev/cu.usbserial-1140",
             "description": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
+            "vid": "0x1A86",
+            "pid": "0x7523",
         }
     ]
     key_presses = iter(["enter", "enter", "down", "enter"])
@@ -155,6 +159,8 @@ def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
             "device": "/dev/cu.usbserial-1140",
             "description": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
+            "vid": "0x1A86",
+            "pid": "0x7523",
             "baud_rate": 115200,
         }
     }
@@ -167,6 +173,8 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
             "device": "/dev/cu.usbserial-1140",
             "description": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
+            "vid": "0x1A86",
+            "pid": "0x7523",
         }
     ]
     selected_devices = {
@@ -175,6 +183,8 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
             "device": "/dev/cu.usbserial-1140",
             "description": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
+            "vid": "0x1A86",
+            "pid": "0x7523",
             "baud_rate": 115200,
         }
     }
