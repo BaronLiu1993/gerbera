@@ -33,6 +33,7 @@ def test_hw_201_firmware_generation_uses_read_dispatch_and_signal_pin(tmp_path, 
 
     sketch = FirmwareGenerator.generate(controller)
 
+    assert "#include <Arduino.h>" in sketch
     assert "String firstToken(String input)" in sketch
     assert "String parameterValue(String input, String parameterName)" in sketch
     assert "String commandName = firstToken(line);" in sketch

@@ -6,6 +6,9 @@ from gerbera_sdk.hardware.connections import Connection
 class BaseFirmwareBuilder(ABC):
     template_name: str = ""
 
+    def build_includes(self) -> list[str]:
+        return []
+
     @abstractmethod
     def build_handler(self, connection: Connection) -> str:
         raise NotImplementedError

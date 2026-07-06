@@ -1,10 +1,6 @@
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from gerbera_sdk.hardware.connections import Connection
-from gerbera_sdk.transport.serial_connection import SerialConnection
-
-if TYPE_CHECKING:
-    from gerbera_sdk.hardware.microcontroller import Microcontroller
 
 
 class ConnectionRuntime:
@@ -38,26 +34,6 @@ class ConnectionRuntime:
             payload[key] = ConnectionRuntime._coerce_value(value)
 
         return payload
-
-    @staticmethod
-    def read(connection: Connection, baud_rate: int) -> dict[str, Any]:
-        from gerbera_sdk.hardware.microcontroller import Microcontroller
-
-        board = Microcontroller(id=connection.microcontroller_id).get_board_information()
-        serial_connection = SerialConnection()
-
-        try:
-            serial_connection.connect(
-                port=board["port"],
-                baud=baud_rate,
-            )
-            response = serial_connection.send(
-                ConnectionRuntime.build_read_command(connection)
-            )
-        finally:
-            serial_connection.destroy()
-
-        return ConnectionRuntime.parse_response(response)
 
     @staticmethod
     def _coerce_value(value: str) -> Any:

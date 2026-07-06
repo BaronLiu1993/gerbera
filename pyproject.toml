@@ -13,6 +13,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+mcp = [
+    "fastmcp==3.0.0",
+]
 
 [project.scripts]
 gerbera-cli = "gerbera_cli.main:run"

@@ -4,6 +4,8 @@ from pathlib import Path
 from gerbera_sdk.firmware.generator import FirmwareGenerator
 from gerbera_sdk.hardware.microcontroller import Microcontroller
 
+DEFAULT_FIRMWARE_ROOT = Path("gerbera_firmware")
+
 
 class Flasher:
     @staticmethod
@@ -25,7 +27,7 @@ class Flasher:
     def flash_microcontroller(
         microcontroller: Microcontroller,
         fqbn: str,
-        sketch_root: Path,
+        sketch_root: Path = DEFAULT_FIRMWARE_ROOT,
     ) -> Path:
         board_information = microcontroller.get_board_information()
         sketch_path = FirmwareGenerator.write_sketch(microcontroller, sketch_root)

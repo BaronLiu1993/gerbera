@@ -12,11 +12,12 @@ if TYPE_CHECKING:
 
 class FirmwareGenerator:
     _builders: dict[str, BaseFirmwareBuilder] = {
-        HW201FirmwareBuilder.template_name: HW201FirmwareBuilder(),
+        HW201FirmwareBuilder.template_name: HW201FirmwareBuilder()
     }
 
     @staticmethod
     def generate(microcontroller: "Microcontroller") -> str:
+        includes = "\n".join(FirmwareGenerator._build_includes(microcontroller.connections))
         handlers = "\n\n".join(
             FirmwareGenerator._build_handler(connection)
             for connection in microcontroller.connections
@@ -26,7 +27,9 @@ class FirmwareGenerator:
             for connection in microcontroller.connections
         )
 
-        return f"""const int BAUD_RATE = {microcontroller.baud_rate};
+        return f"""{includes}
+
+const int BAUD_RATE = {microcontroller.baud_rate};
 
 String readLine() {{
   if (!Serial.available()) {{
@@ -99,6 +102,7 @@ void loop() {{
 
     @staticmethod
     def write_sketch(microcontroller: "Microcontroller", sketch_root: Path) -> Path:
+        sketch_root = sketch_root.resolve()
         sketch_root.mkdir(parents=True, exist_ok=True)
         sketch_path = sketch_root / f"{microcontroller.id}.ino"
         sketch_path.write_text(FirmwareGenerator.generate(microcontroller))
@@ -122,3 +126,20 @@ void loop() {{
             raise ValueError(f"Unsupported firmware template: {template_name}")
 
         return FirmwareGenerator._builders[template_name].build_handler(connection)
+
+    @staticmethod
+    def _build_includes(connections: list[Connection]) -> list[str]:
+        includes = ['#include <Arduino.h>']
+
+        for connection in connections:
+            profile = ComponentRegistry.get(connection.component_type)
+            template_name = profile["template"]
+
+            if template_name not in FirmwareGenerator._builders:
+                raise ValueError(f"Unsupported firmware template: {template_name}")
+
+            for include in FirmwareGenerator._builders[template_name].build_includes():
+                if include not in includes:
+                    includes.append(include)
+
+        return includes

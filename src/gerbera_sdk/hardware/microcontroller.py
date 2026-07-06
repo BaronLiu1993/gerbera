@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 
 from gerbera_sdk.components.registry import ComponentRegistry
-from gerbera_sdk.firmware.generator import FirmwareGenerator
 from gerbera_sdk.hardware.connections import Connection
-from gerbera_sdk.transport.runtime import ConnectionRuntime
 
 DEVICE_REGISTRY_PATH = Path("devices.json")
 
@@ -76,20 +74,6 @@ class Microcontroller:
                 return connection
 
         raise ValueError(f"Unknown connection name for board {self.id}: {connection_name}")
-
-    def build_read_command(self, connection_name: str) -> str:
-        return ConnectionRuntime.build_read_command(
-            self.get_connection(connection_name)
-        )
-
-    def generate_firmware(self) -> str:
-        return FirmwareGenerator.generate(self)
-
-    def read(self, connection_name: str) -> dict[str, Any]:
-        return ConnectionRuntime.read(
-            self.get_connection(connection_name),
-            self.baud_rate,
-        )
 
     def _get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
