@@ -138,6 +138,47 @@ def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> No
     assert added is False
 
 
+def test_add_connection_rejects_duplicate_connection_name_per_board(tmp_path, monkeypatch) -> None:
+    registry_path = tmp_path / "devices.json"
+    registry_path.write_text(
+        """
+{
+  "board-1": {
+    "id": "board-1",
+    "port": "/dev/cu.usbserial-1140",
+    "protocol": "serial",
+    "protocol_label": "Serial Port (USB)",
+    "baud_rate": 115200
+  }
+}
+""".strip()
+    )
+    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+
+    controller = Microcontroller(id="board-1")
+    controller.add_connection(
+        Connection(
+            microcontroller_id="board-1",
+            name="room_temperature",
+            description="HW-201 temperature sensor.",
+            pins={"signal": "A0"},
+            component_type="hw-201",
+        )
+    )
+
+    added = controller.add_connection(
+        Connection(
+            microcontroller_id="board-1",
+            name="room_temperature",
+            description="Same command name on another signal pin.",
+            pins={"signal": "A1"},
+            component_type="hw-201",
+        )
+    )
+
+    assert added is False
+
+
 def test_get_board_information_uses_device_registry(tmp_path, monkeypatch) -> None:
     registry_path = tmp_path / "devices.json"
     registry_path.write_text(

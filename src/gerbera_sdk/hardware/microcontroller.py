@@ -18,9 +18,12 @@ class Microcontroller:
     connections: list[Connection] = field(default_factory=list)
 
     def add_connection(self, connection: Connection) -> bool:
-        """Add a connection if none of its pins are already in use."""
+        """Add a connection if its command name and pins are not already in use."""
         self.get_board_information()
         ComponentRegistry.validate_pins(connection.component_type, connection.pins)
+        if connection.name in self._get_connection_names():
+            return False
+
         used_pins = self._get_used_pins()
 
         for pin in connection.pins.values():
@@ -59,6 +62,9 @@ class Microcontroller:
                 used_pins.add(pin)
 
         return used_pins
+
+    def _get_connection_names(self) -> set[str]:
+        return {connection.name for connection in self.connections}
 
     def get_board_information(self) -> dict[str, Any]:
         payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
