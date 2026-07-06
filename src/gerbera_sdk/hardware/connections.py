@@ -1,50 +1,22 @@
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, List
 
-from gerbera_sdk.classes.pin_factory import PinFactory
-
-
-class ConnectionMode(str, Enum):
-    READ = "read"
-    WRITE = "write"
-    BOTH = "both"
+from gerbera_sdk.hardware.pin_factory import PinFactory
 
 
 @dataclass
 class Pin:
-    """A single microcontroller pin and how the attached component uses it."""
+    """A single microcontroller pin used by a component."""
 
     pin_val: str
-    mode: ConnectionMode
-    input_properties: Optional[dict[str, Any]] = None
-    output_properties: Optional[dict[str, Any]] = None
 
     def to_dict(self) -> dict[str, Any]:
-        payload = {
-            "pin": self.pin_val,
-            "mode": self.mode.value,
-        }
-
-        payload.update(
-            PinFactory.build(
-                self.mode.value,
-                input_properties=self.input_properties,
-                output_properties=self.output_properties,
-            )
-        )
-        return payload
+        return {"pin": self.pin_val}
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "Pin":
-        input_schema = payload.get("inputSchema", {})
-        output_schema = payload.get("outputSchema", {})
-
         return cls(
             pin_val=str(payload["pin"]),
-            mode=ConnectionMode(payload["mode"]),
-            input_properties=input_schema.get("properties", {}),
-            output_properties=output_schema.get("properties", {}),
         )
 
 
@@ -59,13 +31,15 @@ class Connection:
     component_type: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "microcontroller_id": self.microcontroller_id,
             "name": self.name,
             "description": self.description,
             "pins": [pin.to_dict() for pin in self.pins],
             "component_type": self.component_type,
         }
+        payload.update(PinFactory.build(self.component_type))
+        return payload
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "Connection":

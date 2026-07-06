@@ -1,6 +1,6 @@
 """Gerbera SDK package."""
 
-from gerbera_sdk.classes.connections import Connection, ConnectionMode, Pin
-from gerbera_sdk.classes.microcontroller import Microcontroller
+from gerbera_sdk.hardware.connections import Connection, Pin
+from gerbera_sdk.hardware.microcontroller import Microcontroller
 
-__all__ = ["Connection", "ConnectionMode", "Microcontroller", "Pin"]
+__all__ = ["Connection", "Microcontroller", "Pin"]

@@ -13,7 +13,7 @@ app = typer.Typer(
     add_completion=False,
 )
 
-app.add_typer(declare_devices_command, name="declare_devices")
+app.add_typer(declare_devices_command, name="devices")
 app.add_typer(install_library_command, name="configure_libraries")
 
 

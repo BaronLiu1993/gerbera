@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, List
 
-from gerbera_sdk.classes.connections import Connection
+from gerbera_sdk.hardware.connections import Connection
 
 
 @dataclass

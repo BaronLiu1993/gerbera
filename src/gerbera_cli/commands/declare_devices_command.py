@@ -154,7 +154,9 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
 
 
 @declare_devices_command.command("select")
-def select_devices(output: Path = DEVICE_MAP_PATH) -> None:
+def select_devices(
+    output: Path = typer.Option(DEVICE_MAP_PATH, "--output", help="Path to write devices.json."),
+) -> None:
     settings = get_settings()
     devices = _available_devices()
 
