@@ -1,12 +1,26 @@
 from gerbera_sdk import Connection, Microcontroller, Pin
 
 
-def test_microcontroller_serializes_to_output_json_shape() -> None:
+def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) -> None:
+    registry_path = tmp_path / "devices.json"
+    registry_path.write_text(
+        """
+{
+  "board-1": {
+    "id": "board-1",
+    "port": "/dev/cu.usbserial-1140",
+    "protocol": "serial",
+    "protocol_label": "Serial Port (USB)",
+    "baud_rate": 115200
+  }
+}
+""".strip()
+    )
+    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+
     controller = Microcontroller(
         id="board-1",
-        port="/dev/cu.usbserial-1140",
-        transport="serial",
-        baud_rate=115200,
+        description="Kitchen controller.",
         connections=[
             Connection(
                 microcontroller_id="board-1",
@@ -20,8 +34,10 @@ def test_microcontroller_serializes_to_output_json_shape() -> None:
 
     assert controller.to_dict() == {
         "id": "board-1",
+        "description": "Kitchen controller.",
         "port": "/dev/cu.usbserial-1140",
-        "transport": "serial",
+        "protocol": "serial",
+        "protocol_label": "Serial Port (USB)",
         "baud_rate": 115200,
         "connections": [
             {
@@ -55,8 +71,10 @@ def test_microcontroller_serializes_to_output_json_shape() -> None:
 def test_microcontroller_deserializes_from_input_json_shape() -> None:
     payload = {
         "id": "board-1",
+        "description": "Kitchen controller.",
         "port": "/dev/cu.usbserial-1140",
-        "transport": "serial",
+        "protocol": "serial",
+        "protocol_label": "Serial Port (USB)",
         "baud_rate": 115200,
         "connections": [
             {
@@ -84,17 +102,31 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
     controller = Microcontroller.from_dict(payload)
 
     assert controller.id == "board-1"
+    assert controller.description == "Kitchen controller."
     assert controller.connections[0].name == "status_led"
     assert controller.connections[0].pins[0].pin_val == "13"
     assert controller.connections[0].component_type == "led"
 
 
-def test_add_connection_rejects_duplicate_pin_usage() -> None:
+def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> None:
+    registry_path = tmp_path / "devices.json"
+    registry_path.write_text(
+        """
+{
+  "board-1": {
+    "id": "board-1",
+    "port": "/dev/cu.usbserial-1140",
+    "protocol": "serial",
+    "protocol_label": "Serial Port (USB)",
+    "baud_rate": 115200
+  }
+}
+""".strip()
+    )
+    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+
     controller = Microcontroller(
         id="board-1",
-        port="/dev/cu.usbserial-1140",
-        transport="serial",
-        baud_rate=115200,
     )
     controller.add_connection(
         Connection(
@@ -117,3 +149,30 @@ def test_add_connection_rejects_duplicate_pin_usage() -> None:
     )
 
     assert added is False
+
+
+def test_get_board_information_uses_device_registry(tmp_path, monkeypatch) -> None:
+    registry_path = tmp_path / "devices.json"
+    registry_path.write_text(
+        """
+{
+  "board-1": {
+    "id": "board-1",
+    "port": "/dev/cu.usbserial-1140",
+    "protocol": "serial",
+    "protocol_label": "Serial Port (USB)",
+    "baud_rate": 115200
+  }
+}
+""".strip()
+    )
+    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+
+    controller = Microcontroller(id="board-1")
+
+    assert controller._get_board_information() == {
+        "port": "/dev/cu.usbserial-1140",
+        "protocol": "serial",
+        "protocol_label": "Serial Port (USB)",
+        "baud_rate": 115200,
+    }
