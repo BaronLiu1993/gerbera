@@ -58,20 +58,6 @@ class Microcontroller:
         self.connections.append(connection)
         return True
 
-    
-
-    def _get_used_pins(self) -> set[str]:
-        used_pins: set[str] = set()
-
-        for existing_connection in self.connections:
-            for pin in existing_connection.pins.values():
-                used_pins.add(pin)
-
-        return used_pins
-
-    def _get_connection_names(self) -> set[str]:
-        return {connection.name for connection in self.connections}
-
     def get_board_information(self) -> dict[str, Any]:
         payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
         if self.id not in payload:
@@ -100,7 +86,19 @@ class Microcontroller:
         return FirmwareGenerator.generate(self)
 
     def read(self, connection_name: str) -> dict[str, Any]:
-        return ConnectionRuntime.read_with_baud(
+        return ConnectionRuntime.read(
             self.get_connection(connection_name),
             self.baud_rate,
         )
+
+    def _get_used_pins(self) -> set[str]:
+        used_pins: set[str] = set()
+
+        for existing_connection in self.connections:
+            for pin in existing_connection.pins.values():
+                used_pins.add(pin)
+
+        return used_pins
+
+    def _get_connection_names(self) -> set[str]:
+        return {connection.name for connection in self.connections}
