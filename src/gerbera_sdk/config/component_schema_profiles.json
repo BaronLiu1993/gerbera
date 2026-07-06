@@ -1,0 +1,18 @@
+{
+  "hw-201": {
+    "pins": [
+      "signal"
+    ],
+    "operation": "read",
+    "template": "hw_201_read",
+    "input": {},
+    "output": {
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      }
+    }
+  }
+}

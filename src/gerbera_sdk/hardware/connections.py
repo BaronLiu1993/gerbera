@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from gerbera_sdk.components.registry import ComponentRegistry
 from gerbera_sdk.hardware.pin_factory import PinFactory
 
 
@@ -15,6 +16,7 @@ class Connection:
     component_type: str
 
     def to_dict(self) -> dict[str, Any]:
+        ComponentRegistry.validate_pins(self.component_type, self.pins)
         payload = {
             "microcontroller_id": self.microcontroller_id,
             "name": self.name,

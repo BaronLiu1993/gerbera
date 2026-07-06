@@ -1,0 +1,1 @@
+"""Static SDK configuration data."""

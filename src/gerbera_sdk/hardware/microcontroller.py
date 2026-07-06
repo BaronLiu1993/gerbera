@@ -3,6 +3,7 @@ from typing import Any
 import json
 from pathlib import Path
 
+from gerbera_sdk.components.registry import ComponentRegistry
 from gerbera_sdk.hardware.connections import Connection
 
 DEVICE_REGISTRY_PATH = Path("devices.json")
@@ -18,7 +19,8 @@ class Microcontroller:
 
     def add_connection(self, connection: Connection) -> bool:
         """Add a connection if none of its pins are already in use."""
-        self._get_board_information()
+        self.get_board_information()
+        ComponentRegistry.validate_pins(connection.component_type, connection.pins)
         used_pins = self._get_used_pins()
 
         for pin in connection.pins.values():
@@ -29,7 +31,7 @@ class Microcontroller:
         return True
 
     def to_dict(self) -> dict[str, Any]:
-        board_information = self._get_board_information()
+        board_information = self.get_board_information()
 
         return {
             "id": self.id,
@@ -58,7 +60,7 @@ class Microcontroller:
 
         return used_pins
 
-    def _get_board_information(self) -> dict[str, Any]:
+    def get_board_information(self) -> dict[str, Any]:
         payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
         if self.id not in payload:
             raise ValueError(f"Unknown device id: {self.id}")
@@ -70,3 +72,10 @@ class Microcontroller:
             "protocol_label": device.get("protocol_label", ""),
             "baud_rate": int(device["baud_rate"]),
         }
+
+    def _get_board_information(self) -> dict[str, Any]:
+        return self.get_board_information()
+
+    @property
+    def baud_rate(self) -> int:
+        return self.get_board_information()["baud_rate"]

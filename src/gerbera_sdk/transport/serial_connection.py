@@ -1,5 +1,7 @@
-import serial
 import time
+
+import serial
+
 
 class SerialConnection:
     def __init__(self):
