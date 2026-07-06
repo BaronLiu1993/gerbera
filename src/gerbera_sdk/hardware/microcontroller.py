@@ -1,22 +1,21 @@
-from dataclasses import dataclass, field
-from typing import Any, List
+from dataclasses import dataclass
+from typing import Any
+import json
+from pathlib import Path
 
 from gerbera_sdk.hardware.connections import Connection
 
+DEVICE_REGISTRY_PATH = Path("devices.json")
 
 @dataclass
 class Microcontroller:
     """A microcontroller board and the components connected to it."""
-
     id: str
-    port: str
-    transport: str
-    baud_rate: int
-    connections: List[Connection] = field(default_factory=list)
+    description: str
 
     def add_connection(self, connection: Connection) -> bool:
         """Add a connection if none of its pins are already in use."""
-
+        port, transport, baud_rate, connections = 
         used_pins = self._get_used_pins()
 
         for pin in connection.pins:
@@ -48,6 +47,7 @@ class Microcontroller:
             ],
         )
 
+
     def _get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
 
@@ -56,3 +56,11 @@ class Microcontroller:
                 used_pins.add(pin.pin_val)
 
         return used_pins
+
+    def _get_board_information(self) -> dict[]:
+        payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
+        device = payload[self.id]
+        port, transport, baud_rate, connections = device["port"], device["baud_rate"], device[""]
+
+        return ()
+

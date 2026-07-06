@@ -63,7 +63,7 @@ def _render_selection_menu(
         marker = "[x]" if is_selected else "[ ]"
         typer.echo(
             f"{prefix} {marker} {device['device']} | "
-            f"{device['description']} | {device['hwid']}"
+            f"{device['protocol_label']} | {device['hwid']}"
         )
 
     continue_index = len(devices)
@@ -73,7 +73,7 @@ def _render_selection_menu(
     if selected_devices:
         typer.echo("\nCurrent mapping:")
         for device_id, selected in selected_devices.items():
-            typer.echo(f"- {device_id}: {selected['device']}")
+            typer.echo(f"- {device_id}: {selected['port']}")
 
 
 def _available_devices() -> list[dict]:
@@ -99,7 +99,8 @@ def _available_devices() -> list[dict]:
         devices.append(
             {
                 "device": port["address"],
-                "description": port.get("protocol_label", port["label"]),
+                "protocol": port.get("protocol", ""),
+                "protocol_label": port.get("protocol_label", port["label"]),
                 "hwid": hwid,
                 "vid": properties["vid"],
                 "pid": properties["pid"],
@@ -136,7 +137,7 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
 
         chosen = devices[cursor]
         if any(
-            selected["device"] == chosen["device"] and selected["hwid"] == chosen["hwid"]
+            selected["port"] == chosen["device"] and selected["hwid"] == chosen["hwid"]
             for selected in selected_devices.values()
         ):
             continue
@@ -144,8 +145,9 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
         device_id = str(uuid4())
         selected_devices[device_id] = {
             "id": device_id,
-            "device": chosen["device"],
-            "description": chosen["description"],
+            "port": chosen["device"],
+            "protocol": chosen["protocol"],
+            "protocol_label": chosen["protocol_label"],
             "hwid": chosen["hwid"],
             "vid": chosen["vid"],
             "pid": chosen["pid"],

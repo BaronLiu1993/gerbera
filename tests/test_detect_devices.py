@@ -62,7 +62,8 @@ def test_available_devices_collects_arduino_cli_metadata(monkeypatch) -> None:
         {
             "index": 0,
             "device": "/dev/cu.usbserial-1140",
-            "description": "Serial Port (USB)",
+            "protocol": "serial",
+            "protocol_label": "Serial Port (USB)",
             "hwid": "USB VID:PID=0x1A86:0x7523",
             "vid": "0x1A86",
             "pid": "0x7523",
@@ -70,7 +71,8 @@ def test_available_devices_collects_arduino_cli_metadata(monkeypatch) -> None:
         {
             "index": 1,
             "device": "/dev/cu.other",
-            "description": "Serial Port (USB)",
+            "protocol": "serial",
+            "protocol_label": "Serial Port (USB)",
             "hwid": "USB VID:PID=0x9999:0x1111 SERIAL=abc123",
             "vid": "0x9999",
             "pid": "0x1111",
@@ -130,14 +132,15 @@ def test_available_devices_keeps_duplicate_descriptions(monkeypatch) -> None:
 
     devices = declare_devices_command._available_devices()
 
-    assert devices[0]["description"] == "Serial Port (USB)"
-    assert devices[1]["description"] == "Serial Port (USB)"
+    assert devices[0]["protocol_label"] == "Serial Port (USB)"
+    assert devices[1]["protocol_label"] == "Serial Port (USB)"
 def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
     devices = [
         {
             "index": 0,
             "device": "/dev/cu.usbserial-1140",
-            "description": "USB Serial",
+            "protocol": "serial",
+            "protocol_label": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
             "vid": "0x1A86",
             "pid": "0x7523",
@@ -156,8 +159,9 @@ def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
     assert selected == {
         "generated-uuid": {
             "id": "generated-uuid",
-            "device": "/dev/cu.usbserial-1140",
-            "description": "USB Serial",
+            "port": "/dev/cu.usbserial-1140",
+            "protocol": "serial",
+            "protocol_label": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
             "vid": "0x1A86",
             "pid": "0x7523",
@@ -171,7 +175,8 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
         {
             "index": 0,
             "device": "/dev/cu.usbserial-1140",
-            "description": "USB Serial",
+            "protocol": "serial",
+            "protocol_label": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
             "vid": "0x1A86",
             "pid": "0x7523",
@@ -180,8 +185,9 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
     selected_devices = {
         "generated-uuid": {
             "id": "generated-uuid",
-            "device": "/dev/cu.usbserial-1140",
-            "description": "USB Serial",
+            "port": "/dev/cu.usbserial-1140",
+            "protocol": "serial",
+            "protocol_label": "USB Serial",
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
             "vid": "0x1A86",
             "pid": "0x7523",
