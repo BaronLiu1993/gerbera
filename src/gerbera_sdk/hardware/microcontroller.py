@@ -66,7 +66,7 @@ class Microcontroller:
     def _get_connection_names(self) -> set[str]:
         return {connection.name for connection in self.connections}
 
-    def get_board_information(self) -> dict[str, Any]:
+    def _get_board_information(self) -> dict[str, Any]:
         payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
         if self.id not in payload:
             raise ValueError(f"Unknown device id: {self.id}")
@@ -78,9 +78,6 @@ class Microcontroller:
             "protocol_label": device.get("protocol_label", ""),
             "baud_rate": int(device["baud_rate"]),
         }
-
-    def _get_board_information(self) -> dict[str, Any]:
-        return self.get_board_information()
 
     @property
     def baud_rate(self) -> int:

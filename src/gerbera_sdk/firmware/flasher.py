@@ -25,10 +25,10 @@ class Flasher:
     def flash_microcontroller(
         microcontroller: Microcontroller,
         fqbn: str,
-        sketch_dir: Path,
+        sketch_root: Path,
     ) -> Path:
         board_information = microcontroller.get_board_information()
-        sketch_path = FirmwareGenerator.write_sketch(microcontroller, sketch_dir)
+        sketch_path = FirmwareGenerator.write_sketch(microcontroller, sketch_root)
         Flasher.flashCode(
             port=board_information["port"],
             fqbn=fqbn,

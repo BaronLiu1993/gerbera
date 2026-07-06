@@ -22,10 +22,9 @@ class HardwareSystem:
         sketch_paths: dict[str, Path] = {}
 
         for microcontroller in self.microcontrollers:
-            sketch_dir = sketch_root / microcontroller.id
             sketch_paths[microcontroller.id] = FirmwareGenerator.write_sketch(
                 microcontroller,
-                sketch_dir,
+                sketch_root,
             )
 
         return sketch_paths
@@ -43,11 +42,10 @@ class HardwareSystem:
                     f"Missing fqbn for microcontroller: {microcontroller.id}"
                 )
 
-            sketch_dir = sketch_root / microcontroller.id
             sketch_paths[microcontroller.id] = Flasher.flash_microcontroller(
                 microcontroller=microcontroller,
                 fqbn=fqbn_by_microcontroller_id[microcontroller.id],
-                sketch_dir=sketch_dir,
+                sketch_root=sketch_root,
             )
 
         return sketch_paths

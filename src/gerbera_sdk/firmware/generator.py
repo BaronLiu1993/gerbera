@@ -95,9 +95,9 @@ void loop() {{
 """
 
     @staticmethod
-    def write_sketch(microcontroller: Microcontroller, sketch_dir: Path) -> Path:
-        sketch_dir.mkdir(parents=True, exist_ok=True)
-        sketch_path = sketch_dir / f"{microcontroller.id}.ino"
+    def write_sketch(microcontroller: Microcontroller, sketch_root: Path) -> Path:
+        sketch_root.mkdir(parents=True, exist_ok=True)
+        sketch_path = sketch_root / f"{microcontroller.id}.ino"
         sketch_path.write_text(FirmwareGenerator.generate(microcontroller))
         return sketch_path
 
