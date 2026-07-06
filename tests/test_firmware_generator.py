@@ -10,8 +10,7 @@ def test_hw_201_firmware_generation_uses_read_dispatch_and_signal_pin(tmp_path, 
     "id": "board-1",
     "port": "/dev/cu.usbserial-1140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 115200
+    "protocol_label": "Serial Port (USB)"
   }
 }
 """.strip()
@@ -20,6 +19,7 @@ def test_hw_201_firmware_generation_uses_read_dispatch_and_signal_pin(tmp_path, 
 
     controller = Microcontroller(
         id="board-1",
+        baud_rate=115200,
         connections=[
             Connection(
                 microcontroller_id="board-1",

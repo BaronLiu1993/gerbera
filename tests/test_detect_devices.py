@@ -165,7 +165,6 @@ def test_select_devices_interactively_adds_selection_once(monkeypatch) -> None:
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
             "vid": "0x1A86",
             "pid": "0x7523",
-            "baud_rate": 115200,
         }
     }
 
@@ -191,7 +190,6 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
             "hwid": "USB VID:PID=1A86:7523 LOCATION=1-1.4",
             "vid": "0x1A86",
             "pid": "0x7523",
-            "baud_rate": 115200,
         }
     }
     output_path = tmp_path / "devices.json"

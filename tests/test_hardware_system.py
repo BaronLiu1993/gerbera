@@ -17,15 +17,13 @@ def test_generate_sketches_writes_one_sketch_per_microcontroller(tmp_path, monke
     "id": "board-1",
     "port": "/dev/cu.usbserial-1140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 115200
+    "protocol_label": "Serial Port (USB)"
   },
   "board-2": {
     "id": "board-2",
     "port": "/dev/cu.usbserial-2140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 9600
+    "protocol_label": "Serial Port (USB)"
   }
 }
 """.strip()
@@ -34,6 +32,7 @@ def test_generate_sketches_writes_one_sketch_per_microcontroller(tmp_path, monke
 
     first_board = Microcontroller(
         id="board-1",
+        baud_rate=115200,
         connections=[
             Connection(
                 microcontroller_id="board-1",
@@ -46,6 +45,7 @@ def test_generate_sketches_writes_one_sketch_per_microcontroller(tmp_path, monke
     )
     second_board = Microcontroller(
         id="board-2",
+        baud_rate=9600,
         connections=[
             Connection(
                 microcontroller_id="board-2",

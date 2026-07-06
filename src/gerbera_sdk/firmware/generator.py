@@ -1,10 +1,13 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gerbera_sdk.components.registry import ComponentRegistry
 from gerbera_sdk.firmware.builders.base import BaseFirmwareBuilder
 from gerbera_sdk.firmware.builders.hw201 import HW201FirmwareBuilder
 from gerbera_sdk.hardware.connections import Connection
-from gerbera_sdk.hardware.microcontroller import Microcontroller
+
+if TYPE_CHECKING:
+    from gerbera_sdk.hardware.microcontroller import Microcontroller
 
 
 class FirmwareGenerator:
@@ -13,7 +16,7 @@ class FirmwareGenerator:
     }
 
     @staticmethod
-    def generate(microcontroller: Microcontroller) -> str:
+    def generate(microcontroller: "Microcontroller") -> str:
         handlers = "\n\n".join(
             FirmwareGenerator._build_handler(connection)
             for connection in microcontroller.connections
@@ -95,7 +98,7 @@ void loop() {{
 """
 
     @staticmethod
-    def write_sketch(microcontroller: Microcontroller, sketch_root: Path) -> Path:
+    def write_sketch(microcontroller: "Microcontroller", sketch_root: Path) -> Path:
         sketch_root.mkdir(parents=True, exist_ok=True)
         sketch_path = sketch_root / f"{microcontroller.id}.ino"
         sketch_path.write_text(FirmwareGenerator.generate(microcontroller))

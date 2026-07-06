@@ -10,8 +10,7 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
     "id": "board-1",
     "port": "/dev/cu.usbserial-1140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 115200
+    "protocol_label": "Serial Port (USB)"
   }
 }
 """.strip()
@@ -21,6 +20,7 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
     controller = Microcontroller(
         id="board-1",
         description="Kitchen controller.",
+        baud_rate=115200,
         connections=[
             Connection(
                 microcontroller_id="board-1",
@@ -90,6 +90,7 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
 
     assert controller.id == "board-1"
     assert controller.description == "Kitchen controller."
+    assert controller.baud_rate == 115200
     assert controller.connections[0].name == "room_temperature"
     assert controller.connections[0].pins["signal"] == "A0"
     assert controller.connections[0].component_type == "hw-201"
@@ -104,8 +105,7 @@ def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> No
     "id": "board-1",
     "port": "/dev/cu.usbserial-1140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 115200
+    "protocol_label": "Serial Port (USB)"
   }
 }
 """.strip()
@@ -147,8 +147,7 @@ def test_add_connection_rejects_duplicate_connection_name_per_board(tmp_path, mo
     "id": "board-1",
     "port": "/dev/cu.usbserial-1140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 115200
+    "protocol_label": "Serial Port (USB)"
   }
 }
 """.strip()
@@ -198,11 +197,10 @@ def test_get_board_information_uses_device_registry(tmp_path, monkeypatch) -> No
 
     controller = Microcontroller(id="board-1")
 
-    assert controller._get_board_information() == {
+    assert controller.get_board_information() == {
         "port": "/dev/cu.usbserial-1140",
         "protocol": "serial",
         "protocol_label": "Serial Port (USB)",
-        "baud_rate": 115200,
     }
 
 
@@ -215,8 +213,7 @@ def test_add_connection_raises_for_missing_required_pin_role(tmp_path, monkeypat
     "id": "board-1",
     "port": "/dev/cu.usbserial-1140",
     "protocol": "serial",
-    "protocol_label": "Serial Port (USB)",
-    "baud_rate": 115200
+    "protocol_label": "Serial Port (USB)"
   }
 }
 """.strip()

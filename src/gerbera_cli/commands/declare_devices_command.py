@@ -13,7 +13,6 @@ from gerbera_cli.config import get_settings
 declare_devices_command = typer.Typer(help="Serial device detection commands.")
 
 DEVICE_MAP_PATH = Path("devices.json")
-DEFAULT_BAUD_RATE = 115200
 
 
 def _is_candidate_device(port: dict) -> bool:
@@ -151,7 +150,6 @@ def _select_devices_interactively(devices: list[dict]) -> dict[str, dict]:
             "hwid": chosen["hwid"],
             "vid": chosen["vid"],
             "pid": chosen["pid"],
-            "baud_rate": DEFAULT_BAUD_RATE,
         }
 
 

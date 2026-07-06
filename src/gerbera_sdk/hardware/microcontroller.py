@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 
 from gerbera_sdk.components.registry import ComponentRegistry
+from gerbera_sdk.firmware.generator import FirmwareGenerator
 from gerbera_sdk.hardware.connections import Connection
+from gerbera_sdk.transport.runtime import ConnectionRuntime
 
 DEVICE_REGISTRY_PATH = Path("devices.json")
 
@@ -15,7 +17,30 @@ class Microcontroller:
 
     id: str
     description: str = ""
+    baud_rate: int = 115200
     connections: list[Connection] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        board_information = self.get_board_information()
+
+        return {
+            "id": self.id,
+            "description": self.description,
+            "port": board_information["port"],
+            "protocol": board_information["protocol"],
+            "protocol_label": board_information["protocol_label"],
+            "baud_rate": self.baud_rate,
+            "connections": [connection.to_dict() for connection in self.connections],
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "Microcontroller":
+        return cls(
+            id=payload["id"],
+            description=payload.get("description", ""),
+            baud_rate=int(payload.get("baud_rate", 115200)),
+            connections=[Connection.from_dict(connection) for connection in payload.get("connections", [])],
+        )
 
     def add_connection(self, connection: Connection) -> bool:
         """Add a connection if its command name and pins are not already in use."""
@@ -33,26 +58,7 @@ class Microcontroller:
         self.connections.append(connection)
         return True
 
-    def to_dict(self) -> dict[str, Any]:
-        board_information = self.get_board_information()
-
-        return {
-            "id": self.id,
-            "description": self.description,
-            "port": board_information["port"],
-            "protocol": board_information["protocol"],
-            "protocol_label": board_information["protocol_label"],
-            "baud_rate": board_information["baud_rate"],
-            "connections": [connection.to_dict() for connection in self.connections],
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "Microcontroller":
-        return cls(
-            id=payload["id"],
-            description=payload.get("description", ""),
-            connections=[Connection.from_dict(connection) for connection in payload.get("connections", [])],
-        )
+    
 
     def _get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
@@ -66,7 +72,7 @@ class Microcontroller:
     def _get_connection_names(self) -> set[str]:
         return {connection.name for connection in self.connections}
 
-    def _get_board_information(self) -> dict[str, Any]:
+    def get_board_information(self) -> dict[str, Any]:
         payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
         if self.id not in payload:
             raise ValueError(f"Unknown device id: {self.id}")
@@ -76,9 +82,25 @@ class Microcontroller:
             "port": device.get("port", device.get("device", "")),
             "protocol": device.get("protocol", ""),
             "protocol_label": device.get("protocol_label", ""),
-            "baud_rate": int(device["baud_rate"]),
         }
 
-    @property
-    def baud_rate(self) -> int:
-        return self.get_board_information()["baud_rate"]
+    def get_connection(self, connection_name: str) -> Connection:
+        for connection in self.connections:
+            if connection.name == connection_name:
+                return connection
+
+        raise ValueError(f"Unknown connection name for board {self.id}: {connection_name}")
+
+    def build_read_command(self, connection_name: str) -> str:
+        return ConnectionRuntime.build_read_command(
+            self.get_connection(connection_name)
+        )
+
+    def generate_firmware(self) -> str:
+        return FirmwareGenerator.generate(self)
+
+    def read(self, connection_name: str) -> dict[str, Any]:
+        return ConnectionRuntime.read_with_baud(
+            self.get_connection(connection_name),
+            self.baud_rate,
+        )
