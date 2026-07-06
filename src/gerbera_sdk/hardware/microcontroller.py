@@ -13,7 +13,7 @@ class Microcontroller:
     """A microcontroller board and the components connected to it."""
 
     id: str
-    description: str
+    description: str = ""
     connections: list[Connection] = field(default_factory=list)
 
     def add_connection(self, connection: Connection) -> bool:
@@ -22,7 +22,7 @@ class Microcontroller:
         used_pins = self._get_used_pins()
 
         for pin in connection.pins:
-            if pin.pin_val in used_pins:
+            if pin in used_pins:
                 return False
 
         self.connections.append(connection)
@@ -54,7 +54,7 @@ class Microcontroller:
 
         for existing_connection in self.connections:
             for pin in existing_connection.pins:
-                used_pins.add(pin.pin_val)
+                used_pins.add(pin)
 
         return used_pins
 

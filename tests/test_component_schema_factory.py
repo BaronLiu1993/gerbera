@@ -12,21 +12,11 @@ def test_led_schema_profile_is_write_like() -> None:
             },
             "required": ["value"],
         },
-        "outputSchema": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        },
     }
 
 
 def test_button_schema_profile_is_read_like() -> None:
     assert PinFactory.build("button") == {
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        },
         "outputSchema": {
             "type": "object",
             "properties": {

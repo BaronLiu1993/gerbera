@@ -1,4 +1,4 @@
-from gerbera_sdk import Connection, Microcontroller, Pin
+from gerbera_sdk import Connection, Microcontroller
 
 
 def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) -> None:
@@ -26,7 +26,7 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
                 microcontroller_id="board-1",
                 name="status_led",
                 description="Status LED on the board.",
-                pins=[Pin(pin_val="13")],
+                pins=["13"],
                 component_type="led",
             )
         ],
@@ -44,11 +44,7 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
                 "microcontroller_id": "board-1",
                 "name": "status_led",
                 "description": "Status LED on the board.",
-                "pins": [
-                    {
-                        "pin": "13",
-                    }
-                ],
+                "pins": ["13"],
                 "component_type": "led",
                 "inputSchema": {
                     "type": "object",
@@ -57,11 +53,6 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
                     }
                     ,
                     "required": ["value"],
-                },
-                "outputSchema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
                 },
             }
         ],
@@ -81,7 +72,7 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
                 "microcontroller_id": "board-1",
                 "name": "status_led",
                 "description": "Status LED on the board.",
-                "pins": [{"pin": "13"}],
+                "pins": ["13"],
                 "component_type": "led",
                 "inputSchema": {
                     "type": "object",
@@ -89,11 +80,6 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
                         "value": {"type": "boolean"},
                     },
                     "required": ["value"],
-                },
-                "outputSchema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
                 },
             }
         ],
@@ -104,7 +90,7 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
     assert controller.id == "board-1"
     assert controller.description == "Kitchen controller."
     assert controller.connections[0].name == "status_led"
-    assert controller.connections[0].pins[0].pin_val == "13"
+    assert controller.connections[0].pins[0] == "13"
     assert controller.connections[0].component_type == "led"
 
 
@@ -133,7 +119,7 @@ def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> No
             microcontroller_id="board-1",
             name="status_led",
             description="Status LED on the board.",
-            pins=[Pin(pin_val="13")],
+            pins=["13"],
             component_type="led",
         )
     )
@@ -143,7 +129,7 @@ def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> No
             microcontroller_id="board-1",
             name="other_led",
             description="Another LED on the same pin.",
-            pins=[Pin(pin_val="13")],
+            pins=["13"],
             component_type="led",
         )
     )
