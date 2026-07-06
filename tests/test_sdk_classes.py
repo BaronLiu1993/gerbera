@@ -26,7 +26,7 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
                 microcontroller_id="board-1",
                 name="status_led",
                 description="Status LED on the board.",
-                pins=["13"],
+                pins={"signal": "13"},
                 component_type="led",
             )
         ],
@@ -44,7 +44,7 @@ def test_microcontroller_serializes_to_output_json_shape(tmp_path, monkeypatch) 
                 "microcontroller_id": "board-1",
                 "name": "status_led",
                 "description": "Status LED on the board.",
-                "pins": ["13"],
+                "pins": {"signal": "13"},
                 "component_type": "led",
                 "inputSchema": {
                     "type": "object",
@@ -72,7 +72,7 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
                 "microcontroller_id": "board-1",
                 "name": "status_led",
                 "description": "Status LED on the board.",
-                "pins": ["13"],
+                "pins": {"signal": "13"},
                 "component_type": "led",
                 "inputSchema": {
                     "type": "object",
@@ -90,7 +90,7 @@ def test_microcontroller_deserializes_from_input_json_shape() -> None:
     assert controller.id == "board-1"
     assert controller.description == "Kitchen controller."
     assert controller.connections[0].name == "status_led"
-    assert controller.connections[0].pins[0] == "13"
+    assert controller.connections[0].pins["signal"] == "13"
     assert controller.connections[0].component_type == "led"
 
 
@@ -119,7 +119,7 @@ def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> No
             microcontroller_id="board-1",
             name="status_led",
             description="Status LED on the board.",
-            pins=["13"],
+            pins={"signal": "13"},
             component_type="led",
         )
     )
@@ -129,7 +129,7 @@ def test_add_connection_rejects_duplicate_pin_usage(tmp_path, monkeypatch) -> No
             microcontroller_id="board-1",
             name="other_led",
             description="Another LED on the same pin.",
-            pins=["13"],
+            pins={"signal": "13"},
             component_type="led",
         )
     )

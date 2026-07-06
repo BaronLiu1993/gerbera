@@ -1,0 +1,29 @@
+{
+  "led": {
+    "input": {
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "output": {}
+  },
+  "button": {
+    "input": {},
+    "output": {
+      "pressed": {
+        "type": "boolean"
+      }
+    }
+  },
+  "hw-201": {
+    "input": {},
+    "output": {
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      }
+    }
+  }
+}

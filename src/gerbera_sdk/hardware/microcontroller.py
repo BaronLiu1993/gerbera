@@ -21,7 +21,7 @@ class Microcontroller:
         self._get_board_information()
         used_pins = self._get_used_pins()
 
-        for pin in connection.pins:
+        for pin in connection.pins.values():
             if pin in used_pins:
                 return False
 
@@ -53,7 +53,7 @@ class Microcontroller:
         used_pins: set[str] = set()
 
         for existing_connection in self.connections:
-            for pin in existing_connection.pins:
+            for pin in existing_connection.pins.values():
                 used_pins.add(pin)
 
         return used_pins

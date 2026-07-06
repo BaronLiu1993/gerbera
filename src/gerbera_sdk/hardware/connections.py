@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any
 
 from gerbera_sdk.hardware.pin_factory import PinFactory
 
@@ -11,7 +11,7 @@ class Connection:
     microcontroller_id: str
     name: str
     description: str
-    pins: List[str]
+    pins: dict[str, str]
     component_type: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -19,7 +19,7 @@ class Connection:
             "microcontroller_id": self.microcontroller_id,
             "name": self.name,
             "description": self.description,
-            "pins": list(self.pins),
+            "pins": dict(self.pins),
             "component_type": self.component_type,
         }
         payload.update(PinFactory.build(self.component_type))
@@ -31,6 +31,9 @@ class Connection:
             microcontroller_id=payload["microcontroller_id"],
             name=payload["name"],
             description=payload["description"],
-            pins=[str(pin) for pin in payload.get("pins", [])],
+            pins={
+                str(pin_name): str(pin_value)
+                for pin_name, pin_value in payload.get("pins", {}).items()
+            },
             component_type=payload["component_type"],
         )

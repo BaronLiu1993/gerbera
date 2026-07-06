@@ -4,7 +4,7 @@ from gerbera_sdk.hardware.pin_factory import PinFactory
 
 
 def test_led_schema_profile_is_write_like() -> None:
-    assert PinFactory.build("led") == {
+    assert PinFactory.build("  LED  ") == {
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -23,6 +23,19 @@ def test_button_schema_profile_is_read_like() -> None:
                 "pressed": {"type": "boolean"},
             },
             "required": ["pressed"],
+        },
+    }
+
+
+def test_hw_201_schema_profile_uses_normalized_name_lookup() -> None:
+    assert PinFactory.build(" hw-201 ") == {
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "value": {"type": "number"},
+                "unit": {"type": "string"},
+            },
+            "required": ["value", "unit"],
         },
     }
 
