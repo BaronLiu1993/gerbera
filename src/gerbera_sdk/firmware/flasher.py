@@ -6,7 +6,6 @@ from gerbera_sdk.hardware.microcontroller import Microcontroller
 
 DEFAULT_FIRMWARE_ROOT = Path("gerbera_firmware")
 
-
 class Flasher:
     @staticmethod
     def flashCode(port: str, fqbn: str, sketch_path: str) -> None:
@@ -29,10 +28,9 @@ class Flasher:
         fqbn: str,
         sketch_root: Path = DEFAULT_FIRMWARE_ROOT,
     ) -> Path:
-        board_information = microcontroller.get_board_information()
         sketch_path = FirmwareGenerator.write_sketch(microcontroller, sketch_root)
         Flasher.flashCode(
-            port=board_information["port"],
+            port=microcontroller.port,
             fqbn=fqbn,
             sketch_path=str(sketch_path),
         )

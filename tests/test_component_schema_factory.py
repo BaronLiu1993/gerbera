@@ -1,7 +1,7 @@
 import pytest
 
 from gerbera_sdk.components.registry import ComponentRegistry
-from gerbera_sdk.hardware.pin_factory import PinFactory
+from gerbera_sdk.hardware.pin import PinFactory
 
 
 def test_hw_201_schema_profile_uses_normalized_name_lookup() -> None:

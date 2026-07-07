@@ -1,11 +1,13 @@
 from typing import Any, Callable
 
-from gerbera_sdk.hardware.connections import Connection
+from gerbera_sdk.hardware.connection import Connection
 from gerbera_sdk.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.hardware.microcontroller import Microcontroller
 from gerbera_sdk.mcp.transport_pool import SerialTransportPool
 
+
 from fastmcp import FastMCP
+
 
 
 class GerberaMCPServer:

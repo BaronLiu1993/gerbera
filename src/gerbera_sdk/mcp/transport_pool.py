@@ -12,11 +12,10 @@ class SerialTransportPool:
             return self._connections[microcontroller_id]
 
         microcontroller = self.hardware_system.get_microcontroller(microcontroller_id)
-        board_information = microcontroller.get_board_information()
 
         serial_connection = SerialConnection()
         serial_connection.connect(
-            port=board_information["port"],
+            port=microcontroller.port,
             baud=microcontroller.baud_rate,
         )
         self._connections[microcontroller_id] = serial_connection

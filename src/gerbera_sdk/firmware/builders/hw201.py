@@ -1,10 +1,10 @@
 from gerbera_sdk.firmware.builders.base import BaseFirmwareBuilder
-from gerbera_sdk.hardware.connections import Connection
+from gerbera_sdk.hardware.connection import Connection
 
 
 class HW201FirmwareBuilder(BaseFirmwareBuilder):
     template_name = "hw_201_read"
-
+    
     def build_handler(self, connection: Connection) -> str:
         signal_pin = connection.pins["signal"]
 

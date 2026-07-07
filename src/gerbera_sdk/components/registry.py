@@ -4,7 +4,7 @@ from typing import Any
 
 
 COMPONENT_SCHEMA_PROFILES_PATH = (
-    Path(__file__).resolve().parent.parent / "config" / "component_schema_profiles.json"
+    Path(__file__).resolve().parent / "component_schema_profiles.json"
 )
 
 

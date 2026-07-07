@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from gerbera_sdk.components.registry import ComponentRegistry
 from gerbera_sdk.firmware.builders.base import BaseFirmwareBuilder
 from gerbera_sdk.firmware.builders.hw201 import HW201FirmwareBuilder
-from gerbera_sdk.hardware.connections import Connection
+from gerbera_sdk.hardware.connection import Connection
 
 if TYPE_CHECKING:
     from gerbera_sdk.hardware.microcontroller import Microcontroller

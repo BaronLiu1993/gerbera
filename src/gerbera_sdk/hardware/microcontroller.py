@@ -1,32 +1,27 @@
 from dataclasses import dataclass, field
 from typing import Any
-import json
-from pathlib import Path
 
 from gerbera_sdk.components.registry import ComponentRegistry
-from gerbera_sdk.hardware.connections import Connection
-
-DEVICE_REGISTRY_PATH = Path("devices.json")
+from gerbera_sdk.hardware.connection import Connection
 
 
 @dataclass
 class Microcontroller:
-    """A microcontroller board and the components connected to it."""
-
     id: str
+    port: str
     description: str = ""
-    baud_rate: int = 115200
+    baud_rate: int
+    protocol: str
+    protocol_label: str
     connections: list[Connection] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        board_information = self.get_board_information()
-
         return {
             "id": self.id,
+            "port": self.port,
             "description": self.description,
-            "port": board_information["port"],
-            "protocol": board_information["protocol"],
-            "protocol_label": board_information["protocol_label"],
+            "protocol": self.protocol,
+            "protocol_label": self.protocol_label,
             "baud_rate": self.baud_rate,
             "connections": [connection.to_dict() for connection in self.connections],
         }
@@ -34,39 +29,41 @@ class Microcontroller:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "Microcontroller":
         return cls(
-            id=payload["id"],
-            description=payload.get("description", ""),
+            id=str(payload["id"]),
+            port=str(payload["port"]),
+            description=str(payload.get("description", "")),
             baud_rate=int(payload.get("baud_rate", 115200)),
-            connections=[Connection.from_dict(connection) for connection in payload.get("connections", [])],
+            protocol=str(payload.get("protocol", "serial")),
+            protocol_label=str(payload.get("protocol_label", "Serial")),
+            connections=[
+                Connection.from_dict(connection)
+                for connection in payload.get("connections", [])
+            ],
         )
 
-    def add_connection(self, connection: Connection) -> bool:
-        """Add a connection if its command name and pins are not already in use."""
-        self.get_board_information()
-        ComponentRegistry.validate_pins(connection.component_type, connection.pins)
-        if connection.name in self._get_connection_names():
-            return False
+    def add_connections(
+        self,
+        connections: list[Connection],
+    ) -> None:
+        pending_connections = list(connections)
 
-        used_pins = self._get_used_pins()
+        for connection in pending_connections:
+            ComponentRegistry.validate_pins(connection.component_type, connection.pins)
 
-        for pin in connection.pins.values():
-            if pin in used_pins:
-                return False
+            if connection.name in self._get_connection_names():
+                raise ValueError(
+                    f"Connection name already exists on board {self.id}: "
+                    f"{connection.name}"
+                )
 
-        self.connections.append(connection)
-        return True
+            used_pins = self._get_used_pins()
+            for pin in connection.pins.values():
+                if pin in used_pins:
+                    raise ValueError(
+                        f"Pin already in use on board {self.id}: {pin}"
+                    )
 
-    def get_board_information(self) -> dict[str, Any]:
-        payload = json.loads(DEVICE_REGISTRY_PATH.read_text())
-        if self.id not in payload:
-            raise ValueError(f"Unknown device id: {self.id}")
-
-        device = payload[self.id]
-        return {
-            "port": device.get("port", device.get("device", "")),
-            "protocol": device.get("protocol", ""),
-            "protocol_label": device.get("protocol_label", ""),
-        }
+            self.connections.append(connection)
 
     def get_connection(self, connection_name: str) -> Connection:
         for connection in self.connections:
@@ -75,6 +72,8 @@ class Microcontroller:
 
         raise ValueError(f"Unknown connection name for board {self.id}: {connection_name}")
 
+
+    # Helper Functions for Deduping
     def _get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
 

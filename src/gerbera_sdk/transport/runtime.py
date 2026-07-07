@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from gerbera_sdk.hardware.connections import Connection
+from gerbera_sdk.hardware.connection import Connection
 
 
 class ConnectionRuntime:
@@ -31,18 +31,6 @@ class ConnectionRuntime:
                 continue
 
             key, value = token.split(":", 1)
-            payload[key] = ConnectionRuntime._coerce_value(value)
+            payload[key] = float(value)
 
         return payload
-
-    @staticmethod
-    def _coerce_value(value: str) -> Any:
-        try:
-            return int(value)
-        except ValueError:
-            pass
-
-        try:
-            return float(value)
-        except ValueError:
-            return value
