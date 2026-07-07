@@ -9,22 +9,18 @@ from gerbera_sdk.hardware.connection import Connection
 class Microcontroller:
     id: str
     port: str
-    description: str = ""
     baud_rate: int
-    protocol: str
-    protocol_label: str
     fqbn: str = ""
+    description: str = ""
     connections: list[Connection] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "port": self.port,
+            "baud_rate": self.baud_rate,
             "fqbn": self.fqbn,
             "description": self.description,
-            "protocol": self.protocol,
-            "protocol_label": self.protocol_label,
-            "baud_rate": self.baud_rate,
             "connections": [connection.to_dict() for connection in self.connections],
         }
 
@@ -33,11 +29,9 @@ class Microcontroller:
         return cls(
             id=str(payload["id"]),
             port=str(payload["port"]),
+            baud_rate=int(payload.get("baud_rate", 115200)),
             fqbn=str(payload.get("fqbn", "")),
             description=str(payload.get("description", "")),
-            baud_rate=int(payload.get("baud_rate", 115200)),
-            protocol=str(payload.get("protocol", "serial")),
-            protocol_label=str(payload.get("protocol_label", "Serial")),
             connections=[
                 Connection.from_dict(connection)
                 for connection in payload.get("connections", [])
@@ -50,7 +44,7 @@ class Microcontroller:
     ) -> None:
         pending_connections = list(connections)
         connection_names = {connection.name for connection in self.connections}
-        
+
         for connection in pending_connections:
             if connection.name in connection_names:
                 raise ValueError(

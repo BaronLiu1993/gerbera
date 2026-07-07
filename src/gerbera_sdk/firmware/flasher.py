@@ -1,7 +1,5 @@
 import subprocess
 from pathlib import Path
-
-from gerbera_sdk.firmware.generator import FirmwareGenerator
 from gerbera_sdk.hardware.microcontroller import Microcontroller
 
 DEFAULT_FIRMWARE_ROOT = Path("gerbera_firmware")
