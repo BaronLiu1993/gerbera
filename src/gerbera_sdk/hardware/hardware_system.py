@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any
+import subprocess
 
 from gerbera_sdk.hardware.microcontroller import Microcontroller
 
@@ -38,6 +39,12 @@ class HardwareSystem:
         }
 
         for microcontroller in microcontrollers:
+            if microcontroller.hardware_system_id != self.id:
+                raise ValueError(
+                    f"Microcontroller {microcontroller.id} belongs to hardware system "
+                    f"{microcontroller.hardware_system_id}, expected {self.id}"
+                )
+
             if microcontroller.id in existing_microcontroller_ids:
                 raise ValueError(
                     f"Microcontroller already exists in hardware system {self.id}: "
@@ -46,5 +53,22 @@ class HardwareSystem:
 
             existing_microcontroller_ids.add(microcontroller.id)
             self.microcontrollers.append(microcontroller)
+    
+    def install_microcontroller_packages(self) -> None:
+        for microcontroller in self.microcontrollers:
+            fqbn = microcontroller.fqbn
+            parts = fqbn.split(":")
+            if len(parts) > 3:
+                raise ValueError(f"Invalid fqbn: {fqbn}")
 
+            core_package = ":".join(parts[:2])
+
+            subprocess.run(
+                ["arduino-cli", "core", "install", core_package],
+                check=True,
+            )
+        
+
+
+    
     

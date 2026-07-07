@@ -8,15 +8,17 @@ from gerbera_sdk.hardware.connection import Connection
 @dataclass
 class Microcontroller:
     id: str
+    hardware_system_id: str
     port: str
     baud_rate: int
-    fqbn: str = ""
+    fqbn: str
     description: str = ""
     connections: list[Connection] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
+            "hardware_system_id": self.hardware_system_id,
             "port": self.port,
             "baud_rate": self.baud_rate,
             "fqbn": self.fqbn,
@@ -28,6 +30,7 @@ class Microcontroller:
     def from_dict(cls, payload: dict[str, Any]) -> "Microcontroller":
         return cls(
             id=str(payload["id"]),
+            hardware_system_id=str(payload["hardware_system_id"]),
             port=str(payload["port"]),
             baud_rate=int(payload.get("baud_rate", 115200)),
             fqbn=str(payload.get("fqbn", "")),
