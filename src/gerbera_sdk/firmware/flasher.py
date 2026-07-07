@@ -19,17 +19,3 @@ class Flasher:
             "--fqbn", fqbn,
             sketch_path
         ], check=True)
-
-    @staticmethod
-    def flash_microcontroller(
-        microcontroller: Microcontroller,
-        fqbn: str,
-        sketch_root: Path = DEFAULT_FIRMWARE_ROOT,
-    ) -> Path:
-        sketch_path = FirmwareGenerator.write_sketch(microcontroller, sketch_root)
-        Flasher.flashCode(
-            port=microcontroller.port,
-            fqbn=fqbn,
-            sketch_path=str(sketch_path),
-        )
-        return sketch_path
