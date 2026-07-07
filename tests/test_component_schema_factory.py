@@ -1,6 +1,6 @@
 import pytest
 
-from gerbera_sdk.components.registry import ComponentRegistry
+from gerbera_sdk.MCP.tools.registry import ComponentRegistry
 from gerbera_sdk.hardware.pin import PinFactory
 
 

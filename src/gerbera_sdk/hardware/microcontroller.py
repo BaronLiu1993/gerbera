@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from gerbera_sdk.components.registry import ComponentRegistry
+from gerbera_sdk.MCP.tools.registry import ComponentRegistry
 from gerbera_sdk.hardware.connection import Connection
 
 
@@ -13,12 +13,14 @@ class Microcontroller:
     baud_rate: int
     protocol: str
     protocol_label: str
+    fqbn: str = ""
     connections: list[Connection] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "port": self.port,
+            "fqbn": self.fqbn,
             "description": self.description,
             "protocol": self.protocol,
             "protocol_label": self.protocol_label,
@@ -31,6 +33,7 @@ class Microcontroller:
         return cls(
             id=str(payload["id"]),
             port=str(payload["port"]),
+            fqbn=str(payload.get("fqbn", "")),
             description=str(payload.get("description", "")),
             baud_rate=int(payload.get("baud_rate", 115200)),
             protocol=str(payload.get("protocol", "serial")),
@@ -46,11 +49,10 @@ class Microcontroller:
         connections: list[Connection],
     ) -> None:
         pending_connections = list(connections)
-
+        connection_names = {connection.name for connection in self.connections}
+        
         for connection in pending_connections:
-            ComponentRegistry.validate_pins(connection.component_type, connection.pins)
-
-            if connection.name in self._get_connection_names():
+            if connection.name in connection_names:
                 raise ValueError(
                     f"Connection name already exists on board {self.id}: "
                     f"{connection.name}"
@@ -65,14 +67,6 @@ class Microcontroller:
 
             self.connections.append(connection)
 
-    def get_connection(self, connection_name: str) -> Connection:
-        for connection in self.connections:
-            if connection.name == connection_name:
-                return connection
-
-        raise ValueError(f"Unknown connection name for board {self.id}: {connection_name}")
-
-
     # Helper Functions for Deduping
     def _get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
@@ -82,6 +76,3 @@ class Microcontroller:
                 used_pins.add(pin)
 
         return used_pins
-
-    def _get_connection_names(self) -> set[str]:
-        return {connection.name for connection in self.connections}

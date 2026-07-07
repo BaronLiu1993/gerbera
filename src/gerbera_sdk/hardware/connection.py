@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
-
+from pin import Pin
 
 @dataclass
 class Connection:
@@ -10,7 +10,7 @@ class Connection:
     description: str = ""
     pins: dict[str, str] = None
     component_type: str = ""
-    pins: dict = {}
+    pins: list[Pin]
 
     def to_dict(self) -> dict[str, Any]:
         return {
