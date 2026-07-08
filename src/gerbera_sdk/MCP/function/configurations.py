@@ -8,6 +8,5 @@ BUILDER_MAPPING = {
 MICROCONTROLLER_MAPPING = {
     "arduino:avr:mega": {
         "includes": ["Arduino.h"],
-        "library_import_overrides": {},
     },
 }

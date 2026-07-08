@@ -20,8 +20,6 @@ class Libraries:
                 includes.append(include)
                 normalized_includes.add(normalized_include)
 
-        import_overrides = board_mapping.get("library_import_overrides", {})
-
         for connection in microcontroller.connections:
             if connection.component_type not in BUILDER_MAPPING:
                 raise ValueError(
@@ -31,11 +29,7 @@ class Libraries:
 
             builder = BUILDER_MAPPING[connection.component_type]()
             for library in builder.required_libraries():
-                install_name = library.get("install", "")
                 include_name = library.get("include")
-
-                if install_name in import_overrides:
-                    include_name = import_overrides[install_name]
 
                 if not include_name:
                     continue

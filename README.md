@@ -1,105 +1,94 @@
 # gerbera-cli
 
-Gerbera currently has two layers:
+Gerbera has two layers:
 
-- `gerbera_cli`: local setup commands
-- `gerbera_sdk`: hardware modeling and generated runtime contracts
+- `gerbera_cli`: local machine setup
+- `gerbera_sdk`: hardware modeling plus generated device-side runtime
 
 ## Current Goal
 
-The current goal is simple:
+The current goal is:
 
-- declare boards locally
+- declare boards explicitly
 - model hardware capabilities in Python
-- generate a thin device-side command layer
-- expose those capabilities cleanly to a higher runtime or MCP layer
+- generate a thin firmware command layer
+- keep device code small and push interpretation upward
 
 ## Boundaries
 
 ### `gerbera_cli`
 
-The CLI is intentionally narrow.
+The CLI is for machine-side setup:
 
-Right now it is for:
-
-- detecting and declaring boards
-- installing Arduino libraries
+- detect and declare boards
+- install Arduino libraries
+- install board cores
 
 It is not where hardware behavior is defined.
 
 ### `gerbera_sdk`
 
-The SDK owns:
+The SDK is the source of truth for:
 
-- the hardware model
-- the command contract
-- generated firmware/runtime building blocks
-
-It is the source of truth for what a board can do.
+- hardware modeling
+- command naming
+- firmware generation
+- parser, setup, and routing generation
 
 ## Core Decisions
 
 ### Hardware is declared, not inferred
 
-Gerbera does not try to guess what is attached to a board.
+Gerbera does not try to guess what is wired to a board.
 
-The developer declares the hardware in code. That is more reliable and keeps the system predictable.
+Developers define:
 
-### `Connection` is the main unit
+- the board
+- the `fqbn`
+- the connections
+- the pin roles
 
-A `Connection` is not just a pin mapping. It represents one callable hardware capability.
+That keeps the system explicit and deterministic.
 
-Example:
+### `Connection` is the callable unit
 
-```python
-Connection(
-    microcontroller_id=device_id,
-    name="room_temperature",
-    description="Temperature sensor on A0.",
-    pins={"signal": "A0"},
-    component_type="hw-201",
-)
-```
+A `Connection` is one callable hardware capability on a board.
 
-That single object is the thing that later becomes:
+It becomes:
 
-- a generated handler
-- a command name
+- a generated firmware handler
+- a command name in the runtime contract
 - a future MCP-facing capability
 
-### Pins are named by role
+### Pins use hardware-facing labels
 
-Pins are modeled by semantic names, not position.
+Pins should mirror real hardware labels and protocol roles.
 
-Example:
+Examples:
 
-```python
-pins={"signal": "A0"}
-```
+- `out`
+- `tx`
+- `rx`
+- `sda`
+- `scl`
 
-For multi-pin components:
+This is preferred over vague names like `signal` when the module already has a concrete label.
 
-```python
-pins={"tx": "17", "rx": "16"}
-```
+### The device layer stays thin
 
-This keeps generation explicit and avoids fragile ordering assumptions.
+The firmware/device side should only:
 
-### Component type drives behavior
+- receive a command
+- parse it
+- route it
+- touch hardware
+- return raw data
 
-Each connection declares a `component_type`.
+It should not contain business logic or higher-level interpretation.
 
-Example:
+### The command contract stays simple
 
-```python
-component_type="hw-201"
-```
-
-That type maps to known behavior in configuration and code generation. The developer chooses the component type; the system does not invent one.
-
-### The board command contract stays simple
-
-The board should receive a small serial command string, not raw MCP JSON.
+The board receives a small string command, not raw MCP JSON.
 
 Examples:
 
@@ -109,65 +98,42 @@ WRITE,set_led,value:true
 WRITE,set_motor,speed:120,direction:forward
 ```
 
-This keeps the embedded side small and easy to parse.
+### Parsing is shared
 
-### Parsing is shared infrastructure
+Parsing is generated once and reused by all handlers.
 
-Command parsing should be generated once and reused by all handlers.
-
-The parser should produce:
+The generated parser produces:
 
 - `action`
 - `commandName`
 - params
 
-Handlers should receive structured parsed input instead of manually splitting strings themselves.
-
-### Empty params are valid
-
-Some commands, especially reads, do not need params.
-
-Example:
-
-```text
-READ,room_temperature
-```
-
-That is a valid command.
+Handlers receive structured parsed input instead of splitting strings themselves.
 
 ### Reads are one-shot for MVP
 
-For now, reads are one-shot requests, not streams.
+For now, reads are one-shot requests rather than streams.
 
-That keeps the contract simpler and leaves streaming as a future extension.
+That keeps the runtime contract small and easy to extend later.
 
-### Firmware or device-side code should stay thin
+## Domain Model
 
-The embedded layer should only:
-
-- receive a command
-- parse it
-- route it
-- touch hardware
-- return a response
-
-Business logic and orchestration stay on the Python side.
-
-## Current Domain Model
-
-The intended hierarchy is:
+Current intended hierarchy:
 
 - `HardwareSystem`
   - many `Microcontroller`
 - `Microcontroller`
   - many `Connection`
+- `Connection`
+  - pin mappings plus component type
 
-For MVP, `Microcontroller` should stay minimal:
+Current `Microcontroller` shape:
 
 ```python
 @dataclass
 class Microcontroller:
     id: str
+    hardware_system_id: str
     port: str
     baud_rate: int
     fqbn: str
@@ -175,31 +141,191 @@ class Microcontroller:
     connections: list[Connection] = field(default_factory=list)
 ```
 
-## Current Flow
+## Hierarchy
 
-The current flow is:
+```mermaid
+classDiagram
+    class HardwareSystem {
+      +id: str
+      +description: str
+      +microcontrollers: list[Microcontroller]
+    }
+
+    class Microcontroller {
+      +id: str
+      +hardware_system_id: str
+      +port: str
+      +baud_rate: int
+      +fqbn: str
+      +description: str
+      +connections: list[Connection]
+    }
+
+    class Connection {
+      +id: str
+      +microcontroller_id: str
+      +name: str
+      +component_type: str
+      +pins: ...
+    }
+
+    class Pin {
+      +name: PinName
+      +value: str
+    }
+
+    class PinName {
+      <<enum>>
+      out
+      tx
+      rx
+      sda
+      scl
+    }
+
+    HardwareSystem "1" *-- "*" Microcontroller
+    Microcontroller "1" *-- "*" Connection
+    Connection "1" *-- "*" Pin
+    Pin --> PinName
+```
+
+## Generation Model
+
+Firmware generation is built from a few parts:
+
+- `BaseFirmwareBuilder`
+  - device-specific contract
+- device builders like `HW201FirmwareBuilder`
+  - declare required libraries
+  - generate the raw handler body
+- `Parser`
+  - generates shared parsing code
+- `Routing`
+  - generates `setup()` and `loop()`
+- `Libraries`
+  - stitches includes, parser, handlers, setup, and loop together
+
+## Include And Library Resolution
+
+There are two sources of include/import information.
+
+### 1. Device builder declarations
+
+Each device builder declares required libraries through:
+
+```python
+def required_libraries(self) -> list[dict[str, str]]:
+    ...
+```
+
+The current contract is:
+
+- install name
+- include/import name
+
+Conceptually:
+
+```python
+[
+    {
+        "install": "SomeLibrary",
+        "include": "SomeLibrary.h",
+    }
+]
+```
+
+### 2. Board-level `fqbn` mapping
+
+`MICROCONTROLLER_MAPPING` is keyed by `fqbn`.
+
+It can declare:
+
+- board-level includes
+- board-specific library import overrides
+
+This means:
+
+- component/device definitions stay the primary source of library needs
+- `fqbn` can adjust the import name when a board needs something different
+
+## Include Deduping
+
+Generated includes are deduped before firmware assembly.
+
+Deduping is normalized with:
+
+- `.strip()`
+- `.lower()`
+
+But the first configured formatting is preserved in the generated firmware output.
+
+## Generated Runtime Shape
+
+The generated firmware is assembled from:
+
+- includes
+- `const int BAUD_RATE = ...`
+- parser code
+- generated handlers
+- `setup()`
+- `loop()`
+
+For MVP, `setup()` is intentionally minimal:
+
+```cpp
+void setup() {
+  Serial.begin(BAUD_RATE);
+}
+```
+
+`loop()` then:
+
+- reads a line
+- parses it
+- routes by `commandName`
+- calls `handle_<connection_name>(command)`
+
+## Flow
+
+```mermaid
+flowchart TD
+    A[Declare boards in CLI] --> B[Create HardwareSystem]
+    B --> C[Add Microcontroller objects]
+    C --> D[Add Connection objects]
+    D --> E[Resolve device builders by component_type]
+    E --> F[Resolve board mapping by fqbn]
+    F --> G[Build includes]
+    E --> H[Build handlers]
+    I[Parser] --> J[Build firmware]
+    K[Routing setup/loop] --> J
+    G --> J
+    H --> J
+```
+
+## Current Flow
 
 1. Use the CLI to declare boards locally.
 2. Build a `HardwareSystem` in Python.
-3. Add `Microcontroller` objects.
-4. Add `Connection` objects to each board.
-5. Generate shared parser/routing code plus connection-specific handlers.
-6. Use that generated layer as the bridge between Python and the device.
+3. Add `Microcontroller` objects with explicit `fqbn`.
+4. Add `Connection` objects with explicit `component_type`.
+5. Resolve device builders and board mapping.
+6. Generate includes, parser, handlers, setup, and loop.
+7. Use that generated layer as the bridge to the board.
 
 ## `devices.json`
 
-`devices.json` is the bridge from CLI setup to SDK modeling.
+`devices.json` is still the bridge from CLI setup to SDK modeling.
 
-For now it should stay small and only hold board registry information, not component behavior.
+It should stay focused on board registry data rather than component behavior.
 
-## What Is Out of Scope Right Now
+## What Is Out Of Scope Right Now
 
 - automatic hardware detection
 - streaming reads
-- rich user-authored MCP schemas
 - putting business logic on the board
 - making the board understand MCP directly
-- locking in a flashing workflow
+- rich user-authored MCP schemas
+- broad automatic inference of attached device capabilities
 
 ## Run
 
