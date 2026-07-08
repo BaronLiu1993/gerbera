@@ -1,5 +1,5 @@
 from gerbera_sdk.firmware.function.configurations import (
-    BUILDER_MAPPING,
+    DEVICES_MAPPING,
     MICROCONTROLLER_MAPPING,
 )
 from gerbera_sdk.firmware.function.parser import Parser
@@ -21,13 +21,13 @@ class Generator:
                 normalized_includes.add(normalized_include)
 
         for connection in microcontroller.connections:
-            if connection.component_type not in BUILDER_MAPPING:
+            if connection.component_type not in DEVICES_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for firmware generation: "
                     f"{connection.component_type}"
                 )
 
-            builder = BUILDER_MAPPING[connection.component_type]()
+            builder = DEVICES_MAPPING[connection.component_type]()
             for library in builder.required_libraries():
                 include_name = library.get("include")
 
@@ -47,13 +47,13 @@ class Generator:
         handlers = []
 
         for connection in microcontroller.connections:
-            if connection.component_type not in BUILDER_MAPPING:
+            if connection.component_type not in DEVICES_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for firmware generation: "
                     f"{connection.component_type}"
                 )
 
-            builder = BUILDER_MAPPING[connection.component_type]()
+            builder = DEVICES_MAPPING[connection.component_type]()
             handlers.append(builder.build_handler(connection))
 
         return "\n\n".join(handlers)

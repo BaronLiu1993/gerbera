@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from typing import Any
-import subprocess
 
 from gerbera_sdk.models.microcontroller import Microcontroller
 from gerbera_sdk.firmware.function.configurations import MICROCONTROLLER_MAPPING
@@ -55,14 +54,23 @@ class HardwareSystem:
             existing_microcontroller_ids.add(microcontroller.id)
             self.microcontrollers.append(microcontroller)
     
-    def install_microcontroller_packages(self) -> None:
+    def get_required_microcontroller_packages(self) -> list[str]:
+        libraries: list[str] = []
+        normalized_library_names: set[str] = set()
+
         for microcontroller in self.microcontrollers:
             fqbn = microcontroller.fqbn
-            libraries = MICROCONTROLLER_MAPPING[fqbn]["libraries"]
+            if fqbn not in MICROCONTROLLER_MAPPING:
+                raise ValueError(f"Unsupported microcontroller fqbn: {fqbn}")
 
-            for library in libraries:
-                subprocess.run(
-                    ["arduino-cli", "core", "install", library],
-                    check=True,
-                )
-        
+            package_names = MICROCONTROLLER_MAPPING[fqbn]["libraries"]
+
+            for library in package_names:
+                normalized_library = library.strip().lower()
+                if normalized_library in normalized_library_names:
+                    continue
+
+                libraries.append(library)
+                normalized_library_names.add(normalized_library)
+
+        return libraries

@@ -3,3 +3,4 @@
 devices.json
 test.py
 gerbera_firmware
+__pycache__

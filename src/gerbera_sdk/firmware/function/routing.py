@@ -1,4 +1,4 @@
-from gerbera_sdk.firmware.function.configurations import BUILDER_MAPPING
+from gerbera_sdk.firmware.function.configurations import DEVICES_MAPPING
 from gerbera_sdk.models.connection import Connection
 
 
@@ -14,7 +14,7 @@ class Routing:
         dispatch_lines = []
 
         for connection in connections:
-            if connection.component_type not in BUILDER_MAPPING:
+            if connection.component_type not in DEVICES_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for routing: {connection.component_type}"
                 )

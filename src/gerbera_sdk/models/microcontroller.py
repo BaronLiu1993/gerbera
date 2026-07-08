@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from typing import Any
-import subprocess
 
 from gerbera_sdk.firmware.function.configurations import DEVICES_MAPPING
 from gerbera_sdk.models.connection import Connection
@@ -69,7 +68,8 @@ class Microcontroller:
             self.connections.append(connection)
 
     def get_required_libraries(self) -> list[str]:
-        libraries: list[str] = []
+        libraries: list[dict[str, str]] = []
+        normalized_library_names: set[str] = set()
 
         for connection in self.connections:
             if connection.component_type not in DEVICES_MAPPING:
@@ -80,18 +80,16 @@ class Microcontroller:
 
             builder = DEVICES_MAPPING[connection.component_type]()
             for library in builder.required_libraries():
-                if library not in libraries:
-                    libraries.append(library)
+                install_name = library.get("install", "").strip()
+                normalized_install_name = install_name.lower()
+
+                if not install_name or normalized_install_name in normalized_library_names:
+                    continue
+
+                libraries.append(library)
+                normalized_library_names.add(normalized_install_name)
 
         return libraries
-
-    def install_device_packages(self) -> None:
-        required_libraries = self.get_required_libraries
-        for library in required_libraries:
-            subprocess.run(
-                ["arduino-cli", "core", "install", library],
-                check=True,
-            )
 
     def set_firmware_file(self, path) -> None:
             self.firmware_file_path = path

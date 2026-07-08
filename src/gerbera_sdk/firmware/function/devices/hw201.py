@@ -9,6 +9,9 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
     # So key is the library install name and the value is the import name
     def required_libraries(self) -> list[dict[str, str]]:
         return []
+    
+    def required_commands(self, connection) -> list[str]:
+        return [f"READ,{connection.name}"]
 
     def build_handler(self, connection: Connection) -> str:
         out_pin = connection.pins["out"]

@@ -63,5 +63,5 @@ class Flash:
             raise RuntimeError(f"Failed to flash hardware system {hardware_system.id}") from e
 
     @staticmethod
-    def compile(hardware_system) -> None:
+    def flash(hardware_system) -> None:
         Flash.flash_code(hardware_system)
