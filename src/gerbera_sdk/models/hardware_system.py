@@ -3,6 +3,7 @@ from typing import Any
 import subprocess
 
 from gerbera_sdk.models.microcontroller import Microcontroller
+from gerbera_sdk.firmware.function.configurations import MICROCONTROLLER_MAPPING
 
 
 @dataclass
@@ -57,14 +58,11 @@ class HardwareSystem:
     def install_microcontroller_packages(self) -> None:
         for microcontroller in self.microcontrollers:
             fqbn = microcontroller.fqbn
-            parts = fqbn.split(":")
-            if len(parts) > 3:
-                raise ValueError(f"Invalid fqbn: {fqbn}")
+            libraries = MICROCONTROLLER_MAPPING[fqbn]["libraries"]
 
-            core_package = ":".join(parts[:2])
-
-            subprocess.run(
-                ["arduino-cli", "core", "install", core_package],
-                check=True,
-            )
+            for library in libraries:
+                subprocess.run(
+                    ["arduino-cli", "core", "install", library],
+                    check=True,
+                )
         

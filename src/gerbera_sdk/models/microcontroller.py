@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
+import subprocess
 
-from gerbera_sdk.firmware.function.configurations import BUILDER_MAPPING
+from gerbera_sdk.firmware.function.configurations import DEVICES_MAPPING
 from gerbera_sdk.models.connection import Connection
 
 
@@ -24,6 +25,7 @@ class Microcontroller:
             "baud_rate": self.baud_rate,
             "fqbn": self.fqbn,
             "description": self.description,
+            "firmware_file_path": self.firmware_file_path,
             "connections": [connection.to_dict() for connection in self.connections],
         }
 
@@ -36,6 +38,7 @@ class Microcontroller:
             baud_rate=int(payload.get("baud_rate")),
             fqbn=str(payload.get("fqbn")),
             description=str(payload.get("description", "")),
+            firmware_file_path=str(payload.get("firmware_file_path", "")),
             connections=[
                 Connection.from_dict(connection)
                 for connection in payload.get("connections", [])
@@ -69,21 +72,29 @@ class Microcontroller:
         libraries: list[str] = []
 
         for connection in self.connections:
-            if connection.component_type not in BUILDER_MAPPING:
+            if connection.component_type not in DEVICES_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for library resolution: "
                     f"{connection.component_type}"
                 )
 
-            builder = BUILDER_MAPPING[connection.component_type]()
+            builder = DEVICES_MAPPING[connection.component_type]()
             for library in builder.required_libraries():
                 if library not in libraries:
                     libraries.append(library)
 
         return libraries
-    
+
+    def install_device_packages(self) -> None:
+        required_libraries = self.get_required_libraries
+        for library in required_libraries:
+            subprocess.run(
+                ["arduino-cli", "core", "install", library],
+                check=True,
+            )
+
     def set_firmware_file(self, path) -> None:
-        self.firmware_file_path = path
+            self.firmware_file_path = path
 
     # Helper Functions for Deduping
     def _get_used_pins(self) -> set[str]:
