@@ -1,5 +1,5 @@
-from gerbera_sdk.MCP.function.devices.base import BaseFirmwareBuilder
-from gerbera_sdk.hardware.connection import Connection
+from gerbera_sdk.firmware.function.devices.base import BaseFirmwareBuilder
+from gerbera_sdk.models.connection import Connection
 
 class HW201FirmwareBuilder(BaseFirmwareBuilder):
     template_name = "hw_201_read"

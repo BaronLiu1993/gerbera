@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 import subprocess
 
-from gerbera_sdk.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.microcontroller import Microcontroller
 
 
 @dataclass

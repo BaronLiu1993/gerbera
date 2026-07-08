@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from gerbera_sdk.MCP.function.configurations import BUILDER_MAPPING
-from gerbera_sdk.MCP.tools.registry import ComponentRegistry
-from gerbera_sdk.hardware.connection import Connection
+from gerbera_sdk.firmware.function.configurations import BUILDER_MAPPING
+from gerbera_sdk.models.connection import Connection
 
 
 @dataclass
@@ -14,6 +13,7 @@ class Microcontroller:
     baud_rate: int
     fqbn: str
     description: str = ""
+    firmware_file_path: str = ""
     connections: list[Connection] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,8 +69,6 @@ class Microcontroller:
         libraries: list[str] = []
 
         for connection in self.connections:
-            ComponentRegistry.get(connection.component_type)
-
             if connection.component_type not in BUILDER_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for library resolution: "
@@ -83,6 +81,9 @@ class Microcontroller:
                     libraries.append(library)
 
         return libraries
+    
+    def set_firmware_file(self, path) -> None:
+        self.firmware_file_path = path
 
     # Helper Functions for Deduping
     def _get_used_pins(self) -> set[str]:

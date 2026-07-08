@@ -1,15 +1,14 @@
 from dataclasses import dataclass
-from typing import Any
-from pin import Pin
+from typing import Any, Optional
 
 @dataclass
 class Connection:
-    id: str
-    microcontroller_id: str
-    name: str
+    id: str = ""
+    microcontroller_id: str = ""
+    name: str = ""
+    component_type: str = ""
+    pins: Optional[dict[str, str]] = None
     description: str = ""
-    component_type: str
-    pins: list[Pin]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -17,8 +16,8 @@ class Connection:
             "microcontroller_id": self.microcontroller_id,
             "name": self.name,
             "description": self.description,
-            "pins": dict(self.pins),
             "component_type": self.component_type,
+            "pins": dict(self.pins or {}),
         }
 
     @classmethod
@@ -27,10 +26,10 @@ class Connection:
             id=str(payload.get("id", "")),
             microcontroller_id=str(payload.get("microcontroller_id", "")),
             name=str(payload.get("name", "")),
-            description=str(payload.get("description", "")),
+            component_type=str(payload.get("component_type", "")),
             pins={
                 str(pin_name): str(pin_value)
                 for pin_name, pin_value in payload.get("pins", {}).items()
             },
-            component_type=str(payload.get("component_type", "")),
+            description=str(payload.get("description", "")),
         )

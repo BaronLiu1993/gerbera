@@ -1,13 +1,13 @@
-from gerbera_sdk.MCP.function.configurations import (
+from gerbera_sdk.firmware.function.configurations import (
     BUILDER_MAPPING,
     MICROCONTROLLER_MAPPING,
 )
-from gerbera_sdk.MCP.function.parser import Parser
-from gerbera_sdk.MCP.function.routing import Routing
-from gerbera_sdk.hardware.microcontroller import Microcontroller
+from gerbera_sdk.firmware.function.parser import Parser
+from gerbera_sdk.firmware.function.routing import Routing
+from gerbera_sdk.models.microcontroller import Microcontroller
 
 
-class Libraries:
+class Generator:
     @staticmethod
     def build_includes(microcontroller: Microcontroller) -> str:
         includes: list[str] = []
@@ -60,9 +60,9 @@ class Libraries:
 
     @staticmethod
     def build_firmware(microcontroller: Microcontroller) -> str:
-        includes = Libraries.build_includes(microcontroller)
+        includes = Generator.build_includes(microcontroller)
         parser_code = Parser.parse_command_code()
-        handler_code = Libraries.build_handlers(microcontroller)
+        handler_code = Generator.build_handlers(microcontroller)
         setup_code = Routing.build_setup_code()
         routing_code = Routing.build_loop_code(microcontroller.connections)
 

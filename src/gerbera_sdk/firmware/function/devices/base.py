@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from gerbera_sdk.hardware.connection import Connection
+from gerbera_sdk.models.connection import Connection
 
 
 class BaseFirmwareBuilder(ABC):

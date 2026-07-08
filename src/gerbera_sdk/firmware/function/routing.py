@@ -1,5 +1,5 @@
-from gerbera_sdk.MCP.function.configurations import BUILDER_MAPPING
-from gerbera_sdk.hardware.connection import Connection
+from gerbera_sdk.firmware.function.configurations import BUILDER_MAPPING
+from gerbera_sdk.models.connection import Connection
 
 
 class Routing:
