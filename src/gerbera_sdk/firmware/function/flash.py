@@ -5,6 +5,7 @@ from gerbera_sdk.firmware.function.generator import Generator
 from gerbera_sdk.models.hardware_system import HardwareSystem
 
 DEFAULT_FIRMWARE_ROOT = Path("gerbera_firmware")
+DEFAULT_BUILD_ROOT = DEFAULT_FIRMWARE_ROOT / "build"
 
 
 class Flash:
@@ -15,10 +16,12 @@ class Flash:
 
         for microcontroller in hardware_system.microcontrollers:
             firmware_code = Generator.build_firmware(microcontroller)
-            sketch_path = DEFAULT_FIRMWARE_ROOT / f"{microcontroller.id}.ino"
+            sketch_dir = DEFAULT_FIRMWARE_ROOT / microcontroller.id
+            sketch_dir.mkdir(parents=True, exist_ok=True)
+            sketch_path = sketch_dir / f"{microcontroller.id}.ino"
             sketch_path.write_text(firmware_code)
-            microcontroller.set_firmware_file(str(sketch_path))
-            generated_files[microcontroller.id] = str(sketch_path)
+            microcontroller.set_firmware_file(str(sketch_dir))
+            generated_files[microcontroller.id] = str(sketch_dir)
 
         return generated_files
 
@@ -31,15 +34,19 @@ class Flash:
                 port = microcontroller.port
                 fqbn = microcontroller.fqbn
                 sketch_path = microcontroller.firmware_file_path
+                build_path = DEFAULT_BUILD_ROOT / microcontroller.id
 
                 if not sketch_path:
                     raise ValueError(
                         f"Missing firmware file path for microcontroller {microcontroller.id}"
                     )
 
+                build_path.mkdir(parents=True, exist_ok=True)
+
                 subprocess.run([
                     "arduino-cli", "compile",
                     "--fqbn", fqbn,
+                    "--build-path", str(build_path),
                     sketch_path
                 ], check=True)
 
@@ -47,8 +54,14 @@ class Flash:
                     "arduino-cli", "upload",
                     "-p", port,
                     "--fqbn", fqbn,
+                    "--input-dir", str(build_path),
                     sketch_path
                 ], check=True)
 
+                print("worked")
         except Exception as e:
             raise RuntimeError(f"Failed to flash hardware system {hardware_system.id}") from e
+
+    @staticmethod
+    def compile(hardware_system) -> None:
+        Flash.flash_code(hardware_system)
