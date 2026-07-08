@@ -1,18 +1,20 @@
 # gerbera-cli
 
-Gerbera has two layers:
+Gerbera currently has two layers:
 
-- `gerbera_cli`: local machine setup
-- `gerbera_sdk`: hardware modeling plus generated device-side runtime
+- `gerbera_cli`: local setup and board declaration
+- `gerbera_sdk`: hardware modeling, firmware generation, flashing, and MCP runtime
 
 ## Current Goal
 
-The current goal is:
+The current design is optimized for:
 
-- declare boards explicitly
-- model hardware capabilities in Python
-- generate a thin firmware command layer
-- keep device code small and push interpretation upward
+- explicit hardware declaration
+- thin generated firmware
+- simple serial commands
+- generated MCP tools from the same hardware model
+
+The hardware model defined by the developer is the source of truth.
 
 ## Boundaries
 
@@ -20,20 +22,22 @@ The current goal is:
 
 The CLI is for machine-side setup:
 
-- detect and declare boards
-- install Arduino libraries
-- install board cores
+- detect boards
+- declare boards locally
+- install Arduino packages manually when needed
 
 It is not where hardware behavior is defined.
 
 ### `gerbera_sdk`
 
-The SDK is the source of truth for:
+The SDK owns:
 
-- hardware modeling
+- hardware domain modeling
 - command naming
+- dependency resolution
 - firmware generation
-- parser, setup, and routing generation
+- firmware flashing
+- MCP server generation and runtime
 
 ## Core Decisions
 
@@ -43,12 +47,11 @@ Gerbera does not try to guess what is wired to a board.
 
 Developers define:
 
-- the board
+- the hardware system
+- each microcontroller
 - the `fqbn`
-- the connections
-- the pin roles
-
-That keeps the system explicit and deterministic.
+- each connection
+- the pin-role mapping
 
 ### `Connection` is the callable unit
 
@@ -57,12 +60,12 @@ A `Connection` is one callable hardware capability on a board.
 It becomes:
 
 - a generated firmware handler
-- a command name in the runtime contract
-- a future MCP-facing capability
+- a serial command name
+- an MCP tool
 
 ### Pins use hardware-facing labels
 
-Pins should mirror real hardware labels and protocol roles.
+Pin mappings should mirror real hardware labels and protocol roles.
 
 Examples:
 
@@ -72,11 +75,9 @@ Examples:
 - `sda`
 - `scl`
 
-This is preferred over vague names like `signal` when the module already has a concrete label.
+### The firmware stays thin
 
-### The device layer stays thin
-
-The firmware/device side should only:
+Generated firmware should only:
 
 - receive a command
 - parse it
@@ -84,11 +85,11 @@ The firmware/device side should only:
 - touch hardware
 - return raw data
 
-It should not contain business logic or higher-level interpretation.
+It should not contain business logic.
 
 ### The command contract stays simple
 
-The board receives a small string command, not raw MCP JSON.
+The board receives a small string command rather than MCP JSON.
 
 Examples:
 
@@ -98,34 +99,34 @@ WRITE,set_led,value:true
 WRITE,set_motor,speed:120,direction:forward
 ```
 
-### Parsing is shared
+### Domain models declare, runtime orchestrates
 
-Parsing is generated once and reused by all handlers.
+The domain layer should stay pure.
 
-The generated parser produces:
+Models declare:
 
-- `action`
-- `commandName`
-- params
+- structure
+- relationships
+- validation
+- dependency metadata
 
-Handlers receive structured parsed input instead of splitting strings themselves.
+The runtime layer performs:
 
-### Reads are one-shot for MVP
-
-For now, reads are one-shot requests rather than streams.
-
-That keeps the runtime contract small and easy to extend later.
+- `arduino-cli` installs
+- firmware flashing
+- MCP server creation
+- serial connection lifecycle
 
 ## Domain Model
 
-Current intended hierarchy:
+Current hierarchy:
 
 - `HardwareSystem`
   - many `Microcontroller`
 - `Microcontroller`
   - many `Connection`
 - `Connection`
-  - pin mappings plus component type
+  - one callable hardware capability
 
 Current `Microcontroller` shape:
 
@@ -138,10 +139,11 @@ class Microcontroller:
     baud_rate: int
     fqbn: str
     description: str = ""
+    firmware_file_path: str = ""
     connections: list[Connection] = field(default_factory=list)
 ```
 
-## Hierarchy
+## Domain Hierarchy
 
 ```mermaid
 classDiagram
@@ -149,6 +151,10 @@ classDiagram
       +id: str
       +description: str
       +microcontrollers: list[Microcontroller]
+      +to_dict()
+      +from_dict()
+      +add_microcontrollers()
+      +get_required_microcontroller_packages()
     }
 
     class Microcontroller {
@@ -158,7 +164,12 @@ classDiagram
       +baud_rate: int
       +fqbn: str
       +description: str
+      +firmware_file_path: str
       +connections: list[Connection]
+      +to_dict()
+      +from_dict()
+      +add_connections()
+      +get_required_libraries()
     }
 
     class Connection {
@@ -166,64 +177,77 @@ classDiagram
       +microcontroller_id: str
       +name: str
       +component_type: str
-      +pins: ...
-    }
-
-    class Pin {
-      +name: PinName
-      +value: str
-    }
-
-    class PinName {
-      <<enum>>
-      out
-      tx
-      rx
-      sda
-      scl
+      +pins: dict[str, str]
+      +description: str
     }
 
     HardwareSystem "1" *-- "*" Microcontroller
     Microcontroller "1" *-- "*" Connection
-    Connection "1" *-- "*" Pin
-    Pin --> PinName
+```
+
+## Runtime Boundary
+
+```mermaid
+flowchart TD
+    A[HardwareSystem] --> B[GerberaRuntime]
+    B --> C[Install board packages]
+    B --> D[Install device libraries]
+    B --> E[Flash firmware]
+    B --> F[Build GerberaMCPServer]
+    F --> G[Open persistent serial connections]
+    F --> H[Expose generated MCP tools]
 ```
 
 ## Generation Model
 
-Firmware generation is built from a few parts:
+Firmware generation is composed from a few focused parts:
 
-- `BaseFirmwareBuilder`
-  - device-specific contract
-- device builders like `HW201FirmwareBuilder`
-  - declare required libraries
-  - generate the raw handler body
+- device builders such as `HW201FirmwareBuilder`
 - `Parser`
-  - generates shared parsing code
 - `Routing`
-  - generates `setup()` and `loop()`
-- `Libraries`
-  - stitches includes, parser, handlers, setup, and loop together
+- `Generator`
+- `Flash`
 
-## Include And Library Resolution
+The builder owns device-specific code generation.
 
-There are two sources of include/import information.
+It declares:
 
-### 1. Device builder declarations
+- required Arduino libraries
+- supported commands
+- raw handler code
 
-Each device builder declares required libraries through:
+The shared generator layer builds:
+
+- includes
+- parser code
+- handlers
+- `setup()`
+- `loop()`
+
+## Dependency Resolution
+
+There are two dependency sources.
+
+### Board-level packages
+
+`HardwareSystem.get_required_microcontroller_packages()` resolves Arduino cores from the `fqbn` mapping.
+
+Example:
 
 ```python
-def required_libraries(self) -> list[dict[str, str]]:
-    ...
+MICROCONTROLLER_MAPPING = {
+    "arduino:avr:mega": {
+        "includes": ["Arduino.h"],
+        "libraries": ["arduino:avr"],
+    },
+}
 ```
 
-The current contract is:
+### Device-level libraries
 
-- install name
-- include/import name
+`Microcontroller.get_required_libraries()` resolves component libraries from each device builder.
 
-Conceptually:
+Current builder contract:
 
 ```python
 [
@@ -234,109 +258,43 @@ Conceptually:
 ]
 ```
 
-### 2. Board-level `fqbn` mapping
+The runtime installs:
 
-`MICROCONTROLLER_MAPPING` is keyed by `fqbn`.
+- board packages with `arduino-cli core install`
+- device libraries with `arduino-cli lib install`
 
-It can declare:
+## MCP Surface
 
-- board-level includes
-- board-specific library import overrides
+The MCP server is generated from the same hardware model.
 
-This means:
+Tool naming follows the action + connection contract:
 
-- component/device definitions stay the primary source of library needs
-- `fqbn` can adjust the import name when a board needs something different
+- `read_room_temperature`
+- `write_led`
 
-## Include Deduping
+Each tool:
 
-Generated includes are deduped before firmware assembly.
+- builds a serial command
+- sends it through a persistent serial connection
+- parses the raw response
 
-Deduping is normalized with:
-
-- `.strip()`
-- `.lower()`
-
-But the first configured formatting is preserved in the generated firmware output.
-
-## Generated Runtime Shape
-
-The generated firmware is assembled from:
-
-- includes
-- `const int BAUD_RATE = ...`
-- parser code
-- generated handlers
-- `setup()`
-- `loop()`
-
-For MVP, `setup()` is intentionally minimal:
-
-```cpp
-void setup() {
-  Serial.begin(BAUD_RATE);
-}
-```
-
-`loop()` then:
-
-- reads a line
-- parses it
-- routes by `commandName`
-- calls `handle_<connection_name>(command)`
-
-## Flow
+## End-to-End Flow
 
 ```mermaid
-flowchart TD
-    A[Declare boards in CLI] --> B[Create HardwareSystem]
-    B --> C[Add Microcontroller objects]
-    C --> D[Add Connection objects]
-    D --> E[Resolve device builders by component_type]
-    E --> F[Resolve board mapping by fqbn]
-    F --> G[Build includes]
-    E --> H[Build handlers]
-    I[Parser] --> J[Build firmware]
-    K[Routing setup/loop] --> J
-    G --> J
-    H --> J
-```
+sequenceDiagram
+    participant Dev as Developer
+    participant Model as HardwareSystem
+    participant Runtime as GerberaRuntime
+    participant Flash as Flash
+    participant MCP as GerberaMCPServer
+    participant Board as Microcontroller
 
-## Current Flow
-
-1. Use the CLI to declare boards locally.
-2. Build a `HardwareSystem` in Python.
-3. Add `Microcontroller` objects with explicit `fqbn`.
-4. Add `Connection` objects with explicit `component_type`.
-5. Resolve device builders and board mapping.
-6. Generate includes, parser, handlers, setup, and loop.
-7. Use that generated layer as the bridge to the board.
-
-## `devices.json`
-
-`devices.json` is still the bridge from CLI setup to SDK modeling.
-
-It should stay focused on board registry data rather than component behavior.
-
-## What Is Out Of Scope Right Now
-
-- automatic hardware detection
-- streaming reads
-- putting business logic on the board
-- making the board understand MCP directly
-- rich user-authored MCP schemas
-- broad automatic inference of attached device capabilities
-
-## Run
-
-CLI help:
-
-```bash
-PYTHONPATH=src python -m gerbera_cli.main --help
-```
-
-Tests:
-
-```bash
-PYTHONPATH=src .venv/bin/pytest
+    Dev->>Model: Define hardware system in Python
+    Dev->>Runtime: run(hardware_system)
+    Runtime->>Runtime: install board packages
+    Runtime->>Runtime: install device libraries
+    Runtime->>Flash: flash(hardware_system)
+    Flash->>Board: compile and upload firmware
+    Runtime->>MCP: create server from model
+    MCP->>Board: send serial commands on tool calls
 ```
