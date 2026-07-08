@@ -1,7 +1,7 @@
 {
   "hw-201": {
     "pins": [
-      "signal"
+      "out"
     ],
     "operation": "read",
     "template": "hw_201_read",

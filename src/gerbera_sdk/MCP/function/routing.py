@@ -4,6 +4,12 @@ from gerbera_sdk.hardware.connection import Connection
 
 class Routing:
     @staticmethod
+    def build_setup_code() -> str:
+        return """void setup() {
+  Serial.begin(BAUD_RATE);
+}"""
+
+    @staticmethod
     def build_loop_code(connections: list[Connection]) -> str:
         dispatch_lines = []
 
@@ -23,11 +29,7 @@ class Routing:
 
         dispatch_code = "\n".join(dispatch_lines)
 
-        return f"""void setup() {{
-  Serial.begin(BAUD_RATE);
-}}
-
-void loop() {{
+        return f"""void loop() {{
   String line = readLine();
   if (line.length() == 0) {{
     return;

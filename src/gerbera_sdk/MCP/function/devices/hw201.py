@@ -1,12 +1,17 @@
-from gerbera_sdk.MCP.function.base import BaseFirmwareBuilder
+from gerbera_sdk.MCP.function.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.hardware.connection import Connection
-
 
 class HW201FirmwareBuilder(BaseFirmwareBuilder):
     template_name = "hw_201_read"
-    
+
+    # Each entry should declare the Arduino library install name and the
+    # corresponding #include import name used in generated firmware. 
+    # So key is the library install name and the value is the import name
+    def required_libraries(self) -> list[dict[str, str]]:
+        return []
+
     def build_handler(self, connection: Connection) -> str:
-        signal_pin = connection.pins["signal"]
+        out_pin = connection.pins["out"]
 
         return f"""void handle_{connection.name}(const ParsedCommand& command) {{
   if (command.action != "READ") {{
@@ -14,11 +19,8 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
     return;
   }}
 
-  int raw = analogRead({signal_pin});
-  float voltage = raw * (5.0 / 1023.0);
-  float celsius = (voltage - 0.5) * 100.0;
+  int value = digitalRead({out_pin});
 
   Serial.print("value:");
-  Serial.print(celsius);
-  Serial.println(",unit:celsius");
+  Serial.println(value);
 }}"""

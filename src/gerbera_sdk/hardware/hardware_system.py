@@ -68,7 +68,3 @@ class HardwareSystem:
                 check=True,
             )
         
-
-
-    
-    

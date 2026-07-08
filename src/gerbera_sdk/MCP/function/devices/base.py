@@ -6,7 +6,7 @@ from gerbera_sdk.hardware.connection import Connection
 class BaseFirmwareBuilder(ABC):
     template_name: str = ""
 
-    def build_includes(self) -> list[str]:
+    def required_libraries(self) -> list[dict[str, str]]:
         return []
 
     @abstractmethod

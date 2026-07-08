@@ -4,12 +4,11 @@ from pin import Pin
 
 @dataclass
 class Connection:
-    id: str = ""
-    microcontroller_id: str = ""
-    name: str = ""
+    id: str
+    microcontroller_id: str
+    name: str
     description: str = ""
-    pins: dict[str, str] = None
-    component_type: str = ""
+    component_type: str
     pins: list[Pin]
 
     def to_dict(self) -> dict[str, Any]:

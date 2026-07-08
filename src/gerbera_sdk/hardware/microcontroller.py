@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from gerbera_sdk.MCP.function.configurations import BUILDER_MAPPING
 from gerbera_sdk.MCP.tools.registry import ComponentRegistry
 from gerbera_sdk.hardware.connection import Connection
 
@@ -32,8 +33,8 @@ class Microcontroller:
             id=str(payload["id"]),
             hardware_system_id=str(payload["hardware_system_id"]),
             port=str(payload["port"]),
-            baud_rate=int(payload.get("baud_rate", 115200)),
-            fqbn=str(payload.get("fqbn", "")),
+            baud_rate=int(payload.get("baud_rate")),
+            fqbn=str(payload.get("fqbn")),
             description=str(payload.get("description", "")),
             connections=[
                 Connection.from_dict(connection)
@@ -63,6 +64,25 @@ class Microcontroller:
                     )
 
             self.connections.append(connection)
+
+    def get_required_libraries(self) -> list[str]:
+        libraries: list[str] = []
+
+        for connection in self.connections:
+            ComponentRegistry.get(connection.component_type)
+
+            if connection.component_type not in BUILDER_MAPPING:
+                raise ValueError(
+                    f"Unsupported component type for library resolution: "
+                    f"{connection.component_type}"
+                )
+
+            builder = BUILDER_MAPPING[connection.component_type]()
+            for library in builder.required_libraries():
+                if library not in libraries:
+                    libraries.append(library)
+
+        return libraries
 
     # Helper Functions for Deduping
     def _get_used_pins(self) -> set[str]:
