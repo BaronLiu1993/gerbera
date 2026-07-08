@@ -10,4 +10,7 @@ MICROCONTROLLER_MAPPING = {
     "arduino:avr:mega": {
         "includes": ["Arduino.h"],
     },
+    "arduino:avr:uno": {
+        "includes": ["Arduino.h"],
+    },
 }
