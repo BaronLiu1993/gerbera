@@ -37,28 +37,30 @@ class CommandCompiler:
     ) -> str:
         normalized_action = action.strip().upper()
 
+        serialized_arg = ""
+        if params:
+            if len(params) > 1:
+                raise ValueError(
+                    "Firmware contract only supports one key:value argument."
+                )
+
+            key, value = next(iter(params.items()))
+            serialized_arg = f"{key}:{value}"
+
         for command in CommandCompiler.supported_commands(connection):
             normalized_command = command.strip()
             if not normalized_command.upper().startswith(f"{normalized_action},"):
                 continue
 
-            if not params:
+            if not serialized_arg:
                 return normalized_command
 
-            serialized_params = [
-                f"{key}:{value}"
-                for key, value in params.items()
-            ]
-            return ",".join([normalized_command, *serialized_params])
+            return ",".join([normalized_command, serialized_arg])
 
-        if not params:
+        if not serialized_arg:
             return f"{normalized_action},{connection.name}"
 
-        serialized_params = [
-            f"{key}:{value}"
-            for key, value in params.items()
-        ]
-        return ",".join([f"{normalized_action},{connection.name}", *serialized_params])
+        return ",".join([f"{normalized_action},{connection.name}", serialized_arg])
 
     @staticmethod
     def parse_response(response: str) -> dict[str, str]:

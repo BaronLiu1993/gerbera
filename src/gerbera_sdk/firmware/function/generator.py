@@ -12,7 +12,7 @@ class Generator:
     def build_includes(microcontroller: Microcontroller) -> str:
         includes: list[str] = []
         normalized_includes: set[str] = set()
-        board_mapping = MICROCONTROLLER_MAPPING.get(microcontroller.fqbn, {})
+        board_mapping = MICROCONTROLLER_MAPPING.get(microcontroller.fqbn)
         for include_name in board_mapping.get("includes", ["Arduino.h"]):
             include = f"#include <{include_name}>"
             normalized_include = include.strip().lower()
@@ -63,12 +63,12 @@ class Generator:
         includes = Generator.build_includes(microcontroller)
         parser_code = Parser.parse_command_code()
         handler_code = Generator.build_handlers(microcontroller)
-        setup_code = Routing.build_setup_code()
+        setup_code = Routing.build_setup_code(microcontroller.connections)
         routing_code = Routing.build_loop_code(microcontroller.connections)
 
         return f"""{includes}
 
-const int BAUD_RATE = {microcontroller.baud_rate};
+const long BAUD_RATE = {microcontroller.baud_rate};
 
 {parser_code}
 

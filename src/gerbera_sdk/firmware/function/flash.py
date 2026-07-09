@@ -1,22 +1,21 @@
 import subprocess
+import shutil
 from pathlib import Path
 
 from gerbera_sdk.firmware.function.generator import Generator
 from gerbera_sdk.models.hardware_system import HardwareSystem
 
-DEFAULT_FIRMWARE_ROOT = Path("gerbera_firmware")
-DEFAULT_BUILD_ROOT = DEFAULT_FIRMWARE_ROOT / "build"
+DEFAULT_BUILD_DIRNAME = "build"
 
 
 class Flash:
     @staticmethod
     def generate_files(hardware_system: HardwareSystem) -> dict[str, str]:
-        DEFAULT_FIRMWARE_ROOT.mkdir(parents=True, exist_ok=True)
         generated_files: dict[str, str] = {}
 
         for microcontroller in hardware_system.microcontrollers:
             firmware_code = Generator.build_firmware(microcontroller)
-            sketch_dir = DEFAULT_FIRMWARE_ROOT / microcontroller.id
+            sketch_dir = Path(microcontroller.id)
             sketch_dir.mkdir(parents=True, exist_ok=True)
             sketch_path = sketch_dir / f"{microcontroller.id}.ino"
             sketch_path.write_text(firmware_code)
@@ -34,12 +33,15 @@ class Flash:
                 port = microcontroller.port
                 fqbn = microcontroller.fqbn
                 sketch_path = microcontroller.firmware_file_path
-                build_path = DEFAULT_BUILD_ROOT / microcontroller.id
+                build_path = Path(microcontroller.id) / DEFAULT_BUILD_DIRNAME
 
                 if not sketch_path:
                     raise ValueError(
                         f"Missing firmware file path for microcontroller {microcontroller.id}"
                     )
+
+                if build_path.exists():
+                    shutil.rmtree(build_path)
 
                 build_path.mkdir(parents=True, exist_ok=True)
 

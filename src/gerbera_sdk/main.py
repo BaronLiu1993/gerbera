@@ -30,26 +30,47 @@ class GerberaRuntime:
                 installed_libraries.add(normalized_install_name)
 
     @staticmethod
-    def create_server(
-        hardware_system: HardwareSystem
-    ) -> GerberaMCPServer:
-        GerberaRuntime.install_dependencies(hardware_system)
-        Flash.flash(hardware_system)
-        return GerberaMCPServer(hardware_system)
-
-    @staticmethod
-    def run(
+    def setup(
         hardware_system: HardwareSystem,
         install_dependencies: bool = True,
         flash_firmware: bool = True,
     ) -> None:
-        server = GerberaRuntime.create_server(
-            hardware_system=hardware_system,
-            install_dependencies=install_dependencies,
-            flash_firmware=flash_firmware,
-        )
+        if install_dependencies:
+            GerberaRuntime.install_dependencies(hardware_system)
+
+        if flash_firmware:
+            Flash.flash(hardware_system)
+
+    @staticmethod
+    def create_server(
+        hardware_system: HardwareSystem,
+    ) -> GerberaMCPServer:
+        return GerberaMCPServer(hardware_system)
+
+    @staticmethod
+    def serve(
+        hardware_system: HardwareSystem,
+        transport: str = "stdio",
+        **transport_kwargs,
+    ) -> None:
+        server = GerberaRuntime.create_server(hardware_system)
 
         try:
-            server.run()
+            server.run(
+                transport=transport,
+                **transport_kwargs,
+            )
         finally:
             server.close()
+
+    @staticmethod
+    def run(
+        hardware_system: HardwareSystem,
+        transport: str = "stdio",
+        **transport_kwargs,
+    ) -> None:
+        GerberaRuntime.serve(
+            hardware_system=hardware_system,
+            transport=transport,
+            **transport_kwargs,
+        )

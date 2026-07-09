@@ -81,5 +81,12 @@ class GerberaMCPServer:
 
         self.serial_pool.clear()
 
-    def run(self) -> None:
-        self.app.run()
+    def run(
+        self,
+        transport: str = "stdio",
+        **transport_kwargs,
+    ) -> None:
+        self.app.run(
+            transport=transport,
+            **transport_kwargs,
+        )

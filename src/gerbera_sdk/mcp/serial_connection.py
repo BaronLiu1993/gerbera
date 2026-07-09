@@ -10,10 +10,20 @@ class SerialConnection:
     def connect(self, port: str, baud: int = 115200):
         self._conn = serial.Serial(port, baud, timeout=2)
         time.sleep(2)
+        self._conn.reset_input_buffer()
 
     def send(self, command: str) -> str:
+        self._conn.reset_input_buffer()
         self._conn.write(f"{command}\n".encode())
-        return self._conn.readline().decode().strip()
+        self._conn.flush()
+
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            response = self._conn.readline().decode(errors="ignore").strip()
+            if response:
+                return response
+
+        return ""
 
     def destroy(self):
         if self._conn and self._conn.is_open:
