@@ -2,7 +2,7 @@ import subprocess
 import shutil
 from pathlib import Path
 
-from gerbera_sdk.firmware.function.generator import Generator
+from gerbera_sdk.firmware.generator import Generator
 from gerbera_sdk.models.hardware_system import HardwareSystem
 
 DEFAULT_BUILD_DIRNAME = "build"
@@ -60,7 +60,6 @@ class Flash:
                     sketch_path
                 ], check=True)
 
-                print("worked")
         except Exception as e:
             raise RuntimeError(f"Failed to flash hardware system {hardware_system.id}") from e
 

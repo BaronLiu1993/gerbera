@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from gerbera_sdk.models.microcontroller import Microcontroller
-from gerbera_sdk.firmware.function.configurations import MICROCONTROLLER_MAPPING
+from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
 
 
 @dataclass

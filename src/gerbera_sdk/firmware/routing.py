@@ -1,4 +1,4 @@
-from gerbera_sdk.firmware.function.configurations import DEVICES_MAPPING
+from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.mcp.commands import CommandCompiler
 from gerbera_sdk.models.connection import Connection
 
@@ -21,12 +21,14 @@ class Routing:
 
             builder = DEVICES_MAPPING[connection.component_type]()
 
-            for pin, mode in builder.pin_modes(connection).items():
-                if pin in configured_pins:
+            for pin_spec in builder.pin_modes(connection):
+                if pin_spec.pin in configured_pins:
                     continue
 
-                setup_lines.append(f"  pinMode({pin}, {mode});")
-                configured_pins.add(pin)
+                setup_lines.append(f"  pinMode({pin_spec.pin}, {pin_spec.mode.value});")
+                configured_pins.add(pin_spec.pin)
+
+            setup_lines.extend(builder.build_setup_lines(connection))
 
         setup_body = "\n".join(setup_lines)
 
@@ -44,14 +46,14 @@ class Routing:
                     f"Unsupported component type for routing: {connection.component_type}"
                 )
 
-            for command in CommandCompiler.supported_commands(connection):
-                action, command_name = (part.strip() for part in command.split(",", 1))
+            for command_spec in CommandCompiler.command_specs(connection):
+                action = command_spec.method.strip().upper()
                 dispatch_lines.append(
                     '    if (action == "%s" && commandName == "%s") {\n'
-                    "      handle_%s(rawArg);\n"
+                    "      handle_%s(line);\n"
                     "      return;\n"
                     "    }"
-                    % (action, command_name, connection.name)
+                    % (action, connection.name, connection.name)
                 )
 
         dispatch_code = "\n".join(dispatch_lines)
@@ -66,7 +68,6 @@ class Routing:
 
     String action = actionOf(line);
     String commandName = commandNameOf(line);
-    String rawArg = rawArgOf(line);
     if (action.length() == 0 || commandName.length() == 0) {{
       Serial.println("error:invalid_command");
       return;

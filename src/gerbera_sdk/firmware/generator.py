@@ -1,9 +1,9 @@
-from gerbera_sdk.firmware.function.configurations import (
+from gerbera_sdk.firmware.configurations import (
     DEVICES_MAPPING,
     MICROCONTROLLER_MAPPING,
 )
-from gerbera_sdk.firmware.function.parser import Parser
-from gerbera_sdk.firmware.function.routing import Routing
+from gerbera_sdk.firmware.parser import Parser
+from gerbera_sdk.firmware.routing import Routing
 from gerbera_sdk.models.microcontroller import Microcontroller
 
 
@@ -29,7 +29,7 @@ class Generator:
 
             builder = DEVICES_MAPPING[connection.component_type]()
             for library in builder.required_libraries():
-                include_name = library.get("include")
+                include_name = library.include
 
                 if not include_name:
                     continue
@@ -41,6 +41,24 @@ class Generator:
                     normalized_includes.add(normalized_include)
 
         return "\n".join(includes)
+
+    @staticmethod
+    def build_definitions(microcontroller: Microcontroller) -> str:
+        definitions = []
+
+        for connection in microcontroller.connections:
+            if connection.component_type not in DEVICES_MAPPING:
+                raise ValueError(
+                    f"Unsupported firmware template for definitions: "
+                    f"{connection.component_type}"
+                )
+
+            builder = DEVICES_MAPPING[connection.component_type]()
+            definition = builder.build_definitions(connection).strip()
+            if definition:
+                definitions.append(definition)
+
+        return "\n\n".join(definitions)
 
     @staticmethod
     def build_handlers(microcontroller: Microcontroller) -> str:
@@ -62,6 +80,7 @@ class Generator:
     def build_firmware(microcontroller: Microcontroller) -> str:
         includes = Generator.build_includes(microcontroller)
         parser_code = Parser.parse_command_code()
+        definition_code = Generator.build_definitions(microcontroller)
         handler_code = Generator.build_handlers(microcontroller)
         setup_code = Routing.build_setup_code(microcontroller.connections)
         routing_code = Routing.build_loop_code(microcontroller.connections)
@@ -71,6 +90,8 @@ class Generator:
 const long BAUD_RATE = {microcontroller.baud_rate};
 
 {parser_code}
+
+{definition_code}
 
 {handler_code}
 

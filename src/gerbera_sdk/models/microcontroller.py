@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from gerbera_sdk.firmware.function.configurations import DEVICES_MAPPING
+from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
+from gerbera_sdk.contracts.firmware_contract import LibrarySpec
 from gerbera_sdk.models.connection import Connection
 
 
@@ -67,8 +68,8 @@ class Microcontroller:
 
             self.connections.append(connection)
 
-    def get_required_libraries(self) -> list[str]:
-        libraries: list[dict[str, str]] = []
+    def get_required_libraries(self) -> list[LibrarySpec]:
+        libraries: list[LibrarySpec] = []
         normalized_library_names: set[str] = set()
 
         for connection in self.connections:
@@ -80,7 +81,7 @@ class Microcontroller:
 
             builder = DEVICES_MAPPING[connection.component_type]()
             for library in builder.required_libraries():
-                install_name = library.get("install", "").strip()
+                install_name = library.install.strip()
                 normalized_install_name = install_name.lower()
 
                 if not install_name or normalized_install_name in normalized_library_names:

@@ -1,3 +1,4 @@
+from gerbera_sdk.contracts.command_contract import CommandSpec
 from typing import Optional
 
 from gerbera_sdk.mcp.commands import CommandCompiler
@@ -32,7 +33,7 @@ class GerberaMCPServer:
     def _register_tools(self) -> None:
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
-                for command in CommandCompiler.supported_commands(connection):
+                for command in CommandCompiler.command_specs(connection):
                     self._register_connection_tool(
                         microcontroller,
                         connection,
@@ -43,9 +44,9 @@ class GerberaMCPServer:
         self,
         microcontroller: Microcontroller,
         connection,
-        command: str,
+        command: CommandSpec,
     ) -> None:
-        action = command.split(",", 1)[0].strip().upper()
+        action = command.method.strip().upper()
         tool_name = f"{action.lower()}_{connection.name}"
 
         def tool_function(
@@ -65,9 +66,9 @@ class GerberaMCPServer:
 
         tool_function.__name__ = tool_name
 
-        # Update this to be more descriptive
+        command_description = CommandCompiler.describe_command(connection, action)
         tool_function.__doc__ = connection.description or (
-            f"Send the predefined {action} command for {connection.name} over serial."
+            f"Send {command_description} over serial."
         )
 
         self.app.tool(

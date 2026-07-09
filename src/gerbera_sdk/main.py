@@ -1,6 +1,6 @@
 import subprocess
 
-from gerbera_sdk.firmware.function.flash import Flash
+from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.mcp.server import GerberaMCPServer
 from gerbera_sdk.models.hardware_system import HardwareSystem
 
@@ -17,7 +17,7 @@ class GerberaRuntime:
         installed_libraries: set[str] = set()
         for microcontroller in hardware_system.microcontrollers:
             for library in microcontroller.get_required_libraries():
-                install_name = library.get("install", "").strip()
+                install_name = library.install.strip()
                 normalized_install_name = install_name.lower()
 
                 if not install_name or normalized_install_name in installed_libraries:
