@@ -1,3 +1,7 @@
 """Domain models."""
 
-__all__: list[str] = []
+from gerbera_sdk.models.database import Database
+
+__all__ = [
+    "Database",
+]
