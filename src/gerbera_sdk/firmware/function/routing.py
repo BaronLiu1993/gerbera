@@ -1,4 +1,4 @@
-from gerbera_sdk.firmware.function.configurations import DEVICES_MAPPING
+from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.server.commands import CommandCompiler
 from gerbera_sdk.models.connection import Connection
 
