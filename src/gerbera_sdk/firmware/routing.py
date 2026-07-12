@@ -39,12 +39,16 @@ class Routing:
     @staticmethod
     def build_loop_code(connections: list[Connection]) -> str:
         dispatch_lines = []
+        stream_lines = []
 
         for connection in connections:
             if connection.component_type not in DEVICES_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for routing: {connection.component_type}"
                 )
+
+            builder = DEVICES_MAPPING[connection.component_type]()
+            stream_lines.extend(builder.build_loop_lines(connection))
 
             for command_spec in CommandCompiler.command_specs(connection):
                 action = command_spec.method.strip().upper()
@@ -57,8 +61,10 @@ class Routing:
                 )
 
         dispatch_code = "\n".join(dispatch_lines)
+        stream_code = "\n".join(stream_lines)
 
         return f"""void loop() {{
+{stream_code}
   if (Serial.available()) {{
     String line = Serial.readStringUntil('\\n');
     line.trim();

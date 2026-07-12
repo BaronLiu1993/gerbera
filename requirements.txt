@@ -1,0 +1,5 @@
+fastmcp==3.0.0
+psycopg[binary]==3.3.4
+pyserial==3.5
+pytest==9.1.1
+typer==0.26.8

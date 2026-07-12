@@ -19,6 +19,14 @@ class BaseFirmwareBuilder(ABC):
     def build_setup_lines(self, connection: Connection) -> list[str]:
         return []
 
+    # Optional hook for devices that need recurring loop behavior.
+    def build_stream_lines(self, connection: Connection) -> list[str]:
+        return []
+
+    # Optional hook for devices that stream data.
+    def connect_data_sink(self) -> Database:
+        return
+
     @abstractmethod
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:
         raise NotImplementedError

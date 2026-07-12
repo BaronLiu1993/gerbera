@@ -1,4 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import psycopg
+from psycopg import sql
 
 
 @dataclass
@@ -8,6 +10,8 @@ class Database:
     user: str
     password: str
     database: str
+    buffer_size: int = 100
+
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -21,9 +25,9 @@ class Database:
     @classmethod
     def from_dict(cls, payload: dict[str, object]) -> "Database":
         return cls(
-            host=str(payload.get("host", "127.0.0.1")),
-            port=int(payload.get("port", 5432)),
-            user=str(payload.get("user", "postgres")),
-            password=str(payload.get("password", "")),
-            database=str(payload.get("database", "gerbera")),
+            host=str(payload.get("host")),
+            port=int(payload.get("port")),
+            user=str(payload.get("user")),
+            password=str(payload.get("password")),
+            database=str(payload.get("database")),
         )
