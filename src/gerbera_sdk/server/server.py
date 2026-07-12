@@ -1,14 +1,14 @@
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from typing import Optional
 
-from gerbera_sdk.mcp.commands import CommandCompiler
-from gerbera_sdk.mcp.serial_connection import SerialConnection
+from gerbera_sdk.server.commands import CommandCompiler
+from gerbera_sdk.server.serial_connection import SerialConnection
 from gerbera_sdk.models.hardware_system import HardwareSystem
 from gerbera_sdk.models.microcontroller import Microcontroller
 from fastmcp import FastMCP
 
 
-class GerberaMCPServer:
+class GerberaServer:
     def __init__(self, hardware_system: HardwareSystem) -> None:
         self.hardware_system = hardware_system
         self.serial_pool: dict[str, SerialConnection] = {}
@@ -19,16 +19,23 @@ class GerberaMCPServer:
         self,
         microcontroller: Microcontroller,
     ) -> SerialConnection:
-        if microcontroller.id in self.serial_pool:
-            return self.serial_pool[microcontroller.id]
+        if microcontroller.id not in self.serial_pool:
+            raise RuntimeError("Microcontroller Does not Exist")
+        return self.serial_pool[microcontroller.id]
 
-        connection = SerialConnection()
-        connection.connect(
-            port=microcontroller.port,
-            baud=microcontroller.baud_rate,
-        )
-        self.serial_pool[microcontroller.id] = connection
-        return connection
+    def _register_serial_connection(self) -> None:
+
+        try:
+            for microcontroller in self.hardware_system.microcontrollers:
+                connection = SerialConnection()
+                connection.connect(
+                    port=microcontroller.port,
+                    baud=microcontroller.baud_rate,
+                )
+                microcontroller_id = microcontroller.id
+                self.serial_pool[microcontroller_id] = connection
+        except Exception as e:
+            raise RuntimeError(e)
 
     def _register_tools(self) -> None:
         for microcontroller in self.hardware_system.microcontrollers:
@@ -62,6 +69,7 @@ class GerberaMCPServer:
                 params=params,
             )
             response = serial_connection.send(built_command)
+
             return CommandCompiler.parse_response(response)
 
         tool_function.__name__ = tool_name

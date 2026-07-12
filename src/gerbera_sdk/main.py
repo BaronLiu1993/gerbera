@@ -1,7 +1,7 @@
 import subprocess
 
 from gerbera_sdk.firmware.flash import Flash
-from gerbera_sdk.mcp.server import GerberaMCPServer
+from gerbera_sdk.server.server import GerberaServer
 from gerbera_sdk.models.hardware_system import HardwareSystem
 
 
@@ -44,8 +44,8 @@ class GerberaRuntime:
     @staticmethod
     def create_server(
         hardware_system: HardwareSystem,
-    ) -> GerberaMCPServer:
-        return GerberaMCPServer(hardware_system)
+    ) -> GerberaServer:
+        return GerberaServer(hardware_system)
 
     @staticmethod
     def serve(

@@ -1,5 +1,5 @@
 from gerbera_sdk.main import GerberaRuntime
-from gerbera_sdk.mcp import GerberaMCPServer, SerialConnection
+from gerbera_sdk.server import GerberaServer, SerialConnection
 from gerbera_sdk.models.connection import Connection
 from gerbera_sdk.models.database import Database
 from gerbera_sdk.models.hardware_system import HardwareSystem
@@ -9,7 +9,7 @@ from gerbera_sdk.models.pin import Pin, PinName
 __all__ = [
     "Connection",
     "Database",
-    "GerberaMCPServer",
+    "GerberaServer",
     "GerberaRuntime",
     "HardwareSystem",
     "Microcontroller",
