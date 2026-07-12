@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
 
 @dataclass
 class Event:
-
-
-    def execute_side_effect(self):
-        pass
+    event_id: str
+    event_bus_id: str
+    event_name: str
+    payload: dict[str, str] = field(default_factory=dict)
