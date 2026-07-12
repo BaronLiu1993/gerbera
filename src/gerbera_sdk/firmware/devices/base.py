@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec, PinModeSpec
@@ -24,8 +25,8 @@ class BaseFirmwareBuilder(ABC):
         return []
 
     # Optional hook for devices that stream data.
-    def connect_data_sink(self) -> Database:
-        return
+    def connect_data_sink(self) -> Any:
+        return None
 
     @abstractmethod
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:

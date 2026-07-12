@@ -1,175 +1,104 @@
-from gerbera_sdk import Connection, GerberaMCPServer, HardwareSystem, Microcontroller
-from gerbera_sdk.mcp.transport_pool import SerialTransportPool
+from gerbera_sdk import Connection, GerberaServer, HardwareSystem, Microcontroller
 
 
-def test_serial_transport_pool_reuses_persistent_connections(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
-    registry_path.write_text(
-        """
-{
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
-}
-""".strip()
-    )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+class FakeFastMCP:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.registered_tools: dict[str, object] = {}
 
-    created_connections: list[object] = []
+    def tool(self, name: str, description: str):
+        def decorator(func):
+            func.__doc__ = description
+            self.registered_tools[name] = func
+            return func
 
-    class FakeSerialConnection:
-        def __init__(self) -> None:
-            self.connect_calls: list[tuple[str, int]] = []
-            self.send_calls: list[str] = []
-            self.destroy_called = False
-            created_connections.append(self)
+        return decorator
 
-        def connect(self, port: str, baud: int = 115200) -> None:
-            self.connect_calls.append((port, baud))
+    def run(self, **kwargs) -> None:
+        self.kwargs = kwargs
 
-        def send(self, command: str) -> str:
-            self.send_calls.append(command)
-            return "value:23.5,unit:celsius"
 
-        def destroy(self) -> None:
-            self.destroy_called = True
+class FakeSerialConnection:
+    def __init__(self) -> None:
+        self.connect_calls: list[tuple[str, int]] = []
+        self.send_calls: list[str] = []
+        self.destroy_called = False
 
-    monkeypatch.setattr(
-        "gerbera_sdk.mcp.transport_pool.SerialConnection",
-        FakeSerialConnection,
-    )
+    def connect(self, port: str, baud: int = 115200) -> None:
+        self.connect_calls.append((port, baud))
 
+    def send(self, command: str) -> str:
+        self.send_calls.append(command)
+        return "value:1"
+
+    def destroy(self) -> None:
+        self.destroy_called = True
+
+
+def build_hardware_system() -> HardwareSystem:
     hardware_system = HardwareSystem(
-        microcontrollers=[
-            Microcontroller(
-                id="board-1",
-                baud_rate=115200,
-                connections=[
-                    Connection(
-                        microcontroller_id="board-1",
-                        name="room_temperature",
-                        description="Temperature sensor.",
-                        pins={"signal": "A0"},
-                        component_type="hw-201",
-                    )
-                ],
-            )
-        ]
-    )
-    transport_pool = SerialTransportPool(hardware_system)
-
-    first_response = transport_pool.execute("board-1", "room_temperature")
-    second_response = transport_pool.execute("board-1", "room_temperature")
-    transport_pool.close_all()
-
-    assert first_response == {"value": 23.5, "unit": "celsius"}
-    assert second_response == {"value": 23.5, "unit": "celsius"}
-    assert len(created_connections) == 1
-    assert created_connections[0].connect_calls == [("/dev/cu.usbserial-1140", 115200)]
-    assert created_connections[0].send_calls == [
-        "room_temperature",
-        "room_temperature",
-    ]
-    assert created_connections[0].destroy_called is True
-
-
-def test_create_server_raises_without_fastmcp_dependency(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
-    registry_path.write_text(
-        """
-{
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
-}
-""".strip()
-    )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
-    monkeypatch.setattr("gerbera_sdk.mcp.server.FastMCP", None)
-
-    hardware_system = HardwareSystem(
-        microcontrollers=[Microcontroller(id="board-1")]
-    )
-
-    try:
-        GerberaMCPServer(hardware_system).create_server()
-    except ImportError as exc:
-        assert "fastmcp is not installed" in str(exc)
-    else:
-        raise AssertionError("Expected missing fastmcp dependency error")
-
-
-def test_create_server_builds_overview_and_connection_tools(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
-    registry_path.write_text(
-        """
-{
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
-}
-""".strip()
-    )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
-
-    class FakeFastMCP:
-        def __init__(self, name, instructions=None, tools=None):
-            self.name = name
-            self.instructions = instructions
-            self.tools = tools or []
-
-        def run(self, **kwargs):
-            self.kwargs = kwargs
-
-    monkeypatch.setattr("gerbera_sdk.mcp.server.FastMCP", FakeFastMCP)
-
-    hardware_system = HardwareSystem(
+        id="system-1",
         description="Kitchen system",
-        microcontrollers=[
-            Microcontroller(
-                id="board-1",
-                baud_rate=115200,
-                connections=[
-                    Connection(
-                        microcontroller_id="board-1",
-                        name="room_temperature",
-                        description="Temperature sensor.",
-                        pins={"signal": "A0"},
-                        component_type="hw-201",
-                    )
-                ],
+        microcontrollers=[],
+    )
+    microcontroller = Microcontroller(
+        id="board-1",
+        hardware_system_id="system-1",
+        port="/dev/cu.usbserial-1140",
+        baud_rate=115200,
+        fqbn="arduino:avr:mega",
+        connections=[
+            Connection(
+                id="sensor-1",
+                microcontroller_id="board-1",
+                name="obstacle_sensor",
+                description="Obstacle sensor.",
+                pins={"out": "7"},
+                component_type="hw201",
             )
         ],
     )
-    server = GerberaMCPServer(hardware_system)
+    hardware_system.add_microcontrollers([microcontroller])
+    return hardware_system
 
-    def fake_execute(microcontroller_id: str, connection_name: str) -> dict[str, object]:
-        assert microcontroller_id == "board-1"
-        assert connection_name == "room_temperature"
-        return {"value": 22.5, "unit": "celsius"}
 
-    monkeypatch.setattr(server.transport_pool, "execute", fake_execute)
+def test_register_serial_connection_caches_per_microcontroller(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
 
-    fastmcp_server = server.create_server()
-    tools_by_name = {tool.__name__: tool for tool in fastmcp_server.tools}
+    server = GerberaServer(build_hardware_system())
 
-    assert fastmcp_server.name == "Gerbera MCP Server"
-    assert "overview tool first" in fastmcp_server.instructions
-    assert set(tools_by_name.keys()) == {
-        "gerbera_hardware_overview",
-        "room_temperature",
-    }
-    assert tools_by_name["gerbera_hardware_overview"]()["description"] == "Kitchen system"
-    assert tools_by_name["room_temperature"]() == {
-        "value": 22.5,
-        "unit": "celsius",
-    }
+    server._register_serial_connection()
+
+    assert set(server.serial_pool.keys()) == {"board-1"}
+    serial_connection = server.serial_pool["board-1"]
+    assert serial_connection.connect_calls == [("/dev/cu.usbserial-1140", 115200)]
+
+
+def test_registered_tool_uses_cached_serial_connection(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_hardware_system())
+    server._register_serial_connection()
+
+    tool = server.app.registered_tools["read_obstacle_sensor"]
+    response = tool()
+
+    serial_connection = server.serial_pool["board-1"]
+    assert serial_connection.send_calls == ["READ,obstacle_sensor"]
+    assert response == {"value": "1"}
+
+
+def test_close_destroys_registered_serial_connections(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_hardware_system())
+    server._register_serial_connection()
+    serial_connection = server.serial_pool["board-1"]
+
+    server.close()
+
+    assert serial_connection.destroy_called is True
+    assert server.serial_pool == {}
