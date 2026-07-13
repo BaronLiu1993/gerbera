@@ -2,6 +2,17 @@
 
 Use this when adding a new hardware component type.
 
+## Brainstorming Mode
+
+If the user is asking conceptual questions, comparing designs, or explicitly says
+`brainstorm`, `do not implement`, `do not code`, or similar, do not edit files,
+run implementation commands, scaffold code, or wire runtime behavior.
+
+In brainstorming mode, respond with architecture, tradeoffs, examples, and
+recommended next steps only. Wait for an explicit implementation request such as
+`implement this`, `make the change`, `edit the files`, `scaffold it`, or
+`do this` before modifying the repository.
+
 ## Mental Model
 
 A `Connection` is a specific physical device wired to a microcontroller.
