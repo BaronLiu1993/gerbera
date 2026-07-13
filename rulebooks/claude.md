@@ -73,28 +73,30 @@ Use optional hooks only when needed:
 Firmware responses that should return to MCP tools must use:
 
 ```text
-MCP,<component_type>_<connection_id>,key:value
+MCP,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,key:value
 ```
 
 Example:
 
 ```cpp
-Serial.println("MCP,led_green-led,state:on");
+Serial.println("MCP,led_8e910dfb_f928a260,state:on");
 ```
 
 Streaming data that should go to the event/database path must use:
 
 ```text
-STREAM,<component_type>_<connection_id>,key:value,key:value
+STREAM,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,key:value,key:value
 ```
 
 Example:
 
 ```cpp
-Serial.println("STREAM,hw201_obstacle-sensor,value:1");
+Serial.println("STREAM,hw201_8e910dfb_e8f75c2b,value:1");
 ```
 
 Do not return plain `state:on`, `value:1`, or `error:...` from generated handlers if MCP needs to read the result. The listener will ignore those because they do not include an event type and event name.
+
+Use `connection.event_name` in builders so event/table names stay stable and stay under PostgreSQL's 63-byte identifier limit. For real hardware, the `microcontroller_id` should come from the UUID in `devices.json`; Gerbera hashes both microcontroller identity and connection identity into short deterministic suffixes.
 
 ## Command Contract
 
@@ -163,7 +165,7 @@ The firmware should usually emit only measured values, for example `value:1`.
 - All required pins are documented in tests.
 - `required_commands(...)` matches the handler parser.
 - Handler uses `parameterValue(input, "...")` for parameters.
-- MCP responses use `MCP,<component_type>_<connection_id>,...`.
-- Streaming responses use `STREAM,<component_type>_<connection_id>,...`.
+- MCP responses use `MCP,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...`.
+- Streaming responses use `STREAM,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...`.
 - Any required library has both `include` and `install` in `LibrarySpec`.
 - Tests assert command contract, pin modes, and generated handler strings.

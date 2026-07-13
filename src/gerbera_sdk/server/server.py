@@ -8,6 +8,7 @@ from gerbera_sdk.models.microcontroller import Microcontroller
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import event_worker
+from gerbera_sdk.events.stream_controller import StreamController
 from fastmcp import FastMCP
 import uuid
 
@@ -17,6 +18,7 @@ class GerberaServer:
         self.hardware_system = hardware_system
         self.serial_pool: dict[str, SerialConnection] = {}
         self.event_bus = EventBus(event_bus_id=f"{hardware_system.id}:events")
+        self.stream_controller = StreamController(self.event_bus)
         self.event_listener: EventListener | None = None
         self.app = FastMCP(hardware_system.description)
         self._register_event_bus()
@@ -231,12 +233,17 @@ class GerberaServer:
         state: str,
     ):
         def tool_function() -> dict[str, str]:
-            return self._send_connection_command(
+            response = self._send_connection_command(
                 microcontroller=microcontroller,
                 connection=connection,
                 action="WRITE",
                 params={"state": state},
             )
+
+            if state == "off":
+                self.stream_controller.stop_stream(microcontroller, connection)
+
+            return response
 
         return tool_function
 
@@ -270,7 +277,7 @@ class GerberaServer:
             params=params,
         )
 
-        event_name = f"{connection.component_type}_{connection.id}"
+        event_name = connection.event_name
         event = self.event_bus.get_handler(("MCP", microcontroller.id, event_name))
         event.clear_responses()
 
@@ -289,7 +296,7 @@ class GerberaServer:
             self.event_listener.stop_listeners()
             self.event_listener = None
 
-        event_worker.flush_now()
+        self.stream_controller.flush_all()
         event_worker.stop()
 
         for serial_connection in self.serial_pool.values():

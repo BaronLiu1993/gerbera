@@ -28,3 +28,8 @@ class EventBus:
             raise RuntimeError("Event does not exist")
 
         return self.events[event_key]
+
+    def flush_stream_buffers(self) -> None:
+        for event in self.events.values():
+            if event.streamable:
+                event.flush()

@@ -48,10 +48,10 @@ Use optional methods only when the component actually needs them.
 
 ## Event Naming Rule
 
-The event name is always:
+The event name is normally:
 
 ```text
-<component_type>_<connection.id>
+<component_type>_<short_microcontroller_hash>_<short_connection_hash>
 ```
 
 Generated firmware must use the same value.
@@ -59,7 +59,7 @@ Generated firmware must use the same value.
 Correct:
 
 ```python
-f"MCP,{connection.component_type}_{connection.id},state:on"
+f"MCP,{connection.event_name},state:on"
 ```
 
 Wrong:
@@ -68,7 +68,9 @@ Wrong:
 f"MCP,{connection.name},state:on"
 ```
 
-The runtime event bus registers by `component_type` plus `id`, not only by `connection.name`.
+The runtime event bus registers by `connection.event_name`, not only by `connection.name`.
+For real hardware, `microcontroller_id` should be the stable UUID from `devices.json`.
+Gerbera hashes that UUID and the connection identity before using them in event/table names so PostgreSQL identifiers stay short and stable.
 
 ## MCP Response Rule
 
@@ -81,9 +83,9 @@ MCP,<event_name>,key:value
 Examples:
 
 ```cpp
-Serial.println("MCP,led_green-led,state:on");
-Serial.println("MCP,dcmotor_drive-motor,status:forward");
-Serial.print("MCP,sg90_servo-motor,angle:");
+Serial.println("MCP,led_8e910dfb_f928a260,state:on");
+Serial.println("MCP,dcmotor_8e910dfb_67b5a2fa,status:forward");
+Serial.print("MCP,sg90_8e910dfb_d33ce7dc,angle:");
 Serial.println(angle);
 ```
 
@@ -99,8 +101,8 @@ Serial.println("error:invalid_arg");
 Good:
 
 ```cpp
-Serial.println("MCP,led_green-led,state:on");
-Serial.println("MCP,led_green-led,error:invalid_arg");
+Serial.println("MCP,led_8e910dfb_f928a260,state:on");
+Serial.println("MCP,led_8e910dfb_f928a260,error:invalid_arg");
 ```
 
 ## Streaming Rule
@@ -206,8 +208,8 @@ For each new builder, test:
 - Pin modes
 - Required libraries
 - Handler contains expected pin writes/reads
-- Handler emits `MCP,<component_type>_<id>,...`
-- Streaming output emits `STREAM,<component_type>_<id>,...` if applicable
+- Handler emits `MCP,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...`
+- Streaming output emits `STREAM,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...` if applicable
 - Schema if database streaming is supported
 
 Run focused tests:

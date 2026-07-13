@@ -39,6 +39,12 @@ class Event:
         self.responses.put(normalized_payload)
         return normalized_payload
 
+    def flush(self) -> list[dict[str, str]]:
+        if self.buffer is None:
+            return []
+
+        return self.buffer.flush()
+
     def clear_responses(self) -> None:
         while True:
             try:
