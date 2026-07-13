@@ -9,9 +9,6 @@ from gerbera_sdk.models.connection import Connection
 class BaseFirmwareBuilder(ABC):
     template_name: str = ""
 
-    def required_libraries(self) -> list[LibrarySpec]:
-        return []
-
     # Optional hook for devices that need global runtime objects.
     def build_definitions(self, connection: Connection) -> str:
         return ""
@@ -28,6 +25,10 @@ class BaseFirmwareBuilder(ABC):
     # Key is column name and value is the SQL column spec.
     def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
         return {}
+
+    @abstractmethod
+    def required_libraries(self) -> list[LibrarySpec]:
+        raise NotImplementedError
 
     @abstractmethod
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:

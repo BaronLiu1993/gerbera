@@ -21,6 +21,7 @@ class LibrarySpec:
 
 class ColumnType(str, Enum):
     INTEGER = "INTEGER"
+    FLOAT = "DOUBLE PRECISION"
     TIMESTAMP = "TIMESTAMP"
     TEXT = "TEXT"
     BOOLEAN = "BOOLEAN"
