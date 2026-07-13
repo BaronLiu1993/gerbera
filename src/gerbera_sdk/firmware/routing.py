@@ -45,10 +45,10 @@ class Routing:
             if connection.component_type not in DEVICES_MAPPING:
                 raise ValueError(
                     f"Unsupported component type for routing: {connection.component_type}"
-                )
+            )
 
             builder = DEVICES_MAPPING[connection.component_type]()
-            stream_lines.extend(builder.build_loop_lines(connection))
+            stream_lines.extend(builder.build_stream_lines(connection))
 
             for command_spec in CommandCompiler.command_specs(connection):
                 action = command_spec.method.strip().upper()
