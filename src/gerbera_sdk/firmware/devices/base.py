@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
-from gerbera_sdk.contracts.firmware_contract import LibrarySpec, PinModeSpec
+from gerbera_sdk.contracts.firmware_contract import ColumnSpec, LibrarySpec, PinModeSpec
 from gerbera_sdk.models.connection import Connection
 
 
@@ -24,9 +24,10 @@ class BaseFirmwareBuilder(ABC):
     def build_stream_lines(self, connection: Connection) -> list[str]:
         return []
 
-    # Optional hook for devices that stream data.
-    def connect_data_sink(self) -> Any:
-        return None
+    # Optional hook for generating schema when a database is connected.
+    # Key is column name and value is the SQL column spec.
+    def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
+        return {}
 
     @abstractmethod
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:

@@ -17,3 +17,20 @@ class PinModeSpec:
 class LibrarySpec:
     include: str
     install: str
+
+
+class ColumnType(str, Enum):
+    INTEGER = "INTEGER"
+    TIMESTAMP = "TIMESTAMP"
+    TEXT = "TEXT"
+    BOOLEAN = "BOOLEAN"
+
+
+@dataclass(frozen=True)
+class ColumnSpec:
+    type: ColumnType
+    idx: bool = False
+    primary_key: bool = False
+    nullable: bool = True
+    default: str | None = None
+    sql_suffix: str | None = None
