@@ -3,16 +3,17 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware_system import HardwareSystem
 from serial import Serial
 import threading
+import uuid
 from serial import SerialException
 
 
 @dataclass
 class EventListener:
-    event_listener_id: str
     hardware_system: HardwareSystem
     _serial_pool: dict[str, Serial]
     _threads: dict[str, threading.Thread]
     _event_bus: EventBus
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     _stop_event: threading.Event = field(default_factory=threading.Event)
 
     def create_listeners(self):

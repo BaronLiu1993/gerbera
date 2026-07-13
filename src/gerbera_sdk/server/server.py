@@ -10,14 +10,13 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import event_worker
 from gerbera_sdk.events.stream_controller import StreamController
 from fastmcp import FastMCP
-import uuid
 
 # Set all ids to be auto set to be uuidv4
 class GerberaServer:
     def __init__(self, hardware_system: HardwareSystem) -> None:
         self.hardware_system = hardware_system
         self.serial_pool: dict[str, SerialConnection] = {}
-        self.event_bus = EventBus(event_bus_id=f"{hardware_system.id}:events")
+        self.event_bus = EventBus()
         self.stream_controller = StreamController(self.event_bus)
         self.event_listener: EventListener | None = None
         self.app = FastMCP(hardware_system.description)
@@ -59,7 +58,6 @@ class GerberaServer:
             return
 
         self.event_listener = EventListener(
-            event_listener_id=str(uuid.uuid4()),
             hardware_system=self.hardware_system,
             _serial_pool=self.serial_pool,
             _threads={},

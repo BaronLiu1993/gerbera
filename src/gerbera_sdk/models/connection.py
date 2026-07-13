@@ -82,7 +82,6 @@ class Connection:
         event_type = "STREAM"
         event_name = self.event_name
         event = Event(
-            event_id=str(uuid.uuid4()),
             event_type=event_type,
             microcontroller_id=self.microcontroller_id,
             event_name=event_name,
@@ -100,7 +99,6 @@ class Connection:
         event_type = "MCP"
         event_name = self.event_name
         event = Event(
-            event_id=str(uuid.uuid4()),
             event_type=event_type,
             microcontroller_id=self.microcontroller_id,
             event_name=event_name,

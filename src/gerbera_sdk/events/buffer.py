@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
+import uuid
 
 from gerbera_sdk.events.event_worker import event_worker
 
 
 @dataclass
 class Buffer:
-    buffer_id: str
-    event_id: str
     table_name: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     max_size: int = 50
     items: list[dict[str, str]] = field(default_factory=list)
 

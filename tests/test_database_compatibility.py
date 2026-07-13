@@ -58,7 +58,7 @@ def test_database_on_unsupported_connection_raises() -> None:
             component_type="led",
             pins={"out": "13"},
             database=FakeDatabase(),
-            event_bus=EventBus(event_bus_id="events"),
+            event_bus=EventBus(),
         )
 
 
@@ -72,7 +72,7 @@ def test_database_table_name_uses_microcontroller_id_and_connection_name() -> No
         component_type="hw201",
         pins={"out": "7"},
         database=database,
-        event_bus=EventBus(event_bus_id="events"),
+        event_bus=EventBus(),
     )
 
     table_name = database.created_tables[0][0]

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from queue import Empty, Queue
 import threading
 import time
+import uuid
 
 from gerbera_sdk.models.database import Database
 
@@ -19,6 +20,7 @@ class EventWorker:
         max_retries: int = 3,
         retry_delay_seconds: float = 1.0,
     ) -> None:
+        self.id = str(uuid.uuid4())
         self._database: Database | None = None
         self._queue: Queue[WriteJob] = Queue()
         self._max_retries = max_retries

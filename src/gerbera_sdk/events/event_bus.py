@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import uuid
 
 from gerbera_sdk.events.event import Event
 
@@ -7,7 +8,7 @@ EventKey = tuple[str, str, str]
 
 @dataclass
 class EventBus:
-    event_bus_id: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     events: dict[EventKey, Event] = field(default_factory=dict)
 
     def add_event(

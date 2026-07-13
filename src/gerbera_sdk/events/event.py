@@ -1,15 +1,16 @@
 from dataclasses import dataclass, field
 from queue import Empty, Queue
+import uuid
 
 from gerbera_sdk.events.buffer import Buffer
 
 
 @dataclass
 class Event:
-    event_id: str
     event_type: str
     microcontroller_id: str
     event_name: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     streamable: bool = False
     table_name: str | None = None
     buffer: Buffer | None = None
@@ -20,11 +21,7 @@ class Event:
             if self.table_name is None:
                 raise RuntimeError("Streamable event requires a table_name")
 
-            self.buffer = Buffer(
-                buffer_id=self.event_id,
-                event_id=self.event_id,
-                table_name=self.table_name,
-            )
+            self.buffer = Buffer(table_name=self.table_name)
 
     def perform_work(self, payload: dict[str, str]) -> dict[str, str] | None:
         normalized_payload = dict(payload)
@@ -57,4 +54,4 @@ class Event:
         try:
             return self.responses.get(timeout=timeout)
         except Empty as exc:
-            raise TimeoutError(f"Timed out waiting for event response: {self.event_id}") from exc
+            raise TimeoutError(f"Timed out waiting for event response: {self.id}") from exc
