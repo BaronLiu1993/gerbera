@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import hashlib
 import re
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 import uuid
 
 from gerbera_sdk.events.event_worker import event_worker
@@ -23,6 +23,10 @@ class Connection:
     description: str = ""
     database: Database | None = None
     event_bus: EventBus | None = None
+    actions: dict[
+        str,
+        Callable[[Optional[dict[str, str]]], dict[str, str]],
+    ] = field(default_factory=dict, repr=False)
 
     @property
     def event_name(self) -> str:
@@ -109,6 +113,26 @@ class Connection:
             event_name,
             event,
         )
+
+    def register_action(
+        self,
+        action: str,
+        callback: Callable[[Optional[dict[str, str]]], dict[str, str]],
+    ) -> None:
+        self.actions[action.strip().upper()] = callback
+
+    def perform_action(
+        self,
+        action: str,
+        params: Optional[dict[str, str]] = None,
+    ) -> dict[str, str]:
+        normalized_action = action.strip().upper()
+        if normalized_action not in self.actions:
+            raise RuntimeError(
+                f"Action is not registered for {self.name}: {normalized_action}"
+            )
+
+        return self.actions[normalized_action](params)
 
     def to_dict(self) -> dict[str, Any]:
         return {

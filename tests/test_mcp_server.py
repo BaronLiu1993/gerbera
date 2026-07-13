@@ -161,6 +161,37 @@ def test_registered_tool_uses_cached_serial_connection(monkeypatch) -> None:
     assert response == {"value": "1"}
 
 
+def test_connection_exposes_registered_actions(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_hardware_system())
+    server._register_serial_connection()
+    connection = server.hardware_system.microcontrollers[0].connections[0]
+
+    assert set(connection.actions.keys()) == {"READ"}
+    assert connection.perform_action("READ") == {"value": "1"}
+
+    serial_connection = server.serial_pool["board-1"]
+    assert serial_connection.send_calls == ["READ,obstacle_sensor"]
+
+
+def test_mcp_tool_delegates_to_connection_action(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_hardware_system())
+    connection = server.hardware_system.microcontrollers[0].connections[0]
+    connection.register_action(
+        "READ",
+        lambda params=None: {"source": "connection_action"},
+    )
+
+    tool = server.app.registered_tools["read_obstacle_sensor"]
+
+    assert tool() == {"source": "connection_action"}
+
+
 def test_close_destroys_registered_serial_connections(monkeypatch) -> None:
     monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
     monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)

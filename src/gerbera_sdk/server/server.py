@@ -11,7 +11,6 @@ from gerbera_sdk.events.event_worker import event_worker
 from gerbera_sdk.events.stream_controller import StreamController
 from fastmcp import FastMCP
 
-# Set all ids to be auto set to be uuidv4
 class GerberaServer:
     def __init__(self, hardware_system: HardwareSystem) -> None:
         self.hardware_system = hardware_system
@@ -69,6 +68,11 @@ class GerberaServer:
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
                 for command in CommandCompiler.command_specs(connection):
+                    self._register_connection_action(
+                        microcontroller,
+                        connection,
+                        command,
+                    )
                     self._register_connection_tool(
                         microcontroller,
                         connection,
@@ -206,6 +210,26 @@ class GerberaServer:
             description=tool_function.__doc__,
         )(tool_function)
 
+    def _register_connection_action(
+        self,
+        microcontroller: Microcontroller,
+        connection,
+        command: CommandSpec,
+    ) -> None:
+        action = command.method.strip().upper()
+
+        def action_function(
+            params: Optional[dict[str, str]] = None,
+        ) -> dict[str, str]:
+            return self._send_connection_command(
+                microcontroller=microcontroller,
+                connection=connection,
+                action=action,
+                params=params,
+            )
+
+        connection.register_action(action, action_function)
+
     def _build_tool_function(
         self,
         microcontroller: Microcontroller,
@@ -215,12 +239,7 @@ class GerberaServer:
         def tool_function(
             params: Optional[dict[str, str]] = None,
         ) -> dict[str, str]:
-            return self._send_connection_command(
-                microcontroller=microcontroller,
-                connection=connection,
-                action=action,
-                params=params,
-            )
+            return connection.perform_action(action, params)
 
         return tool_function
 
@@ -231,12 +250,7 @@ class GerberaServer:
         state: str,
     ):
         def tool_function() -> dict[str, str]:
-            response = self._send_connection_command(
-                microcontroller=microcontroller,
-                connection=connection,
-                action="WRITE",
-                params={"state": state},
-            )
+            response = connection.perform_action("WRITE", {"state": state})
 
             if state == "off":
                 self.stream_controller.stop_stream(microcontroller, connection)
@@ -252,12 +266,7 @@ class GerberaServer:
         state: str,
     ):
         def tool_function() -> dict[str, str]:
-            return self._send_connection_command(
-                microcontroller=microcontroller,
-                connection=connection,
-                action="WRITE",
-                params={"state": state},
-            )
+            return connection.perform_action("WRITE", {"state": state})
 
         return tool_function
 
