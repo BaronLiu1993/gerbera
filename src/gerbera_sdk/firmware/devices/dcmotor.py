@@ -61,7 +61,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
   int speed = 255;
 
   if (direction.length() == 0) {{
-    Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_arg");
+    Serial.println("MCP,{connection.event_name},error:invalid_arg");
     return;
   }}
 
@@ -79,7 +79,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     digitalWrite({in1_pin}, HIGH);
     digitalWrite({in2_pin}, LOW);
     analogWrite({enable_pin}, speed);
-    Serial.println("MCP,{connection.component_type}_{connection.id},status:forward");
+    Serial.println("MCP,{connection.event_name},status:forward");
     return;
   }}
 
@@ -87,7 +87,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     digitalWrite({in1_pin}, LOW);
     digitalWrite({in2_pin}, HIGH);
     analogWrite({enable_pin}, speed);
-    Serial.println("MCP,{connection.component_type}_{connection.id},status:reverse");
+    Serial.println("MCP,{connection.event_name},status:reverse");
     return;
   }}
 
@@ -95,9 +95,9 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     digitalWrite({in1_pin}, LOW);
     digitalWrite({in2_pin}, LOW);
     analogWrite({enable_pin}, 0);
-    Serial.println("MCP,{connection.component_type}_{connection.id},status:stop");
+    Serial.println("MCP,{connection.event_name},status:stop");
     return;
   }}
 
-  Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_direction");
+  Serial.println("MCP,{connection.event_name},error:invalid_direction");
 }}"""

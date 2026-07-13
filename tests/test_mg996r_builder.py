@@ -21,4 +21,4 @@ def test_mg996r_builder_reuses_servo_contract() -> None:
     assert builder.build_setup_lines(connection) == ["  heavy_servo_servo.attach(10);"]
     handler = builder.build_handler(connection)
     assert "heavy_servo_servo.write(angle);" in handler
-    assert "MCP,mg996r_heavy-servo,angle:" in handler
+    assert "MCP,mg996r_fbc1de23_ed45b427,angle:" in handler

@@ -78,9 +78,6 @@ class HardwareSystem:
                 f"{microcontroller.hardware_system_id}, expected {self.id}"
             )
 
-        if self.database is not None and microcontroller.database is None:
-            microcontroller.database = self.database
-
         if microcontroller.connections:
             connections = list(microcontroller.connections)
             microcontroller.connections = []

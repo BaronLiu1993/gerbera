@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.contracts.firmware_contract import ColumnSpec, LibrarySpec, PinModeSpec
@@ -8,6 +7,7 @@ from gerbera_sdk.models.connection import Connection
 
 class BaseFirmwareBuilder(ABC):
     template_name: str = ""
+    supports_database: bool = False
 
     # Optional hook for devices that need global runtime objects.
     def build_definitions(self, connection: Connection) -> str:

@@ -7,6 +7,7 @@ from gerbera_sdk.models.connection import Connection
 
 class HW201FirmwareBuilder(BaseFirmwareBuilder):
     template_name = "hw_201_read"
+    supports_database = True
 
     def required_libraries(self) -> list:
         return []
@@ -80,7 +81,7 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
         return [
             f"  if ({connection.name}_stream_on) {{",
             f"    int value = digitalRead({out_pin});",
-            f'    Serial.print("STREAM,{connection.component_type}_{connection.id},value:");',
+            f'    Serial.print("STREAM,{connection.event_name},value:");',
             "    Serial.println(value);",
             "    delay(100);",
             "  }",
@@ -93,7 +94,7 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
             return f"""void handle_{connection.name}(const String& input) {{
   (void)input;
   int value = digitalRead({out_pin});
-  Serial.print("MCP,{connection.component_type}_{connection.id},value:");
+  Serial.print("MCP,{connection.event_name},value:");
   Serial.println(value);
 }}"""
 
@@ -104,21 +105,21 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
     String state = parameterValue(input, "state");
     if (state == "on") {{
       {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.component_type}_{connection.id},status:on");
+      Serial.println("MCP,{connection.event_name},status:on");
       return;
     }}
 
     if (state == "off") {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.component_type}_{connection.id},status:off");
+      Serial.println("MCP,{connection.event_name},status:off");
       return;
     }}
 
-    Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_state");
+    Serial.println("MCP,{connection.event_name},error:invalid_state");
     return;
   }}
 
   int value = digitalRead({out_pin});
-  Serial.print("MCP,{connection.component_type}_{connection.id},value:");
+  Serial.print("MCP,{connection.event_name},value:");
   Serial.println(value);
 }}"""

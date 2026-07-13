@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+import hashlib
+import re
 from typing import Any, Optional
 import uuid
 
@@ -10,6 +12,8 @@ from gerbera_sdk.events.event import Event
 
 @dataclass
 class Connection:
+    MAX_EVENT_NAME_LENGTH = 63
+
     name: str
     component_type: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -20,25 +24,55 @@ class Connection:
     database: Database | None = None
     event_bus: EventBus | None = None
 
+    @property
+    def event_name(self) -> str:
+        connection_key = self.id or self.name
+        connection_hash = hashlib.sha1(connection_key.encode()).hexdigest()[:8]
+        if self.microcontroller_id:
+            microcontroller_hash = hashlib.sha1(
+                self.microcontroller_id.encode()
+            ).hexdigest()[:8]
+            return self._safe_identifier(
+                f"{self.component_type}_{microcontroller_hash}_{connection_hash}"
+            )
+
+        return self._safe_identifier(f"{self.component_type}_{connection_hash}")
+
+    @classmethod
+    def _safe_identifier(cls, value: str) -> str:
+        normalized = re.sub(r"[^a-zA-Z0-9_]+", "_", value).strip("_").lower()
+        if len(normalized) <= cls.MAX_EVENT_NAME_LENGTH:
+            return normalized
+
+        digest = hashlib.sha1(normalized.encode()).hexdigest()[:8]
+        prefix_length = cls.MAX_EVENT_NAME_LENGTH - len(digest) - 1
+        return f"{normalized[:prefix_length].rstrip('_')}_{digest}"
+
     def __post_init__(self) -> None:
         if self.event_bus is None:
             return
 
+        from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
+
+        if self.component_type not in DEVICES_MAPPING:
+            raise ValueError(
+                f"Unsupported component type for event registration: "
+                f"{self.component_type}"
+            )
+
+        builder = DEVICES_MAPPING[self.component_type]()
+
         if self.database is not None:
-            from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
+            if not builder.supports_database:
+                raise ValueError(
+                    f"{self.component_type} does not support database streaming"
+                )
 
             event_worker.configure_database(self.database)
             event_worker.start()
 
-            if self.component_type not in DEVICES_MAPPING:
-                raise ValueError(
-                    f"Unsupported component type for schema generation: "
-                    f"{self.component_type}"
-                )
-
-            builder = DEVICES_MAPPING[self.component_type]()
             schema = builder.required_schema(self)
-            table_name = f"{self.component_type}_{self.id}"
+            table_name = self.event_name
             self.database.create_database_table(table_name, schema)
             self._register_stream_event(table_name)
 
@@ -46,7 +80,7 @@ class Connection:
 
     def _register_stream_event(self, table_name: str) -> None:
         event_type = "STREAM"
-        event_name = f"{self.component_type}_{self.id}"
+        event_name = self.event_name
         event = Event(
             event_id=str(uuid.uuid4()),
             event_type=event_type,
@@ -64,7 +98,7 @@ class Connection:
 
     def _register_mcp_event(self) -> None:
         event_type = "MCP"
-        event_name = f"{self.component_type}_{self.id}"
+        event_name = self.event_name
         event = Event(
             event_id=str(uuid.uuid4()),
             event_type=event_type,

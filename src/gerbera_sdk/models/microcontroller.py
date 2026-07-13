@@ -116,9 +116,6 @@ class Microcontroller:
                 f"{connection.microcontroller_id}, expected {self.id}"
             )
 
-        if self.database is not None and connection.database is None:
-            connection.database = self.database
-
     def get_required_libraries(self) -> list[LibrarySpec]:
         libraries: list[LibrarySpec] = []
         normalized_library_names: set[str] = set()

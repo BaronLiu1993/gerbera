@@ -7,6 +7,7 @@ from gerbera_sdk.models.connection import Connection
 
 class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
     template_name = "hcsr04_read"
+    supports_database = True
 
     def required_libraries(self) -> list:
         return []
@@ -87,7 +88,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
             *read_distance,
             "    if (duration > 0) {",
             "      float distanceCm = duration * 0.0343 / 2.0;",
-            f'      Serial.print("STREAM,{connection.component_type}_{connection.id},distance_cm:");',
+            f'      Serial.print("STREAM,{connection.event_name},distance_cm:");',
             "      Serial.println(distanceCm);",
             "    }",
             "    delay(100);",
@@ -102,12 +103,12 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
   (void)input;
 {read_distance}
   if (duration == 0) {{
-    Serial.println("MCP,{connection.component_type}_{connection.id},error:timeout");
+    Serial.println("MCP,{connection.event_name},error:timeout");
     return;
   }}
 
   float distanceCm = duration * 0.0343 / 2.0;
-  Serial.print("MCP,{connection.component_type}_{connection.id},distance_cm:");
+  Serial.print("MCP,{connection.event_name},distance_cm:");
   Serial.println(distanceCm);
 }}"""
 
@@ -118,28 +119,28 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
     String state = parameterValue(input, "state");
     if (state == "on") {{
       {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.component_type}_{connection.id},status:on");
+      Serial.println("MCP,{connection.event_name},status:on");
       return;
     }}
 
     if (state == "off") {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.component_type}_{connection.id},status:off");
+      Serial.println("MCP,{connection.event_name},status:off");
       return;
     }}
 
-    Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_state");
+    Serial.println("MCP,{connection.event_name},error:invalid_state");
     return;
   }}
 
 {read_distance}
   if (duration == 0) {{
-    Serial.println("MCP,{connection.component_type}_{connection.id},error:timeout");
+    Serial.println("MCP,{connection.event_name},error:timeout");
     return;
   }}
 
   float distanceCm = duration * 0.0343 / 2.0;
-  Serial.print("MCP,{connection.component_type}_{connection.id},distance_cm:");
+  Serial.print("MCP,{connection.event_name},distance_cm:");
   Serial.println(distanceCm);
 }}"""
 
