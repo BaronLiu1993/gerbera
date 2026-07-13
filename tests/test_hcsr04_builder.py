@@ -26,7 +26,7 @@ def test_hcsr04_builder_defines_pins_command_and_handler() -> None:
     assert pin_modes[1].mode == PinMode.INPUT
     assert [command.method for command in commands] == ["READ"]
     assert "pulseIn(9, HIGH, 30000)" in handler
-    assert "MCP,hcsr04_distance-sensor,distance_cm:" in handler
+    assert "MCP,hcsr04_fbc1de23_b67cc64a,distance_cm:" in handler
 
 
 def test_hcsr04_builder_supports_database_streaming() -> None:
@@ -54,7 +54,7 @@ def test_hcsr04_builder_supports_database_streaming() -> None:
     assert schema["distance_cm"].type == ColumnType.FLOAT
     assert "bool distance_sensor_stream_on = false;" in definitions
     assert "if (distance_sensor_stream_on)" in stream_lines
-    assert "STREAM,hcsr04_distance-sensor,distance_cm:" in stream_lines
+    assert "STREAM,hcsr04_fbc1de23_b67cc64a,distance_cm:" in stream_lines
     assert 'if (action == "WRITE")' in handler
     assert "distance_sensor_stream_on = true;" in handler
     assert "distance_sensor_stream_on = false;" in handler

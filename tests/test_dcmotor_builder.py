@@ -35,10 +35,10 @@ def test_dcmotor_builder_defines_write_only_driver_contract() -> None:
     assert "digitalWrite(6, HIGH);" in handler
     assert "analogWrite(9, speed);" in handler
     assert "analogWrite(9, 0);" in handler
-    assert "MCP,dcmotor_drive-motor,status:forward" in handler
-    assert "MCP,dcmotor_drive-motor,status:reverse" in handler
-    assert "MCP,dcmotor_drive-motor,status:stop" in handler
-    assert "MCP,dcmotor_drive-motor,error:invalid_direction" in handler
+    assert "MCP,dcmotor_fbc1de23_67b5a2fa,status:forward" in handler
+    assert "MCP,dcmotor_fbc1de23_67b5a2fa,status:reverse" in handler
+    assert "MCP,dcmotor_fbc1de23_67b5a2fa,status:stop" in handler
+    assert "MCP,dcmotor_fbc1de23_67b5a2fa,error:invalid_direction" in handler
 
 
 def test_dcmotor_builder_requires_enable_pin_for_pwm() -> None:

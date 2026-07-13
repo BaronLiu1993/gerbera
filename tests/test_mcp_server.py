@@ -197,6 +197,63 @@ def test_stream_toggle_tools_send_state_commands(monkeypatch) -> None:
     server.close()
 
 
+def test_stream_turn_off_flushes_partial_buffer(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_streaming_hardware_system())
+    server._register_serial_connection()
+
+    connection = server.hardware_system.microcontrollers[0].connections[0]
+    database = connection.database
+    stream_event = server.event_bus.get_handler(
+        ("STREAM", "board-1", connection.event_name)
+    )
+    stream_event.perform_work({"value": "1"})
+    stream_event.perform_work({"value": "0"})
+
+    turn_off = server.app.registered_tools["turn_off_obstacle_sensor_stream"]
+    assert turn_off() == {"value": "1"}
+
+    assert database.writes == [
+        (
+            connection.event_name,
+            [
+                {"value": "1"},
+                {"value": "0"},
+            ],
+        )
+    ]
+
+    server.close()
+
+
+def test_close_flushes_partial_stream_buffers(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_streaming_hardware_system())
+    server._register_serial_connection()
+
+    connection = server.hardware_system.microcontrollers[0].connections[0]
+    database = connection.database
+    stream_event = server.event_bus.get_handler(
+        ("STREAM", "board-1", connection.event_name)
+    )
+    stream_event.perform_work({"value": "1"})
+
+    server.close()
+
+    assert database.writes == [
+        (
+            connection.event_name,
+            [
+                {"value": "1"},
+            ],
+        )
+    ]
+
+
 def test_state_toggle_tools_send_state_commands(monkeypatch) -> None:
     monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
     monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
