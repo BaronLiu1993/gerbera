@@ -35,6 +35,22 @@ class FakeSerialConnection:
         self.destroy_called = True
 
 
+class FakeDatabase:
+    def __init__(self) -> None:
+        self.created_tables: list[tuple[str, object]] = []
+        self.writes: list[tuple[str, list[dict[str, str]]]] = []
+
+    def create_database_table(self, table_name: str, schema) -> None:
+        self.created_tables.append((table_name, schema))
+
+    def write_database_table(
+        self,
+        table_name: str,
+        payload: list[dict[str, str]],
+    ) -> None:
+        self.writes.append((table_name, payload))
+
+
 def build_hardware_system() -> HardwareSystem:
     hardware_system = HardwareSystem(
         id="system-1",
@@ -55,6 +71,34 @@ def build_hardware_system() -> HardwareSystem:
                 description="Obstacle sensor.",
                 pins={"out": "7"},
                 component_type="hw201",
+            )
+        ],
+    )
+    hardware_system.add_microcontrollers([microcontroller])
+    return hardware_system
+
+
+def build_streaming_hardware_system() -> HardwareSystem:
+    hardware_system = HardwareSystem(
+        id="system-1",
+        description="Kitchen system",
+        microcontrollers=[],
+    )
+    microcontroller = Microcontroller(
+        id="board-1",
+        hardware_system_id="system-1",
+        port="/dev/cu.usbserial-1140",
+        baud_rate=115200,
+        fqbn="arduino:avr:mega",
+        connections=[
+            Connection(
+                id="sensor-1",
+                microcontroller_id="board-1",
+                name="obstacle_sensor",
+                description="Obstacle sensor.",
+                pins={"out": "7"},
+                component_type="hw201",
+                database=FakeDatabase(),
             )
         ],
     )
@@ -102,3 +146,25 @@ def test_close_destroys_registered_serial_connections(monkeypatch) -> None:
 
     assert serial_connection.destroy_called is True
     assert server.serial_pool == {}
+
+
+def test_stream_toggle_tools_send_state_commands(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_streaming_hardware_system())
+    server._register_serial_connection()
+
+    turn_on = server.app.registered_tools["turn_on_obstacle_sensor_stream"]
+    turn_off = server.app.registered_tools["turn_off_obstacle_sensor_stream"]
+
+    assert turn_on() == {"value": "1"}
+    assert turn_off() == {"value": "1"}
+
+    serial_connection = server.serial_pool["board-1"]
+    assert serial_connection.send_calls == [
+        "WRITE,obstacle_sensor,state:on",
+        "WRITE,obstacle_sensor,state:off",
+    ]
+
+    server.close()
