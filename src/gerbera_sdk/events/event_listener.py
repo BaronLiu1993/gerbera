@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from gerbera_sdk.events.event_bus.streaming_event_bus import StreamingEventBus
-from gerbera_sdk.events.event_bus.mcp_event_bus import MCPEventBus
+from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware_system import HardwareSystem
 from serial import Serial
 import threading
@@ -12,9 +11,7 @@ class EventListener:
     hardware_system: HardwareSystem
     _serial_pool: dict[str, Serial]
     _threads: dict[str, threading.Thread]
-
-    _mcp_event_bus: MCPEventBus
-    _streaming_event_bus: StreamingEventBus
+    _event_bus: EventBus
 
     def create_listeners(self):
         for microcontroller in self.hardware_system.microcontrollers:
@@ -43,9 +40,15 @@ class EventListener:
         res_payload = {}
 
         tokens = line.split(",")
+        if len(tokens) < 2:
+            return None
+
         event_type, event_name, payload_tokens = tokens[0], tokens[1], tokens[2:]
 
         for payload_token in payload_tokens:
+            if ":" not in payload_token:
+                continue
+
             key, val = payload_token.split(":", 1)
             if key in res_payload:
                 raise ValueError("Key already exists")
@@ -55,10 +58,14 @@ class EventListener:
 
 
     def _dispatch_event(
-        self, bus, microcontroller_id: str, event_name: str, payload: dict[str, str]
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+        payload: dict[str, str],
     ) -> None:
-        event_key = (microcontroller_id, event_name)
-        handler = bus.get_handler(event_key)
+        event_key = (event_type, microcontroller_id, event_name)
+        handler = self._event_bus.get_handler(event_key)
         handler.perform_work(payload)
 
     def _listen_loop(self, microcontroller_id):
@@ -71,21 +78,15 @@ class EventListener:
             if not line:
                 continue
 
-            event_type, event_name, payload = self._parse_payload(line)
+            parsed_payload = self._parse_payload(line)
+            if parsed_payload is None:
+                continue
 
-            if event_type == "MCP":
-                self._dispatch_event(
-                    self._mcp_event_bus,
-                    microcontroller_id,
-                    event_name,
-                    payload,
-                )
-            elif event_type == "STREAM":
-                self._dispatch_event(
-                    self._streaming_event_bus,
-                    microcontroller_id,
-                    event_name,
-                    payload,
-                )
-            else:
-                raise ValueError("Unsupported Value Type")
+            event_type, event_name, payload = parsed_payload
+
+            self._dispatch_event(
+                event_type,
+                microcontroller_id,
+                event_name,
+                payload,
+            )
