@@ -8,8 +8,6 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event import Event
 
 
-
-
 @dataclass
 class Connection:
     id: str
@@ -22,6 +20,9 @@ class Connection:
     event_bus: EventBus | None = None
 
     def __post_init__(self) -> None:
+        if self.event_bus is None:
+            return
+
         if self.database is not None:
             from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 
@@ -38,12 +39,9 @@ class Connection:
             schema = builder.required_schema(self)
             table_name = f"{self.component_type}_{self.id}"
             self.database.create_database_table(table_name, schema)
+            self._register_stream_event(table_name)
 
-            if self.event_bus is not None:
-                self._register_stream_event(table_name)
-
-        if self.event_bus is not None:
-            self._register_mcp_event()
+        self._register_mcp_event()
 
     def _register_stream_event(self, table_name: str) -> None:
         event_type = "STREAM"

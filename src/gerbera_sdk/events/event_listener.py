@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware_system import HardwareSystem
 from serial import Serial
 import threading
+from serial import SerialException
 
 
 @dataclass
@@ -12,8 +13,10 @@ class EventListener:
     _serial_pool: dict[str, Serial]
     _threads: dict[str, threading.Thread]
     _event_bus: EventBus
+    _stop_event: threading.Event = field(default_factory=threading.Event)
 
     def create_listeners(self):
+        self._stop_event.clear()
         for microcontroller in self.hardware_system.microcontrollers:
             microcontroller_id = microcontroller.id
 
@@ -28,6 +31,8 @@ class EventListener:
             thread.start()
 
     def stop_listeners(self):
+        self._stop_event.set()
+
         for serial_connection in self._serial_pool.values():
             close = getattr(serial_connection, "close", None)
             if callable(close):
@@ -35,6 +40,8 @@ class EventListener:
 
         for thread in self._threads.values():
             thread.join(timeout=1)
+
+        self._threads.clear()
 
     def _parse_payload(self, line: str):
         res_payload = {}
@@ -70,8 +77,14 @@ class EventListener:
 
     def _listen_loop(self, microcontroller_id):
         serial_connection = self._serial_pool[microcontroller_id]
-        while True:
-            line = serial_connection.readline()
+        while not self._stop_event.is_set():
+            try:
+                line = serial_connection.readline()
+            except (OSError, SerialException):
+                if self._stop_event.is_set():
+                    return
+                raise
+
             if isinstance(line, bytes):
                 line = line.decode(errors="ignore")
             line = line.strip()

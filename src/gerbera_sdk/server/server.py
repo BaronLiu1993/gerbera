@@ -7,6 +7,7 @@ from gerbera_sdk.models.hardware_system import HardwareSystem
 from gerbera_sdk.models.microcontroller import Microcontroller
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.event_worker import event_worker
 from fastmcp import FastMCP
 import uuid
 
@@ -82,34 +83,11 @@ class GerberaServer:
     ) -> None:
         action = command.method.strip().upper()
         tool_name = f"{action.lower()}_{connection.name}"
-
-        def tool_function(
-            params: Optional[dict[str, str]] = None,
-            _microcontroller: Microcontroller = microcontroller,
-            _connection=connection,
-            _action: str = action,
-        ) -> dict[str, str]:
-            serial_connection = self._get_serial_connection(_microcontroller)
-            built_command = CommandCompiler.build_command(
-                _connection,
-                action=_action,
-                params=params,
-            )
-
-            event_name = f"{_connection.component_type}_{_connection.id}"
-            event = self.event_bus.get_handler(("MCP", _microcontroller.id, event_name))
-            event.clear_responses()
-
-            write = getattr(serial_connection, "write", None)
-            if callable(write):
-                write(built_command)
-            else:
-                response = serial_connection.send(built_command)
-                if response:
-                    return CommandCompiler.parse_response(response)
-
-            return event.wait_for_response()
-
+        tool_function = self._build_tool_function(
+            microcontroller,
+            connection,
+            action,
+        )
         tool_function.__name__ = tool_name
 
         command_description = CommandCompiler.describe_command(connection, action)
@@ -122,10 +100,45 @@ class GerberaServer:
             description=tool_function.__doc__,
         )(tool_function)
 
+    def _build_tool_function(
+        self,
+        microcontroller: Microcontroller,
+        connection,
+        action: str,
+    ):
+        def tool_function(
+            params: Optional[dict[str, str]] = None,
+        ) -> dict[str, str]:
+            serial_connection = self._get_serial_connection(microcontroller)
+            built_command = CommandCompiler.build_command(
+                connection,
+                action=action,
+                params=params,
+            )
+
+            event_name = f"{connection.component_type}_{connection.id}"
+            event = self.event_bus.get_handler(("MCP", microcontroller.id, event_name))
+            event.clear_responses()
+
+            write = getattr(serial_connection, "write", None)
+            if callable(write):
+                write(built_command)
+            else:
+                response = serial_connection.send(built_command)
+                if response:
+                    return CommandCompiler.parse_response(response)
+
+            return event.wait_for_response()
+
+        return tool_function
+
     def close(self) -> None:
         if self.event_listener is not None:
             self.event_listener.stop_listeners()
             self.event_listener = None
+
+        event_worker.flush_now()
+        event_worker.stop()
 
         for serial_connection in self.serial_pool.values():
             serial_connection.destroy()
