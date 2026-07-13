@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import uuid
 
 import psycopg
 from psycopg import sql
@@ -14,6 +15,8 @@ class Database:
     user: str
     password: str
     databaseName: str
+    hardware_system_id: str = ""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     table_names: dict[str, Table] = field(default_factory=dict)
 
     def _dsn(self) -> str:
@@ -116,6 +119,7 @@ class Database:
             "user": self.user,
             "password": self.password,
             "database": self.databaseName,
+            "hardware_system_id": self.hardware_system_id,
         }
 
     @classmethod
@@ -126,4 +130,5 @@ class Database:
             user=str(payload.get("user")),
             password=str(payload.get("password")),
             databaseName=str(payload.get("database")),
+            hardware_system_id=str(payload.get("hardware_system_id", "")),
         )

@@ -1,15 +1,27 @@
 from dataclasses import dataclass, field
 from typing import Any
+import uuid
 
+from gerbera_sdk.models.database import Database
 from gerbera_sdk.models.microcontroller import Microcontroller
 from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
 
 
 @dataclass
 class HardwareSystem:
-    id: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     description: str = ""
     microcontrollers: list[Microcontroller] = field(default_factory=list)
+    database: Database | None = None
+
+    def __post_init__(self) -> None:
+        if self.database is not None and not self.database.hardware_system_id:
+            self.database.hardware_system_id = self.id
+
+        if self.microcontrollers:
+            microcontrollers = list(self.microcontrollers)
+            self.microcontrollers = []
+            self.add_microcontrollers(microcontrollers)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -19,6 +31,7 @@ class HardwareSystem:
                 microcontroller.to_dict()
                 for microcontroller in self.microcontrollers
             ],
+            "database": self.database.to_dict() if self.database is not None else None,
         }
 
     @classmethod
@@ -30,6 +43,11 @@ class HardwareSystem:
                 Microcontroller.from_dict(microcontroller)
                 for microcontroller in payload.get("microcontrollers", [])
             ],
+            database=(
+                Database.from_dict(payload["database"])
+                if payload.get("database") is not None
+                else None
+            ),
         )
     
     # Add All Microcontrollers at Once to The List
@@ -39,11 +57,7 @@ class HardwareSystem:
         }
 
         for microcontroller in microcontrollers:
-            if microcontroller.hardware_system_id != self.id:
-                raise ValueError(
-                    f"Microcontroller {microcontroller.id} belongs to hardware system "
-                    f"{microcontroller.hardware_system_id}, expected {self.id}"
-                )
+            self._prepare_microcontroller(microcontroller)
 
             if microcontroller.id in existing_microcontroller_ids:
                 raise ValueError(
@@ -53,6 +67,24 @@ class HardwareSystem:
 
             existing_microcontroller_ids.add(microcontroller.id)
             self.microcontrollers.append(microcontroller)
+
+    def _prepare_microcontroller(self, microcontroller: Microcontroller) -> None:
+        if not microcontroller.hardware_system_id:
+            microcontroller.hardware_system_id = self.id
+
+        if microcontroller.hardware_system_id != self.id:
+            raise ValueError(
+                f"Microcontroller {microcontroller.id} belongs to hardware system "
+                f"{microcontroller.hardware_system_id}, expected {self.id}"
+            )
+
+        if self.database is not None and microcontroller.database is None:
+            microcontroller.database = self.database
+
+        if microcontroller.connections:
+            connections = list(microcontroller.connections)
+            microcontroller.connections = []
+            microcontroller.add_connections(connections)
     
     def get_required_microcontroller_packages(self) -> list[str]:
         libraries: list[str] = []
