@@ -19,4 +19,6 @@ def test_mg996r_builder_reuses_servo_contract() -> None:
     assert builder.required_commands(connection)[0].params["angle"].max == 180
     assert "Servo heavy_servo_servo;" in builder.build_definitions(connection)
     assert builder.build_setup_lines(connection) == ["  heavy_servo_servo.attach(10);"]
-    assert "heavy_servo_servo.write(angle);" in builder.build_handler(connection)
+    handler = builder.build_handler(connection)
+    assert "heavy_servo_servo.write(angle);" in handler
+    assert "MCP,mg996r_heavy-servo,angle:" in handler
