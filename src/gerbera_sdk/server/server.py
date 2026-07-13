@@ -74,9 +74,10 @@ class GerberaServer:
                         connection,
                         command,
                     )
+                self._register_state_toggle_tools(microcontroller, connection)
                 self._register_stream_toggle_tools(microcontroller, connection)
 
-    def _connection_supports_stream_toggle(self, connection) -> bool:
+    def _connection_supports_state_toggle(self, connection) -> bool:
         for command in CommandCompiler.command_specs(connection):
             if command.method.strip().upper() != "WRITE":
                 continue
@@ -88,6 +89,53 @@ class GerberaServer:
             return {"on", "off"}.issubset(set(state_param.enum))
 
         return False
+
+    def _connection_supports_stream_toggle(self, connection) -> bool:
+        return connection.database is not None and self._connection_supports_state_toggle(connection)
+
+    def _register_state_toggle_tools(
+        self,
+        microcontroller: Microcontroller,
+        connection,
+    ) -> None:
+        if not self._connection_supports_state_toggle(connection):
+            return
+
+        self._register_state_toggle_tool(
+            microcontroller=microcontroller,
+            connection=connection,
+            state="on",
+            tool_name=f"turn_on_{connection.name}",
+            description=f"Turn on {connection.name}.",
+        )
+        self._register_state_toggle_tool(
+            microcontroller=microcontroller,
+            connection=connection,
+            state="off",
+            tool_name=f"turn_off_{connection.name}",
+            description=f"Turn off {connection.name}.",
+        )
+
+    def _register_state_toggle_tool(
+        self,
+        microcontroller: Microcontroller,
+        connection,
+        state: str,
+        tool_name: str,
+        description: str,
+    ) -> None:
+        tool_function = self._build_state_toggle_tool_function(
+            microcontroller=microcontroller,
+            connection=connection,
+            state=state,
+        )
+        tool_function.__name__ = tool_name
+        tool_function.__doc__ = description
+
+        self.app.tool(
+            name=tool_name,
+            description=description,
+        )(tool_function)
 
     def _register_stream_toggle_tools(
         self,
@@ -177,6 +225,22 @@ class GerberaServer:
         return tool_function
 
     def _build_stream_toggle_tool_function(
+        self,
+        microcontroller: Microcontroller,
+        connection,
+        state: str,
+    ):
+        def tool_function() -> dict[str, str]:
+            return self._send_connection_command(
+                microcontroller=microcontroller,
+                connection=connection,
+                action="WRITE",
+                params={"state": state},
+            )
+
+        return tool_function
+
+    def _build_state_toggle_tool_function(
         self,
         microcontroller: Microcontroller,
         connection,

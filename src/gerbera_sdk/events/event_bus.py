@@ -17,7 +17,6 @@ class EventBus:
         event_name: str,
         event: Event,
     ) -> None:
-        # event_name is the component_type
         event_key = (event_type, microcontroller_id, event_name)
         if event_key in self.events:
             raise RuntimeError("Event already exists")

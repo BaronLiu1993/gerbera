@@ -26,5 +26,7 @@ def test_led_builder_write_contract_and_handler() -> None:
     assert 'parameterValue(input, "state")' in handler
     assert "digitalWrite(13, HIGH);" in handler
     assert "digitalWrite(13, LOW);" in handler
-    assert "error:invalid_arg" in handler
-    assert "error:invalid_value" in handler
+    assert "MCP,led_green-led,state:on" in handler
+    assert "MCP,led_green-led,state:off" in handler
+    assert "MCP,led_green-led,error:invalid_arg" in handler
+    assert "MCP,led_green-led,error:invalid_value" in handler

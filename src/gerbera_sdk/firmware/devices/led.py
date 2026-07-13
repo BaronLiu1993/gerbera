@@ -41,21 +41,21 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
   String value = parameterValue(input, "state");
 
   if (value.length() == 0) {{
-    Serial.println("error:invalid_arg");
+    Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_arg");
     return;
   }}
 
   if (value == "on") {{
     digitalWrite({out_pin}, HIGH);
-    Serial.println("state:on");
+    Serial.println("MCP,{connection.component_type}_{connection.id},state:on");
     return;
   }}
 
   if (value == "off") {{
     digitalWrite({out_pin}, LOW);
-    Serial.println("state:off");
+    Serial.println("MCP,{connection.component_type}_{connection.id},state:off");
     return;
   }}
 
-  Serial.println("error:invalid_value");
+  Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_value");
 }}"""

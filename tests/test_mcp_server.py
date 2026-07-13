@@ -106,6 +106,33 @@ def build_streaming_hardware_system() -> HardwareSystem:
     return hardware_system
 
 
+def build_led_hardware_system() -> HardwareSystem:
+    hardware_system = HardwareSystem(
+        id="system-1",
+        description="Kitchen system",
+        microcontrollers=[],
+    )
+    microcontroller = Microcontroller(
+        id="board-1",
+        hardware_system_id="system-1",
+        port="/dev/cu.usbserial-1140",
+        baud_rate=115200,
+        fqbn="arduino:avr:mega",
+        connections=[
+            Connection(
+                id="green-led",
+                microcontroller_id="board-1",
+                name="green_led",
+                description="Green LED.",
+                pins={"out": "13"},
+                component_type="led",
+            )
+        ],
+    )
+    hardware_system.add_microcontrollers([microcontroller])
+    return hardware_system
+
+
 def test_register_serial_connection_caches_per_microcontroller(monkeypatch) -> None:
     monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
     monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
@@ -165,6 +192,28 @@ def test_stream_toggle_tools_send_state_commands(monkeypatch) -> None:
     assert serial_connection.send_calls == [
         "WRITE,obstacle_sensor,state:on",
         "WRITE,obstacle_sensor,state:off",
+    ]
+
+    server.close()
+
+
+def test_state_toggle_tools_send_state_commands(monkeypatch) -> None:
+    monkeypatch.setattr("gerbera_sdk.server.server.FastMCP", FakeFastMCP)
+    monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
+
+    server = GerberaServer(build_led_hardware_system())
+    server._register_serial_connection()
+
+    turn_on = server.app.registered_tools["turn_on_green_led"]
+    turn_off = server.app.registered_tools["turn_off_green_led"]
+
+    assert turn_on() == {"value": "1"}
+    assert turn_off() == {"value": "1"}
+
+    serial_connection = server.serial_pool["board-1"]
+    assert serial_connection.send_calls == [
+        "WRITE,green_led,state:on",
+        "WRITE,green_led,state:off",
     ]
 
     server.close()

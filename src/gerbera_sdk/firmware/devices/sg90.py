@@ -48,12 +48,12 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
   String angleValue = parameterValue(input, "angle");
 
   if (angleValue.length() == 0) {{
-    Serial.println("error:invalid_arg");
+    Serial.println("MCP,{connection.component_type}_{connection.id},error:invalid_arg");
     return;
   }}
 
   int angle = angleValue.toInt();
   {connection.name}_servo.write(angle);
-  Serial.print("angle:");
+  Serial.print("MCP,{connection.component_type}_{connection.id},angle:");
   Serial.println(angle);
 }}"""
