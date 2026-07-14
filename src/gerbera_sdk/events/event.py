@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from queue import Empty, Queue
 import uuid
 
@@ -30,6 +31,7 @@ class Event:
             if self.buffer is None:
                 raise RuntimeError("Streamable event requires a buffer")
 
+            normalized_payload["created_at"] = datetime.now(timezone.utc)
             self.buffer.write(normalized_payload)
             return None
 
