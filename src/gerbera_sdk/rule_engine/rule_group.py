@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Callable, Any
-from condition import Condition
+from typing import Callable
 from enum import Enum
 import uuid
 
-from rule_buffer import RuleBuffer
+from gerbera_sdk.rule_engine.condition import Condition
+from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
 
 
 class RuleGroupOperatorEnum(Enum):
@@ -14,21 +14,36 @@ class RuleGroupOperatorEnum(Enum):
 @dataclass
 class RuleGroup:
     conditions: list[Condition] # Has to be passed in to create the class
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     operator: RuleGroupOperatorEnum
-    callback: Callable[[dict[str, Any]], None]
+    callback: Callable[[], None]
     rule_buffer: RuleBuffer
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def _get_actual_value(self, event_type, microcontroller_id, event_name):
-        event_key = (event_type, microcontroller_id, event_name)
-        actual = self.rule_buffer.buffer[event_key]
-        return actual
+    def _get_actual_value(
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+        field_name: str,
+    ) -> str:
+        actual = self.rule_buffer.read_event_value(
+            event_type,
+            microcontroller_id,
+            event_name,
+            field_name,
+        )
+        return str(actual)
 
 
     def evaluate_rule_group(self) -> bool:
         if self.operator == RuleGroupOperatorEnum.AND:
             for condition in self.conditions:
-                actual = self._get_actual_value(condition.event_type, condition.microcontroller_id, condition.event_name)
+                actual = self._get_actual_value(
+                    condition.event_type,
+                    condition.microcontroller_id,
+                    condition.event_name,
+                    condition.field_name,
+                )
                 rule_check = condition.evaluate_condition(actual)
 
                 if not rule_check:
@@ -38,13 +53,17 @@ class RuleGroup:
 
         elif self.operator == RuleGroupOperatorEnum.OR:
             for condition in self.conditions:
-                actual = self._get_actual_value(condition.event_type, condition.microcontroller_id, condition.event_name)
+                actual = self._get_actual_value(
+                    condition.event_type,
+                    condition.microcontroller_id,
+                    condition.event_name,
+                    condition.field_name,
+                )
                 rule_check = condition.evaluate_condition(actual)
 
                 if rule_check:
                     return True
             
             return False
-        
-                
 
+        raise ValueError(f"Unsupported rule group operator: {self.operator}")
