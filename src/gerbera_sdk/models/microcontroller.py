@@ -1,16 +1,19 @@
 from dataclasses import dataclass, field
+import json
+from pathlib import Path
 from typing import Any
-import uuid
 
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec
 from gerbera_sdk.models.connection import Connection
 from gerbera_sdk.models.database import Database
 
+DEVICE_REGISTRY_PATH = Path("devices.json")
+
 
 @dataclass
 class Microcontroller:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = ""
     hardware_system_id: str = ""
     port: str = ""
     baud_rate: int = 115200
@@ -19,8 +22,19 @@ class Microcontroller:
     firmware_file_path: str = ""
     connections: list[Connection] = field(default_factory=list)
     database: Database | None = None
+    _resolved_id_from_port: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        resolved_id = self._resolve_id_from_port()
+        if not resolved_id:
+            raise ValueError(
+                "Microcontroller id must be resolved from devices.json via port; "
+                "explicit ids are not allowed."
+            )
+
+        self.id = resolved_id
+        self._resolved_id_from_port = True
+
         if not self.connections:
             return
 
@@ -111,10 +125,22 @@ class Microcontroller:
             connection.microcontroller_id = self.id
 
         if connection.microcontroller_id != self.id:
-            raise ValueError(
-                f"Connection {connection.name} belongs to microcontroller "
-                f"{connection.microcontroller_id}, expected {self.id}"
-            )
+            if self._resolved_id_from_port:
+                connection.microcontroller_id = self.id
+            else:
+                raise ValueError(
+                    f"Connection {connection.name} belongs to microcontroller "
+                    f"{connection.microcontroller_id}, expected {self.id}"
+                )
+
+        if (
+            connection.database is None
+            and self.database is not None
+            and connection.component_type in DEVICES_MAPPING
+        ):
+            builder = DEVICES_MAPPING[connection.component_type]()
+            if builder.supports_database:
+                connection.database = self.database
 
     def get_required_libraries(self) -> list[LibrarySpec]:
         libraries: list[LibrarySpec] = []
@@ -152,3 +178,26 @@ class Microcontroller:
                 used_pins.add(pin)
 
         return used_pins
+
+    def _resolve_id_from_port(self) -> str | None:
+        if not self.port or not DEVICE_REGISTRY_PATH.exists():
+            return None
+
+        try:
+            registry = json.loads(DEVICE_REGISTRY_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            return None
+
+        for device_id, device in registry.items():
+            device_port = str(device.get("port", device.get("device", "")))
+            if device_port != self.port:
+                continue
+
+            resolved_id = str(device.get("id", "")).strip()
+            if resolved_id:
+                return resolved_id
+
+            fallback_id = str(device_id).strip()
+            return fallback_id or None
+
+        return None

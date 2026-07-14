@@ -29,5 +29,5 @@ def test_sg90_builder_servo_contract() -> None:
     assert builder.build_setup_lines(connection) == ["  servo_motor_servo.attach(10);"]
     assert 'parameterValue(input, "angle")' in handler
     assert "servo_motor_servo.write(angle);" in handler
-    assert "MCP,sg90_fbc1de23_d33ce7dc,angle:" in handler
-    assert "MCP,sg90_fbc1de23_d33ce7dc,error:invalid_arg" in handler
+    assert f"MCP,{connection.event_name},angle:" in handler
+    assert f"MCP,{connection.event_name},error:invalid_arg" in handler

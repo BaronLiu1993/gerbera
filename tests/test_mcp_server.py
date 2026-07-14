@@ -138,11 +138,12 @@ def test_register_serial_connection_caches_per_microcontroller(monkeypatch) -> N
     monkeypatch.setattr("gerbera_sdk.server.server.SerialConnection", FakeSerialConnection)
 
     server = GerberaServer(build_hardware_system())
+    board_id = server.hardware_system.microcontrollers[0].id
 
     server._register_serial_connection()
 
-    assert set(server.serial_pool.keys()) == {"board-1"}
-    serial_connection = server.serial_pool["board-1"]
+    assert set(server.serial_pool.keys()) == {board_id}
+    serial_connection = server.serial_pool[board_id]
     assert serial_connection.connect_calls == [("/dev/cu.usbserial-1140", 115200)]
 
 
@@ -152,11 +153,12 @@ def test_registered_tool_uses_cached_serial_connection(monkeypatch) -> None:
 
     server = GerberaServer(build_hardware_system())
     server._register_serial_connection()
+    board_id = server.hardware_system.microcontrollers[0].id
 
     tool = server.app.registered_tools["read_obstacle_sensor"]
     response = tool()
 
-    serial_connection = server.serial_pool["board-1"]
+    serial_connection = server.serial_pool[board_id]
     assert serial_connection.send_calls == ["READ,obstacle_sensor"]
     assert response == {"value": "1"}
 
@@ -168,11 +170,12 @@ def test_connection_exposes_registered_actions(monkeypatch) -> None:
     server = GerberaServer(build_hardware_system())
     server._register_serial_connection()
     connection = server.hardware_system.microcontrollers[0].connections[0]
+    board_id = server.hardware_system.microcontrollers[0].id
 
     assert set(connection.actions.keys()) == {"READ"}
     assert connection.perform_action("READ") == {"value": "1"}
 
-    serial_connection = server.serial_pool["board-1"]
+    serial_connection = server.serial_pool[board_id]
     assert serial_connection.send_calls == ["READ,obstacle_sensor"]
 
 
@@ -198,7 +201,8 @@ def test_close_destroys_registered_serial_connections(monkeypatch) -> None:
 
     server = GerberaServer(build_hardware_system())
     server._register_serial_connection()
-    serial_connection = server.serial_pool["board-1"]
+    board_id = server.hardware_system.microcontrollers[0].id
+    serial_connection = server.serial_pool[board_id]
 
     server.close()
 
@@ -212,6 +216,7 @@ def test_stream_toggle_tools_send_state_commands(monkeypatch) -> None:
 
     server = GerberaServer(build_streaming_hardware_system())
     server._register_serial_connection()
+    board_id = server.hardware_system.microcontrollers[0].id
 
     turn_on = server.app.registered_tools["turn_on_obstacle_sensor_stream"]
     turn_off = server.app.registered_tools["turn_off_obstacle_sensor_stream"]
@@ -219,7 +224,7 @@ def test_stream_toggle_tools_send_state_commands(monkeypatch) -> None:
     assert turn_on() == {"value": "1"}
     assert turn_off() == {"value": "1"}
 
-    serial_connection = server.serial_pool["board-1"]
+    serial_connection = server.serial_pool[board_id]
     assert serial_connection.send_calls == [
         "WRITE,obstacle_sensor,state:on",
         "WRITE,obstacle_sensor,state:off",
@@ -235,10 +240,11 @@ def test_stream_turn_off_flushes_partial_buffer(monkeypatch) -> None:
     server = GerberaServer(build_streaming_hardware_system())
     server._register_serial_connection()
 
+    board_id = server.hardware_system.microcontrollers[0].id
     connection = server.hardware_system.microcontrollers[0].connections[0]
     database = connection.database
     stream_event = server.event_bus.get_handler(
-        ("STREAM", "board-1", connection.event_name)
+        ("STREAM", board_id, connection.event_name)
     )
     stream_event.perform_work({"value": "1"})
     stream_event.perform_work({"value": "0"})
@@ -272,10 +278,11 @@ def test_close_flushes_partial_stream_buffers(monkeypatch) -> None:
     server = GerberaServer(build_streaming_hardware_system())
     server._register_serial_connection()
 
+    board_id = server.hardware_system.microcontrollers[0].id
     connection = server.hardware_system.microcontrollers[0].connections[0]
     database = connection.database
     stream_event = server.event_bus.get_handler(
-        ("STREAM", "board-1", connection.event_name)
+        ("STREAM", board_id, connection.event_name)
     )
     stream_event.perform_work({"value": "1"})
 
@@ -300,6 +307,7 @@ def test_state_toggle_tools_send_state_commands(monkeypatch) -> None:
 
     server = GerberaServer(build_led_hardware_system())
     server._register_serial_connection()
+    board_id = server.hardware_system.microcontrollers[0].id
 
     turn_on = server.app.registered_tools["turn_on_green_led"]
     turn_off = server.app.registered_tools["turn_off_green_led"]
@@ -307,7 +315,7 @@ def test_state_toggle_tools_send_state_commands(monkeypatch) -> None:
     assert turn_on() == {"value": "1"}
     assert turn_off() == {"value": "1"}
 
-    serial_connection = server.serial_pool["board-1"]
+    serial_connection = server.serial_pool[board_id]
     assert serial_connection.send_calls == [
         "WRITE,green_led,state:on",
         "WRITE,green_led,state:off",

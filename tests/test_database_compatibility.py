@@ -76,7 +76,7 @@ def test_database_table_name_uses_microcontroller_id_and_connection_name() -> No
     )
 
     table_name = database.created_tables[0][0]
-    assert table_name == "hw201_8e910dfb_e8f75c2b"
+    assert table_name == "hw201_8e910dfb"
     assert len(table_name) <= 63
 
 
@@ -89,5 +89,4 @@ def test_event_name_is_capped_for_postgres_identifiers() -> None:
     )
 
     assert len(connection.event_name) <= 63
-    assert connection.event_name.startswith("hcsr04_8e910dfb_")
-    assert "very_long_sensor_name" not in connection.event_name
+    assert connection.event_name == "hcsr04_8e910dfb"

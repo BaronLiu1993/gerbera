@@ -78,6 +78,17 @@ class HardwareSystem:
                 f"{microcontroller.hardware_system_id}, expected {self.id}"
             )
 
+        if microcontroller.database is None and self.database is not None:
+            from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
+
+            supports_database = any(
+                connection.component_type in DEVICES_MAPPING
+                and DEVICES_MAPPING[connection.component_type]().supports_database
+                for connection in microcontroller.connections
+            )
+            if supports_database:
+                microcontroller.database = self.database
+
         if microcontroller.connections:
             connections = list(microcontroller.connections)
             microcontroller.connections = []

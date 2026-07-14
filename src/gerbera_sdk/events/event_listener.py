@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.utils import build_event_key
 from gerbera_sdk.models.hardware_system import HardwareSystem
 from serial import Serial
 import threading
@@ -65,16 +66,19 @@ class EventListener:
         return event_type, event_name, res_payload
 
 
-    def _dispatch_event(
+    def _dispatch_event_to_event_bus(
         self,
         event_type: str,
         microcontroller_id: str,
         event_name: str,
         payload: dict[str, str],
     ) -> None:
-        event_key = (event_type, microcontroller_id, event_name)
+        event_key = build_event_key(event_type, microcontroller_id, event_name)
         handler = self._event_bus.get_handler(event_key)
         handler.perform_work(payload)
+    
+    def _dispatch_event_to_rule_engine(self):
+        pass
 
     def _listen_loop(self, microcontroller_id):
         serial_connection = self._serial_pool[microcontroller_id]
@@ -98,7 +102,11 @@ class EventListener:
 
             event_type, event_name, payload = parsed_payload
 
-            self._dispatch_event(
+            self._dispatch_event_to_rule_engine(
+                
+            )
+
+            self._dispatch_event_to_event_bus(
                 event_type,
                 microcontroller_id,
                 event_name,
