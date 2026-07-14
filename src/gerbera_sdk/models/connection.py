@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 import uuid
 
+from gerbera_sdk.contracts.firmware_contract import OutputEventType
 from gerbera_sdk.events.event_worker import event_worker
 from gerbera_sdk.models.database import Database
 from gerbera_sdk.events.event_bus import EventBus
@@ -9,6 +10,8 @@ from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.utils import build_connection_event_name
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
+from gerbera_sdk.rule_engine.condition import Condition, OperatorEnum
+
 
 
 
@@ -120,6 +123,39 @@ class Connection:
     ) -> None:
         self.actions[action.strip().upper()] = callback
 
+    def create_condition(
+        self,
+        field_name: str,
+        operator: OperatorEnum,
+        expected: str,
+        event_type: OutputEventType | str | None = None,
+    ) -> Condition:
+
+        builder = DEVICES_MAPPING[self.component_type]()
+        output_contract = builder.output_contract(self)
+
+        normalized_field_name = str(field_name)
+        resolved_event_type = self._resolve_condition_event_type(
+            output_contract=output_contract,
+            field_name=normalized_field_name,
+            event_type=event_type,
+        )
+
+        normalized_operator = (
+            operator
+            if isinstance(operator, OperatorEnum)
+            else OperatorEnum(str(operator))
+        )
+
+        return Condition(
+            event_type=resolved_event_type.value,
+            microcontroller_id=self.microcontroller_id,
+            event_name=self.event_name,
+            field_name=normalized_field_name,
+            expected=str(expected),
+            operator=normalized_operator,
+        )
+
     def perform_action(
         self,
         action: str,
@@ -132,6 +168,41 @@ class Connection:
             )
 
         return self.actions[normalized_action](params)
+
+    def _resolve_condition_event_type(
+        self,
+        output_contract: dict[OutputEventType, dict[str, Any]],
+        field_name: str,
+        event_type: OutputEventType | str | None,
+    ) -> OutputEventType:
+        if event_type is None:
+            valid_fields = sorted(
+                {
+                    output_field_name
+                    for fields in output_contract.values()
+                    for output_field_name in fields.keys()
+                }
+            )
+            raise ValueError(
+                f"event_type is required when creating a condition for "
+                f"{self.component_type}. Valid fields: {valid_fields}"
+            )
+
+        normalized_event_type = (
+            event_type
+            if isinstance(event_type, OutputEventType)
+            else OutputEventType(str(event_type))
+        )
+        fields = output_contract.get(normalized_event_type, {})
+        if field_name not in fields:
+            valid_fields = sorted(fields.keys())
+            raise ValueError(
+                f"Field {field_name!r} is not available for "
+                f"{normalized_event_type.value} on {self.component_type}. "
+                f"Valid fields: {valid_fields}"
+            )
+
+        return normalized_event_type
 
     def to_dict(self) -> dict[str, Any]:
         return {

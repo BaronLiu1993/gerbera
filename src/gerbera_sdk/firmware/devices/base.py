@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
-from gerbera_sdk.contracts.firmware_contract import ColumnSpec, LibrarySpec, PinModeSpec
+from gerbera_sdk.contracts.firmware_contract import (
+    ColumnSpec,
+    LibrarySpec,
+    OutputEventType,
+    OutputFieldSpec,
+    PinModeSpec,
+)
 from gerbera_sdk.models.connection import Connection
 
 
@@ -24,6 +30,13 @@ class BaseFirmwareBuilder(ABC):
     # Optional hook for generating schema when a database is connected.
     # Key is column name and value is the SQL column spec.
     def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
+        return {}
+
+    # Optional hook for defining the fields that MCP/STREAM can emit.
+    def output_contract(
+        self,
+        connection: Connection,
+    ) -> dict[OutputEventType, dict[str, OutputFieldSpec]]:
         return {}
 
     @abstractmethod

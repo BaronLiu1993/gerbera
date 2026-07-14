@@ -1,6 +1,13 @@
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
-from gerbera_sdk.contracts.firmware_contract import ColumnSpec, ColumnType
-from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
+from gerbera_sdk.contracts.firmware_contract import (
+    ColumnSpec,
+    ColumnType,
+    OutputEventType,
+    OutputFieldSpec,
+    OutputFieldType,
+    PinMode,
+    PinModeSpec,
+)
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.models.connection import Connection
 
@@ -65,6 +72,45 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
                 nullable=False,
             ),
         }
+
+    def output_contract(
+        self,
+        connection: Connection,
+    ) -> dict[OutputEventType, dict[str, OutputFieldSpec]]:
+        outputs: dict[OutputEventType, dict[str, OutputFieldSpec]] = {
+            OutputEventType.MCP: {
+                "value": OutputFieldSpec(
+                    type=OutputFieldType.INTEGER,
+                    description="Current digital sensor value.",
+                ),
+            }
+        }
+
+        if connection.database is None:
+            return outputs
+
+        outputs[OutputEventType.MCP].update(
+            {
+                "status": OutputFieldSpec(
+                    type=OutputFieldType.TEXT,
+                    description="Acknowledged stream state after a WRITE action.",
+                ),
+
+
+                # Might need to delete this later but keeping for now to avoid error handling and unhappy paths, focus on happy path
+                "error": OutputFieldSpec(
+                    type=OutputFieldType.TEXT,
+                    description="Error emitted when a WRITE action is invalid.",
+                ),
+            }
+        )
+        outputs[OutputEventType.STREAM] = {
+            "value": OutputFieldSpec(
+                type=OutputFieldType.INTEGER,
+                description="Continuously streamed digital sensor value.",
+            ),
+        }
+        return outputs
 
     def build_definitions(self, connection: Connection) -> str:
         if connection.database is None:

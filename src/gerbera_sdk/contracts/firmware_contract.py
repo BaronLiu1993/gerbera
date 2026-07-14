@@ -14,6 +14,19 @@ class ColumnType(str, Enum):
     BOOLEAN = "BOOLEAN"
 
 
+class OutputEventType(str, Enum):
+    MCP = "MCP"
+    STREAM = "STREAM"
+
+
+class OutputFieldType(str, Enum):
+    INTEGER = "INTEGER"
+    FLOAT = "FLOAT"
+    TIMESTAMP = "TIMESTAMP"
+    TEXT = "TEXT"
+    BOOLEAN = "BOOLEAN"
+
+
 @dataclass(frozen=True)
 class PinModeSpec:
     pin: str
@@ -34,3 +47,9 @@ class ColumnSpec:
     nullable: bool = True
     default: str | None = None
     sql_suffix: str | None = None
+
+
+@dataclass(frozen=True)
+class OutputFieldSpec:
+    type: OutputFieldType
+    description: str = ""

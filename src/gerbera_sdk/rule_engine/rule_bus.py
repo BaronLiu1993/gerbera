@@ -39,7 +39,7 @@ class RuleBus:
             event_name,
         )
 
-        for rule_group in self.rule_bus.get(event_key):
+        for rule_group in self.rule_bus.get(event_key, []):
             condition_res = rule_group.evaluate_rule_group()
             if condition_res:
                 rule_group.callback()

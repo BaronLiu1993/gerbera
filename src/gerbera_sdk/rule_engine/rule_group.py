@@ -11,12 +11,13 @@ class RuleGroupOperatorEnum(Enum):
     AND = "and"
     OR = "or"
 
+# Have user create a new instance of the object
 @dataclass
 class RuleGroup:
     conditions: list[Condition] # Has to be passed in to create the class
     operator: RuleGroupOperatorEnum
     callback: Callable[[], None]
-    rule_buffer: RuleBuffer
+    rule_buffer: RuleBuffer | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def _get_actual_value(
@@ -26,6 +27,9 @@ class RuleGroup:
         event_name: str,
         field_name: str,
     ) -> str:
+        if self.rule_buffer is None:
+            raise RuntimeError("RuleGroup must be attached to a RuleBuffer before evaluation")
+
         actual = self.rule_buffer.read_event_value(
             event_type,
             microcontroller_id,

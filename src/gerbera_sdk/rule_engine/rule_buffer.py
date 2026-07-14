@@ -6,6 +6,7 @@ from gerbera_sdk.events.utils import EventKey
 from gerbera_sdk.rule_engine.rule_bus import RuleBus
 
 
+
 @dataclass
 class RuleBuffer:
     buffer: dict[EventKey, dict[str, Any]] = field(default_factory=dict)
