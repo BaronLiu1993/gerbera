@@ -2,9 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 
 from gerbera_sdk.events.event import Event
-
-
-EventKey = tuple[str, str, str]
+from gerbera_sdk.events.utils import EventKey, build_event_key
 
 @dataclass
 class EventBus:
@@ -18,7 +16,7 @@ class EventBus:
         event_name: str,
         event: Event,
     ) -> None:
-        event_key = (event_type, microcontroller_id, event_name)
+        event_key = build_event_key(event_type, microcontroller_id, event_name)
         if event_key in self.events:
             raise RuntimeError("Event already exists")
 

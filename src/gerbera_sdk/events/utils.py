@@ -3,13 +3,14 @@ import re
 
 
 MAX_EVENT_NAME_LENGTH = 63
+EventKey = tuple[str, str, str]
 
 
 def build_event_key(
     event_type: str,
     microcontroller_id: str,
     event_name: str,
-) -> tuple[str, str, str]:
+) -> EventKey:
     return (event_type, microcontroller_id, event_name)
 
 

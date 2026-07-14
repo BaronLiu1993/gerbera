@@ -2,14 +2,15 @@ from dataclasses import dataclass, field
 from typing import Any
 import uuid
 
-
-EventKey = tuple[str, str, str]
+from rule_bus import RuleBus
+from gerbera_sdk.events.utils import EventKey
 
 
 @dataclass
 class RuleBuffer:
     buffer: dict[EventKey, dict[str, Any]] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    rule_bus: RuleBus
 
     def register_event_in_buffer(
         self,
@@ -48,6 +49,7 @@ class RuleBuffer:
         event_payload = self._get_event_payload(event_key)
 
         for key, value in payload.items():
+            self.rule_bus.emit_evaluation_event(event_type, microcontroller_id, event_name)
             event_payload[str(key)] = value
 
     def read_event_value(
