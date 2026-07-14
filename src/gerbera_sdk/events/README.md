@@ -70,3 +70,22 @@ This is an event-driven producer-consumer pipeline with write-behind batch buffe
 - Sink: database
 
 Partial batches flush on stream-off and server shutdown.
+
+## Event Name
+
+The `event_name` parsed from firmware payloads is `connection.event_name`.
+
+Payload shape:
+
+```text
+MCP,<event_name>,key:value
+STREAM,<event_name>,key:value
+```
+
+That identifier is generated from:
+
+- `component_type`
+- a short hash of `microcontroller_id`
+- a short hash of the canonicalized `pins` mapping
+
+This keeps routing and stream table naming stable while avoiding collisions for same-type devices on the same board.

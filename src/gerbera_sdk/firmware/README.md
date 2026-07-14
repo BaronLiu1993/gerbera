@@ -66,6 +66,18 @@ MCP,<connection.event_name>,key:value
 STREAM,<connection.event_name>,key:value
 ```
 
+`connection.event_name` is the runtime-safe internal identifier. It is generated from:
+
+- `component_type`
+- a short hash of `microcontroller_id`
+- a short hash of the canonicalized `pins` mapping
+
+This same identifier is reused for:
+
+- firmware serial output
+- event bus routing
+- stream table naming
+
 ## Rule
 
 Keep generated firmware thin. It should parse command strings, touch hardware, and emit structured serial lines.

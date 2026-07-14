@@ -118,8 +118,20 @@ classDiagram
 Current format:
 
 ```text
-<component_type>_<short_microcontroller_hash>
+<component_type>_<short_microcontroller_hash>_<short_pin_hash>
 ```
+
+How it is built:
+
+- `component_type` is kept readable
+- `microcontroller_id` is hashed down to a short stable suffix
+- `pins` are canonicalized into a stable signature such as `echo=8,trigger=9`
+- that pin signature is hashed down to a short suffix
+
+Why pins are included:
+
+- `component_type + microcontroller_id` is not enough when the same board has two devices of the same type
+- adding the pin signature distinguishes physical attachments without relying on mutable fields like `name`
 
 This is intentionally short to avoid PostgreSQL identifier length issues. It is internal identity, not a user-facing label.
 
