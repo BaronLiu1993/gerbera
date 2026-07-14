@@ -6,6 +6,13 @@ class PinMode(str, Enum):
     INPUT = "INPUT"
     OUTPUT = "OUTPUT"
 
+class ColumnType(str, Enum):
+    INTEGER = "INTEGER"
+    FLOAT = "DOUBLE PRECISION"
+    TIMESTAMP = "TIMESTAMP"
+    TEXT = "TEXT"
+    BOOLEAN = "BOOLEAN"
+
 
 @dataclass(frozen=True)
 class PinModeSpec:
@@ -17,14 +24,6 @@ class PinModeSpec:
 class LibrarySpec:
     include: str
     install: str
-
-@dataclass(frozen=True)
-class ColumnType(str, Enum):
-    INTEGER = "INTEGER"
-    FLOAT = "DOUBLE PRECISION"
-    TIMESTAMP = "TIMESTAMP"
-    TEXT = "TEXT"
-    BOOLEAN = "BOOLEAN"
 
 
 @dataclass(frozen=True)

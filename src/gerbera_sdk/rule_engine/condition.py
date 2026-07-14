@@ -33,6 +33,9 @@ class Condition:
         )
 
     def evaluate_condition(self, actual: str) -> bool:
+        if actual is None:
+            return False
+
         if self.operator == OperatorEnum.EQUAL:
             return actual == self.expected
 
