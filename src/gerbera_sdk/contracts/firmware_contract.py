@@ -18,7 +18,7 @@ class LibrarySpec:
     include: str
     install: str
 
-
+@dataclass(frozen=True)
 class ColumnType(str, Enum):
     INTEGER = "INTEGER"
     FLOAT = "DOUBLE PRECISION"
