@@ -17,11 +17,23 @@ def build_event_key(
 def build_connection_event_name(
     component_type: str,
     microcontroller_id: str,
+    pins: dict[str, str] | None = None,
 ) -> str:
     microcontroller_hash = hashlib.sha1(
         microcontroller_id.encode()
     ).hexdigest()[:8]
-    return safe_identifier(f"{component_type}_{microcontroller_hash}")
+    pin_hash = hashlib.sha1(
+        build_pin_signature(pins).encode()
+    ).hexdigest()[:8]
+    return safe_identifier(f"{component_type}_{microcontroller_hash}_{pin_hash}")
+
+
+def build_pin_signature(pins: dict[str, str] | None = None) -> str:
+    normalized_pins = pins or {}
+    return ",".join(
+        f"{str(key)}={str(value)}"
+        for key, value in sorted(normalized_pins.items())
+    )
 
 
 def safe_identifier(

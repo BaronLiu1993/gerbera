@@ -2,9 +2,11 @@ import pytest
 
 from gerbera_sdk import Connection, HardwareSystem, Microcontroller
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.utils import build_pin_signature
 from gerbera_sdk.firmware.devices.hcsr04 import HCSR04FirmwareBuilder
 from gerbera_sdk.firmware.devices.hw201 import HW201FirmwareBuilder
 from gerbera_sdk.firmware.devices.led import LEDFirmwareBuilder
+import hashlib
 
 
 class FakeDatabase:
@@ -25,7 +27,15 @@ def test_database_compatibility_is_explicit_per_builder() -> None:
     assert HCSR04FirmwareBuilder.supports_database is True
 
 
-def test_database_is_not_propagated_to_every_connection() -> None:
+def test_database_is_not_propagated_to_every_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        Microcontroller,
+        "_resolve_id_from_port",
+        lambda self: "board-1",
+    )
+
     database = FakeDatabase()
     connection = Connection(
         id="green-led",
@@ -34,8 +44,8 @@ def test_database_is_not_propagated_to_every_connection() -> None:
         pins={"out": "13"},
     )
     microcontroller = Microcontroller(
-        id="board-1",
         hardware_system_id="system-1",
+        port="/dev/test-port",
         connections=[connection],
     )
 
@@ -62,13 +72,14 @@ def test_database_on_unsupported_connection_raises() -> None:
         )
 
 
-def test_database_table_name_uses_microcontroller_id_and_connection_name() -> None:
+def test_database_table_name_uses_microcontroller_id_and_pins() -> None:
     database = FakeDatabase()
+    microcontroller_id = "27b30005-ff68-4c81-93ec-8d3ce7c7a242"
 
     Connection(
         id="obstacle-sensor",
         name="obstacle_sensor",
-        microcontroller_id="27b30005-ff68-4c81-93ec-8d3ce7c7a242",
+        microcontroller_id=microcontroller_id,
         component_type="hw201",
         pins={"out": "7"},
         database=database,
@@ -76,7 +87,13 @@ def test_database_table_name_uses_microcontroller_id_and_connection_name() -> No
     )
 
     table_name = database.created_tables[0][0]
-    assert table_name == "hw201_8e910dfb"
+    expected_microcontroller_hash = hashlib.sha1(
+        microcontroller_id.encode()
+    ).hexdigest()[:8]
+    expected_pin_hash = hashlib.sha1(
+        build_pin_signature({"out": "7"}).encode()
+    ).hexdigest()[:8]
+    assert table_name == f"hw201_{expected_microcontroller_hash}_{expected_pin_hash}"
     assert len(table_name) <= 63
 
 
@@ -89,4 +106,29 @@ def test_event_name_is_capped_for_postgres_identifiers() -> None:
     )
 
     assert len(connection.event_name) <= 63
-    assert connection.event_name == "hcsr04_8e910dfb"
+    expected_microcontroller_hash = hashlib.sha1(
+        connection.microcontroller_id.encode()
+    ).hexdigest()[:8]
+    expected_pin_hash = hashlib.sha1(
+        build_pin_signature({"trig": "8", "echo": "9"}).encode()
+    ).hexdigest()[:8]
+    assert connection.event_name == (
+        f"hcsr04_{expected_microcontroller_hash}_{expected_pin_hash}"
+    )
+
+
+def test_event_name_changes_for_same_component_type_on_different_pins() -> None:
+    connection_one = Connection(
+        name="obstacle_sensor_one",
+        microcontroller_id="27b30005-ff68-4c81-93ec-8d3ce7c7a242",
+        component_type="hw201",
+        pins={"out": "7"},
+    )
+    connection_two = Connection(
+        name="obstacle_sensor_two",
+        microcontroller_id="27b30005-ff68-4c81-93ec-8d3ce7c7a242",
+        component_type="hw201",
+        pins={"out": "8"},
+    )
+
+    assert connection_one.event_name != connection_two.event_name

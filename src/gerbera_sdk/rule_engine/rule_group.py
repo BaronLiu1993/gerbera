@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 from enum import Enum
 import uuid
 
 from gerbera_sdk.rule_engine.condition import Condition
-from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
+
+if TYPE_CHECKING:
+    from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
 
 
 class RuleGroupOperatorEnum(Enum):
@@ -17,7 +19,7 @@ class RuleGroup:
     conditions: list[Condition] # Has to be passed in to create the class
     operator: RuleGroupOperatorEnum
     callback: Callable[[], None]
-    rule_buffer: RuleBuffer | None = None
+    rule_buffer: "RuleBuffer | None" = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def _get_actual_value(

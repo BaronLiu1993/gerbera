@@ -9,8 +9,8 @@ from gerbera_sdk.rule_engine.rule_bus import RuleBus
 
 @dataclass
 class RuleBuffer:
+    rule_bus: "RuleBus"
     buffer: dict[EventKey, dict[str, Any]] = field(default_factory=dict)
-    rule_bus: RuleBus
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def register_event_in_buffer(

@@ -8,11 +8,6 @@ from gerbera_sdk.models.database import Database
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.utils import build_connection_event_name
-from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
-from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
-from gerbera_sdk.rule_engine.condition import Condition, OperatorEnum
-
-
 
 
 @dataclass
@@ -26,7 +21,6 @@ class Connection:
     description: str = ""
     database: Database | None = None
     event_bus: EventBus | None = None
-    rule_buffer: RuleBuffer | None = None
     actions: dict[
         str,
         Callable[[Optional[dict[str, str]]], dict[str, str]],
@@ -37,19 +31,14 @@ class Connection:
         return build_connection_event_name(
             component_type=self.component_type,
             microcontroller_id=self.microcontroller_id,
+            pins=self.pins,
         )
 
     def __post_init__(self) -> None:
         if self.event_bus is None:
             return
 
-        if self.component_type not in DEVICES_MAPPING:
-            raise ValueError(
-                f"Unsupported component type for event registration: "
-                f"{self.component_type}"
-            )
-
-        builder = DEVICES_MAPPING[self.component_type]()
+        builder = self._get_builder()
 
         if self.database is not None:
             if not builder.supports_database:
@@ -70,7 +59,7 @@ class Connection:
     def _register_stream_event(self, table_name: str) -> None:
         event_type = "STREAM"
         event_name = self.event_name
-        builder = DEVICES_MAPPING[self.component_type]()
+        builder = self._get_builder()
 
         event = Event(
             event_type=event_type,
@@ -123,39 +112,6 @@ class Connection:
     ) -> None:
         self.actions[action.strip().upper()] = callback
 
-    def create_condition(
-        self,
-        field_name: str,
-        operator: OperatorEnum,
-        expected: str,
-        event_type: OutputEventType | str | None = None,
-    ) -> Condition:
-
-        builder = DEVICES_MAPPING[self.component_type]()
-        output_contract = builder.output_contract(self)
-
-        normalized_field_name = str(field_name)
-        resolved_event_type = self._resolve_condition_event_type(
-            output_contract=output_contract,
-            field_name=normalized_field_name,
-            event_type=event_type,
-        )
-
-        normalized_operator = (
-            operator
-            if isinstance(operator, OperatorEnum)
-            else OperatorEnum(str(operator))
-        )
-
-        return Condition(
-            event_type=resolved_event_type.value,
-            microcontroller_id=self.microcontroller_id,
-            event_name=self.event_name,
-            field_name=normalized_field_name,
-            expected=str(expected),
-            operator=normalized_operator,
-        )
-
     def perform_action(
         self,
         action: str,
@@ -169,40 +125,16 @@ class Connection:
 
         return self.actions[normalized_action](params)
 
-    def _resolve_condition_event_type(
-        self,
-        output_contract: dict[OutputEventType, dict[str, Any]],
-        field_name: str,
-        event_type: OutputEventType | str | None,
-    ) -> OutputEventType:
-        if event_type is None:
-            valid_fields = sorted(
-                {
-                    output_field_name
-                    for fields in output_contract.values()
-                    for output_field_name in fields.keys()
-                }
-            )
+    def _get_builder(self):
+        from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
+
+        if self.component_type not in DEVICES_MAPPING:
             raise ValueError(
-                f"event_type is required when creating a condition for "
-                f"{self.component_type}. Valid fields: {valid_fields}"
+                f"Unsupported component type for event registration: "
+                f"{self.component_type}"
             )
 
-        normalized_event_type = (
-            event_type
-            if isinstance(event_type, OutputEventType)
-            else OutputEventType(str(event_type))
-        )
-        fields = output_contract.get(normalized_event_type, {})
-        if field_name not in fields:
-            valid_fields = sorted(fields.keys())
-            raise ValueError(
-                f"Field {field_name!r} is not available for "
-                f"{normalized_event_type.value} on {self.component_type}. "
-                f"Valid fields: {valid_fields}"
-            )
-
-        return normalized_event_type
+        return DEVICES_MAPPING[self.component_type]()
 
     def to_dict(self) -> dict[str, Any]:
         return {
