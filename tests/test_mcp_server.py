@@ -250,8 +250,14 @@ def test_stream_turn_off_flushes_partial_buffer(monkeypatch) -> None:
         (
             connection.event_name,
             [
-                {"value": "1"},
-                {"value": "0"},
+                {
+                    "value": "1",
+                    "created_at": database.writes[0][1][0]["created_at"],
+                },
+                {
+                    "value": "0",
+                    "created_at": database.writes[0][1][1]["created_at"],
+                },
             ],
         )
     ]
@@ -279,7 +285,10 @@ def test_close_flushes_partial_stream_buffers(monkeypatch) -> None:
         (
             connection.event_name,
             [
-                {"value": "1"},
+                {
+                    "value": "1",
+                    "created_at": database.writes[0][1][0]["created_at"],
+                },
             ],
         )
     ]

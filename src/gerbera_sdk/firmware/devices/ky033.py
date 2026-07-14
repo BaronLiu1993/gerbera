@@ -63,7 +63,6 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
                 type=ColumnType.TIMESTAMP,
                 idx=True,
                 nullable=False,
-                default="CURRENT_TIMESTAMP",
             ),
         }
 

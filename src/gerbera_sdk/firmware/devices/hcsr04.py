@@ -68,7 +68,6 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
                 type=ColumnType.TIMESTAMP,
                 idx=True,
                 nullable=False,
-                default="CURRENT_TIMESTAMP",
             ),
         }
 
