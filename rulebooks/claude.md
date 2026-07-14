@@ -78,36 +78,37 @@ Use optional hooks only when needed:
 - `build_setup_lines(...)`: setup code beyond `pinMode(...)`, for example `servo.attach(pin);`.
 - `build_stream_lines(...)`: recurring loop code for database-backed streaming.
 - `required_schema(...)`: database columns for streamed data.
+- `output_contract(...)`: emitted MCP/STREAM fields and types.
 
 ## Serial Response Contract
 
 Firmware responses that should return to MCP tools must use:
 
 ```text
-MCP,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,key:value
+MCP,<component_type>_<short_microcontroller_hash>,key:value
 ```
 
 Example:
 
 ```cpp
-Serial.println("MCP,led_8e910dfb_f928a260,state:on");
+Serial.println("MCP,led_8e910dfb,state:on");
 ```
 
 Streaming data that should go to the event/database path must use:
 
 ```text
-STREAM,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,key:value,key:value
+STREAM,<component_type>_<short_microcontroller_hash>,key:value,key:value
 ```
 
 Example:
 
 ```cpp
-Serial.println("STREAM,hw201_8e910dfb_e8f75c2b,value:1");
+Serial.println("STREAM,hw201_8e910dfb,value:1");
 ```
 
 Do not return plain `state:on`, `value:1`, or `error:...` from generated handlers if MCP needs to read the result. The listener will ignore those because they do not include an event type and event name.
 
-Use `connection.event_name` in builders so event/table names stay stable and stay under PostgreSQL's 63-byte identifier limit. For real hardware, the `microcontroller_id` should come from the UUID in `devices.json`; Gerbera hashes both microcontroller identity and connection identity into short deterministic suffixes.
+Use `connection.event_name` in builders so event/table names stay stable and stay under PostgreSQL's 63-byte identifier limit. For real hardware, the `microcontroller_id` should come from the UUID in `devices.json`; Gerbera hashes that board identity into a short deterministic suffix.
 
 ## Command Contract
 
@@ -160,14 +161,45 @@ For database-compatible sensors:
 1. Keep the normal request/response handler working.
 2. Add separate streaming definitions/lines only when database is connected.
 3. Implement `required_schema(...)` with `ColumnSpec`.
-4. Ensure stream payload keys match database column names.
+4. Implement `output_contract(...)` for `MCP` and `STREAM` fields.
+5. Ensure stream payload keys match database column names.
 
-For auto-generated columns, prefer database defaults:
+For auto-generated columns:
 
 - `id`: primary key / auto increment
-- `created_at`: current timestamp default
+- `created_at`: supplied by the runtime/event path
 
-The firmware should usually emit only measured values, for example `value:1`.
+The firmware should usually emit only measured values, for example `value:1`. Do not rely on a database `CURRENT_TIMESTAMP` default for streamed event timing.
+
+## Output Contract
+
+If a device emits structured MCP or STREAM values, define them in `output_contract(...)`.
+
+Example:
+
+```python
+return {
+    OutputEventType.MCP: {
+        "value": OutputFieldSpec(
+            type=OutputFieldType.INTEGER,
+            description="Current digital sensor value.",
+        ),
+    },
+    OutputEventType.STREAM: {
+        "value": OutputFieldSpec(
+            type=OutputFieldType.INTEGER,
+            description="Continuously streamed sensor value.",
+        ),
+    },
+}
+```
+
+This contract is the source of truth for:
+
+- device-emitted MCP fields
+- device-emitted STREAM fields
+- rule field validation
+- buffer initialization
 
 ## New Device Checklist
 
@@ -176,7 +208,8 @@ The firmware should usually emit only measured values, for example `value:1`.
 - All required pins are documented in tests.
 - `required_commands(...)` matches the handler parser.
 - Handler uses `parameterValue(input, "...")` for parameters.
-- MCP responses use `MCP,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...`.
-- Streaming responses use `STREAM,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...`.
+- MCP responses use `MCP,<component_type>_<short_microcontroller_hash>,...`.
+- Streaming responses use `STREAM,<component_type>_<short_microcontroller_hash>,...`.
+- Output fields are declared in `output_contract(...)`.
 - Any required library has both `include` and `install` in `LibrarySpec`.
 - Tests assert command contract, pin modes, and generated handler strings.

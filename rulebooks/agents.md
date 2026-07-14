@@ -53,6 +53,10 @@ build_definitions(self, connection: Connection) -> str
 build_setup_lines(self, connection: Connection) -> list[str]
 build_stream_lines(self, connection: Connection) -> list[str]
 required_schema(self, connection: Connection) -> dict[str, ColumnSpec]
+output_contract(
+    self,
+    connection: Connection,
+) -> dict[OutputEventType, dict[str, OutputFieldSpec]]
 ```
 
 Use optional methods only when the component actually needs them.
@@ -62,7 +66,7 @@ Use optional methods only when the component actually needs them.
 The event name is normally:
 
 ```text
-<component_type>_<short_microcontroller_hash>_<short_connection_hash>
+<component_type>_<short_microcontroller_hash>
 ```
 
 Generated firmware must use the same value.
@@ -81,7 +85,7 @@ f"MCP,{connection.name},state:on"
 
 The runtime event bus registers by `connection.event_name`, not only by `connection.name`.
 For real hardware, `microcontroller_id` should be the stable UUID from `devices.json`.
-Gerbera hashes that UUID and the connection identity before using them in event/table names so PostgreSQL identifiers stay short and stable.
+Gerbera hashes that UUID into a short deterministic suffix so event and table names stay short and stable.
 
 ## MCP Response Rule
 
@@ -94,9 +98,9 @@ MCP,<event_name>,key:value
 Examples:
 
 ```cpp
-Serial.println("MCP,led_8e910dfb_f928a260,state:on");
-Serial.println("MCP,dcmotor_8e910dfb_67b5a2fa,status:forward");
-Serial.print("MCP,sg90_8e910dfb_d33ce7dc,angle:");
+Serial.println("MCP,led_8e910dfb,state:on");
+Serial.println("MCP,dcmotor_8e910dfb,status:forward");
+Serial.print("MCP,sg90_8e910dfb,angle:");
 Serial.println(angle);
 ```
 
@@ -112,8 +116,8 @@ Serial.println("error:invalid_arg");
 Good:
 
 ```cpp
-Serial.println("MCP,led_8e910dfb_f928a260,state:on");
-Serial.println("MCP,led_8e910dfb_f928a260,error:invalid_arg");
+Serial.println("MCP,led_8e910dfb,state:on");
+Serial.println("MCP,led_8e910dfb,error:invalid_arg");
 ```
 
 ## Streaming Rule
@@ -182,6 +186,38 @@ LibrarySpec(
 
 The include is used in generated firmware. The install name is used by setup/install dependency code.
 
+## Output Contract
+
+If a device emits structured MCP or STREAM responses, define `output_contract(...)`.
+
+Use `OutputEventType`, `OutputFieldType`, and `OutputFieldSpec`, not raw dictionaries of ad hoc strings.
+
+Example:
+
+```python
+return {
+    OutputEventType.MCP: {
+        "value": OutputFieldSpec(
+            type=OutputFieldType.INTEGER,
+            description="Current digital sensor value.",
+        ),
+    },
+    OutputEventType.STREAM: {
+        "value": OutputFieldSpec(
+            type=OutputFieldType.INTEGER,
+            description="Continuously streamed digital sensor value.",
+        ),
+    },
+}
+```
+
+Use this contract as the source of truth for:
+
+- MCP response fields
+- STREAM payload fields
+- rule-authoring field validation
+- buffer initialization
+
 ## Database Schema
 
 If the device streams to a database, define `required_schema(...)`.
@@ -204,12 +240,15 @@ return {
     "created_at": ColumnSpec(
         type=ColumnType.TIMESTAMP,
         nullable=False,
-        default="CURRENT_TIMESTAMP",
     ),
 }
 ```
 
-Firmware stream payloads should contain only columns that are supplied by firmware. Do not require firmware to emit `id` or `created_at` if the database can default them.
+Firmware stream payloads should contain only columns that are supplied by firmware.
+
+Do not require firmware to emit `id`; the database should generate it.
+
+`created_at` is emitted by the runtime/event path now, not by a database default. Keep the database column present, but do not rely on `CURRENT_TIMESTAMP` defaults for streamed event timing.
 
 ## Tests Required
 
@@ -219,8 +258,9 @@ For each new builder, test:
 - Pin modes
 - Required libraries
 - Handler contains expected pin writes/reads
-- Handler emits `MCP,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...`
-- Streaming output emits `STREAM,<component_type>_<short_microcontroller_hash>_<short_connection_hash>,...` if applicable
+- Handler emits `MCP,<component_type>_<short_microcontroller_hash>,...`
+- Streaming output emits `STREAM,<component_type>_<short_microcontroller_hash>,...` if applicable
+- Output contract if the device emits MCP and/or STREAM fields
 - Schema if database streaming is supported
 
 Run focused tests:
