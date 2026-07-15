@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, Callable
 from enum import Enum
 import uuid
 
-from gerbera_sdk.harness.agent.tool.rule_engine.condition import Condition
+from gerbera_sdk.harness.agent.rule_engine.condition import Condition
 
 if TYPE_CHECKING:
-    from gerbera_sdk.harness.agent.tool.rule_engine.rule_buffer import RuleBuffer
+    from gerbera_sdk.harness.agent.rule_engine.rule_buffer import RuleBuffer
 
 
 class RuleGroupOperatorEnum(Enum):
