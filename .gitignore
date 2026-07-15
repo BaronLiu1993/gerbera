@@ -9,3 +9,4 @@ debug_serial_minimal
 serve_mcp.py
 setup_hardware.py
 example_hardware_system.py
+gerbera.egg-info

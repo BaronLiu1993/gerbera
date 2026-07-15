@@ -1,6 +1,6 @@
 # Models
 
-READ: we will need to clean up the code for this modelling. It is messy right now and does not fully reflect the intended user experience yet. THE SOURCE OF TRUTH FOR MICROCONTROLLERS IS THE DEVICE.JSON FILE
+READ: we will need to clean up the code for this modelling. It is messy right now and does not fully reflect the intended user experience yet. THE SOURCE OF TRUTH FOR MICROCONTROLLERS IS `config.json["devices"]`.
 
 The models folder owns the hardware declaration graph and the database model used by the runtime.
 
@@ -15,7 +15,7 @@ Models should stay focused on:
 
 ```text
 hardware_system.py      Top-level hardware declaration.
-microcontroller.py      Board identity resolved from devices.json via port.
+microcontroller.py      Board identity resolved from config.json via port.
 connection.py           One declared device connection on a board.
 database.py             PostgreSQL connection details and table helpers.
 table.py                In-memory table metadata.
@@ -97,7 +97,7 @@ classDiagram
 
 `Microcontroller.id`
 
-- is resolved from `devices.json`
+- is resolved from `config.json["devices"]`
 - is not intended to be user-defined directly
 - is currently derived by matching the declared `port`
 

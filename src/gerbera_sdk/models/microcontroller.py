@@ -8,7 +8,7 @@ from gerbera_sdk.contracts.firmware_contract import LibrarySpec
 from gerbera_sdk.models.connection import Connection
 from gerbera_sdk.models.database import Database
 
-DEVICE_REGISTRY_PATH = Path("devices.json")
+CONFIG_PATH = Path("config.json")
 
 
 @dataclass
@@ -28,7 +28,7 @@ class Microcontroller:
         resolved_id = self._resolve_id_from_port()
         if not resolved_id:
             raise ValueError(
-                "Microcontroller id must be resolved from devices.json via port; "
+                "Microcontroller id must be resolved from config.json['devices'] via port; "
                 "explicit ids are not allowed."
             )
 
@@ -169,7 +169,6 @@ class Microcontroller:
     def set_firmware_file(self, path) -> None:
         self.firmware_file_path = path
 
-    # Helper Functions for Deduping
     def _get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
 
@@ -180,16 +179,20 @@ class Microcontroller:
         return used_pins
 
     def _resolve_id_from_port(self) -> str | None:
-        if not self.port or not DEVICE_REGISTRY_PATH.exists():
-            return None
+        if not self.port:
+            raise ValueError("Microcontroller port is required for config lookup")
 
-        try:
-            registry = json.loads(DEVICE_REGISTRY_PATH.read_text())
-        except (OSError, json.JSONDecodeError):
-            return None
+        if not CONFIG_PATH.exists():
+            raise FileNotFoundError("config.json not found")
+
+        config = json.loads(CONFIG_PATH.read_text())
+        registry = config.get("devices", {})
+        if not isinstance(registry, dict):
+            raise ValueError("config.json['devices'] must be an object")
 
         for device_id, device in registry.items():
-            device_port = str(device.get("port", device.get("device", "")))
+            device_port = str(device.get("address")).strip()
+
             if device_port != self.port:
                 continue
 
@@ -200,4 +203,6 @@ class Microcontroller:
             fallback_id = str(device_id).strip()
             return fallback_id or None
 
-        return None
+        raise ValueError(
+            f"No device in config.json['devices'] matched port {self.port!r}"
+        )

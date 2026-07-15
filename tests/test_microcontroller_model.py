@@ -4,14 +4,17 @@ from gerbera_sdk import Connection, Database, HardwareSystem, Microcontroller
 
 
 def _write_registry(tmp_path, board_id: str = "board-1", port: str = "/dev/cu.usbserial-1140"):
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         f"""
 {{
-  "{board_id}": {{
-    "id": "{board_id}",
-    "device": "{port}"
-  }}
+  "devices": {{
+    "{board_id}": {{
+      "id": "{board_id}",
+      "device": "{port}"
+    }}
+  }},
+  "entry_point": "serve_mcp.py"
 }}
 """.strip()
     )
@@ -21,7 +24,7 @@ def _write_registry(tmp_path, board_id: str = "board-1", port: str = "/dev/cu.us
 def test_microcontroller_requires_registry_match_from_port() -> None:
     with pytest.raises(
         ValueError,
-        match="Microcontroller id must be resolved from devices.json via port",
+        match="Microcontroller id must be resolved from config.json\\['devices'\\] via port",
     ):
         Microcontroller()
 
@@ -30,19 +33,22 @@ def test_microcontroller_resolves_stable_id_from_port_registry(
     tmp_path,
     monkeypatch,
 ) -> None:
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         """
 {
-  "27b30005-ff68-4c81-93ec-8d3ce7c7a242": {
-    "id": "27b30005-ff68-4c81-93ec-8d3ce7c7a242",
-    "device": "/dev/cu.usbserial-1140"
-  }
+  "devices": {
+    "27b30005-ff68-4c81-93ec-8d3ce7c7a242": {
+      "id": "27b30005-ff68-4c81-93ec-8d3ce7c7a242",
+      "device": "/dev/cu.usbserial-1140"
+    }
+  },
+  "entry_point": "serve_mcp.py"
 }
 """.strip()
     )
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
 
@@ -55,7 +61,7 @@ def test_microcontroller_resolves_stable_id_from_port_registry(
 def test_microcontroller_resolves_id_from_registry_port(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     microcontroller = Microcontroller(port="/dev/cu.usbserial-1140")
@@ -73,7 +79,7 @@ def test_hardware_system_id_defaults_to_uuid() -> None:
 def test_hardware_system_sets_microcontroller_parent_id(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     hardware_system = HardwareSystem(id="system-1")
@@ -88,7 +94,7 @@ def test_hardware_system_sets_microcontroller_parent_id(tmp_path, monkeypatch) -
 def test_microcontroller_sets_connection_parent_id(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     hardware_system = HardwareSystem(id="system-1")
@@ -110,7 +116,7 @@ def test_microcontroller_sets_connection_parent_id(tmp_path, monkeypatch) -> Non
 def test_microcontroller_requires_hardware_system_before_connections(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     microcontroller = Microcontroller(port="/dev/cu.usbserial-1140")
@@ -127,7 +133,7 @@ def test_microcontroller_requires_hardware_system_before_connections(tmp_path, m
 def test_microcontroller_normalizes_connection_parent_to_resolved_id(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     hardware_system = HardwareSystem(id="system-1")
@@ -162,7 +168,7 @@ def test_hardware_system_sets_database_parent_id() -> None:
 def test_hardware_system_passes_database_to_microcontroller(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     database = Database(
@@ -193,7 +199,7 @@ def test_hardware_system_passes_database_to_microcontroller(tmp_path, monkeypatc
 def test_microcontroller_passes_database_to_connection(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     database = Database(
@@ -223,7 +229,7 @@ def test_microcontroller_passes_database_to_connection(tmp_path, monkeypatch) ->
 def test_explicit_connection_database_is_not_overwritten(tmp_path, monkeypatch) -> None:
     registry_path = _write_registry(tmp_path)
     monkeypatch.setattr(
-        "gerbera_sdk.models.microcontroller.DEVICE_REGISTRY_PATH",
+        "gerbera_sdk.models.microcontroller.CONFIG_PATH",
         registry_path,
     )
     inherited_database = Database(
