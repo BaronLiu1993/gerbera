@@ -1,14 +1,15 @@
 # Gerbera CLI
 
-The CLI folder owns local developer commands around machine and board setup.
+The CLI folder owns local developer commands for board discovery, local runtime bring-up, and external deployment steps.
 
-It is separate from the SDK runtime. The CLI helps prepare the local environment; the SDK defines and runs the hardware system.
+It is separate from the SDK runtime. The CLI prepares and orchestrates the local environment; the SDK defines and runs the hardware system.
 
 ## Folders
 
 ```text
-commands/       CLI command implementations.
-ngrok/          Local tunnel helper scaffolding.
+initialise/     Hardware discovery and config bootstrap.
+setup/          Local runtime bring-up and tunnel startup.
+deploy/         External deployment and agent-facing orchestration.
 ```
 
 ## Ownership
@@ -17,8 +18,9 @@ The CLI owns:
 
 - detecting attached boards
 - writing local board declarations into `config.json`
-- command-line setup helpers
-- optional tunnel helper commands
+- loading the user-declared hardware entry point
+- local setup and runtime orchestration
+- external deployment commands
 
 The CLI does not own:
 
@@ -31,12 +33,16 @@ The CLI does not own:
 
 ```mermaid
 flowchart TD
-    A[User runs CLI command] --> B[Detect or declare board]
-    B --> C[config.json]
-    C --> D[example_hardware_system.py reads device UUID]
-    D --> E[Gerbera SDK runtime]
+    A[gerbera init] --> B[Detect boards]
+    B --> C[Write config.json]
+    C --> D[gerbera setup]
+    D --> E[Load hardware object]
+    E --> F[Flash firmware]
+    F --> G[Start local runtime]
+    G --> H[Write server metadata to config.json]
+    H --> I[gerbera deploy]
 ```
 
 ## Rule
 
-CLI output can feed the SDK, but hardware behavior should stay in SDK models and device builders.
+CLI orchestration can feed the SDK runtime, but hardware behavior should stay in SDK models and firmware device builders.
