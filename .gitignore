@@ -1,12 +1,8 @@
 .venv
 .pytest_cache
-devices.json
-test.py
+config.json
 gerbera_firmware
 __pycache__
-debug_serial_minimal
-27b30005-ff68-4c81-93ec-8d3ce7c7a242
 serve_mcp.py
-setup_hardware.py
-example_hardware_system.py
+index.py
 gerbera.egg-info
