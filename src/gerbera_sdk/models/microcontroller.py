@@ -42,44 +42,6 @@ class Microcontroller:
         self.connections = []
         self.add_connections(connections)
 
-    @property
-    def microcontroller_id(self) -> str:
-        return self.id
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "hardware_system_id": self.hardware_system_id,
-            "port": self.port,
-            "baud_rate": self.baud_rate,
-            "fqbn": self.fqbn,
-            "description": self.description,
-            "firmware_file_path": self.firmware_file_path,
-            "connections": [connection.to_dict() for connection in self.connections],
-            "database": self.database.to_dict() if self.database is not None else None,
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "Microcontroller":
-        return cls(
-            id=str(payload["id"]),
-            hardware_system_id=str(payload["hardware_system_id"]),
-            port=str(payload["port"]),
-            baud_rate=int(payload.get("baud_rate")),
-            fqbn=str(payload.get("fqbn")),
-            description=str(payload.get("description", "")),
-            firmware_file_path=str(payload.get("firmware_file_path", "")),
-            connections=[
-                Connection.from_dict(connection)
-                for connection in payload.get("connections", [])
-            ],
-            database=(
-                Database.from_dict(payload["database"])
-                if payload.get("database") is not None
-                else None
-            ),
-        )
-
     def add_connections(
         self,
         connections: list[Connection],

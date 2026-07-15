@@ -24,33 +24,6 @@ class HardwareSystem:
             self.microcontrollers = []
             self.add_microcontrollers(microcontrollers)
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "description": self.description,
-            "microcontrollers": [
-                microcontroller.to_dict()
-                for microcontroller in self.microcontrollers
-            ],
-            "database": self.database.to_dict() if self.database is not None else None,
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "HardwareSystem":
-        return cls(
-            id=str(payload["id"]),
-            description=str(payload.get("description", "")),
-            microcontrollers=[
-                Microcontroller.from_dict(microcontroller)
-                for microcontroller in payload.get("microcontrollers", [])
-            ],
-            database=(
-                Database.from_dict(payload["database"])
-                if payload.get("database") is not None
-                else None
-            ),
-        )
-
     # Add All Microcontrollers at Once to The List
     def add_microcontrollers(self, microcontrollers: list[Microcontroller]) -> None:
         existing_microcontroller_ids = {

@@ -42,18 +42,12 @@ class GerberaRuntime:
             Flash.flash(hardware_system)
 
     @staticmethod
-    def create_server(
-        hardware_system: HardwareSystem,
-    ) -> GerberaServer:
-        return GerberaServer(hardware_system)
-
-    @staticmethod
-    def serve(
+    def run(
         hardware_system: HardwareSystem,
         transport: str = "stdio",
         **transport_kwargs,
     ) -> None:
-        server = GerberaRuntime.create_server(hardware_system)
+        server = GerberaServer(hardware_system)
 
         try:
             server.run(
@@ -62,15 +56,3 @@ class GerberaRuntime:
             )
         finally:
             server.close()
-
-    @staticmethod
-    def run(
-        hardware_system: HardwareSystem,
-        transport: str = "stdio",
-        **transport_kwargs,
-    ) -> None:
-        GerberaRuntime.serve(
-            hardware_system=hardware_system,
-            transport=transport,
-            **transport_kwargs,
-        )

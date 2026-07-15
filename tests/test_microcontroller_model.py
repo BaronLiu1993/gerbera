@@ -55,7 +55,6 @@ def test_microcontroller_resolves_stable_id_from_port_registry(
     microcontroller = Microcontroller(port="/dev/cu.usbserial-1140")
 
     assert microcontroller.id == "27b30005-ff68-4c81-93ec-8d3ce7c7a242"
-    assert microcontroller.microcontroller_id == microcontroller.id
 
 
 def test_microcontroller_resolves_id_from_registry_port(tmp_path, monkeypatch) -> None:
@@ -67,7 +66,6 @@ def test_microcontroller_resolves_id_from_registry_port(tmp_path, monkeypatch) -
     microcontroller = Microcontroller(port="/dev/cu.usbserial-1140")
 
     assert microcontroller.id == "board-1"
-    assert microcontroller.microcontroller_id == "board-1"
 
 
 def test_hardware_system_id_defaults_to_uuid() -> None:

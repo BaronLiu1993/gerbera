@@ -15,16 +15,3 @@ class PinName(str, Enum):
 class Pin:
     name: PinName
     value: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "name": self.name.value,
-            "value": self.value,
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "Pin":
-        return cls(
-            name=PinName(str(payload["name"]).strip().lower()),
-            value=str(payload["value"]),
-        )

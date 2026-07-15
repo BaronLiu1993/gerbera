@@ -75,14 +75,6 @@ class Connection:
             event,
         )
 
-        if self.rule_buffer is not None:
-            self.rule_buffer.register_event_in_buffer(
-                event_type,
-                self.microcontroller_id,
-                event_name,
-                schema=builder.required_schema(self),
-            )
-
     def _register_mcp_event(self) -> None:
         event_type = "MCP"
         event_name = self.event_name
@@ -97,13 +89,6 @@ class Connection:
             event_name,
             event,
         )
-
-        if self.rule_buffer is not None:
-            self.rule_buffer.register_event_in_buffer(
-                event_type,
-                self.microcontroller_id,
-                event_name,
-            )
 
     def register_action(
         self,
@@ -135,35 +120,3 @@ class Connection:
             )
 
         return DEVICES_MAPPING[self.component_type]()
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "hardware_system_id": self.hardware_system_id,
-            "microcontroller_id": self.microcontroller_id,
-            "name": self.name,
-            "description": self.description,
-            "component_type": self.component_type,
-            "pins": dict(self.pins or {}),
-            "database": self.database.to_dict() if self.database is not None else None,
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "Connection":
-        return cls(
-            id=str(payload.get("id", "")),
-            hardware_system_id=str(payload.get("hardware_system_id", "")),
-            microcontroller_id=str(payload.get("microcontroller_id", "")),
-            name=str(payload.get("name", "")),
-            component_type=str(payload.get("component_type", "")),
-            pins={
-                str(pin_name): str(pin_value)
-                for pin_name, pin_value in payload.get("pins", {}).items()
-            },
-            description=str(payload.get("description", "")),
-            database=(
-                Database.from_dict(payload["database"])
-                if payload.get("database") is not None
-                else None
-            ),
-        )

@@ -111,24 +111,3 @@ class Database:
             conn.commit()
         
         self.table_names[table_name] = Table(table_name, schema) 
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "host": self.host,
-            "port": self.port,
-            "user": self.user,
-            "password": self.password,
-            "database": self.databaseName,
-            "hardware_system_id": self.hardware_system_id,
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, object]) -> "Database":
-        return cls(
-            host=str(payload.get("host")),
-            port=int(payload.get("port")),
-            user=str(payload.get("user")),
-            password=str(payload.get("password")),
-            databaseName=str(payload.get("database")),
-            hardware_system_id=str(payload.get("hardware_system_id", "")),
-        )
