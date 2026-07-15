@@ -124,7 +124,7 @@ Current format:
 How it is built:
 
 - `component_type` is kept readable
-- `microcontroller_id` is hashed down to a short stable suffix
+- the owning microcontroller `id` is hashed down to a short stable suffix
 - `pins` are canonicalized into a stable signature such as `echo=8,trigger=9`
 - that pin signature is hashed down to a short suffix
 

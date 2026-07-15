@@ -1,28 +1,37 @@
 import json
-import os
 import uuid
 import subprocess
-import typer
+
 import questionary
+import typer
 
-init_app = typer.Typer()
-CONFIG_PATH = "config.json"
+from gerbera_cli.utils import CONFIG_PATH, _load_config
 
-def _load_existing_config(filepath: str = CONFIG_PATH) -> dict:
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {"devices": {}, "entry_point": ""}
 
-def _load_existing_devices(filepath: str = CONFIG_PATH) -> dict:
-    config = _load_existing_config(filepath)
+def _load_existing_devices() -> dict:
+    try:
+        config = _load_config()
+    except FileNotFoundError:
+        return {}
+
     devices = config.get("devices", {})
-    return devices if isinstance(devices, dict) else {}
+    if not isinstance(devices, dict):
+        raise ValueError("config.json['devices'] must be an object")
+
+    return devices
+
+
+def _load_existing_config() -> dict:
+    try:
+        return _load_config()
+    except FileNotFoundError:
+        return {
+            "devices": {},
+            "entry_point": "",
+            "hardware_name": "hardware",
+            "server": {"port": "", "host": ""},
+        }
+
 
 def _raw_board_data_adapter(devices, existing_devices):
     board_data = []
@@ -40,7 +49,7 @@ def _raw_board_data_adapter(devices, existing_devices):
         board_data.append(payload)
     return board_data
 
-@init_app.command()
+
 def init():
     config = _load_existing_config()
     device_json = _load_existing_devices()
@@ -51,42 +60,50 @@ def init():
         ["arduino-cli", "board", "list", "--format", "json"],
         capture_output=True,
         text=True,
-        check=True
+        check=True,
     )
-    
-    data = json.loads(result.stdout)    
-    detected_ports = _raw_board_data_adapter(data.get("detected_ports", []), device_json)
-    choices = [
-        f"{board['address']}" 
-        for board in detected_ports
-    ]
-    
+
+    data = json.loads(result.stdout)
+    detected_ports = _raw_board_data_adapter(
+        data.get("detected_ports", []),
+        device_json,
+    )
+    choices = [board["address"] for board in detected_ports]
+
     selected_choices = questionary.checkbox(
         "Select microcontrollers to configure (Space to select, Enter to confirm):",
-        choices=choices
+        choices=choices,
     ).ask()
 
     if not selected_choices:
-        typer.echo("Aborted (or no devices selected).")
         raise typer.Exit()
-    
+
     typer.echo("You selected:")
     for dev in selected_choices:
         typer.echo(f" • {dev}")
 
     confirm = questionary.confirm("Do you want to write these to config?").ask()
-    
+
     if not confirm:
-        typer.echo("Operation canceled.")
+        typer.echo("Operation cancelled.")
         raise typer.Exit()
 
     entry_point = questionary.text(
         "Define the app entry point:",
-        default="index",
+        default=str(config.get("entry_point", "")).strip() or "index.py",
     ).ask()
 
     if not entry_point:
-        typer.echo("Operation canceled.")
+        typer.echo("Operation cancelled.")
+        raise typer.Exit()
+
+    hardware_name = questionary.text(
+        "Define the hardware variable name:",
+        default=str(config.get("hardware_name", "")).strip() or "hardware",
+    ).ask()
+
+    if not hardware_name:
+        typer.echo("Operation cancelled.")
         raise typer.Exit()
 
     for choice in selected_choices:
@@ -96,14 +113,16 @@ def init():
 
     config["devices"] = device_json
     config["entry_point"] = entry_point.strip()
+    config["hardware_name"] = hardware_name.strip()
+    config["server"] = {"local_endpoint": "", "port": "", "public_endpoint": ""}
+    config["harness"] = {"id": "", "ip_address": "", "created_at": ""}
 
     try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4)
+        CONFIG_PATH.write_text(json.dumps(config, indent=4))
         typer.secho(
             f"✓ Successfully updated config! Currently managing {len(device_json)} device(s) in config.json.",
-            fg=typer.colors.GREEN, 
-            bold=True
+            fg=typer.colors.GREEN,
+            bold=True,
         )
-    except IOError as e:
-        typer.secho(f"Failed to write file: {e}", fg=typer.colors.RED)
+    except OSError as exc:
+        typer.secho(f"Failed to write file: {exc}", fg=typer.colors.RED)

@@ -1,11 +1,15 @@
+
 import typer
 
-# Subcommands
-from gerbera_cli.initialise.initialise import init_app
+from gerbera_cli.initialise.initialise import init
+from gerbera_cli.setup.setup import setup
+from gerbera_cli.deploy.deploy import deploy
 
 app = typer.Typer()
 
-app.add_typer(init_app, help="")
+app.command(name="init")(init)
+app.command(name="setup")(setup)
+app.command(name="deploy")(deploy)
 
 def main():
     app()
