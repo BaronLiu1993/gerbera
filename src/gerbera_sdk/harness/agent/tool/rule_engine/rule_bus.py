@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 
 from gerbera_sdk.events.utils import EventKey, build_event_key
-from gerbera_sdk.rule_engine.rule_group import RuleGroup
+from gerbera_sdk.harness.agent.tool.rule_engine.rule_group import RuleGroup
 
 
 @dataclass

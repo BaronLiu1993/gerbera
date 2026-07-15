@@ -1,4 +1,4 @@
-from gerbera_sdk.rule_engine.condition import Condition, MatchMode, Operator
+from gerbera_sdk.harness.agent.tool.rule_engine.condition import Condition, MatchMode, Operator
 from gerbera_sdk.rule_engine.latest_value_store import LatestValueStore
 from gerbera_sdk.rule_engine.rule_listener import RuleListener
 from gerbera_sdk.rule_engine.ruleset import RuleSet

@@ -25,9 +25,7 @@ class Infrastructure:
         client = self.client.get_client
         droplet_payload = self.create_payload(name, region, size)
         response = client.droplets.create(body=droplet_payload)
-
         droplet_id = response["droplet"]["id"]
- 
         completed = False
 
         while not completed:

@@ -4,9 +4,9 @@ import uuid
 
 from gerbera_sdk.contracts.firmware_contract import OutputEventType
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
-from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
-from gerbera_sdk.rule_engine.rule_bus import RuleBus
-from gerbera_sdk.rule_engine.rule_group import RuleGroup
+from gerbera_sdk.harness.agent.tool.rule_engine.rule_buffer import RuleBuffer
+from gerbera_sdk.harness.agent.tool.rule_engine.rule_bus import RuleBus
+from gerbera_sdk.harness.agent.tool.rule_engine.rule_group import RuleGroup
 
 if TYPE_CHECKING:
     from gerbera_sdk.models.connection import Connection

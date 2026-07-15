@@ -3,7 +3,7 @@ from typing import Any
 import uuid
 
 from gerbera_sdk.events.utils import EventKey
-from gerbera_sdk.rule_engine.rule_bus import RuleBus
+from gerbera_sdk.harness.agent.tool.rule_engine.rule_bus import RuleBus
 
 
 
