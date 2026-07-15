@@ -16,7 +16,7 @@ ngrok/          Local tunnel helper scaffolding.
 The CLI owns:
 
 - detecting attached boards
-- writing local board declarations such as `devices.json`
+- writing local board declarations into `config.json`
 - command-line setup helpers
 - optional tunnel helper commands
 
@@ -32,7 +32,7 @@ The CLI does not own:
 ```mermaid
 flowchart TD
     A[User runs CLI command] --> B[Detect or declare board]
-    B --> C[devices.json]
+    B --> C[config.json]
     C --> D[example_hardware_system.py reads device UUID]
     D --> E[Gerbera SDK runtime]
 ```

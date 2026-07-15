@@ -25,5 +25,5 @@ Commands should not:
 flowchart TD
     A[CLI entrypoint] --> B[Command function]
     B --> C[Local system action]
-    C --> D[devices.json or user output]
+    C --> D[config.json or user output]
 ```

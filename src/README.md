@@ -13,7 +13,7 @@ gerbera_sdk/    SDK domain model, firmware generation, runtime server, events.
 
 ```mermaid
 flowchart TD
-    A[gerbera_cli] --> B[devices.json]
+    A[gerbera_cli] --> B[config.json]
     B --> C[User hardware declaration]
     C --> D[gerbera_sdk]
     D --> E[Firmware and runtime server]

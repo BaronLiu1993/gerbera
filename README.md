@@ -18,7 +18,7 @@ src/gerbera_sdk/        SDK runtime, models, firmware generation, events, server
 rulebooks/              Human and agent guidance for adding devices safely.
 tests/                  Unit tests for builders, models, server behavior, events.
 example_hardware_system.py
-devices.json            Locally declared microcontrollers discovered by CLI.
+config.json             Local app config with `devices` and `entry_point`.
 ```
 
 ## Runtime Flow
