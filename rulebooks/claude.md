@@ -108,7 +108,7 @@ Serial.println("STREAM,hw201_8e910dfb,value:1");
 
 Do not return plain `state:on`, `value:1`, or `error:...` from generated handlers if MCP needs to read the result. The listener will ignore those because they do not include an event type and event name.
 
-Use `connection.event_name` in builders so event/table names stay stable and stay under PostgreSQL's 63-byte identifier limit. For real hardware, the `microcontroller_id` should come from the UUID in `devices.json`; Gerbera hashes that board identity into a short deterministic suffix.
+Use `connection.event_name` in builders so event/table names stay stable and stay under PostgreSQL's 63-byte identifier limit. For real hardware, the `microcontroller_id` should come from the UUID in `config.json["devices"]`; Gerbera hashes that board identity into a short deterministic suffix.
 
 ## Command Contract
 

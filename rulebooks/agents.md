@@ -84,7 +84,7 @@ f"MCP,{connection.name},state:on"
 ```
 
 The runtime event bus registers by `connection.event_name`, not only by `connection.name`.
-For real hardware, `microcontroller_id` should be the stable UUID from `devices.json`.
+For real hardware, `microcontroller_id` should be the stable UUID from `config.json["devices"]`.
 Gerbera hashes that UUID into a short deterministic suffix so event and table names stay short and stable.
 
 ## MCP Response Rule
