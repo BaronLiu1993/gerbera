@@ -2,20 +2,23 @@ from gerbera_sdk import Connection, FirmwareGenerator, Microcontroller
 
 
 def test_hw_201_firmware_generation_uses_read_dispatch_and_signal_pin(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         """
 {
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
+  "devices": {
+    "board-1": {
+      "id": "board-1",
+      "port": "/dev/cu.usbserial-1140",
+      "protocol": "serial",
+      "protocol_label": "Serial Port (USB)"
+    }
+  },
+  "entry_point": "serve_mcp.py"
 }
 """.strip()
     )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+    monkeypatch.setattr("gerbera_sdk.models.microcontroller.CONFIG_PATH", registry_path)
 
     controller = Microcontroller(
         id="board-1",

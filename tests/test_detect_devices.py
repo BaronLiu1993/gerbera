@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from gerbera_cli.commands import declare_devices_command
+from gerbera_cli.initialise import declare_devices_command
 from gerbera_cli.main import app
 
 
@@ -192,7 +192,7 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
             "pid": "0x7523",
         }
     }
-    output_path = tmp_path / "devices.json"
+    output_path = tmp_path / "config.json"
 
     monkeypatch.setattr(declare_devices_command, "_available_devices", lambda: devices)
     monkeypatch.setattr(
@@ -210,7 +210,7 @@ def test_select_command_writes_device_mapping_json(monkeypatch, tmp_path) -> Non
 
 
 def test_select_command_handles_no_devices(monkeypatch, tmp_path) -> None:
-    output_path = tmp_path / "devices.json"
+    output_path = tmp_path / "config.json"
     monkeypatch.setattr(declare_devices_command, "_available_devices", lambda: [])
 
     result = runner.invoke(app, ["devices", "select", "--output", str(output_path)])

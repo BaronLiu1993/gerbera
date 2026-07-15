@@ -17,20 +17,23 @@ def test_get_microcontroller_returns_existing_board() -> None:
 
 
 def test_generate_sketches_uses_default_user_firmware_folder(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         """
 {
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
+  "devices": {
+    "board-1": {
+      "id": "board-1",
+      "port": "/dev/cu.usbserial-1140",
+      "protocol": "serial",
+      "protocol_label": "Serial Port (USB)"
+    }
+  },
+  "entry_point": "serve_mcp.py"
 }
 """.strip()
     )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+    monkeypatch.setattr("gerbera_sdk.models.microcontroller.CONFIG_PATH", registry_path)
     monkeypatch.chdir(tmp_path)
 
     hardware_system = HardwareSystem(
@@ -58,26 +61,29 @@ def test_generate_sketches_uses_default_user_firmware_folder(tmp_path, monkeypat
 
 
 def test_generate_sketches_writes_one_sketch_per_microcontroller(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         """
 {
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
+  "devices": {
+    "board-1": {
+      "id": "board-1",
+      "port": "/dev/cu.usbserial-1140",
+      "protocol": "serial",
+      "protocol_label": "Serial Port (USB)"
+    },
+    "board-2": {
+      "id": "board-2",
+      "port": "/dev/cu.usbserial-2140",
+      "protocol": "serial",
+      "protocol_label": "Serial Port (USB)"
+    }
   },
-  "board-2": {
-    "id": "board-2",
-    "port": "/dev/cu.usbserial-2140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
+  "entry_point": "serve_mcp.py"
 }
 """.strip()
     )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+    monkeypatch.setattr("gerbera_sdk.models.microcontroller.CONFIG_PATH", registry_path)
 
     first_board = Microcontroller(
         id="board-1",
@@ -117,20 +123,23 @@ def test_generate_sketches_writes_one_sketch_per_microcontroller(tmp_path, monke
 
 
 def test_compile_returns_firmware_and_sketch_path(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         """
 {
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
+  "devices": {
+    "board-1": {
+      "id": "board-1",
+      "port": "/dev/cu.usbserial-1140",
+      "protocol": "serial",
+      "protocol_label": "Serial Port (USB)"
+    }
+  },
+  "entry_point": "serve_mcp.py"
 }
 """.strip()
     )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+    monkeypatch.setattr("gerbera_sdk.models.microcontroller.CONFIG_PATH", registry_path)
 
     controller = Microcontroller(
         id="board-1",
@@ -175,20 +184,23 @@ def test_build_read_command_delegates_to_microcontroller() -> None:
 
 
 def test_prepare_command_returns_transport_metadata(tmp_path, monkeypatch) -> None:
-    registry_path = tmp_path / "devices.json"
+    registry_path = tmp_path / "config.json"
     registry_path.write_text(
         """
 {
-  "board-1": {
-    "id": "board-1",
-    "port": "/dev/cu.usbserial-1140",
-    "protocol": "serial",
-    "protocol_label": "Serial Port (USB)"
-  }
+  "devices": {
+    "board-1": {
+      "id": "board-1",
+      "port": "/dev/cu.usbserial-1140",
+      "protocol": "serial",
+      "protocol_label": "Serial Port (USB)"
+    }
+  },
+  "entry_point": "serve_mcp.py"
 }
 """.strip()
     )
-    monkeypatch.setattr("gerbera_sdk.hardware.microcontroller.DEVICE_REGISTRY_PATH", registry_path)
+    monkeypatch.setattr("gerbera_sdk.models.microcontroller.CONFIG_PATH", registry_path)
 
     controller = Microcontroller(
         id="board-1",
