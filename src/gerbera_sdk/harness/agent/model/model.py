@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 import uuid
-from model_adapters import AnthropicAdapter, OpenAIAdapter, GeminiAdapter
+from gerbera_sdk.harness.agent.model.model_adapters import AnthropicAdapter, OpenAIAdapter, GeminiAdapter
 
 
 class ModelProviderEnum(Enum):
