@@ -2,7 +2,7 @@ import subprocess
 import shutil
 from pathlib import Path
 
-from gerbera_sdk.firmware.generator import Generator
+from gerbera_sdk.firmware.function.generator import Generator
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 DEFAULT_BUILD_DIRNAME = "build"

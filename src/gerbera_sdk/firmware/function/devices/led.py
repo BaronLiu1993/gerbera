@@ -1,5 +1,5 @@
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
-from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
+from gerbera_sdk.firmware.function.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
 from gerbera_sdk.models.hardware.connection import Connection
 
@@ -41,21 +41,21 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
   String value = parameterValue(input, "state");
 
   if (value.length() == 0) {{
-    Serial.println("MCP,{connection.event_name},error:invalid_arg");
+    Serial.println("error:invalid_arg");
     return;
   }}
 
   if (value == "on") {{
     digitalWrite({out_pin}, HIGH);
-    Serial.println("MCP,{connection.event_name},state:on");
+    Serial.println("state:on");
     return;
   }}
 
   if (value == "off") {{
     digitalWrite({out_pin}, LOW);
-    Serial.println("MCP,{connection.event_name},state:off");
+    Serial.println("state:off");
     return;
   }}
 
-  Serial.println("MCP,{connection.event_name},error:invalid_value");
+  Serial.println("error:invalid_value");
 }}"""

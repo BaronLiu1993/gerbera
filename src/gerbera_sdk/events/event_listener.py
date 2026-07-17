@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.utils import build_event_key
-from gerbera_sdk.models.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from serial import Serial
 import threading
 import uuid

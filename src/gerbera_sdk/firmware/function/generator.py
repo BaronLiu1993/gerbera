@@ -1,9 +1,9 @@
-from gerbera_sdk.firmware.configurations import (
+from gerbera_sdk.firmware.function.configurations import (
     DEVICES_MAPPING,
     MICROCONTROLLER_MAPPING,
 )
-from gerbera_sdk.firmware.parser import Parser
-from gerbera_sdk.firmware.routing import Routing
+from gerbera_sdk.firmware.function.parser import Parser
+from gerbera_sdk.firmware.function.routing import Routing
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
 

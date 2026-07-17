@@ -1,8 +1,8 @@
 import subprocess
 
 from gerbera_sdk.firmware.flash import Flash
-from gerbera_sdk.server.server import GerberaServer
-from gerbera_sdk.models.hardware_system import HardwareSystem
+from gerbera_sdk.models.runtime.server import GerberaServer
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 
 class GerberaRuntime:

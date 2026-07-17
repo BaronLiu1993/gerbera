@@ -5,6 +5,7 @@ from typing import Any
 
 class PinName(str, Enum):
     OUT = "out"
+    SIGNAL = "signal"
     TX = "tx"
     RX = "rx"
     SDA = "sda"

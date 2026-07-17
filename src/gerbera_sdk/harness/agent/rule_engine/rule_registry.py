@@ -9,8 +9,8 @@ from gerbera_sdk.harness.agent.rule_engine.rule_bus import RuleBus
 from gerbera_sdk.harness.agent.rule_engine.rule_group import RuleGroup
 
 if TYPE_CHECKING:
-    from gerbera_sdk.models.connection import Connection
-    from gerbera_sdk.models.hardware_system import HardwareSystem
+    from gerbera_sdk.models.hardware.connection import Connection
+    from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 
 @dataclass

@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 
-from gerbera_sdk.models.database import Database
+from gerbera_sdk.models.hardware.database import Database
 
 
 @dataclass(frozen=True)

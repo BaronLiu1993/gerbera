@@ -1,10 +1,10 @@
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from typing import Optional
 
-from gerbera_sdk.server.commands import CommandCompiler
-from gerbera_sdk.server.serial_connection import SerialConnection
-from gerbera_sdk.models.hardware_system import HardwareSystem
-from gerbera_sdk.models.microcontroller import Microcontroller
+from gerbera_sdk.models.runtime.commands import CommandCompiler
+from gerbera_sdk.models.runtime.serial_connection import SerialConnection
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import event_worker
@@ -267,7 +267,6 @@ class GerberaServer:
     ):
         def tool_function() -> dict[str, str]:
             return connection.perform_action("WRITE", {"state": state})
-
         return tool_function
 
     def _send_connection_command(

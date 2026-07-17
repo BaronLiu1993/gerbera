@@ -1,5 +1,5 @@
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
-from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
+from gerbera_sdk.firmware.function.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec, PinModeSpec
 from gerbera_sdk.models.hardware.connection import Connection
 
@@ -9,10 +9,7 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
 
     def required_libraries(self) -> list[LibrarySpec]:
         return [
-            LibrarySpec(
-                include="Servo.h",
-                install="Servo",
-            )
+            LibrarySpec(include="Servo.h")
         ]
 
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:
@@ -48,12 +45,12 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
   String angleValue = parameterValue(input, "angle");
 
   if (angleValue.length() == 0) {{
-    Serial.println("MCP,{connection.event_name},error:invalid_arg");
+    Serial.println("error:invalid_arg");
     return;
   }}
 
   int angle = angleValue.toInt();
   {connection.name}_servo.write(angle);
-  Serial.print("MCP,{connection.event_name},angle:");
+  Serial.print("angle:");
   Serial.println(angle);
 }}"""

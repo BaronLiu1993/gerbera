@@ -2,7 +2,7 @@ from typing import Optional
 
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
-from gerbera_sdk.models.connection import Connection
+from gerbera_sdk.models.hardware.connection import Connection
 
 
 class CommandCompiler:

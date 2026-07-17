@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import event_worker
-from gerbera_sdk.models.connection import Connection
-from gerbera_sdk.models.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
 
 @dataclass

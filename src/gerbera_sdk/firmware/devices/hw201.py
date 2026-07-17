@@ -9,7 +9,7 @@ from gerbera_sdk.contracts.firmware_contract import (
     PinModeSpec,
 )
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
-from gerbera_sdk.models.connection import Connection
+from gerbera_sdk.models.hardware.connection import Connection
 
 
 class HW201FirmwareBuilder(BaseFirmwareBuilder):
