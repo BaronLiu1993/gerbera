@@ -45,7 +45,7 @@ Those are owned elsewhere and feed data into this layer.
 
 ### `EventKey`
 
-Defined in [events/utils.py](/Users/jiexuanliu/Desktop/firecracker/cli/src/gerbera_sdk/events/utils.py).
+Defined in [utils.py](/Users/jiexuanliu/Desktop/firecracker/cli/src/gerbera_sdk/utils.py).
 
 ```python
 EventKey = tuple[str, str, str]

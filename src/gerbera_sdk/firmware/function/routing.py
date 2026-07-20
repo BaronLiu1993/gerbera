@@ -1,5 +1,5 @@
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
-from gerbera_sdk.models.runtime.commands import CommandCompiler
+from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.hardware.connection import Connection
 
 

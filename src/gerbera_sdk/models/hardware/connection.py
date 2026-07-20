@@ -5,7 +5,7 @@ from pin import Pin
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.events.utils import build_connection_event_name
+from gerbera_sdk.utils import build_connection_event_name
 
 
 @dataclass

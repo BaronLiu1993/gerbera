@@ -17,6 +17,15 @@ DEVICES_MAPPING = {
     "sg90": SG90FirmwareBuilder,
 }
 
+
+def get_device_builder(component_type: str, context: str = "device"):
+    if component_type not in DEVICES_MAPPING:
+        raise ValueError(
+            f"Unsupported component type for {context}: {component_type}"
+        )
+
+    return DEVICES_MAPPING[component_type]()
+
 MICROCONTROLLER_MAPPING = {
     "arduino:avr:mega": {
         "includes": ["Arduino.h"],

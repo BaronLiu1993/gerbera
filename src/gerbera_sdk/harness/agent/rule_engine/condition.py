@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import uuid
 
-from gerbera_sdk.events.utils import EventKey
+from gerbera_sdk.utils import EventKey
 
 
 class OperatorEnum(Enum):

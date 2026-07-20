@@ -1,59 +1,87 @@
-# Server
+# Runtime
 
-The server folder owns the runtime MCP server, serial command execution, tool registration, and response waiting.
+The runtime folder owns the live server process around the declared hardware graph.
+
+It is responsible for:
+
+- opening and closing serial connections
+- registering MCP tools
+- translating command specs into wire commands
+- registering MCP and STREAM events
+- starting and stopping listener threads
+- coordinating stream flushing and database writes
+
+It is not responsible for:
+
+- defining the hardware graph itself
+- device-specific firmware behavior
+- pin modeling
+- board/package metadata for compilation
 
 ## Files
 
 ```text
-server.py               GerberaServer runtime orchestration.
-commands.py             CommandCompiler for command strings and response parsing.
-serial_connection.py    Serial port wrapper.
+server.py               Thin facade over ServerRuntime.
+server_runtime.py       Top-level runtime orchestrator.
+board_runtime.py        Per-process board transport pool and lifecycle.
+event_runtime.py        Event/listener runtime helper.
+command_runtime.py      Command compilation and response parsing.
+serial_connection.py    Raw serial transport wrapper.
+commands.py             Compatibility shim for CommandCompiler import path.
 ```
 
 ## Ownership
 
-This folder owns:
+`ServerRuntime` owns:
 
-- registering MCP tools from connection command specs
+- startup and shutdown order
+- MCP app/tool registration
+- event registration
+- binding executable actions onto connections
+- command dispatch through board transport
+
+`BoardRuntime` owns:
+
 - opening one serial connection per microcontroller
-- sending command strings to firmware
-- waiting for MCP event responses
-- starting/stopping event listeners
-- delegating stream lifecycle cleanup to `StreamController`
+- looking up the active serial connection for a board
+- closing active serial connections
 
-This folder does not own:
+`EventRuntime` should own:
 
-- device-specific firmware logic
-- database schema design
-- buffer internals
-- stream event parsing
+- event bus registration
+- event listener lifecycle
+- event runtime assembly
 
-## Tool Call Flow
+Right now, some of that logic still lives in `ServerRuntime`.
 
-```mermaid
-flowchart TD
-    A[MCP tool] --> B[CommandCompiler.build_command]
-    B --> C[SerialConnection.write or send]
-    C --> D[Arduino firmware]
-    D --> E[MCP serial event]
-    E --> F[EventListener]
-    F --> G[EventBus]
-    G --> H[Event response queue]
-    H --> I[GerberaServer returns dict]
-```
+`CommandCompiler` owns:
 
-## Stream Toggle Flow
+- reading command specs from device builders
+- validating and serializing command parameters
+- parsing firmware response payloads
+- building command descriptions for MCP tools
+
+## Runtime Flow
 
 ```mermaid
 flowchart TD
-    A[turn_on_x_stream] --> B[WRITE state:on]
-    B --> C[Arduino stream flag on]
-    D[turn_off_x_stream] --> E[WRITE state:off]
-    E --> F[Arduino stream flag off]
-    F --> G[StreamController.stop_stream]
-    G --> H[Flush partial stream buffer]
+    A[HardwareSystem] --> B[ServerRuntime]
+    B --> C[BoardRuntime.start]
+    B --> D[Register MCP/STREAM events]
+    B --> E[Register MCP tools]
+    C --> F[SerialConnection]
+    E --> G[CommandCompiler.build_command]
+    G --> F
+    F --> H[Firmware]
+    H --> I[EventListener]
+    I --> J[EventBus]
+    J --> K[MCP response or stream buffer]
 ```
 
-## Rule
+## Boundary Rule
 
-`GerberaServer` should orchestrate. It should not know how buffers work internally.
+The runtime layer should know how the system runs.
+
+The hardware layer should only know what the system is.
+
+If a class needs to start threads, open ports, register MCP tools, or configure the event worker, it belongs in runtime rather than hardware.

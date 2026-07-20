@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.events.utils import EventKey, build_event_key
+from gerbera_sdk.utils import EventKey, build_event_key
 
 @dataclass
 class EventBus:

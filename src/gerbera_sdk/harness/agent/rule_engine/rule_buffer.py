@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 import uuid
 
-from gerbera_sdk.events.utils import EventKey
+from gerbera_sdk.utils import EventKey
 from gerbera_sdk.harness.agent.rule_engine.rule_bus import RuleBus
 
 

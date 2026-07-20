@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-\
+
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec
 from gerbera_sdk.models.hardware.connection import Connection
