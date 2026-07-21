@@ -11,8 +11,8 @@ CONFIG_PATH = Path("config.json")
 @dataclass
 class Microcontroller:
     port: str
-    baud_rate: int = 115200
     fqbn: str
+    baud_rate: int = 115200
     description: str = ""
     connections: list[Connection] = field(default_factory=list)
 

@@ -9,6 +9,7 @@ description = "Gerbera CLI."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "psycopg[binary]>=3.3,<4.0",
     "pyserial>=3.5,<4.0",
     "questionary>=2.0,<3.0",
     "typer>=0.12,<1.0",

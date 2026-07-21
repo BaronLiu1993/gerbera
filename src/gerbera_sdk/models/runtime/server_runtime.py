@@ -7,9 +7,8 @@ from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
-from gerbera_sdk.events.event_worker import event_worker
+from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
-from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
@@ -23,8 +22,9 @@ class ServerRuntime:
     board_runtime: BoardRuntime
     event_bus: EventBus 
     stream_controller: StreamController
-    event_listener: EventListener | None = field(default=None)
+    event_worker: EventWorker
     app: FastMCP
+    event_listener: EventListener | None = field(default=None)
 
     def _register_mcp_event(
         self,
@@ -48,28 +48,17 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
-        builder = get_device_builder(
-            connection.component_type,
-            context="event registration",
-        )
         if connection.database is None:
             return
 
-        if not builder.supports_database:
-            raise ValueError(
-                f"{connection.component_type} does not support database streaming"
-            )
-
-        schema = builder.required_schema(connection)
         table_name = connection.event_name
-        connection.database.create_database_table(table_name, schema)
-
         event = Event(
             event_type="STREAM",
             microcontroller_id=microcontroller.id,
             event_name=connection.event_name,
             streamable=True,
             table_name=table_name,
+            event_worker=self.event_worker,
         )
         self.event_bus.add_event(
             "STREAM",
@@ -79,17 +68,9 @@ class ServerRuntime:
         )
 
     def _register_events(self) -> None:
-        configured_database = False
-
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
                 self._register_mcp_event(microcontroller, connection)
-
-                if connection.database is not None and not configured_database:
-                    event_worker.configure_database(connection.database)
-                    event_worker.start()
-                    configured_database = True
-
                 self._register_stream_event(microcontroller, connection)
 
     def _start_event_listener(self) -> None:

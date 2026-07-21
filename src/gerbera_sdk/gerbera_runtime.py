@@ -3,7 +3,7 @@ import subprocess
 from fastmcp import FastMCP
 
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.connection import Connection
@@ -11,6 +11,7 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 
 
@@ -57,12 +58,20 @@ class GerberaRuntime:
         **transport_kwargs,
     ) -> None:
         board_runtime = GerberaRuntime._build_board_runtime(hardware_system)
+        event_worker = GerberaRuntime._build_event_worker()
+        database_runtime = GerberaRuntime._build_database_runtime(
+            hardware_system,
+            event_worker,
+        )
         server_runtime = GerberaRuntime._build_server_runtime(
             hardware_system=hardware_system,
             board_runtime=board_runtime,
+            event_worker=event_worker,
         )
 
         try:
+            board_runtime.start()
+            database_runtime.start()
             server_runtime._register_events()
             GerberaRuntime._register_server_runtime_tools(server_runtime)
             server_runtime._start_event_listener()
@@ -73,6 +82,7 @@ class GerberaRuntime:
         finally:
             server_runtime._stop_event_listener()
             server_runtime.stream_controller.flush_all()
+            database_runtime.stop()
             board_runtime.close()
 
     @staticmethod
@@ -85,15 +95,10 @@ class GerberaRuntime:
     def _build_server_runtime(
         hardware_system: HardwareSystem,
         board_runtime: BoardRuntime,
+        event_worker: EventWorker,
     ) -> ServerRuntime:
         event_bus = EventBus()
         stream_controller = StreamController(event_bus)
-        event_listener = EventListener(
-            hardware_system=hardware_system,
-            _serial_pool=board_runtime.serial_pool,
-            _threads={},
-            _event_bus=event_bus,
-        )
         app = FastMCP(hardware_system.description)
 
         return ServerRuntime(
@@ -101,8 +106,22 @@ class GerberaRuntime:
             board_runtime=board_runtime,
             event_bus=event_bus,
             stream_controller=stream_controller,
-            event_listener=event_listener,
+            event_worker=event_worker,
             app=app,
+        )
+
+    @staticmethod
+    def _build_event_worker() -> EventWorker:
+        return EventWorker()
+
+    @staticmethod
+    def _build_database_runtime(
+        hardware_system: HardwareSystem,
+        event_worker: EventWorker,
+    ) -> DatabaseRuntime:
+        return DatabaseRuntime(
+            hardware_system=hardware_system,
+            event_worker=event_worker,
         )
 
     @staticmethod

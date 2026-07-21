@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.events.event_worker import event_worker
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
@@ -16,7 +15,6 @@ class StreamController:
         connection: Connection,
     ) -> None:
         self.flush_stream(microcontroller, connection)
-        event_worker.flush_now()
 
     def flush_stream(
         self,
@@ -30,4 +28,3 @@ class StreamController:
 
     def flush_all(self) -> None:
         self.event_bus.flush_stream_buffers()
-        event_worker.flush_now()

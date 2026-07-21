@@ -13,8 +13,11 @@ def test_event_runtime_ids_default_to_uuid4() -> None:
         microcontroller_id="board-1",
         event_name="led_fbc1de23_f928a260",
     )
-    buffer = Buffer(table_name="hw201_fbc1de23_e8f75c2b")
     event_worker = EventWorker()
+    buffer = Buffer(
+        table_name="hw201_fbc1de23_e8f75c2b",
+        event_worker=event_worker,
+    )
 
     assert UUID(event_bus.id).version == 4
     assert UUID(event.id).version == 4

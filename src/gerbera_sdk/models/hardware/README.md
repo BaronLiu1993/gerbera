@@ -17,7 +17,7 @@ Models should stay focused on:
 hardware_system.py      Top-level hardware declaration.
 microcontroller.py      Board identity resolved from config.json via port.
 connection.py           One declared device connection on a board.
-database.py             PostgreSQL connection details and table helpers.
+database.py             PostgreSQL connection details and table metadata.
 table.py                In-memory table metadata.
 pin.py                  Pin model support.
 ```
@@ -31,7 +31,7 @@ This folder owns:
 - stable board and connection identity
 - connection event naming
 - database attachment metadata
-- database table creation helpers
+- database attachment and table metadata
 
 This folder does not own:
 
@@ -142,7 +142,7 @@ Use `name` and `description` for readability.
 Database support is device-specific.
 
 - Not every connection should receive a database.
-- Only builders marked as database-compatible should create stream tables.
+- `DatabaseRuntime` creates stream tables only for database-compatible builders.
 - A hardware system can define one database at the top level.
 - That database may be propagated downward only when the device builder supports database streaming.
 

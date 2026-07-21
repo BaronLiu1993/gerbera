@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 import uuid
 
-from gerbera_sdk.events.event_worker import event_worker
+from gerbera_sdk.events.event_worker import EventWorker
 
 
 @dataclass
 class Buffer:
     table_name: str
+    event_worker: EventWorker = field(repr=False)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     max_size: int = 50
     items: list[dict[str, str]] = field(default_factory=list)
@@ -26,5 +27,5 @@ class Buffer:
             return []
 
         self.items.clear()
-        event_worker.write_to_db(self.table_name, batch)
+        self.event_worker.write_to_db(self.table_name, batch)
         return batch

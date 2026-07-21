@@ -21,22 +21,24 @@ It is not responsible for:
 ## Files
 
 ```text
-server.py               Thin facade over ServerRuntime.
-server_runtime.py       Top-level runtime orchestrator.
+server_runtime.py       MCP tools, events, listeners, and command dispatch.
 board_runtime.py        Per-process board transport pool and lifecycle.
+database_runtime.py     Database table provisioning and write lifecycle.
 command_runtime.py      Command compilation and response parsing.
-commands.py             Compatibility shim for CommandCompiler import path.
 ```
 
 ## Ownership
 
-`ServerRuntime` owns:
+`GerberaRuntime` owns:
 
 - startup and shutdown order
+- constructing one event worker and injecting it into database and server runtimes
+
+`ServerRuntime` owns:
+
 - MCP app/tool registration
 - event registration
 - event listener lifecycle
-- event worker startup
 - binding executable actions onto connections
 - command dispatch through board transport
 
@@ -45,6 +47,13 @@ commands.py             Compatibility shim for CommandCompiler import path.
 - opening one serial connection per microcontroller
 - looking up the active serial connection for a board
 - closing active serial connections
+
+`DatabaseRuntime` owns:
+
+- validating database-capable connections
+- creating stream tables and indexes
+- routing table writes to the correct database
+- starting, flushing, and stopping the database write worker
 
 `CommandCompiler` owns:
 
@@ -57,19 +66,20 @@ commands.py             Compatibility shim for CommandCompiler import path.
 
 ```mermaid
 flowchart TD
-    A[HardwareSystem] --> B[ServerRuntime]
+    A[HardwareSystem] --> B[GerberaRuntime]
     B --> C[BoardRuntime.start]
-    B --> D[Register MCP/STREAM events]
-    B --> E[Start EventListener]
-    B --> F[Register MCP tools]
-    C --> F[SerialConnection]
-    F --> G[CommandCompiler.build_command]
-    G --> F
-    F --> H[Firmware]
-    E --> I[EventBus]
-    H --> J[EventListener]
-    J --> I
-    I --> K[MCP response or stream buffer]
+    B --> D[DatabaseRuntime.start]
+    B --> E[ServerRuntime]
+    E --> F[Register MCP/STREAM events and tools]
+    E --> G[Start EventListener]
+    C --> H[SerialConnection]
+    F --> I[CommandCompiler.build_command]
+    I --> H
+    H --> J[Firmware]
+    G --> K[EventBus]
+    J --> G
+    K --> L[MCP response or stream buffer]
+    L --> D
 ```
 
 ## Boundary Rule
@@ -78,4 +88,4 @@ The runtime layer should know how the system runs.
 
 The hardware layer should only know what the system is.
 
-If a class needs to start threads, open ports, register MCP tools, or configure the event worker, it belongs in runtime rather than hardware.
+If a class needs to start threads, open ports, register MCP tools, create tables, or configure the event worker, it belongs in runtime rather than hardware.

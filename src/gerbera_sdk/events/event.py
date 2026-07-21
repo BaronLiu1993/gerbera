@@ -4,6 +4,7 @@ from queue import Empty, Queue
 import uuid
 
 from gerbera_sdk.events.buffer import Buffer
+from gerbera_sdk.events.event_worker import EventWorker
 
 
 @dataclass
@@ -15,14 +16,20 @@ class Event:
     streamable: bool = False
     table_name: str | None = None
     buffer: Buffer | None = None
+    event_worker: EventWorker | None = field(default=None, repr=False)
     responses: Queue[dict[str, str]] = field(default_factory=Queue)
 
     def __post_init__(self) -> None:
         if self.streamable and self.buffer is None:
             if self.table_name is None:
                 raise RuntimeError("Streamable event requires a table_name")
+            if self.event_worker is None:
+                raise RuntimeError("Streamable event requires an event_worker")
 
-            self.buffer = Buffer(table_name=self.table_name)
+            self.buffer = Buffer(
+                table_name=self.table_name,
+                event_worker=self.event_worker,
+            )
 
     def perform_work(self, payload: dict[str, str]) -> dict[str, str] | None:
         normalized_payload = dict(payload)

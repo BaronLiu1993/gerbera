@@ -14,10 +14,10 @@ It is the layer that turns a declared hardware system into:
 
 ```text
 contracts/          Shared typed contracts for commands, firmware, and schemas.
-events/             Event bus, listener, buffers, stream flushing, DB worker.
+events/             Event bus, listener, buffers, and stream flushing.
 firmware/           Firmware generation, flashing, and device builders.
 harness/            Agent and rule-engine support around the SDK runtime.
-models/             Hardware declarations and runtime support objects.
+models/             Hardware declarations and board, database, and server runtimes.
 utils.py            Cross-cutting helpers such as event naming and identifiers.
 gerbera_runtime.py  Top-level composition root for setup and run.
 ```
@@ -51,6 +51,7 @@ flowchart TD
     A --> E[GerberaRuntime]
     E --> F[BoardRuntime]
     E --> G[ServerRuntime]
+    E --> Q[DatabaseRuntime]
     G --> H[MCP Tools]
     F --> I[Serial Connections]
     I --> J[Firmware]
@@ -59,6 +60,7 @@ flowchart TD
     L --> M[MCP Responses]
     L --> N[Stream Buffers]
     N --> O[EventWorker]
+    Q --> O
     O --> P[Database]
 ```
 
@@ -70,7 +72,7 @@ Use `GerberaRuntime` in [gerbera_runtime.py](/Users/jiexuanliu/Desktop/firecrack
   Installs Arduino dependencies and flashes firmware when requested.
 
 - `run(...)`
-  Builds `BoardRuntime` and `ServerRuntime`, registers events and tools, starts the listener, runs the MCP app, and closes resources on exit.
+  Builds the board, database, and server runtimes, starts them in order, runs the MCP app, and closes resources on exit.
 
 ## Runtime Shape
 
@@ -82,5 +84,8 @@ Current runtime responsibilities are split like this:
 - `ServerRuntime`
   Owns event registration, tool registration, command dispatch, and MCP app interaction.
 
+- `DatabaseRuntime`
+  Owns stream table provisioning and asynchronous database writes.
+
 - `GerberaRuntime`
-  Is the composition root that wires board and server runtime pieces together in the right order.
+  Is the composition root that wires board, database, and server runtimes together in the right order.

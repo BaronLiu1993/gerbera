@@ -1,6 +1,6 @@
 # Events
 
-The events folder owns inbound serial routing, event dispatch, stream buffering, stream lifecycle cleanup, and database write queueing.
+The events folder owns inbound serial routing, event dispatch, stream buffering, and stream lifecycle cleanup.
 
 ## Files
 
@@ -9,7 +9,7 @@ event_listener.py       Background serial reader per microcontroller.
 event_bus.py            Event registry and routing lookup.
 event.py                MCP response events and STREAM buffer events.
 buffer.py               In-memory batch buffer.
-event_worker.py         Background database write queue with retries.
+event_worker.py         Injected write queue consumed under DatabaseRuntime lifecycle.
 stream_controller.py    Stream lifecycle operations such as flush on stop.
 ```
 
@@ -21,7 +21,7 @@ This folder owns:
 - routing by `(event_type, microcontroller_id, event_name)`
 - buffering stream payloads
 - flushing partial stream buffers
-- queueing database writes
+- queueing stream batches for the database runtime
 
 This folder does not own:
 

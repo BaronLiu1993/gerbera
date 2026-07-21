@@ -1,10 +1,17 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from queue import Empty, Queue
 import threading
 import time
+from typing import Protocol
 import uuid
 
-from gerbera_sdk.models.hardware.database import Database
+
+class DatabaseWriter(Protocol):
+    def write_database_table(
+        self,
+        table_name: str,
+        payload: list[dict[str, str]],
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -14,22 +21,22 @@ class WriteJob:
     retry_count: int = 0
 
 
+@dataclass
 class EventWorker:
-    def __init__(
-        self,
-        max_retries: int = 3,
-        retry_delay_seconds: float = 1.0,
-    ) -> None:
-        self.id = str(uuid.uuid4())
-        self._database: Database | None = None
-        self._queue: Queue[WriteJob] = Queue()
-        self._max_retries = max_retries
-        self._retry_delay_seconds = retry_delay_seconds
-        self._thread: threading.Thread | None = None
-        self._running = False
+    max_retries: int = 3
+    retry_delay_seconds: float = 1.0
+    id: str = field(default_factory=lambda: str(uuid.uuid4()), init=False)
+    _writer: DatabaseWriter | None = field(default=None, init=False, repr=False)
+    _queue: Queue[WriteJob] = field(
+        default_factory=Queue,
+        init=False,
+        repr=False,
+    )
+    _thread: threading.Thread | None = field(default=None, init=False, repr=False)
+    _running: bool = field(default=False, init=False, repr=False)
 
-    def configure_database(self, database: Database) -> None:
-        self._database = database
+    def configure_writer(self, writer: DatabaseWriter) -> None:
+        self._writer = writer
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -84,16 +91,16 @@ class EventWorker:
             self._queue.task_done()
 
     def _process_job(self, job: WriteJob) -> None:
-        if self._database is None:
-            raise RuntimeError("EventWorker database is not configured")
+        if self._writer is None:
+            raise RuntimeError("EventWorker database writer is not configured")
 
         try:
-            self._database.write_database_table(job.table_name, job.batch)
+            self._writer.write_database_table(job.table_name, job.batch)
         except Exception:
-            if job.retry_count >= self._max_retries:
+            if job.retry_count >= self.max_retries:
                 raise
 
-            time.sleep(self._retry_delay_seconds)
+            time.sleep(self.retry_delay_seconds)
             self._queue.put(
                 WriteJob(
                     table_name=job.table_name,
@@ -101,6 +108,3 @@ class EventWorker:
                     retry_count=job.retry_count + 1,
                 )
             )
-
-
-event_worker = EventWorker()
