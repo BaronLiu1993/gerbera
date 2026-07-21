@@ -12,7 +12,7 @@ import typer
 
 from gerbera_cli.utils import CONFIG_PATH, _load_config
 
-from gerbera_sdk.main import GerberaRuntime
+from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 

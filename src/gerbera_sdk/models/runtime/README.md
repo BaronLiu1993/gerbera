@@ -24,9 +24,7 @@ It is not responsible for:
 server.py               Thin facade over ServerRuntime.
 server_runtime.py       Top-level runtime orchestrator.
 board_runtime.py        Per-process board transport pool and lifecycle.
-event_runtime.py        Event/listener runtime helper.
 command_runtime.py      Command compilation and response parsing.
-serial_connection.py    Raw serial transport wrapper.
 commands.py             Compatibility shim for CommandCompiler import path.
 ```
 
@@ -37,6 +35,8 @@ commands.py             Compatibility shim for CommandCompiler import path.
 - startup and shutdown order
 - MCP app/tool registration
 - event registration
+- event listener lifecycle
+- event worker startup
 - binding executable actions onto connections
 - command dispatch through board transport
 
@@ -45,14 +45,6 @@ commands.py             Compatibility shim for CommandCompiler import path.
 - opening one serial connection per microcontroller
 - looking up the active serial connection for a board
 - closing active serial connections
-
-`EventRuntime` should own:
-
-- event bus registration
-- event listener lifecycle
-- event runtime assembly
-
-Right now, some of that logic still lives in `ServerRuntime`.
 
 `CommandCompiler` owns:
 
@@ -68,14 +60,16 @@ flowchart TD
     A[HardwareSystem] --> B[ServerRuntime]
     B --> C[BoardRuntime.start]
     B --> D[Register MCP/STREAM events]
-    B --> E[Register MCP tools]
+    B --> E[Start EventListener]
+    B --> F[Register MCP tools]
     C --> F[SerialConnection]
-    E --> G[CommandCompiler.build_command]
+    F --> G[CommandCompiler.build_command]
     G --> F
     F --> H[Firmware]
-    H --> I[EventListener]
-    I --> J[EventBus]
-    J --> K[MCP response or stream buffer]
+    E --> I[EventBus]
+    H --> J[EventListener]
+    J --> I
+    I --> K[MCP response or stream buffer]
 ```
 
 ## Boundary Rule

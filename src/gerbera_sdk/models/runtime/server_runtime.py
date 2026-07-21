@@ -20,11 +20,11 @@ from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 @dataclass
 class ServerRuntime:
     hardware_system: HardwareSystem
-    board_runtime: BoardRuntime = field(init=False)
-    event_bus: EventBus = field(default_factory=EventBus)
-    stream_controller: StreamController = field(init=False)
-    event_listener: EventListener | None = field(default=None, init=False)
-    app: FastMCP = field(init=False)
+    board_runtime: BoardRuntime
+    event_bus: EventBus 
+    stream_controller: StreamController
+    event_listener: EventListener | None = field(default=None)
+    app: FastMCP
 
     def _register_mcp_event(
         self,
@@ -50,7 +50,7 @@ class ServerRuntime:
     ) -> None:
         builder = get_device_builder(
             connection.component_type,
-            context="runtime registration",
+            context="event registration",
         )
         if connection.database is None:
             return
@@ -78,7 +78,7 @@ class ServerRuntime:
             event,
         )
 
-    def register_events(self) -> None:
+    def _register_events(self) -> None:
         configured_database = False
 
         for microcontroller in self.hardware_system.microcontrollers:
@@ -92,7 +92,24 @@ class ServerRuntime:
 
                 self._register_stream_event(microcontroller, connection)
 
-   
+    def _start_event_listener(self) -> None:
+        if self.event_listener is not None:
+            return
+
+        self.event_listener = EventListener(
+            hardware_system=self.hardware_system,
+            _serial_pool=self.board_runtime.serial_pool,
+            _threads={},
+            _event_bus=self.event_bus,
+        )
+        self.event_listener.create_listeners()
+
+    def _stop_event_listener(self) -> None:
+        if self.event_listener is None:
+            return
+
+        self.event_listener.stop_listeners()
+        self.event_listener = None
 
     def _send_connection_command(
         self,
@@ -101,7 +118,9 @@ class ServerRuntime:
         action: str,
         params: Optional[dict[str, str]] = None,
     ) -> dict[str, str]:
-        serial_connection = self.board_runtime.get_serial_connection(microcontroller)
+        serial_connection = self.board_runtime.get_serial_connection(
+            microcontroller
+        )
         built_command = CommandCompiler.build_command(
             connection,
             action=action,
@@ -165,7 +184,10 @@ class ServerRuntime:
             response = connection.perform_action("WRITE", {"state": state})
 
             if state == "off":
-                self.stream_controller.stop_stream(microcontroller, connection)
+                self.stream_controller.stop_stream(
+                    microcontroller,
+                    connection,
+                )
 
             return response
 
@@ -201,25 +223,6 @@ class ServerRuntime:
             description=tool_function.__doc__,
         )(tool_function)
 
-    def _connection_supports_state_toggle(self, connection: Connection) -> bool:
-        for command in CommandCompiler.command_specs(connection):
-            if command.method.strip().upper() != "WRITE":
-                continue
-
-            state_param = command.params.get("state")
-            if state_param is None:
-                continue
-
-            return {"on", "off"}.issubset(set(state_param.enum))
-
-        return False
-
-    def _connection_supports_stream_toggle(self, connection: Connection) -> bool:
-        return (
-            connection.database is not None
-            and self._connection_supports_state_toggle(connection)
-        )
-
     def _register_state_toggle_tool(
         self,
         connection: Connection,
@@ -236,13 +239,7 @@ class ServerRuntime:
             description=description,
         )(tool_function)
 
-    def _register_state_toggle_tools(
-        self,
-        connection: Connection,
-    ) -> None:
-        if not self._connection_supports_state_toggle(connection):
-            return
-
+    def _register_state_toggle_tools(self, connection: Connection) -> None:
         self._register_state_toggle_tool(
             connection=connection,
             state="on",
@@ -282,9 +279,6 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
-        if not self._connection_supports_stream_toggle(connection):
-            return
-
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
             connection=connection,
@@ -300,7 +294,7 @@ class ServerRuntime:
             description=f"Turn off continuous streaming for {connection.name}.",
         )
 
-    def register_tools(self) -> None:
+    def _register_tools(self) -> None:
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
                 for command in CommandCompiler.command_specs(connection):
