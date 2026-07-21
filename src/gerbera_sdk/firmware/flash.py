@@ -19,7 +19,6 @@ class Flash:
             sketch_dir.mkdir(parents=True, exist_ok=True)
             sketch_path = sketch_dir / f"{microcontroller.id}.ino"
             sketch_path.write_text(firmware_code)
-            microcontroller.set_firmware_file(str(sketch_dir))
             generated_files[microcontroller.id] = str(sketch_dir)
 
         return generated_files
@@ -27,12 +26,12 @@ class Flash:
     @staticmethod
     def flash_code(hardware_system: HardwareSystem) -> None:
         try:
-            Flash.generate_files(hardware_system)
+            generated_files = Flash.generate_files(hardware_system)
 
             for microcontroller in hardware_system.microcontrollers:
                 port = microcontroller.port
                 fqbn = microcontroller.fqbn
-                sketch_path = microcontroller.firmware_file_path
+                sketch_path = generated_files[microcontroller.id]
                 build_path = Path(microcontroller.id) / DEFAULT_BUILD_DIRNAME
 
                 if not sketch_path:

@@ -23,3 +23,4 @@ class ParameterSpec:
 class CommandSpec:
     method: str
     params: dict[str, ParameterSpec] = field(default_factory=dict)
+    description: str = ""

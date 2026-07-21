@@ -6,6 +6,7 @@ import signal
 import subprocess
 from pathlib import Path
 import time
+from typing import Any
 
 import requests
 import typer
@@ -18,7 +19,7 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 def _load_hardware_system_from_config(
     config_path: Path = CONFIG_PATH,
-) -> "HardwareSystem":
+) -> HardwareSystem:
     config = _load_config(config_path)
     entry_point = str(config.get("entry_point")).strip()
     hardware_name = str(config.get("hardware_name")).strip()
@@ -49,19 +50,23 @@ def _load_hardware_system_from_config(
 
     if hardware_system is None:
         raise AttributeError(f"{entry_point_path} must define {hardware_name}")
+    if not isinstance(hardware_system, HardwareSystem):
+        raise TypeError(f"{entry_point_path}:{hardware_name} must be a HardwareSystem")
 
     return hardware_system
 
 
 def _mutate_config(
-    config: dict[str, any],
+    config: dict[str, Any],
     port: str,
     local_endpoint: str,
     public_endpoint: str = "",
-) -> dict[str, any]:
+) -> dict[str, Any]:
     config["server"]["port"] = port
-    config["server"]["local_endpoint"] = f"{local_endpoint}/mcp"
-    config["server"]["public_endpoint"] = f"{public_endpoint}/mcp"
+    config["server"]["local_endpoint"] = f"{local_endpoint.rstrip('/')}/mcp"
+    config["server"]["public_endpoint"] = (
+        f"{public_endpoint.rstrip('/')}/mcp" if public_endpoint else ""
+    )
     return config
 
 
@@ -116,7 +121,7 @@ def _poll_public_endpoint(timeout_seconds: float = 10.0) -> str:
     raise RuntimeError("Failed to retrieve ngrok public endpoint")
 
 
-def setup(port: str = "8000", local_endpoint: str = "127.0.0.1", ) -> None:
+def setup(port: str = "8000", local_endpoint: str = "127.0.0.1") -> None:
     hardware_system = _load_hardware_system_from_config()
     GerberaRuntime.setup(
         hardware_system,
@@ -124,8 +129,9 @@ def setup(port: str = "8000", local_endpoint: str = "127.0.0.1", ) -> None:
         flash_firmware=True,
     )
 
+    local_base_url = f"http://{local_endpoint}:{port}"
     config = _load_config()
-    new_config = _mutate_config(config, port, local_endpoint)
+    new_config = _mutate_config(config, port, local_base_url)
 
     try:
         CONFIG_PATH.write_text(json.dumps(new_config, indent=4))
@@ -136,7 +142,7 @@ def setup(port: str = "8000", local_endpoint: str = "127.0.0.1", ) -> None:
     public_endpoint = _poll_public_endpoint()
 
     config = _load_config()
-    new_config = _mutate_config(config, port, local_endpoint, public_endpoint)
+    new_config = _mutate_config(config, port, local_base_url, public_endpoint)
 
     try:
         CONFIG_PATH.write_text(json.dumps(new_config, indent=4))
