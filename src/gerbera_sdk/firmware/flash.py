@@ -10,34 +10,30 @@ DEFAULT_BUILD_DIRNAME = "build"
 
 class Flash:
     @staticmethod
-    def generate_files(hardware_system: HardwareSystem) -> dict[str, str]:
-        generated_files: dict[str, str] = {}
+    def generate_files(hardware_system: HardwareSystem) -> dict[str, Path]:
+        sketch_paths: dict[str, Path] = {}
 
         for microcontroller in hardware_system.microcontrollers:
             firmware_code = Generator.build_firmware(microcontroller)
-            sketch_dir = Path(microcontroller.id)
-            sketch_dir.mkdir(parents=True, exist_ok=True)
-            sketch_path = sketch_dir / f"{microcontroller.id}.ino"
+            microcontroller_root = Path(microcontroller.id)
+            microcontroller_root.mkdir(parents=True, exist_ok=True)
+            sketch_path = microcontroller_root / f"{microcontroller.id}.ino"
             sketch_path.write_text(firmware_code)
-            generated_files[microcontroller.id] = str(sketch_dir)
+            sketch_paths[microcontroller.id] = sketch_path
 
-        return generated_files
+        return sketch_paths
 
     @staticmethod
     def flash_code(hardware_system: HardwareSystem) -> None:
         try:
-            generated_files = Flash.generate_files(hardware_system)
+            sketch_paths = Flash.generate_files(hardware_system)
 
             for microcontroller in hardware_system.microcontrollers:
                 port = microcontroller.port
                 fqbn = microcontroller.fqbn
-                sketch_path = generated_files[microcontroller.id]
-                build_path = Path(microcontroller.id) / DEFAULT_BUILD_DIRNAME
-
-                if not sketch_path:
-                    raise ValueError(
-                        f"Missing firmware file path for microcontroller {microcontroller.id}"
-                    )
+                sketch_path = sketch_paths[microcontroller.id]
+                microcontroller_root = sketch_path.parent
+                build_path = microcontroller_root / DEFAULT_BUILD_DIRNAME
 
                 if build_path.exists():
                     shutil.rmtree(build_path)
@@ -48,7 +44,7 @@ class Flash:
                     "arduino-cli", "compile",
                     "--fqbn", fqbn,
                     "--build-path", str(build_path),
-                    sketch_path
+                    str(microcontroller_root),
                 ], check=True)
 
                 subprocess.run([
@@ -56,12 +52,12 @@ class Flash:
                     "-p", port,
                     "--fqbn", fqbn,
                     "--input-dir", str(build_path),
-                    sketch_path
+                    str(microcontroller_root),
                 ], check=True)
 
         except Exception as e:
             raise RuntimeError(f"Failed to flash hardware system {hardware_system.id}") from e
 
     @staticmethod
-    def flash(hardware_system) -> None:
+    def flash(hardware_system: HardwareSystem) -> None:
         Flash.flash_code(hardware_system)

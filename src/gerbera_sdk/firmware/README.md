@@ -13,6 +13,14 @@ flash.py                Compiles/uploads generated sketches.
 devices/                Per-component firmware builders.
 ```
 
+Each microcontroller gets one firmware root in the current directory:
+
+```text
+<microcontroller-id>/
+├── <microcontroller-id>.ino
+└── build/
+```
+
 ## Ownership
 
 This folder owns:
