@@ -1,23 +1,25 @@
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
-from datetime import datetime
+from typing import Any
 import uuid
 
-# This is the state
-class EventTypeEnum(Enum):
-    pass
 
-class SourceTypeEnum(Enum):
-    pass
+class EventTypeEnum(str, Enum):
+    STATE_RESPONSE = "state_response"
+
+
+class SourceTypeEnum(str, Enum):
+    MODEL = "model"
+
 
 @dataclass
 class Event:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     event_type: EventTypeEnum
     source_type: SourceTypeEnum
-    payload: dict[str, any]
-    timestamp: datetime
+    payload: dict[str, Any]
     session_id: str
-
-
-    
+    timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))

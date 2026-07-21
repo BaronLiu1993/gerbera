@@ -26,4 +26,4 @@ class Model:
         adapter_cls = MODEL_MAP.get(self.model_provider)
         if adapter_cls is None:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
-        return adapter_cls(api_key=self.api_key, model=self.model, max_token=1000) # Default for now
+        return adapter_cls(api_key=self.api_key, model=self.model, max_tokens=1000)

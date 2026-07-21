@@ -8,7 +8,12 @@ class AnthropicAdapter:
     model: str
     max_tokens: int
 
-    def send(self, user_messages: list[dict], system_prompt: str) -> str:
+    def send(
+        self,
+        user_messages: list[dict],
+        system_prompt: str,
+        valid_schema: dict,
+    ) -> str:
         resp = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -21,6 +26,12 @@ class AnthropicAdapter:
                 "max_tokens": self.max_tokens,
                 "system": system_prompt,
                 "messages": user_messages,
+                "output_config": {
+                    "format": {
+                        "type": "json_schema",
+                        "schema": valid_schema,
+                    }
+                },
             },
         )
         resp.raise_for_status()
@@ -33,7 +44,12 @@ class OpenAIAdapter:
     model: str
     max_tokens: int
 
-    def send(self, user_messages: list[dict], system_prompt: str) -> str:
+    def send(
+        self,
+        user_messages: list[dict],
+        system_prompt: str,
+        valid_schema: dict,
+    ) -> str:
         resp = httpx.post(
             "https://api.openai.com/v1/chat/completions",
             headers={
@@ -43,10 +59,21 @@ class OpenAIAdapter:
             json={
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
                     *user_messages,
                 ],
                 "max_tokens": self.max_tokens,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "state_response",
+                        "strict": True,
+                        "schema": valid_schema,
+                    },
+                },
             },
         )
         resp.raise_for_status()
@@ -59,7 +86,12 @@ class GeminiAdapter:
     model: str
     max_tokens: int
 
-    def send(self, user_messages: list[dict], system_prompt: str) -> str:
+    def send(
+        self,
+        user_messages: list[dict],
+        system_prompt: str,
+        valid_schema: dict,
+    ) -> str:
         resp = httpx.post(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={
@@ -71,6 +103,11 @@ class GeminiAdapter:
                 "system_prompt": system_prompt,
                 "messages": user_messages,
                 "config": {"max_output_tokens": self.max_tokens},
+                "response_format": {
+                    "type": "text",
+                    "mime_type": "application/json",
+                    "schema": valid_schema,
+                },
             },
         )
         resp.raise_for_status()

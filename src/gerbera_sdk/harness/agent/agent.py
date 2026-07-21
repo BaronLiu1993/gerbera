@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+import json
+
 from gerbera_sdk.harness.agent.experiments.session import Session
 from gerbera_sdk.harness.agent.experiments.states import (
     Complete,
@@ -11,8 +14,12 @@ from gerbera_sdk.harness.agent.experiments.states import (
 )
 from gerbera_sdk.harness.agent.model.model import Model
 
-from gerbera_sdk.harness.memory.event import Message
-
+from gerbera_sdk.harness.memory.event import (
+    Event,
+    EventTypeEnum,
+    SourceTypeEnum,
+)
+from gerbera_sdk.harness.memory.memory import Memory
 
 
 STATE_REGISTRY: dict[LoopStateEnum, type[ExperimentState]] = {
@@ -24,15 +31,36 @@ STATE_REGISTRY: dict[LoopStateEnum, type[ExperimentState]] = {
     LoopStateEnum.COMPLETE: Complete,
 }
 
+
+@dataclass
 class Agent:
     session: Session
     model: Model
+    memory: Memory
 
-    def run_agent(self, messages: list[Message]):
-        while self.session.state != LoopStateEnum.COMPLETE:
+    def run_agent(self, messages: list[dict]) -> None:
+        client = self.model.get_agent_client()
+
+        while self.session.state.state != LoopStateEnum.COMPLETE:
             current_state = self.session.state
-            system_prompt = STATE_REGISTRY[current_state].system_prompt
-            next_state, response = Model.get_agent_client().send(messages, system_prompt)
+            raw_response = client.send(messages, current_state.prompt, current_state.valid_schema)
+            output = json.loads(raw_response)
+            next_state = LoopStateEnum(output["next_state"])
 
-            if current_state.valid_transition(next_state):
-                self.session.state = next_state
+            if not current_state.valid_transition(next_state):
+                raise ValueError(
+                    f"Invalid transition: {current_state.state.value} "
+                    f"to {next_state.value}"
+                )
+
+            event = Event(
+                event_type=EventTypeEnum.STATE_RESPONSE,
+                source_type=SourceTypeEnum.MODEL,
+                payload={
+                    "next_state": next_state.value,
+                    "response": output["response"],
+                },
+                session_id=self.session.id,
+            )
+            self.memory.append_event(current_state.state.value, event)
+            self.session.state = STATE_REGISTRY[next_state]()
