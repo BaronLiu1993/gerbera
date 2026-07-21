@@ -8,6 +8,7 @@ class LoopStateEnum(str, Enum):
     EXECUTE = "execute"
     OBSERVE = "observe"
     REVIEW = "review"
+    COMPLETE = "complete"
 
 
 @dataclass(frozen=True)

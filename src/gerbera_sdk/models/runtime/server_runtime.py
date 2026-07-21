@@ -89,8 +89,9 @@ class ServerRuntime:
         if self.event_listener is None:
             return
 
-        self.event_listener.stop_listeners()
+        event_listener = self.event_listener
         self.event_listener = None
+        event_listener.stop_listeners()
 
     def _send_connection_command(
         self,

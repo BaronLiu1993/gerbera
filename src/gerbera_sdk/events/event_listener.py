@@ -1,8 +1,10 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.utils import build_event_key
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from serial import Serial
+from gerbera_sdk.models.runtime.board_runtime import SerialConnection
+from gerbera_sdk.utils import build_event_key
 import threading
 import uuid
 from serial import SerialException
@@ -11,7 +13,7 @@ from serial import SerialException
 @dataclass
 class EventListener:
     hardware_system: HardwareSystem
-    _serial_pool: dict[str, Serial]
+    _serial_pool: Mapping[str, SerialConnection]
     _threads: dict[str, threading.Thread]
     _event_bus: EventBus
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -34,16 +36,14 @@ class EventListener:
 
     def stop_listeners(self):
         self._stop_event.set()
+        try:
+            for serial_connection in self._serial_pool.values():
+                serial_connection.destroy()
+        finally:
+            for thread in self._threads.values():
+                thread.join(timeout=1)
 
-        for serial_connection in self._serial_pool.values():
-            close = getattr(serial_connection, "close", None)
-            if callable(close):
-                close()
-
-        for thread in self._threads.values():
-            thread.join(timeout=1)
-
-        self._threads.clear()
+            self._threads.clear()
 
     def _parse_payload(self, line: str):
         res_payload = {}

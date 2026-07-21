@@ -17,7 +17,7 @@ MODEL_MAP = {
 }
 
 @dataclass
-class AgentClient:
+class Model:
     model_provider: ModelProviderEnum
     model: str
     api_key: str

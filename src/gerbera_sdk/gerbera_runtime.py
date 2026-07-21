@@ -37,6 +37,7 @@ class GerberaRuntime:
         transport: str = "stdio",
         **transport_kwargs,
     ) -> None:
+        GerberaRuntime._validate_unique_connection_names(hardware_system)
         board_runtime = GerberaRuntime._build_board_runtime(hardware_system)
         event_worker = GerberaRuntime._build_event_worker()
         database_runtime = GerberaRuntime._build_database_runtime(
@@ -60,10 +61,38 @@ class GerberaRuntime:
                 **transport_kwargs,
             )
         finally:
-            server_runtime._stop_event_listener()
-            server_runtime.stream_controller.flush_all()
-            database_runtime.stop()
-            board_runtime.close()
+            try:
+                server_runtime._stop_event_listener()
+            finally:
+                try:
+                    try:
+                        server_runtime.stream_controller.flush_all()
+                    finally:
+                        database_runtime.stop()
+                finally:
+                    board_runtime.close()
+
+    @staticmethod
+    def _validate_unique_connection_names(
+        hardware_system: HardwareSystem,
+    ) -> None:
+        connection_owners: dict[str, str] = {}
+
+        for microcontroller in hardware_system.microcontrollers:
+            for connection in microcontroller.connections:
+                normalized_name = connection.name.strip().lower()
+                if not normalized_name:
+                    raise ValueError("Connection name cannot be empty")
+
+                existing_owner = connection_owners.get(normalized_name)
+                if existing_owner is not None:
+                    raise ValueError(
+                        f"Connection name must be globally unique: {connection.name}. "
+                        f"Used by microcontrollers {existing_owner} and "
+                        f"{microcontroller.id}"
+                    )
+
+                connection_owners[normalized_name] = microcontroller.id
 
     @staticmethod
     def _build_board_runtime(
