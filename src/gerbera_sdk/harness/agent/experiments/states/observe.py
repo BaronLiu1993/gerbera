@@ -10,6 +10,7 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 @dataclass(frozen=True)
 class Observe(ExperimentState):
     phase: ClassVar[LoopStateEnum] = LoopStateEnum.OBSERVE
+    system_prompt: ClassVar[str] = "OBSERVE.md"
     valid_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.REVIEW}
     )

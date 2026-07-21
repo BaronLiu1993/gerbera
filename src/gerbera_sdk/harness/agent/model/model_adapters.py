@@ -8,7 +8,7 @@ class AnthropicAdapter:
     model: str
     max_tokens: int
 
-    def send(self, messages: list[dict]) -> str:
+    def send(self, user_messages: list[dict], system_prompt: str) -> str:
         resp = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -19,7 +19,8 @@ class AnthropicAdapter:
             json={
                 "model": self.model,
                 "max_tokens": self.max_tokens,
-                "messages": messages,
+                "system": system_prompt,
+                "messages": user_messages,
             },
         )
         resp.raise_for_status()
@@ -32,7 +33,7 @@ class OpenAIAdapter:
     model: str
     max_tokens: int
 
-    def send(self, messages: list[dict]) -> str:
+    def send(self, user_messages: list[dict], system_prompt: str) -> str:
         resp = httpx.post(
             "https://api.openai.com/v1/chat/completions",
             headers={
@@ -41,7 +42,10 @@ class OpenAIAdapter:
             },
             json={
                 "model": self.model,
-                "messages": messages,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    *user_messages,
+                ],
                 "max_tokens": self.max_tokens,
             },
         )
@@ -55,7 +59,7 @@ class GeminiAdapter:
     model: str
     max_tokens: int
 
-    def send(self, messages: list[dict]) -> str:
+    def send(self, user_messages: list[dict], system_prompt: str) -> str:
         resp = httpx.post(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={
@@ -64,7 +68,8 @@ class GeminiAdapter:
             },
             json={
                 "model": self.model,
-                "messages": messages,
+                "system_prompt": system_prompt,
+                "messages": user_messages,
                 "config": {"max_output_tokens": self.max_tokens},
             },
         )

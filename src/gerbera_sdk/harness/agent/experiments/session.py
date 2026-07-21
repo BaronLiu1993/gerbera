@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 import uuid
 
-from gerbera_sdk.harness.agent.experiments.hypothesis import Hypothesis
 from gerbera_sdk.harness.agent.experiments.states import (
     ExperimentState,
     LoopStateEnum,
@@ -20,6 +19,5 @@ class Session:
 
     def valid_transition(self, state: LoopStateEnum) -> bool:
         return self.state.valid_transition(state)
-
 
 

@@ -3,7 +3,6 @@ from enum import Enum
 import uuid
 from gerbera_sdk.harness.agent.model.model_adapters import AnthropicAdapter, OpenAIAdapter, GeminiAdapter
 
-
 class ModelProviderEnum(Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
@@ -23,8 +22,8 @@ class Model:
     api_key: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def create_agent_client(self):
+    def get_agent_client(self):
         adapter_cls = MODEL_MAP.get(self.model_provider)
         if adapter_cls is None:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
-        return adapter_cls(api_key=self.api_key, model=self.model)
+        return adapter_cls(api_key=self.api_key, model=self.model, max_token=1000) # Default for now
