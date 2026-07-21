@@ -8,13 +8,9 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 
 
 @dataclass(frozen=True)
-class Review(ExperimentState):
-    phase: ClassVar[LoopStateEnum] = LoopStateEnum.REVIEW
-    system_prompt: ClassVar[str] = "REVIEW.md"
+class Hypothesize(ExperimentState):
+    phase: ClassVar[LoopStateEnum] = LoopStateEnum.HYPOTHESIZE
+    system_prompt: ClassVar[str] = "HYPOTHESIZE.md"
     valid_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {
-            LoopStateEnum.HYPOTHESIZE,
-            LoopStateEnum.PLAN,
-            LoopStateEnum.COMPLETE,
-        }
+        {LoopStateEnum.PLAN}
     )

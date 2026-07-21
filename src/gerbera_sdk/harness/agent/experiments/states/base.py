@@ -7,6 +7,7 @@ PROMPT_DIRECTORY = Path(__file__).resolve().parents[3] / "prompts"
 
 
 class LoopStateEnum(str, Enum):
+    HYPOTHESIZE = "hypothesize"
     PLAN = "plan"
     EXECUTE = "execute"
     OBSERVE = "observe"
@@ -23,7 +24,7 @@ class ExperimentState:
     def prompt_path(self) -> Path:
         return PROMPT_DIRECTORY / self.system_prompt
 
-    @property # Do prompt validations here
+    @property
     def prompt(self) -> str:
         return self.prompt_path.read_text().strip()
 

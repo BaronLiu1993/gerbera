@@ -3,6 +3,7 @@ from gerbera_sdk.harness.agent.experiments.states import (
     Complete,
     Execute,
     ExperimentState,
+    Hypothesize,
     LoopStateEnum,
     Observe,
     Plan,
@@ -15,6 +16,7 @@ from gerbera_sdk.harness.memory.event import Message
 
 
 STATE_REGISTRY: dict[LoopStateEnum, type[ExperimentState]] = {
+    LoopStateEnum.HYPOTHESIZE: Hypothesize,
     LoopStateEnum.PLAN: Plan,
     LoopStateEnum.EXECUTE: Execute,
     LoopStateEnum.OBSERVE: Observe,
