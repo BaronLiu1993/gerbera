@@ -1,16 +1,21 @@
 from dataclasses import dataclass, field
 import uuid
 
-from enum import Enum
+from gerbera_sdk.harness.agent.experiments.states import (
+    ExperimentState,
+    LoopStateEnum,
+    Plan,
+)
 
-class LoopStateEnum(Enum):
-    PLAN = "plan"
-    EXECUTE = "execute"
-    OBSERVE = "observe"
-    REVIEW = "review"
 
 @dataclass
 class Session:
+    state: ExperimentState = field(default_factory=Plan)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    state: LoopStateEnum
-    
+
+    @property
+    def phase(self) -> LoopStateEnum:
+        return self.state.phase
+
+    def valid_transition(self, state: LoopStateEnum) -> bool:
+        return self.state.valid_transition(state)

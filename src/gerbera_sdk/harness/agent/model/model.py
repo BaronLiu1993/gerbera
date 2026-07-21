@@ -16,7 +16,6 @@ MODEL_MAP = {
     ModelProviderEnum.GEMINI: GeminiAdapter,
 }
 
-
 @dataclass
 class AgentClient:
     model_provider: ModelProviderEnum
