@@ -38,10 +38,7 @@ class Infrastructure:
             time.sleep(3)
         
         return True
-    
-@infrastructure_app()
-def define_vm():
-    pass
+
 
 
 
