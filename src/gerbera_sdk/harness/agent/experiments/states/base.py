@@ -7,12 +7,13 @@ PROMPT_DIRECTORY = Path(__file__).resolve().parents[3] / "prompts"
 
 
 class LoopStateEnum(str, Enum):
-    HYPOTHESIZE = "hypothesize"
+    INITIALISATION = "initialisation"
     PLAN = "plan"
-    EXECUTE = "execute"
-    OBSERVE = "observe"
+    EXECUTION = "execution"
+    OBSERVATION = "observation"
     REVIEW = "review"
     COMPLETE = "complete"
+    FAILED = "failed"
 
 
 def build_valid_schema(

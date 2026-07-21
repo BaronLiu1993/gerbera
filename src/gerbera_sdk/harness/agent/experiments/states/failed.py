@@ -9,6 +9,6 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 
 # Terminal State
 @dataclass(frozen=True)
-class Complete(ExperimentState):
-    state: ClassVar[LoopStateEnum] = LoopStateEnum.COMPLETE
-    system_prompt: ClassVar[str] = "COMPLETE.md"
+class Failed(ExperimentState):
+    state: ClassVar[LoopStateEnum] = LoopStateEnum.FAILED
+    system_prompt: ClassVar[str] = "FAILED.md"

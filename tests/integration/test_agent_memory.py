@@ -9,11 +9,12 @@ from gerbera_sdk.harness.memory.memory import Memory, SCHEMA_PATH
 
 class FakeClient:
     def __init__(self) -> None:
+        self.contexts = []
         self.responses = iter(
             [
-                ("plan", "hypothesis generated"),
-                ("execute", "plan generated"),
-                ("observe", "plan executed"),
+                ("plan", "hypothesis and initial plan generated"),
+                ("execution", "first task scoped"),
+                ("observation", "first plan step executed"),
                 ("review", "observations recorded"),
                 ("complete", "hypothesis accepted"),
             ]
@@ -25,6 +26,7 @@ class FakeClient:
         system_prompt: str,
         valid_schema: dict,
     ) -> str:
+        self.contexts.append(messages)
         next_state, response = next(self.responses)
         assert next_state in valid_schema["properties"]["next_state"]["enum"]
         return json.dumps(
@@ -36,8 +38,11 @@ class FakeClient:
 
 
 class FakeModel:
+    def __init__(self) -> None:
+        self.client = FakeClient()
+
     def get_agent_client(self) -> FakeClient:
-        return FakeClient()
+        return self.client
 
 
 def test_agent_persists_each_accepted_state_response(tmp_path) -> None:
@@ -46,18 +51,25 @@ def test_agent_persists_each_accepted_state_response(tmp_path) -> None:
     connection.executescript(SCHEMA_PATH.read_text())
     memory = Memory(connection)
     session = Session()
-    agent = Agent(session=session, model=FakeModel(), memory=memory)
+    model = FakeModel()
+    initial_messages = [{"role": "user", "content": "Test the sensor"}]
+    agent = Agent(
+        session=session,
+        model=model,
+        memory=memory,
+        messages=initial_messages,
+    )
 
-    agent.run_agent([])
+    agent.run_agent()
 
     rows = connection.execute(
         "SELECT state, payload, aggregate_id FROM events_log ORDER BY timestamp"
     ).fetchall()
     assert [row["state"] for row in rows] == [
-        "hypothesize",
+        "initialisation",
         "plan",
-        "execute",
-        "observe",
+        "execution",
+        "observation",
         "review",
     ]
     assert all(row["aggregate_id"] == session.id for row in rows)
@@ -66,5 +78,15 @@ def test_agent_persists_each_accepted_state_response(tmp_path) -> None:
         "response": "hypothesis accepted",
     }
     assert session.state.state == LoopStateEnum.COMPLETE
+    assert [len(context) for context in model.client.contexts] == [1, 2, 3, 4, 5]
+    assert all(
+        context[0] == initial_messages[0]
+        for context in model.client.contexts
+    )
+    assert json.loads(model.client.contexts[-1][-1]["content"]) == {
+        "state": "observation",
+        "next_state": "review",
+        "response": "observations recorded",
+    }
 
     connection.close()

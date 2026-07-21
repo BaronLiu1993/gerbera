@@ -9,10 +9,10 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 
 
 @dataclass(frozen=True)
-class Observe(ExperimentState):
-    state: ClassVar[LoopStateEnum] = LoopStateEnum.OBSERVE
-    system_prompt: ClassVar[str] = "OBSERVE.md"
+class Execution(ExperimentState):
+    state: ClassVar[LoopStateEnum] = LoopStateEnum.EXECUTION
+    system_prompt: ClassVar[str] = "EXECUTION.md"
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {LoopStateEnum.REVIEW}
+        {LoopStateEnum.OBSERVATION}
     )
     valid_schema: ClassVar[dict] = build_valid_schema(valid_transition_states)

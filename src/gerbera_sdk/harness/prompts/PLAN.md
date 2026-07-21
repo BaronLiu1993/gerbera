@@ -1,10 +1,10 @@
 # Plan
 
-Create the next experimental plan from the current hypothesis and available
-evidence.
+Select and scope the next task from the immutable research plan.
 
-- Define the objective and expected result.
-- Produce ordered, executable steps.
-- Identify required tools, inputs, and safety constraints.
-- Do not execute actions or claim observations.
-- Transition only to `execute` when the plan is complete.
+- Use the initial plan and all recorded evidence as context.
+- Define exactly one executable task with its expected outcome.
+- State the authorized tools, parameters, constraints, and stopping conditions.
+- Do not modify or replace any previous plan or event.
+- Do not execute the task or claim an observation.
+- Transition only to `execution` when the task is ready.

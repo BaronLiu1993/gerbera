@@ -54,5 +54,3 @@ class Memory:
                     event.session_id,
                 ),
             )
-
-  

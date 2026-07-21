@@ -13,6 +13,6 @@ class Plan(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.PLAN
     system_prompt: ClassVar[str] = "PLAN.md"
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {LoopStateEnum.EXECUTE}
+        {LoopStateEnum.EXECUTION}
     )
     valid_schema: ClassVar[dict] = build_valid_schema(valid_transition_states)

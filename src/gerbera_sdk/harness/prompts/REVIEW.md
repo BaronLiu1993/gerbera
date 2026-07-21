@@ -4,10 +4,12 @@ Evaluate the observations against the hypothesis and expected result.
 
 - Compare expected and observed outcomes.
 - Identify uncertainty, failures, and confounding factors.
-- Decide what the next experimental cycle must address.
+- Treat valid contradictory evidence as a falsified hypothesis.
+- Treat a broken, corrupted, or inconclusive task as an experimental failure,
+  not as evidence that falsifies the hypothesis.
 - Do not execute actions directly.
-- Reject the current hypothesis and transition to `hypothesize` when the
-  evidence contradicts it. The next phase must create a new hypothesis rather
-  than overwrite the rejected hypothesis.
-- Transition to `plan` when the same hypothesis needs another experiment.
-- Transition to `complete` when the evidence supports a final conclusion.
+- Transition to `plan` when another task is required.
+- Transition to `complete` when the evidence supports or falsifies the
+  hypothesis and a final conclusion can be recorded.
+- Transition to `failed` when the workflow cannot safely or meaningfully
+  continue.

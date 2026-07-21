@@ -5,4 +5,4 @@ Finalize the experimental session.
 - Summarize the hypothesis, method, evidence, and conclusion.
 - State unresolved uncertainty and limitations.
 - Do not plan or execute additional actions.
-- Remain in `complete`.
+- Do not transition to another state.
