@@ -20,6 +20,11 @@ class LoopStateEnum(str, Enum):
     FAILED = "failed"
 
 
+class DecisionEnum(str, Enum):
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
 def build_valid_schema(
     valid_transitions: Collection[LoopStateEnum],
     structured_schema: Optional[type[BaseModel]] = None,

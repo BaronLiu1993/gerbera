@@ -8,6 +8,9 @@ from gerbera_sdk.harness.agent.experiments.states import (
     Observation,
     Review,
 )
+from gerbera_sdk.harness.agent.experiments.states.base import (
+    DecisionEnum,
+)
 
 
 def test_each_experiment_state_loads_its_markdown_prompt() -> None:
@@ -37,6 +40,12 @@ def test_experiment_cycle_enforces_valid_transitions() -> None:
     assert not Review().valid_transition(Initialisation.state)
     assert Complete.terminal
     assert Failed.terminal
+
+
+def test_initialisation_accepts_only_readiness_decisions() -> None:
+    assert Initialisation.valid_decisions == frozenset(
+        {DecisionEnum.ACCEPTED, DecisionEnum.REJECTED}
+    )
 
 
 def test_state_owns_transition_validation_and_creation() -> None:

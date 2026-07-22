@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
-import json
-from typing import Any
 
 from gerbera_sdk.harness.agent.experiments.session import Session
+from gerbera_sdk.harness.agent.experiments.states.processes.initialisation_process import (
+    InitialisationProcess,
+)
 from gerbera_sdk.harness.agent.experiments.states import (
     ExperimentState,
     LoopStateEnum,
@@ -14,6 +15,7 @@ from gerbera_sdk.harness.memory.event import (
     EventTypeEnum,
     SourceTypeEnum,
 )
+
 from gerbera_sdk.harness.memory.memory import Memory
 
 
@@ -22,56 +24,54 @@ class Agent:
     session: Session
     model: Model
     memory: Memory
+    initialisation_process: InitialisationProcess | None = None
     messages: list[dict[str, str]] = field(default_factory=list)
     context_window_size: int = 20
 
-    def run_agent(self) -> None:
-        if self.context_window_size < 1:
-            raise ValueError("Context window size must be positive")
+    async def prepare_initialisation_context(self, user_prompt: str) -> str:
+        if self.session.state.state is not LoopStateEnum.INITIALISATION:
+            raise RuntimeError(
+                "Initialisation context can only be prepared during initialisation"
+            )
 
+        context = await self.initialisation_process.run(user_prompt)
+        self.messages.append({"role": "user", "content": context})
+        return context
+
+    def run_agent(self, initial_user_prompt: str) -> None:
         client = self.model.get_agent_client()
+        while self.session.state.state != LoopStateEnum.COMPLETE or self.session.state.state != LoopStateEnum.FAILED:
+            
+            if self.session.state.state == LoopStateEnum.INITIALISATION:
+                initial_context = self.prepare_initialisation_context(initial_user_prompt)
+                client.send()
 
-        while not self.session.state.terminal:
-            current_state = self.session.state
-            raw_response = client.send(
-                self.messages[-self.context_window_size:],
-                current_state.prompt,
-                current_state.valid_schema,
-            )
-            output = current_state.parse_response(raw_response)
-            next_state = LoopStateEnum(output["next_state"])
-            transitioned_state = current_state.transition(next_state)
-            self._record_response(
-                current_state,
-                next_state,
-                output["response"],
-            )
-            self.session.state = transitioned_state
 
-    def _record_response(
-        self,
-        current_state: ExperimentState,
-        next_state: LoopStateEnum,
-        response: Any,
-    ) -> None:
-        event = Event(
-            event_type=EventTypeEnum.STATE_RESPONSE,
-            source_type=SourceTypeEnum.MODEL,
-            payload={
-                "next_state": next_state.value,
-                "response": response,
-            },
-            session_id=self.session.id,
-        )
-        self.memory.append_event(current_state.state.value, event)
-        self.messages.append(
-            {
-                "role": "assistant",
-                "content": json.dumps(
-                    {
-                        "state": current_state.state.value,
-                        **event.payload,
-                    }
-                ),
-            }
-        )
+
+    # def _record_response(
+    #     self,
+    #     current_state: ExperimentState,
+    #     next_state: LoopStateEnum,
+    #     response: Any,
+    # ) -> None:
+    #     event = Event(
+    #         event_type=EventTypeEnum.STATE_RESPONSE,
+    #         source_type=SourceTypeEnum.MODEL,
+    #         payload={
+    #             "next_state": next_state.value,
+    #             "response": response,
+    #         },
+    #         session_id=self.session.id,
+    #     )
+    #     self.memory.append_event(current_state.state.value, event)
+    #     self.messages.append(
+    #         {
+    #             "role": "assistant",
+    #             "content": json.dumps(
+    #                 {
+    #                     "state": current_state.state.value,
+    #                     **event.payload,
+    #                 }
+    #             ),
+    #         }
+    #     )
