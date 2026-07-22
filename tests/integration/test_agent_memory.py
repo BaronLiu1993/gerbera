@@ -12,7 +12,17 @@ class FakeClient:
         self.contexts = []
         self.responses = iter(
             [
-                ("plan", "hypothesis and initial plan generated"),
+                (
+                    "plan",
+                    {
+                        "hypothesis": "Heating increases temperature.",
+                        "dependent_variables": ["temperature"],
+                        "independent_variables": ["heater_state"],
+                        "controlled_variables": ["room_temperature"],
+                        "assumptions": ["The sensor is calibrated."],
+                        "methods": [],
+                    },
+                ),
                 ("execution", "first task scoped"),
                 ("observation", "first plan step executed"),
                 ("review", "observations recorded"),
@@ -28,7 +38,10 @@ class FakeClient:
     ) -> str:
         self.contexts.append(messages)
         next_state, response = next(self.responses)
-        assert next_state in valid_schema["properties"]["next_state"]["enum"]
+        next_state_schema = valid_schema["properties"]["next_state"]
+        assert next_state == next_state_schema.get("const", next_state)
+        if "enum" in next_state_schema:
+            assert next_state in next_state_schema["enum"]
         return json.dumps(
             {
                 "next_state": next_state,

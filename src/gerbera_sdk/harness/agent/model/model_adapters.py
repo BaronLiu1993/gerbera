@@ -7,6 +7,7 @@ class AnthropicAdapter:
     api_key: str
     model: str
     max_tokens: int
+    timeout_seconds: float = 120.0
 
     def send(
         self,
@@ -33,6 +34,7 @@ class AnthropicAdapter:
                     }
                 },
             },
+            timeout=self.timeout_seconds,
         )
         resp.raise_for_status()
         return resp.json()["content"][0]["text"]
@@ -43,6 +45,7 @@ class OpenAIAdapter:
     api_key: str
     model: str
     max_tokens: int
+    timeout_seconds: float = 120.0
 
     def send(
         self,
@@ -75,6 +78,7 @@ class OpenAIAdapter:
                     },
                 },
             },
+            timeout=self.timeout_seconds,
         )
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
@@ -85,6 +89,7 @@ class GeminiAdapter:
     api_key: str
     model: str
     max_tokens: int
+    timeout_seconds: float = 120.0
 
     def send(
         self,
@@ -109,6 +114,7 @@ class GeminiAdapter:
                     "schema": valid_schema,
                 },
             },
+            timeout=self.timeout_seconds,
         )
         resp.raise_for_status()
         return resp.json()["content"][0]["text"]

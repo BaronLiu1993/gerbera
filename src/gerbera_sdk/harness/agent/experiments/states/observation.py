@@ -15,4 +15,3 @@ class Observation(ExperimentState):
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.REVIEW}
     )
-    valid_schema: ClassVar[dict] = build_valid_schema(valid_transition_states)

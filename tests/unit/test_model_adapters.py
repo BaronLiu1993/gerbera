@@ -61,3 +61,6 @@ def test_adapter_uses_native_structured_output_field(
 
     assert adapter.send([], "state prompt", schema) == "{}"
     assert schema_from_request(captured_request) is schema
+
+    if isinstance(adapter, OpenAIAdapter):
+        assert captured_request["response_format"]["json_schema"]["strict"] is True

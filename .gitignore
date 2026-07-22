@@ -6,3 +6,4 @@ __pycache__
 serve_mcp.py
 index.py
 gerbera.egg-info
+test_initialisation_openai.py

@@ -10,15 +10,6 @@ from gerbera_sdk.harness.agent.model.model_adapters import (
 )
 
 
-class AgentClient(Protocol):
-    def send(
-        self,
-        user_messages: list[dict[str, str]],
-        system_prompt: str,
-        valid_schema: dict,
-    ) -> str: ...
-
-
 class ModelProviderEnum(Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
@@ -39,7 +30,7 @@ class Model:
     api_key: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def get_agent_client(self) -> AgentClient:
+    def get_agent_client(self):
         adapter_cls = MODEL_MAP.get(self.model_provider)
         if adapter_cls is None:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")

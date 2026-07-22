@@ -10,20 +10,16 @@ class HypothesisStateEnum(Enum):
     EVALUATING = "evaluating"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
-
-
-class HypothesisTypeEnum(Enum):
-    NULL = "null"
-    ALTERNATIVE = "alternative"
+    
 
 
 @dataclass
 class Hypothesis:
-    statement: str
+    hypothesis: str # This will be the goal
     state: HypothesisStateEnum
     dependent_variables: list[str]
     independent_variables: list[str]
+    controlled_variables: list[str]
     assumptions: list[str]
-    hypothesis_type: HypothesisTypeEnum
     methods: list[Method]
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

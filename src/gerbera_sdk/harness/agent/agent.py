@@ -1,19 +1,13 @@
 from dataclasses import dataclass, field
 import json
+from typing import Any
 
 from gerbera_sdk.harness.agent.experiments.session import Session
 from gerbera_sdk.harness.agent.experiments.states import (
-    Complete,
-    Execution,
     ExperimentState,
-    Failed,
-    Initialisation,
     LoopStateEnum,
-    Observation,
-    Plan,
-    Review,
 )
-from gerbera_sdk.harness.agent.model.model import AgentClient, Model
+from gerbera_sdk.harness.agent.model.model import Model
 
 from gerbera_sdk.harness.memory.event import (
     Event,
@@ -21,19 +15,6 @@ from gerbera_sdk.harness.memory.event import (
     SourceTypeEnum,
 )
 from gerbera_sdk.harness.memory.memory import Memory
-
-
-STATE_REGISTRY: dict[LoopStateEnum, type[ExperimentState]] = {
-    LoopStateEnum.INITIALISATION: Initialisation,
-    LoopStateEnum.PLAN: Plan,
-    LoopStateEnum.EXECUTION: Execution,
-    LoopStateEnum.OBSERVATION: Observation,
-    LoopStateEnum.REVIEW: Review,
-    LoopStateEnum.COMPLETE: Complete,
-    LoopStateEnum.FAILED: Failed,
-}
-
-TERMINAL_STATES = frozenset({LoopStateEnum.COMPLETE, LoopStateEnum.FAILED})
 
 
 @dataclass
@@ -50,42 +31,28 @@ class Agent:
 
         client = self.model.get_agent_client()
 
-        while self.session.state.state not in TERMINAL_STATES:
+        while not self.session.state.terminal:
             current_state = self.session.state
-            next_state, response = self._request_transition(
-                client,
+            raw_response = client.send(
+                self.messages[-self.context_window_size:],
+                current_state.prompt,
+                current_state.valid_schema,
+            )
+            output = current_state.parse_response(raw_response)
+            next_state = LoopStateEnum(output["next_state"])
+            transitioned_state = current_state.transition(next_state)
+            self._record_response(
                 current_state,
+                next_state,
+                output["response"],
             )
-            self._record_response(current_state, next_state, response)
-            self.session.state = STATE_REGISTRY[next_state]()
-
-    def _request_transition(
-        self,
-        client: AgentClient,
-        current_state: ExperimentState,
-    ) -> tuple[LoopStateEnum, str]:
-        raw_response = client.send(
-            self.messages[-self.context_window_size :],
-            current_state.prompt,
-            current_state.valid_schema,
-        )
-        output = json.loads(raw_response)
-        next_state = LoopStateEnum(output["next_state"])
-
-        if not current_state.valid_transition(next_state):
-            raise ValueError(
-                f"Invalid transition: {current_state.state.value} "
-                f"to {next_state.value}"
-            )
-        
-        self.session.state = next_state
-        return next_state, output["response"]
+            self.session.state = transitioned_state
 
     def _record_response(
         self,
         current_state: ExperimentState,
         next_state: LoopStateEnum,
-        response: str,
+        response: Any,
     ) -> None:
         event = Event(
             event_type=EventTypeEnum.STATE_RESPONSE,
@@ -108,4 +75,3 @@ class Agent:
                 ),
             }
         )
-        self.messages[:] = self.messages[-self.context_window_size:]

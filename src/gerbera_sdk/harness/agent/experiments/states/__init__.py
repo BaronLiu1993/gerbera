@@ -10,6 +10,21 @@ from gerbera_sdk.harness.agent.experiments.states.observation import Observation
 from gerbera_sdk.harness.agent.experiments.states.plan import Plan
 from gerbera_sdk.harness.agent.experiments.states.review import Review
 
+
+STATE_REGISTRY: dict[LoopStateEnum, type[ExperimentState]] = {
+    LoopStateEnum.INITIALISATION: Initialisation,
+    LoopStateEnum.PLAN: Plan,
+    LoopStateEnum.EXECUTION: Execution,
+    LoopStateEnum.OBSERVATION: Observation,
+    LoopStateEnum.REVIEW: Review,
+    LoopStateEnum.COMPLETE: Complete,
+    LoopStateEnum.FAILED: Failed,
+}
+
+
+def create_state(state: LoopStateEnum) -> ExperimentState:
+    return STATE_REGISTRY[state]()
+
 __all__ = [
     "Complete",
     "Execution",
@@ -20,4 +35,5 @@ __all__ = [
     "Observation",
     "Plan",
     "Review",
+    "create_state",
 ]
