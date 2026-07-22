@@ -6,7 +6,6 @@ from gerbera_sdk.harness.agent.experiments.states import (
     Failed,
     Initialisation,
     Observation,
-    Plan,
     Review,
 )
 
@@ -14,7 +13,6 @@ from gerbera_sdk.harness.agent.experiments.states import (
 def test_each_experiment_state_loads_its_markdown_prompt() -> None:
     states = [
         Initialisation(),
-        Plan(),
         Execution(),
         Observation(),
         Review(),
@@ -29,28 +27,27 @@ def test_each_experiment_state_loads_its_markdown_prompt() -> None:
 
 
 def test_experiment_cycle_enforces_valid_transitions() -> None:
-    assert Initialisation().valid_transition(Plan.state)
-    assert Plan().valid_transition(Execution.state)
+    assert Initialisation().valid_transition(Initialisation.state)
+    assert Initialisation().valid_transition(Execution.state)
     assert Execution().valid_transition(Observation.state)
     assert Observation().valid_transition(Review.state)
-    assert Review().valid_transition(Plan.state)
+    assert Review().valid_transition(Execution.state)
     assert Review().valid_transition(Complete.state)
     assert Review().valid_transition(Failed.state)
     assert not Review().valid_transition(Initialisation.state)
-    assert not Review().valid_transition(Execution.state)
     assert Complete.terminal
     assert Failed.terminal
 
 
 def test_state_owns_transition_validation_and_creation() -> None:
-    assert isinstance(Initialisation().transition(Plan.state), Plan)
+    assert isinstance(Initialisation().transition(Execution.state), Execution)
 
-    with pytest.raises(ValueError, match="initialisation to execution"):
-        Initialisation().transition(Execution.state)
+    with pytest.raises(ValueError, match="initialisation to observation"):
+        Initialisation().transition(Observation.state)
 
 
 def test_state_output_schema_uses_only_valid_transition_values() -> None:
-    states = [Plan(), Execution(), Observation(), Review()]
+    states = [Execution(), Observation(), Review()]
 
     for state in states:
         assert "valid_schema" in type(state).__dict__
@@ -66,7 +63,7 @@ def test_state_output_schema_uses_only_valid_transition_values() -> None:
         )
 
     assert Initialisation.valid_schema["properties"]["next_state"] == {
-        "enum": ["plan"],
+        "enum": ["execution", "initialisation"],
         "type": "string",
     }
     assert Initialisation.valid_schema["properties"]["response"]["type"] == (

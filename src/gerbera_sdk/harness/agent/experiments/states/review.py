@@ -15,7 +15,7 @@ class Review(ExperimentState):
     system_prompt: ClassVar[str] = "REVIEW.md"
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {
-            LoopStateEnum.PLAN,
+            LoopStateEnum.EXECUTION,
             LoopStateEnum.COMPLETE,
             LoopStateEnum.FAILED,
         }

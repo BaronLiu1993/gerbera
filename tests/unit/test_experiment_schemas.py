@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from gerbera_sdk.harness.agent.experiments.states.initialisation import (
+from gerbera_sdk.harness.agent.experiments.states.schema import (
     HypothesisSchema,
     StepSchema,
 )
@@ -22,15 +22,14 @@ def test_hypothesis_schema_models_the_generated_experiment() -> None:
                     "steps": [
                         {
                             "description": "Read the baseline temperature.",
-                            "expected": "A valid temperature reading.",
+                            "expected": None,
                             "action": {
-                                "type": "observe",
+                                "type": "execute",
                                 "target": "read_temperature",
                                 "params": [
                                     {
                                         "variable": "sample_count",
                                         "value": 3,
-                                        "unit": None,
                                     }
                                 ],
                             },
@@ -76,7 +75,7 @@ def test_hypothesis_output_schema_is_strict() -> None:
     assert_strict_objects(Initialisation.valid_schema)
 
 
-def test_expected_is_nullable_for_non_analysis_steps() -> None:
+def test_execute_steps_require_null_expected() -> None:
     step = StepSchema.model_validate(
         {
             "description": "Turn on the heater.",
@@ -84,7 +83,7 @@ def test_expected_is_nullable_for_non_analysis_steps() -> None:
                 "type": "execute",
                 "target": "turn_on_heater",
                 "params": [
-                    {"variable": "state", "value": True, "unit": None}
+                        {"variable": "state", "value": True}
                 ],
             },
             "expected": None,
@@ -94,16 +93,47 @@ def test_expected_is_nullable_for_non_analysis_steps() -> None:
     assert step.expected is None
 
 
-def test_analysis_steps_require_an_expected_outcome() -> None:
-    with pytest.raises(ValidationError, match="require an expected outcome"):
+def test_review_steps_require_expected_result() -> None:
+    step = StepSchema.model_validate(
+        {
+            "description": "Review the temperature change.",
+            "action": {
+                "type": "review",
+                "target": "compare_temperature",
+                "params": [],
+            },
+            "expected": "The measured temperature increased after heating.",
+        }
+    )
+
+    assert step.expected == "The measured temperature increased after heating."
+
+
+def test_review_steps_reject_null_expected() -> None:
+    with pytest.raises(ValidationError, match="expected result"):
         StepSchema.model_validate(
             {
-                "description": "Review the temperature change.",
+                "description": "Compare the analysis with the hypothesis.",
                 "action": {
                     "type": "review",
-                    "target": "compare_temperature",
+                    "target": "review_temperature_analysis",
                     "params": [],
                 },
                 "expected": None,
+            }
+        )
+
+
+def test_non_review_steps_reject_expected_values() -> None:
+    with pytest.raises(ValidationError, match="Only review actions"):
+        StepSchema.model_validate(
+            {
+                "description": "Turn on the heater.",
+                "action": {
+                    "type": "execute",
+                    "target": "turn_on_heater",
+                    "params": [],
+                },
+                "expected": "The temperature rises.",
             }
         )

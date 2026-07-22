@@ -13,7 +13,7 @@ class FakeClient:
         self.responses = iter(
             [
                 (
-                    "plan",
+                    "execution",
                     {
                         "hypothesis": "Heating increases temperature.",
                         "dependent_variables": ["temperature"],
@@ -23,8 +23,7 @@ class FakeClient:
                         "methods": [],
                     },
                 ),
-                ("execution", "first task scoped"),
-                ("observation", "first plan step executed"),
+                ("observation", "first step executed"),
                 ("review", "observations recorded"),
                 ("complete", "hypothesis accepted"),
             ]
@@ -80,7 +79,6 @@ def test_agent_persists_each_accepted_state_response(tmp_path) -> None:
     ).fetchall()
     assert [row["state"] for row in rows] == [
         "initialisation",
-        "plan",
         "execution",
         "observation",
         "review",
@@ -91,7 +89,7 @@ def test_agent_persists_each_accepted_state_response(tmp_path) -> None:
         "response": "hypothesis accepted",
     }
     assert session.state.state == LoopStateEnum.COMPLETE
-    assert [len(context) for context in model.client.contexts] == [1, 2, 3, 4, 5]
+    assert [len(context) for context in model.client.contexts] == [1, 2, 3, 4]
     assert all(
         context[0] == initial_messages[0]
         for context in model.client.contexts
