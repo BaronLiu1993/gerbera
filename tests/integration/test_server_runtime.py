@@ -1,4 +1,8 @@
+import asyncio
 from types import SimpleNamespace
+
+from fastmcp import FastMCP
+import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
@@ -8,6 +12,7 @@ from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 
 
 class FakeApp:
@@ -65,3 +70,48 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         "turn_on_status_led",
         "turn_off_status_led",
     }
+
+
+def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
+    connection = Connection("motor", "sg90", {"signal": "7"})
+    command = CommandCompiler.command_specs(connection)[0]
+    captured_params = []
+    connection.register_action(
+        "WRITE",
+        lambda params: captured_params.append(params) or params,
+    )
+
+    event_bus = EventBus()
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=object(),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+    )
+    runtime._register_connection_tool(connection, command)
+
+    tool = asyncio.run(app.get_tool("write_motor"))
+    params_schema = tool.parameters["$defs"]["MotorWriteParams"]
+    assert tool.description == "Set servo angle."
+    assert params_schema == {
+        "additionalProperties": False,
+        "properties": {
+            "angle": {
+                "description": "Servo angle in degrees.",
+                "maximum": 180,
+                "minimum": 0,
+                "type": "integer",
+            }
+        },
+        "required": ["angle"],
+        "type": "object",
+    }
+
+    asyncio.run(tool.run({"params": {"angle": 90}}))
+    assert captured_params == [{"angle": "90"}]
+
+    with pytest.raises(ValueError, match="less than or equal to 180"):
+        asyncio.run(tool.run({"params": {"angle": 181}}))

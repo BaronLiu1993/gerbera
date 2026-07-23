@@ -57,6 +57,8 @@ class InitialisationProcess:
 
     async def inspect_hardware(self, client: MCPClient) -> list[dict]:
         tools = await client.list_tools()
+
+        print(tools)
         return [
             {"name": t.name, "description": t.description, "schema": t.inputSchema}
             for t in tools

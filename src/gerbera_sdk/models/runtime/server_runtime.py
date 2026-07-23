@@ -1,9 +1,14 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Annotated, Any, Literal, Optional
 
 from fastmcp import FastMCP
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from gerbera_sdk.contracts.command_contract import CommandSpec
+from gerbera_sdk.contracts.command_contract import (
+    CommandSpec,
+    ParameterSpec,
+    ParameterType,
+)
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
@@ -14,6 +19,13 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+
+PARAMETER_TYPES: dict[ParameterType, type] = {
+    ParameterType.STRING: str,
+    ParameterType.INT: int,
+    ParameterType.FLOAT: float,
+    ParameterType.BOOL: bool,
+}
 
 
 @dataclass
@@ -148,13 +160,70 @@ class ServerRuntime:
         self,
         connection: Connection,
         action: str,
+        command: CommandSpec,
     ):
-        def tool_function(
-            params: Optional[dict[str, str]] = None,
-        ) -> dict[str, str]:
-            return connection.perform_action(action, params)
+        if not command.params:
+            def tool_function() -> dict[str, str]:
+                return connection.perform_action(action)
 
+            return tool_function
+
+        params_model = self._build_tool_params_model(
+            connection,
+            command,
+        )
+
+        def tool_function(params: BaseModel) -> dict[str, str]:
+            values = params.model_dump(exclude_none=True)
+            serialized = {
+                name: str(value)
+                for name, value in values.items()
+            }
+            return connection.perform_action(action, serialized)
+
+        tool_function.__annotations__["params"] = params_model
         return tool_function
+
+    def _build_tool_params_model(
+        self,
+        connection: Connection,
+        command: CommandSpec,
+    ) -> type[BaseModel]:
+        fields: dict[str, tuple[Any, Any]] = {}
+        for name, parameter in command.params.items():
+            annotation = self._build_parameter_annotation(parameter)
+            default = ... if parameter.required else None
+            if not parameter.required:
+                annotation |= None
+            fields[name] = (annotation, default)
+
+        model_name = (
+            f"{connection.name.title().replace('_', '')}"
+            f"{command.method.title()}Params"
+        )
+        
+        return create_model(
+            model_name,
+            __config__=ConfigDict(extra="forbid"),
+            **fields,
+        )
+
+    def _build_parameter_annotation(
+        self,
+        parameter: ParameterSpec,
+    ) -> Any:
+        value_type: Any = PARAMETER_TYPES[parameter.type]
+        if parameter.enum:
+            value_type = Literal.__getitem__(tuple(parameter.enum))
+
+        return Annotated[
+            value_type,
+            Field(
+                description=parameter.description or None,
+                ge=parameter.min,
+                le=parameter.max,
+            ),
+        ]
 
     def _build_stream_toggle_tool_function(
         self,
@@ -192,11 +261,15 @@ class ServerRuntime:
     ) -> None:
         action = command.method.strip().upper()
         tool_name = f"{action.lower()}_{connection.name}"
-        tool_function = self._build_tool_function(connection, action)
+        tool_function = self._build_tool_function(
+            connection,
+            action,
+            command,
+        )
         tool_function.__name__ = tool_name
 
         command_description = CommandCompiler.describe_command(connection, action)
-        tool_function.__doc__ = connection.description or (
+        tool_function.__doc__ = command.description or connection.description or (
             f"Send {command_description} over serial."
         )
 
