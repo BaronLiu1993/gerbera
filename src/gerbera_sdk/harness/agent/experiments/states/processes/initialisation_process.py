@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 import json
-
 import httpx
 
 from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
@@ -10,6 +9,10 @@ from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
 class InitialisationProcess:
     mcp_url: str
     urls: list[str] = field(default_factory=list)
+    available_tool_names: frozenset[str] = field(
+        default_factory=frozenset,
+        init=False,
+    )
 
     def generate_agent_context(
         self,
@@ -44,7 +47,7 @@ class InitialisationProcess:
                 sections.extend([f"### {url}", content.strip()])
         else:
             sections.append("No research sources were provided.")
-
+        print(sections)
         return "\n\n".join(sections)
 
     def fetch_url(self, fetch_url: str) -> str:
@@ -62,6 +65,10 @@ class InitialisationProcess:
     async def run(self, user_prompt: str) -> str:
         async with MCPClient(self.mcp_url) as client:
             hardware_tools = await self.inspect_hardware(client)
+
+        self.available_tool_names = frozenset(
+            tool["name"] for tool in hardware_tools
+        )
 
         sources = {url: self.fetch_url(url) for url in self.urls}
         return self.generate_agent_context(

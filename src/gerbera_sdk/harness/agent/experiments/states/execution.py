@@ -11,7 +11,7 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 @dataclass(frozen=True)
 class Execution(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.EXECUTION
-    system_prompt: ClassVar[str] = "EXECUTION.md"
+    prompt_file: ClassVar[str] = "EXECUTION.md"
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.OBSERVATION}
     )

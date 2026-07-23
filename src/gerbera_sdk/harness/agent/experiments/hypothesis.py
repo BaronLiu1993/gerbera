@@ -2,8 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 from enum import Enum
 
-from method import Method
-
+from gerbera_sdk.harness.agent.experiments.method import Method
 
 class HypothesisStateEnum(Enum):
     DRAFT = "draft"
@@ -11,8 +10,6 @@ class HypothesisStateEnum(Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     
-
-
 @dataclass
 class Hypothesis:
     hypothesis: str # This will be the goal

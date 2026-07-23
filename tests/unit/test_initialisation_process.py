@@ -69,5 +69,6 @@ def test_run_inspects_hardware_then_builds_context(monkeypatch) -> None:
     context = asyncio.run(process.run("Test the heater."))
 
     assert calls == ["inspect_hardware", "fetch_url"]
+    assert process.available_tool_names == frozenset({"read_temperature"})
     assert "# Experiment Context" in context
     assert "Test the heater." in context

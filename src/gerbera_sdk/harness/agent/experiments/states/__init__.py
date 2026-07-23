@@ -1,4 +1,5 @@
 from gerbera_sdk.harness.agent.experiments.states.base import (
+    DecisionEnum,
     ExperimentState,
     LoopStateEnum,
 )
@@ -25,6 +26,7 @@ def create_state(state: LoopStateEnum) -> ExperimentState:
 
 __all__ = [
     "Complete",
+    "DecisionEnum",
     "Execution",
     "ExperimentState",
     "Failed",

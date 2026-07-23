@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 
 from gerbera_sdk.harness.agent.experiments.session import Session
 from gerbera_sdk.harness.agent.experiments.states.processes.initialisation_process import (
@@ -7,6 +8,7 @@ from gerbera_sdk.harness.agent.experiments.states.processes.initialisation_proce
 from gerbera_sdk.harness.agent.experiments.states import (
     ExperimentState,
     LoopStateEnum,
+    DecisionEnum
 )
 from gerbera_sdk.harness.agent.model.model import Model
 
@@ -38,13 +40,30 @@ class Agent:
         self.messages.append({"role": "user", "content": context})
         return context
 
-    def run_agent(self, initial_user_prompt: str) -> None:
+    async def run_agent(self, initial_user_prompt: str) -> None:
         client = self.model.get_agent_client()
-        while self.session.state.state != LoopStateEnum.COMPLETE or self.session.state.state != LoopStateEnum.FAILED:
-            
-            if self.session.state.state == LoopStateEnum.INITIALISATION:
-                initial_context = self.prepare_initialisation_context(initial_user_prompt)
-                client.send()
+        while self.session.state.state != LoopStateEnum.COMPLETE.value:
+            system_prompt = self.session.state.system_prompt
+            valid_schema = self.session.state.valid_schema
+            if self.session.state.state == LoopStateEnum.INITIALISATION.value:
+                await self.prepare_initialisation_context(initial_user_prompt)
+                raw_response = client.send(self.messages, system_prompt, valid_schema)
+                message = json.loads(raw_response)
+
+                decision = message["decision"]
+                next_state = message["next_state"]
+                print(json.dumps(message, indent=4))
+
+                if decision == DecisionEnum.ACCEPTED.value:
+                    print(decision)
+                    print(next_state)
+                    break
+                else:
+                    print("breaking")
+                    break
+                    
+                
+        
 
 
 

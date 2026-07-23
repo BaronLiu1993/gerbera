@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import uuid
 
-from action import Action
+from gerbera_sdk.harness.agent.experiments.action import Action
 
 from enum import Enum
 

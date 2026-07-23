@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-import json
 from pathlib import Path
-from typing import ClassVar, Collection, Optional
+from typing import ClassVar, Collection
 
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 PROMPT_DIRECTORY = Path(__file__).resolve().parents[3] / "prompts"
 
@@ -25,16 +24,19 @@ class DecisionEnum(str, Enum):
     REJECTED = "rejected"
 
 
+class TextResponseSchema(RootModel[str]):
+    pass
+
+
 def build_valid_schema(
     valid_transitions: Collection[LoopStateEnum],
-    structured_schema: Optional[type[BaseModel]] = None,
+    structured_schema: type[BaseModel],
 ) -> dict:
-    response_schema = (
-        structured_schema.model_json_schema()
-        if structured_schema is not None
-        else {"type": "string"}
-    )
+    response_schema = structured_schema.model_json_schema()
     definitions = response_schema.pop("$defs", None)
+    response_schema = {
+        "anyOf": [response_schema, {"type": "null"}],
+    }
 
     schema = {
         "type": "object",
@@ -44,8 +46,12 @@ def build_valid_schema(
                 "enum": sorted(state.value for state in valid_transitions),
             },
             "response": response_schema,
+            "decision": {
+                "type": "string",
+                "enum": [decision.value for decision in DecisionEnum],
+            },
         },
-        "required": ["next_state", "response"],
+        "required": ["next_state", "response", "decision"],
         "additionalProperties": False,
     }
 
@@ -58,16 +64,20 @@ def build_valid_schema(
 @dataclass(frozen=True)
 class ExperimentState:
     state: ClassVar[LoopStateEnum]
-    system_prompt: ClassVar[str]
+    prompt_file: ClassVar[str]
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]]
-    
+
     @property
     def prompt_path(self) -> Path:
-        return PROMPT_DIRECTORY / self.system_prompt
+        return PROMPT_DIRECTORY / self.prompt_file
+
+    @property
+    def system_prompt(self) -> str:
+        return self.prompt_path.read_text().strip()
 
     @property
     def prompt(self) -> str:
-        return self.prompt_path.read_text().strip()
+        return self.system_prompt
 
     def valid_transition(self, state: LoopStateEnum) -> bool:
         return state in self.valid_transition_states

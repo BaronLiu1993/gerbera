@@ -13,7 +13,7 @@ from gerbera_sdk.harness.agent.experiments.states.schema import HypothesisSchema
 @dataclass(frozen=True)
 class Initialisation(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.INITIALISATION
-    system_prompt: ClassVar[str] = "INITIALISATION.md"
+    prompt_file: ClassVar[str] = "INITIALISATION.md"
     valid_decisions: ClassVar[frozenset[DecisionEnum]] = frozenset(
         {DecisionEnum.ACCEPTED, DecisionEnum.REJECTED}
     )

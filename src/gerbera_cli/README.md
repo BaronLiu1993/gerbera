@@ -4,6 +4,61 @@ The CLI folder owns local developer commands for board discovery, local runtime 
 
 It is separate from the SDK runtime. The CLI prepares and orchestrates the local environment; the SDK defines and runs the hardware system.
 
+## First Run
+
+From the repository root, install Gerbera in editable mode:
+
+```bash
+python -m pip install -e .
+```
+
+Ensure `arduino-cli` and `ngrok` are installed and available on `PATH`, connect
+the microcontroller, then run the first Gerbera command:
+
+```bash
+gerbera init
+```
+
+The `init` command detects attached boards and asks for:
+
+- the boards to manage
+- the Python hardware entry point, such as `index.py`
+- the `HardwareSystem` variable name, such as `hardware`
+
+It writes those choices to `config.json`. Next, define that hardware variable in
+the selected entry-point file and start local setup:
+
+```bash
+gerbera setup
+```
+
+`setup` loads the declared hardware, installs firmware dependencies, flashes the
+boards, starts ngrok, writes the local and public MCP endpoints to `config.json`,
+and runs the local server until interrupted. Stop it with `Ctrl+C`.
+
+The current order is therefore:
+
+```text
+install -> gerbera init -> define hardware -> gerbera setup
+```
+
+`gerbera deploy` is registered but currently only loads configuration; it is not
+part of the functional first-run flow yet.
+
+## Device Address Stability
+
+Serial addresses such as `/dev/cu.usbserial-130` are connection locations, not
+stable device identifiers. They may change after reconnecting a board, changing
+USB ports, or attaching devices in a different order.
+
+The current MVP uses the serial address in both `config.json` and the Python
+hardware declaration. If it changes, rerun `gerbera init` and update the
+microcontroller `port` in the hardware entry point.
+
+Future device discovery should preserve the Gerbera UUID by matching a board's
+USB serial number, then update its current address. VID and PID alone are not
+enough because multiple identical boards can share them.
+
 ## Folders
 
 ```text

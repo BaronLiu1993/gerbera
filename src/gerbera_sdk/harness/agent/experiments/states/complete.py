@@ -11,5 +11,5 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 @dataclass(frozen=True)
 class Complete(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.COMPLETE
-    system_prompt: ClassVar[str] = "COMPLETE.md"
+    prompt_file: ClassVar[str] = "COMPLETE.md"
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]]

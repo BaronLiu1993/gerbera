@@ -8,11 +8,16 @@ import typer
 from gerbera_cli.utils import CONFIG_PATH, _load_config
 
 
-def _load_existing_devices() -> dict:
-    try:
-        config = _load_config()
-    except FileNotFoundError:
-        return {}
+def _default_config() -> dict:
+    return {
+        "devices": {},
+        "entry_point": "",
+        "hardware_name": "hardware",
+        "server": {"port": "", "host": ""},
+    }
+
+
+def _load_existing_devices(config: dict) -> dict:
 
     devices = config.get("devices", {})
     if not isinstance(devices, dict):
@@ -23,14 +28,13 @@ def _load_existing_devices() -> dict:
 
 def _load_existing_config() -> dict:
     try:
-        return _load_config()
+        return _load_config(CONFIG_PATH)
     except FileNotFoundError:
-        return {
-            "devices": {},
-            "entry_point": "",
-            "hardware_name": "hardware",
-            "server": {"port": "", "host": ""},
-        }
+        return _default_config()
+    except ValueError:
+        if CONFIG_PATH.exists() and not CONFIG_PATH.read_text().strip():
+            return _default_config()
+        raise
 
 
 def _raw_board_data_adapter(devices, existing_devices):
@@ -52,7 +56,7 @@ def _raw_board_data_adapter(devices, existing_devices):
 
 def init():
     config = _load_existing_config()
-    device_json = _load_existing_devices()
+    device_json = _load_existing_devices(config)
 
     typer.echo("Fetching supported microcontrollers from arduino-cli...")
 

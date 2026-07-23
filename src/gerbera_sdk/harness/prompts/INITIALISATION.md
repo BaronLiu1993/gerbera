@@ -15,11 +15,16 @@ Create the immutable research foundation and an ordered experimental workflow.
     then determine whether the evidence supports, falsifies, or cannot yet resolve
     the hypothesis.
 - Represent action parameters as a list of variable and typed value pairs.
+- Write every variable name in lowercase `snake_case`, with underscores between
+  words.
+- Set every `execute` target to the exact name of an available hardware tool.
+  Never invent tools or represent manual work as an executable action.
 - For `review`, set `expected` to the expected result or acceptance criterion.
 - For `execute` and `observe`, set `expected` to `null`.
 - Make the first checklist action an `execute` action.
 - Define the evidence required for completion or failure.
 - Do not execute any step or claim any observation.
-- Remain in `initialisation` when more context or research is required.
-- Transition to `execution` only when the hypothesis, feasibility, and checklist
-  are ready.
+- Set `decision` to `accepted`, `next_state` to `execution`, and return the
+  complete hypothesis when the context is sufficient.
+- Set `decision` to `rejected`, `next_state` to `initialisation`, and `response`
+  to `null` when the context is insufficient.

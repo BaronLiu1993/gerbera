@@ -137,3 +137,38 @@ def test_non_review_steps_reject_expected_values() -> None:
                 "expected": "The temperature rises.",
             }
         )
+
+
+@pytest.mark.parametrize(
+    "variable_name",
+    ["test scores", "StudyTime", "study-time", "study__time"],
+)
+def test_hypothesis_rejects_non_snake_case_variables(
+    variable_name: str,
+) -> None:
+    with pytest.raises(ValidationError, match="string_pattern_mismatch"):
+        HypothesisSchema.model_validate(
+            {
+                "hypothesis": "Study time affects test scores.",
+                "dependent_variables": [variable_name],
+                "independent_variables": ["study_time"],
+                "controlled_variables": ["prior_knowledge"],
+                "assumptions": [],
+                "methods": [],
+            }
+        )
+
+
+def test_action_parameter_rejects_non_snake_case_variable() -> None:
+    with pytest.raises(ValidationError, match="string_pattern_mismatch"):
+        StepSchema.model_validate(
+            {
+                "description": "Set the sample count.",
+                "action": {
+                    "type": "execute",
+                    "target": "read_temperature",
+                    "params": [{"variable": "sample count", "value": 3}],
+                },
+                "expected": None,
+            }
+        )
