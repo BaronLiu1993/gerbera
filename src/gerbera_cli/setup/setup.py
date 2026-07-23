@@ -89,7 +89,7 @@ def _cleanup(_signum, _frame, ngrok_process: subprocess.Popen[str]) -> None:
 
 def _start_ngrok(port: str) -> subprocess.Popen[str]:
     return subprocess.Popen(
-        ["ngrok", "http", str(port)],
+        ["ngrok", "http", f"http://127.0.0.1:{port}"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         text=True,
