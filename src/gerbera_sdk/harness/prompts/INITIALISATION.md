@@ -12,57 +12,55 @@ Create the immutable research foundation and an ordered experimental workflow.
   experiment when the objective and available tool schemas provide enough
   information.
 - Produce an ordered checklist and classify every action by its single role:
-  - `execute`: perform a bounded, repeatable experimental protocol. It may set
-    up hardware, run one or more trial tool calls, capture outputs, return the
-    hardware to its baseline state, and repeat. It does not interpret results.
-  - `observe`: monitor an experiment that remains active over minutes or hours
-    and record how its outputs change over time. It does not manipulate the
-    independent variable or judge the hypothesis.
-  - `review`: compare the analysis with the hypothesis and its expected result,
-    then determine whether the evidence supports, falsifies, or cannot yet resolve
-    the hypothesis.
+  - `execute`: manipulate variables and collect data with hardware tools. It
+    does not interpret results.
+  - `review`: after data collection is complete, query the persisted results
+    with SQL or analysis tools and compare them with the expected result. It
+    must not collect new hardware data.
 - Write every variable name in lowercase `snake_case`, with underscores between
   words.
-- For `review`, set `expected` to the expected result or acceptance criterion.
-- For `execute` and `observe`, set `expected` to `null`.
+- Put `expected` inside each `review` action. Execute actions do not have an
+  `expected` field.
 - Make the first checklist action an `execute` action.
+- Make the final checklist action a `review` action.
 - Define the evidence required for completion or failure.
 - Do not execute any step or claim any observation.
 
 ## Execute Contract
 
-Each `execute` action defines one repeatable trial condition:
+Each `execute` action must set `action_type` to `execute`, classify its
+`execution_type` as `continuous` or `discrete`, and list the dependent and
+independent variable names involved.
 
-- `independent_variables` lists the variables deliberately manipulated by the
-  trial. Every entry includes its exact value and unit.
-- `dependent_variables` lists the variables measured by tool responses. Set
-  `value` to `null` during initialisation because no measurement exists yet.
-  Always specify the measurement unit, or `null` when dimensionless.
-- `setup_calls` contains tool calls performed once before the first repetition.
-  Use an empty list when no setup is required.
-- `trial_calls` contains the ordered tool calls performed during every
-  repetition. It must contain at least one call.
-- `reset_calls` contains the ordered tool calls that restore the original
-  baseline after every repetition, including the final repetition. Use an empty
-  list only when the trial cannot alter persistent hardware state.
-- `repetitions` is the number of times to perform the complete trial-and-reset
-  cycle and must be at least one.
+- A `continuous` action runs for a positive `duration_seconds`. It defines a
+  `forward_tool_call` that starts the operation and a `reverse_tool_call` that
+  safely stops or reverses it, each with its own parameter list.
+- A `discrete` action defines one `forward_tool_call` and its parameter list.
 
 Every tool call must:
 
-- Set `tool` to an exact available hardware tool name.
-- Represent each tool input as an `arguments` entry containing the MCP parameter
-  name, its concrete value, and the independent or controlled variable it
-  represents. Set `variable` to `null` only for operational parameters.
-- Map each relevant MCP response field to a dependent variable through
-  `captures`. Use an empty list when the call produces no experimental
-  measurement.
-- Use only parameters and response fields declared by the tool schemas. Never
-  invent tools, parameters, or output fields.
+- Set the tool-call field to an exact available tool name.
+- Represent every input as a parameter containing its lowercase snake_case
+  `variable`, concrete `value`, `unit` (or `null` when dimensionless), and
+  scalar `type`.
+- Use only parameters declared by the tool schemas. Never invent tools or
+  parameters.
 
 Create separate execute steps when testing different independent-variable
-values. For example, servo angles `0`, `90`, and `180` are three trial
-conditions, each with its own execute action and reset protocol.
+values.
+
+## Review Contract
+
+A `review` action is a post-collection analysis plan:
+
+- Set `action_type` to `review`.
+- Describe the question to answer in `analysis_goal`.
+- List every collected variable needed for the analysis in `data_variables`.
+- Put the ordered SQL or analysis operations in `review_tool_calls`. Each call
+  names an exact available analysis tool and supplies its parameters.
+- Set `expected` to the hypothesis-derived result or acceptance criterion.
+- Query and analyze existing persisted data only. Do not include execution
+  fields or hardware collection calls in a review action.
 
 ## Readiness Decision
 

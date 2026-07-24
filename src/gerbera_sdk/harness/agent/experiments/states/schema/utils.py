@@ -14,6 +14,6 @@ SnakeCaseVariable = Annotated[
     ),
 ]
 
-# Strict Schema
+# Strict Schema so that Unknown Fields Are Validated
 class StrictSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
