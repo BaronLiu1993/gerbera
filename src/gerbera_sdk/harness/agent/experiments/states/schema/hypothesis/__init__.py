@@ -16,9 +16,6 @@ from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.hypothesis_s
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
     MethodSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.step_schema import (
-    StepSchema,
-)
 
 __all__ = [
     "ActionParameterSchema",
@@ -33,5 +30,4 @@ __all__ = [
     "ParameterTypeSchema",
     "ReviewSchema",
     "ReviewToolCallSchema",
-    "StepSchema",
 ]

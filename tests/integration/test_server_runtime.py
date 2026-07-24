@@ -9,6 +9,7 @@ from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
@@ -120,6 +121,34 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
 
     with pytest.raises(ValueError, match="less than or equal to 180"):
         asyncio.run(tool.run({"params": {"angle": 181}}))
+
+
+def test_database_backed_tool_description_includes_table_name() -> None:
+    database = Database("localhost", 5432, "user", "password", "gerbera")
+    connection = Connection(
+        "motor",
+        "sg90",
+        {"signal": "7"},
+        database=database,
+    )
+    command = CommandCompiler.command_specs(connection)[0]
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=object(),
+        board_runtime=object(),
+        event_bus=EventBus(),
+        stream_controller=object(),
+        event_worker=EventWorker(),
+        app=app,
+    )
+
+    runtime._register_connection_tool(connection, command)
+
+    tool = asyncio.run(app.get_tool("write_motor"))
+    assert (
+        f"Collected data is stored in table `{connection.event_name}`."
+        in tool.description
+    )
 
 
 def test_event_listener_lifecycle_is_strict() -> None:

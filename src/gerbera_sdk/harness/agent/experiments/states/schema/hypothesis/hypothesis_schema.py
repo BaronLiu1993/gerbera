@@ -13,4 +13,4 @@ class HypothesisSchema(StrictSchema):
     independent_variables: list[SnakeCaseVariable]
     controlled_variables: list[SnakeCaseVariable]
     assumptions: list[str]
-    methods: list[MethodSchema]
+    method: MethodSchema

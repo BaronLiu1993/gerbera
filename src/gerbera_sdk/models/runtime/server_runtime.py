@@ -258,6 +258,11 @@ class ServerRuntime:
                 f"Command description is required: "
                 f"{command.method},{connection.name}"
             )
+        if connection.database is not None:
+            description += (
+                f" Collected data is stored in table "
+                f"`{connection.event_name}`."
+            )
 
         action = command.method.strip().lower()
         tool_name = f"{action}_{connection.name}"
