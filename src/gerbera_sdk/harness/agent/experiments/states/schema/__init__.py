@@ -1,12 +1,12 @@
-from gerbera_sdk.harness.agent.experiments.states.schema.initialisation_schema import (
+from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis import (
     ActionParameterSchema,
     ActionSchema,
     ActionTypeEnum,
     HypothesisSchema,
     MethodSchema,
     StepSchema,
-    StrictSchema,
 )
+from gerbera_sdk.harness.agent.experiments.states.schema.utils import StrictSchema
 
 __all__ = [
     "ActionParameterSchema",
