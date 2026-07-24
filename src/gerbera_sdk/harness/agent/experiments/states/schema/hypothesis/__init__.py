@@ -1,14 +1,14 @@
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
-    ActionParameterSchema,
     ActionSchema,
     ActionTypeEnum,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
+    ExecuteActionParameterSchema,
     ExecuteSchema,
     ExecutionTypeEnum,
     ParameterTypeSchema,
     ReviewSchema,
-    ReviewToolCallSchema,
+    ReviewVariableSchema,
 )
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.hypothesis_schema import (
     HypothesisSchema,
@@ -18,16 +18,16 @@ from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schem
 )
 
 __all__ = [
-    "ActionParameterSchema",
     "ActionSchema",
     "ActionTypeEnum",
     "ContinuousExecuteSchema",
     "DiscreteExecuteSchema",
+    "ExecuteActionParameterSchema",
     "ExecuteSchema",
     "ExecutionTypeEnum",
     "HypothesisSchema",
     "MethodSchema",
     "ParameterTypeSchema",
     "ReviewSchema",
-    "ReviewToolCallSchema",
+    "ReviewVariableSchema",
 ]

@@ -7,7 +7,9 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
     LoopStateEnum,
     build_valid_schema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema import HypothesisSchema
+from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis import (
+    HypothesisSchema,
+)
 
 
 @dataclass(frozen=True)

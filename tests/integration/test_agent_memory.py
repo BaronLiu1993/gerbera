@@ -27,7 +27,40 @@ class FakeClient:
                     "independent_variables": ["heater_state"],
                     "controlled_variables": ["room_temperature"],
                     "assumptions": ["The sensor is calibrated."],
-                    "methods": [],
+                    "method": {
+                        "description": "Collect and review temperature readings.",
+                        "name": "heating_test",
+                        "steps": [
+                            {
+                                "description": (
+                                    "Review the collected temperature readings."
+                                ),
+                                "action_type": "review",
+                                "analysis_goal": (
+                                    "Compare temperature by heater state."
+                                ),
+                                "independent_variables": [
+                                    {
+                                        "variable": "heater_state",
+                                        "table_name": "temperature_readings",
+                                        "unit": None,
+                                        "type": "bool",
+                                    }
+                                ],
+                                "dependent_variables": [
+                                    {
+                                        "variable": "temperature",
+                                        "table_name": "temperature_readings",
+                                        "unit": "celsius",
+                                        "type": "float",
+                                    }
+                                ],
+                                "expected": (
+                                    "Temperature is higher when the heater is on."
+                                ),
+                            }
+                        ],
+                    },
                 },
             }
         )
@@ -47,7 +80,7 @@ def test_agent_runs_initialisation_end_to_end() -> None:
         initialisation_process=FakeInitialisationProcess(),
     )
 
-    hypothesis = asyncio.run(agent.run_agent("Test the sensor"))
+    result = asyncio.run(agent.run_agent("Test the sensor"))
 
-    assert hypothesis is not None
+    assert result is None
     assert session.state.state is LoopStateEnum.INITIALISATION

@@ -8,7 +8,7 @@ from gerbera_sdk.harness.agent.experiments.states.schema.utils import (
     StrictSchema,
 )
 
-
+# Type Schemas
 class ActionTypeEnum(str, Enum):
     EXECUTE = "execute"
     REVIEW = "review"
@@ -72,7 +72,6 @@ class ReviewSchema(StrictSchema):
     )
     independent_variables: list[ReviewVariableSchema] = Field(min_length=1)
     dependent_variables: list[ReviewVariableSchema] = Field(min_length=1)
-
     expected: str = Field(
         min_length=1,
         description=(

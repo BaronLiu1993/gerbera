@@ -7,7 +7,7 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 )
 
 
-# Terminal State
+# Terminal State, we have proved the hypothesis
 @dataclass(frozen=True)
 class Complete(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.COMPLETE

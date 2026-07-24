@@ -1,11 +1,12 @@
 import asyncio
 import json
 
-import pytest
-
 from gerbera_sdk.harness.agent.agent import Agent
 from gerbera_sdk.harness.agent.experiments.session import Session
-from gerbera_sdk.harness.agent.experiments.states import LoopStateEnum
+from gerbera_sdk.harness.agent.experiments.states import (
+    Initialisation,
+    LoopStateEnum,
+)
 
 
 class FakeInitialisationProcess:
@@ -20,9 +21,11 @@ class FakeClient:
         responses = response if isinstance(response, list) else [response]
         self.responses = iter(responses)
         self.system_prompt = None
+        self.valid_schema = None
 
     def send(self, messages, system_prompt, valid_schema) -> str:
         self.system_prompt = system_prompt
+        self.valid_schema = valid_schema
         return json.dumps(next(self.responses))
 
 
@@ -41,7 +44,34 @@ def hypothesis_response() -> dict:
         "independent_variables": ["heater_state"],
         "controlled_variables": ["room_temperature"],
         "assumptions": ["The sensor is calibrated."],
-        "methods": [],
+        "method": {
+            "description": "Collect and review temperature readings.",
+            "name": "heating_test",
+            "steps": [
+                {
+                    "description": "Review the collected temperature readings.",
+                    "action_type": "review",
+                    "analysis_goal": "Compare temperature by heater state.",
+                    "independent_variables": [
+                        {
+                            "variable": "heater_state",
+                            "table_name": "temperature_readings",
+                            "unit": None,
+                            "type": "bool",
+                        }
+                    ],
+                    "dependent_variables": [
+                        {
+                            "variable": "temperature",
+                            "table_name": "temperature_readings",
+                            "unit": "celsius",
+                            "type": "float",
+                        }
+                    ],
+                    "expected": "Temperature is higher when the heater is on.",
+                }
+            ],
+        },
     }
 
 
@@ -80,15 +110,15 @@ def test_agent_accepts_valid_initialisation() -> None:
         initialisation_process=FakeInitialisationProcess(),
     )
 
-    hypothesis = asyncio.run(agent.run_agent("Test the heater."))
+    result = asyncio.run(agent.run_agent("Test the heater."))
 
-    assert hypothesis is not None
-    assert hypothesis.hypothesis == "Heating increases temperature."
+    assert result is None
     assert session.state.state is LoopStateEnum.INITIALISATION
     assert model.client.system_prompt.startswith("# Initialisation")
+    assert model.client.valid_schema == Initialisation.valid_schema
 
 
-def test_agent_retries_rejected_initialisation() -> None:
+def test_agent_stops_after_rejected_initialisation() -> None:
     session = Session()
     agent = Agent(
         session=session,
@@ -110,46 +140,8 @@ def test_agent_retries_rejected_initialisation() -> None:
         initialisation_process=FakeInitialisationProcess(),
     )
 
-    hypothesis = asyncio.run(agent.run_agent("Test the heater."))
+    result = asyncio.run(agent.run_agent("Test the heater."))
 
-    assert hypothesis is not None
+    assert result is None
     assert session.state.state is LoopStateEnum.INITIALISATION
-    assert len(agent.messages) == 2
-
-
-def test_agent_rejects_unknown_execute_target() -> None:
-    response = hypothesis_response()
-    response["methods"] = [
-        {
-            "description": "Collect a reading.",
-            "name": "Read sensor",
-            "steps": [
-                {
-                    "description": "Read the sensor.",
-                    "action": {
-                        "type": "execute",
-                        "target": "invented_tool",
-                        "params": [],
-                    },
-                    "expected": None,
-                }
-            ],
-        }
-    ]
-    process = FakeInitialisationProcess()
-    process.available_tool_names = frozenset({"read_temperature"})
-    agent = Agent(
-        session=Session(),
-        model=FakeModel(
-            {
-                "decision": "accepted",
-                "next_state": "execution",
-                "response": response,
-            }
-        ),
-        memory=object(),
-        initialisation_process=process,
-    )
-
-    with pytest.raises(ValueError, match="invented_tool"):
-        asyncio.run(agent.run_agent("Test the heater."))
+    assert len(agent.messages) == 1

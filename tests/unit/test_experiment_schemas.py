@@ -1,10 +1,10 @@
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
-from gerbera_sdk.harness.agent.experiments.states.schema import (
+from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis import (
+    ActionSchema,
     HypothesisSchema,
     ReviewSchema,
-    StepSchema,
 )
 
 
@@ -24,6 +24,7 @@ def action_parameter(
 
 def discrete_execute_action() -> dict:
     return {
+        "description": "Command the motor to 90 degrees.",
         "action_type": "execute",
         "execution_type": "discrete",
         "dependent_variables": ["acknowledged_angle"],
@@ -42,6 +43,7 @@ def discrete_execute_action() -> dict:
 
 def continuous_execute_action() -> dict:
     return {
+        "description": "Run the heater for 30 seconds.",
         "action_type": "execute",
         "execution_type": "continuous",
         "duration_seconds": 30,
@@ -60,51 +62,63 @@ def continuous_execute_action() -> dict:
     }
 
 
+def review_variable(
+    variable: str,
+    table_name: str,
+    parameter_type: str,
+    unit: str | None = None,
+) -> dict:
+    return {
+        "variable": variable,
+        "table_name": table_name,
+        "unit": unit,
+        "type": parameter_type,
+    }
+
+
 def review_action() -> dict:
     return {
+        "description": "Review all collected temperature data.",
         "action_type": "review",
         "analysis_goal": (
             "Compare average temperature with the heater on and off."
         ),
-        "data_variables": ["temperature", "heater_state"],
-        "review_tool_calls": [
-            {
-                "tool": "query_experiment_data",
-                "params": [
-                    action_parameter(
-                        variable="query",
-                        value=(
-                            "SELECT heater_state, AVG(temperature) "
-                            "FROM readings GROUP BY heater_state"
-                        ),
-                        parameter_type="string",
-                    )
-                ],
-            }
+        "independent_variables": [
+            review_variable(
+                variable="heater_state",
+                table_name="heater_readings",
+                parameter_type="bool",
+            )
+        ],
+        "dependent_variables": [
+            review_variable(
+                variable="temperature",
+                table_name="temperature_readings",
+                parameter_type="float",
+                unit="celsius",
+            )
         ],
         "expected": "Average temperature is higher when the heater is on.",
     }
 
 
 def hypothesis_data(action: dict) -> dict:
+    steps = (
+        [action]
+        if action["action_type"] == "review"
+        else [action, review_action()]
+    )
     return {
         "hypothesis": "Heating increases measured temperature.",
         "dependent_variables": ["temperature"],
         "independent_variables": ["heater_state"],
         "controlled_variables": ["room_temperature"],
         "assumptions": ["The sensor is calibrated."],
-        "methods": [
-            {
-                "name": "heating_test",
-                "description": "Compare temperature before and after heating.",
-                "steps": [
-                    {
-                        "description": "Run the planned action.",
-                        "action": action,
-                    }
-                ],
-            }
-        ],
+        "method": {
+            "name": "heating_test",
+            "description": "Compare temperature before and after heating.",
+            "steps": steps,
+        },
     }
 
 
@@ -113,7 +127,7 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
         hypothesis_data(discrete_execute_action())
     )
 
-    action = hypothesis.methods[0].steps[0].action
+    action = hypothesis.method.steps[0]
     assert action.forward_tool_call == "write_motor"
     assert action.params[0].value == 90
 
@@ -123,10 +137,26 @@ def test_hypothesis_schema_models_a_review_step() -> None:
         hypothesis_data(review_action())
     )
 
-    action = hypothesis.methods[0].steps[0].action
+    action = hypothesis.method.steps[0]
     assert isinstance(action, ReviewSchema)
-    assert action.review_tool_calls[0].tool == "query_experiment_data"
+    assert action.dependent_variables[0].table_name == "temperature_readings"
     assert action.expected.startswith("Average temperature")
+
+
+def test_method_requires_at_least_one_step() -> None:
+    data = hypothesis_data(review_action())
+    data["method"]["steps"] = []
+
+    with pytest.raises(ValidationError, match="too_short"):
+        HypothesisSchema.model_validate(data)
+
+
+def test_method_requires_review_as_final_step() -> None:
+    data = hypothesis_data(discrete_execute_action())
+    data["method"]["steps"] = [discrete_execute_action()]
+
+    with pytest.raises(ValidationError, match="final method step"):
+        HypothesisSchema.model_validate(data)
 
 
 def test_hypothesis_schema_excludes_application_owned_fields() -> None:
@@ -134,7 +164,21 @@ def test_hypothesis_schema_excludes_application_owned_fields() -> None:
 
     assert "id" not in schema["properties"]
     assert "state" not in schema["properties"]
-    assert "observed" not in schema["$defs"]["StepSchema"]["properties"]
+    assert "observed" not in schema["$defs"]["MethodSchema"]["properties"]
+
+
+def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
+    from gerbera_sdk.harness.agent.experiments.states import Initialisation
+
+    response_schema = Initialisation.valid_schema["properties"]["response"][
+        "anyOf"
+    ][0]
+
+    assert "method" in response_schema["properties"]
+    assert "methods" not in response_schema["properties"]
+    assert "ContinuousExecuteSchema" in Initialisation.valid_schema["$defs"]
+    assert "DiscreteExecuteSchema" in Initialisation.valid_schema["$defs"]
+    assert "ReviewSchema" in Initialisation.valid_schema["$defs"]
 
 
 def test_hypothesis_output_schema_is_strict() -> None:
@@ -160,43 +204,36 @@ def test_hypothesis_output_schema_is_strict() -> None:
     assert_strict_objects(Initialisation.valid_schema)
 
 
-def test_review_step_requires_an_expected_criterion() -> None:
+def test_review_action_requires_an_expected_criterion() -> None:
     action = review_action()
     action["expected"] = ""
 
     with pytest.raises(ValidationError, match="string_too_short"):
-        StepSchema.model_validate(
-            {
-                "description": "Review collected temperature data.",
-                "action": action,
-            }
-        )
+        ReviewSchema.model_validate(action)
 
 
-def test_review_step_requires_an_analysis_tool_call() -> None:
+def test_review_action_requires_independent_variables() -> None:
     action = review_action()
-    action["review_tool_calls"] = []
+    action["independent_variables"] = []
 
     with pytest.raises(ValidationError, match="too_short"):
-        StepSchema.model_validate(
-            {
-                "description": "Review collected temperature data.",
-                "action": action,
-            }
-        )
+        ReviewSchema.model_validate(action)
 
 
-def test_review_step_rejects_data_collection_fields() -> None:
+def test_review_action_requires_dependent_variables() -> None:
+    action = review_action()
+    action["dependent_variables"] = []
+
+    with pytest.raises(ValidationError, match="too_short"):
+        ReviewSchema.model_validate(action)
+
+
+def test_review_action_rejects_data_collection_fields() -> None:
     action = review_action()
     action["forward_tool_call"] = "read_temperature"
 
     with pytest.raises(ValidationError, match="extra_forbidden"):
-        StepSchema.model_validate(
-            {
-                "description": "Review collected temperature data.",
-                "action": action,
-            }
-        )
+        ReviewSchema.model_validate(action)
 
 
 @pytest.mark.parametrize(
@@ -218,12 +255,7 @@ def test_action_parameter_rejects_non_snake_case_variable() -> None:
     action["params"][0]["variable"] = "sample count"
 
     with pytest.raises(ValidationError, match="string_pattern_mismatch"):
-        StepSchema.model_validate(
-            {
-                "description": "Set the sample count.",
-                "action": action,
-            }
-        )
+        HypothesisSchema.model_validate(hypothesis_data(action))
 
 
 def test_continuous_execute_action_requires_positive_duration() -> None:
@@ -231,12 +263,7 @@ def test_continuous_execute_action_requires_positive_duration() -> None:
     action["duration_seconds"] = 0
 
     with pytest.raises(ValidationError, match="greater_than"):
-        StepSchema.model_validate(
-            {
-                "description": "Run the heater.",
-                "action": action,
-            }
-        )
+        HypothesisSchema.model_validate(hypothesis_data(action))
 
 
 def test_continuous_execute_action_requires_reverse_call() -> None:
@@ -244,12 +271,7 @@ def test_continuous_execute_action_requires_reverse_call() -> None:
     del action["reverse_tool_call"]
 
     with pytest.raises(ValidationError, match="Field required"):
-        StepSchema.model_validate(
-            {
-                "description": "Run the heater.",
-                "action": action,
-            }
-        )
+        HypothesisSchema.model_validate(hypothesis_data(action))
 
 
 def test_action_schema_rejects_unknown_action_type() -> None:
@@ -257,9 +279,4 @@ def test_action_schema_rejects_unknown_action_type() -> None:
     action["action_type"] = "observe"
 
     with pytest.raises(ValidationError, match="union_tag_invalid"):
-        StepSchema.model_validate(
-            {
-                "description": "Observe data.",
-                "action": action,
-            }
-        )
+        TypeAdapter(ActionSchema).validate_python(action)

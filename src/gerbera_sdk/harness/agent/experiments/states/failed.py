@@ -7,7 +7,7 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
 )
 
 
-# Terminal State
+# Two decisions here, either we give up and execute or if we observed something we can go and generate a new hypothesis and try again
 @dataclass(frozen=True)
 class Failed(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.FAILED

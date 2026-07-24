@@ -32,10 +32,26 @@ Each `execute` action must set `action_type` to `execute`, classify its
 `execution_type` as `continuous` or `discrete`, and list the dependent and
 independent variable names involved.
 
-- A `continuous` action runs for a positive `duration_seconds`. It defines a
-  `forward_tool_call` that starts the operation and a `reverse_tool_call` that
-  safely stops or reverses it, each with its own parameter list.
-- A `discrete` action defines one `forward_tool_call` and its parameter list.
+Choose the execution type from the experiment's data-collection semantics:
+
+- You MUST use `continuous` when the objective involves a duration, change over
+  time, repeated timestamped readings, streaming, monitoring, trends,
+  stability, or variation during an interval.
+- A `continuous` action runs for a positive `duration_seconds`. Its
+  `forward_tool_call` starts collection or streaming and its
+  `reverse_tool_call` stops it safely. Use the corresponding start/stop stream
+  tools when they are available.
+- You MUST use `discrete` only for a single bounded command or one-shot reading
+  that does not collect a time series. A discrete action defines one
+  `forward_tool_call` and its parameter list.
+- Do not represent a time-series experiment as one or more discrete readings
+  when continuous streaming tools are available.
+- If a tool description names a database table for collected stream data, use
+  that table in the later review action.
+
+Example: measuring whether an IR sensor output remains stable over 30 seconds
+is `continuous`, with the stream-on tool as `forward_tool_call`, the stream-off
+tool as `reverse_tool_call`, and `duration_seconds` set to `30`.
 
 Every tool call must:
 
@@ -55,9 +71,11 @@ A `review` action is a post-collection analysis plan:
 
 - Set `action_type` to `review`.
 - Describe the question to answer in `analysis_goal`.
-- List every collected variable needed for the analysis in `data_variables`.
-- Put the ordered SQL or analysis operations in `review_tool_calls`. Each call
-  names an exact available analysis tool and supplies its parameters.
+- List the independent and dependent variables in their corresponding fields.
+  Every variable entry must include `variable`, `table_name`, `unit`, and
+  scalar `type`.
+- Copy `table_name` exactly from the database table named in the relevant
+  hardware tool description.
 - Set `expected` to the hypothesis-derived result or acceptance criterion.
 - Query and analyze existing persisted data only. Do not include execution
   fields or hardware collection calls in a review action.
