@@ -44,3 +44,8 @@ def test_build_command_rejects_invalid_parameters(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         CommandCompiler.build_command(connection, "WRITE", params)
+
+
+def test_build_command_rejects_unknown_action() -> None:
+    with pytest.raises(ValueError, match="Unsupported command"):
+        CommandCompiler.build_command(_connection("sg90"), "READ")

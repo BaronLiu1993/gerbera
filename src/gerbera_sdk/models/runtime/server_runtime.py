@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Annotated, Any, Literal, Optional
+from dataclasses import dataclass
+from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
 from pydantic import BaseModel, ConfigDict, Field, create_model
@@ -20,7 +20,7 @@ from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 
-PARAMETER_TYPES: dict[ParameterType, type] = {
+_PARAMETER_TYPES: dict[ParameterType, type] = {
     ParameterType.STRING: str,
     ParameterType.INT: int,
     ParameterType.FLOAT: float,
@@ -32,11 +32,11 @@ PARAMETER_TYPES: dict[ParameterType, type] = {
 class ServerRuntime:
     hardware_system: HardwareSystem
     board_runtime: BoardRuntime
-    event_bus: EventBus 
+    event_bus: EventBus
     stream_controller: StreamController
     event_worker: EventWorker
     app: FastMCP
-    event_listener: EventListener | None = field(default=None)
+    event_listener: EventListener | None = None
 
     def _register_mcp_event(
         self,
@@ -63,13 +63,12 @@ class ServerRuntime:
         if connection.database is None:
             return
 
-        table_name = connection.event_name
         event = Event(
             event_type="STREAM",
             microcontroller_id=microcontroller.id,
             event_name=connection.event_name,
             streamable=True,
-            table_name=table_name,
+            table_name=connection.event_name,
             event_worker=self.event_worker,
         )
         self.event_bus.add_event(
@@ -87,30 +86,30 @@ class ServerRuntime:
 
     def _start_event_listener(self) -> None:
         if self.event_listener is not None:
-            return
+            raise RuntimeError("Event listener is already running")
 
-        self.event_listener = EventListener(
+        event_listener = EventListener(
             hardware_system=self.hardware_system,
             _serial_pool=self.board_runtime.serial_pool,
             _threads={},
             _event_bus=self.event_bus,
         )
-        self.event_listener.create_listeners()
+        event_listener.create_listeners()
+        self.event_listener = event_listener
 
     def _stop_event_listener(self) -> None:
         if self.event_listener is None:
-            return
+            raise RuntimeError("Event listener is not running")
 
-        event_listener = self.event_listener
+        self.event_listener.stop_listeners()
         self.event_listener = None
-        event_listener.stop_listeners()
 
     def _send_connection_command(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
         action: str,
-        params: Optional[dict[str, str]] = None,
+        params: dict[str, str] | None = None,
     ) -> dict[str, str]:
         serial_connection = self.board_runtime.get_serial_connection(
             microcontroller
@@ -126,14 +125,7 @@ class ServerRuntime:
         )
         event.clear_responses()
 
-        write = getattr(serial_connection, "write", None)
-        if callable(write):
-            write(built_command)
-        else:
-            response = serial_connection.send(built_command)
-            if response:
-                return CommandCompiler.parse_response(response)
-
+        serial_connection.write(built_command)
         return event.wait_for_response()
 
     def _register_connection_action(
@@ -145,7 +137,7 @@ class ServerRuntime:
         action = command.method.strip().upper()
 
         def action_function(
-            params: Optional[dict[str, str]] = None,
+            params: dict[str, str] | None = None,
         ) -> dict[str, str]:
             return self._send_connection_command(
                 microcontroller=microcontroller,
@@ -159,10 +151,11 @@ class ServerRuntime:
     def _build_tool_function(
         self,
         connection: Connection,
-        action: str,
         command: CommandSpec,
-    ):
+    ) -> Callable[..., dict[str, str]]:
+        action = command.method.strip().upper()
         if not command.params:
+
             def tool_function() -> dict[str, str]:
                 return connection.perform_action(action)
 
@@ -201,7 +194,7 @@ class ServerRuntime:
             f"{connection.name.title().replace('_', '')}"
             f"{command.method.title()}Params"
         )
-        
+
         return create_model(
             model_name,
             __config__=ConfigDict(extra="forbid"),
@@ -212,7 +205,7 @@ class ServerRuntime:
         self,
         parameter: ParameterSpec,
     ) -> Any:
-        value_type: Any = PARAMETER_TYPES[parameter.type]
+        value_type: Any = _PARAMETER_TYPES[parameter.type]
         if parameter.enum:
             value_type = Literal.__getitem__(tuple(parameter.enum))
 
@@ -230,7 +223,7 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
         state: str,
-    ):
+    ) -> Callable[[], dict[str, str]]:
         def tool_function() -> dict[str, str]:
             response = connection.perform_action("WRITE", {"state": state})
 
@@ -248,7 +241,7 @@ class ServerRuntime:
         self,
         connection: Connection,
         state: str,
-    ):
+    ) -> Callable[[], dict[str, str]]:
         def tool_function() -> dict[str, str]:
             return connection.perform_action("WRITE", {"state": state})
 
@@ -259,24 +252,34 @@ class ServerRuntime:
         connection: Connection,
         command: CommandSpec,
     ) -> None:
-        action = command.method.strip().upper()
-        tool_name = f"{action.lower()}_{connection.name}"
+        description = command.description.strip()
+        if not description:
+            raise ValueError(
+                f"Command description is required: "
+                f"{command.method},{connection.name}"
+            )
+
+        action = command.method.strip().lower()
+        tool_name = f"{action}_{connection.name}"
         tool_function = self._build_tool_function(
             connection,
-            action,
             command,
         )
-        tool_function.__name__ = tool_name
-
-        command_description = CommandCompiler.describe_command(connection, action)
-        tool_function.__doc__ = command.description or connection.description or (
-            f"Send {command_description} over serial."
+        self._register_tool(
+            name=tool_name,
+            description=description,
+            tool_function=tool_function,
         )
 
-        self.app.tool(
-            name=tool_name,
-            description=tool_function.__doc__,
-        )(tool_function)
+    def _register_tool(
+        self,
+        name: str,
+        description: str,
+        tool_function: Callable[..., dict[str, str]],
+    ) -> None:
+        tool_function.__name__ = name
+        tool_function.__doc__ = description
+        self.app.tool(name=name, description=description)(tool_function)
 
     def _register_state_toggle_tool(
         self,
@@ -286,13 +289,11 @@ class ServerRuntime:
         description: str,
     ) -> None:
         tool_function = self._build_state_toggle_tool_function(connection, state)
-        tool_function.__name__ = tool_name
-        tool_function.__doc__ = description
-
-        self.app.tool(
+        self._register_tool(
             name=tool_name,
             description=description,
-        )(tool_function)
+            tool_function=tool_function,
+        )
 
     def _register_state_toggle_tools(self, connection: Connection) -> None:
         self._register_state_toggle_tool(
@@ -321,13 +322,11 @@ class ServerRuntime:
             connection=connection,
             state=state,
         )
-        tool_function.__name__ = tool_name
-        tool_function.__doc__ = description
-
-        self.app.tool(
+        self._register_tool(
             name=tool_name,
             description=description,
-        )(tool_function)
+            tool_function=tool_function,
+        )
 
     def _register_stream_toggle_tools(
         self,
@@ -348,17 +347,3 @@ class ServerRuntime:
             tool_name=f"turn_off_{connection.name}_stream",
             description=f"Turn off continuous streaming for {connection.name}.",
         )
-
-    def _register_tools(self) -> None:
-        for microcontroller in self.hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
-                for command in CommandCompiler.command_specs(connection):
-                    self._register_connection_action(
-                        microcontroller,
-                        connection,
-                        command,
-                    )
-                    self._register_connection_tool(connection, command)
-
-                self._register_state_toggle_tools(connection)
-                self._register_stream_toggle_tools(microcontroller, connection)

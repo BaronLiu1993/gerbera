@@ -7,6 +7,72 @@ from gerbera_sdk.harness.agent.experiments.states.schema import (
 )
 
 
+def execute_action() -> dict:
+    return {
+        "type": "execute",
+        "independent_variables": [
+            {
+                "variable": "commanded_angle",
+                "value": 90,
+                "unit": "degrees",
+            }
+        ],
+        "dependent_variables": [
+            {
+                "variable": "acknowledged_angle",
+                "value": None,
+                "unit": "degrees",
+            }
+        ],
+        "setup_calls": [
+            {
+                "tool": "write_motor",
+                "arguments": [
+                    {
+                        "parameter": "angle",
+                        "value": 0,
+                        "variable": "commanded_angle",
+                    }
+                ],
+                "captures": [],
+            }
+        ],
+        "trial_calls": [
+            {
+                "tool": "write_motor",
+                "arguments": [
+                    {
+                        "parameter": "angle",
+                        "value": 90,
+                        "variable": "commanded_angle",
+                    }
+                ],
+                "captures": [
+                    {
+                        "field": "angle",
+                        "variable": "acknowledged_angle",
+                        "unit": "degrees",
+                    }
+                ],
+            }
+        ],
+        "reset_calls": [
+            {
+                "tool": "write_motor",
+                "arguments": [
+                    {
+                        "parameter": "angle",
+                        "value": 0,
+                        "variable": None,
+                    }
+                ],
+                "captures": [],
+            }
+        ],
+        "repetitions": 3,
+    }
+
+
 def test_hypothesis_schema_models_the_generated_experiment() -> None:
     hypothesis = HypothesisSchema.model_validate(
         {
@@ -21,18 +87,9 @@ def test_hypothesis_schema_models_the_generated_experiment() -> None:
                     "description": "Compare temperature before and after heating.",
                     "steps": [
                         {
-                            "description": "Read the baseline temperature.",
+                            "description": "Test the servo at 90 degrees.",
                             "expected": None,
-                            "action": {
-                                "type": "execute",
-                                "target": "read_temperature",
-                                "params": [
-                                    {
-                                        "variable": "sample_count",
-                                        "value": 3,
-                                    }
-                                ],
-                            },
+                            "action": execute_action(),
                         }
                     ],
                 }
@@ -40,8 +97,11 @@ def test_hypothesis_schema_models_the_generated_experiment() -> None:
         }
     )
 
-    assert hypothesis.methods[0].steps[0].action.target == "read_temperature"
-    assert hypothesis.methods[0].steps[0].action.params[0].value == 3
+    action = hypothesis.methods[0].steps[0].action
+    assert action.trial_calls[0].tool == "write_motor"
+    assert action.independent_variables[0].value == 90
+    assert action.reset_calls[0].arguments[0].value == 0
+    assert action.repetitions == 3
 
 
 def test_hypothesis_schema_excludes_application_owned_fields() -> None:
@@ -79,13 +139,7 @@ def test_execute_steps_require_null_expected() -> None:
     step = StepSchema.model_validate(
         {
             "description": "Turn on the heater.",
-            "action": {
-                "type": "execute",
-                "target": "turn_on_heater",
-                "params": [
-                        {"variable": "state", "value": True}
-                ],
-            },
+            "action": execute_action(),
             "expected": None,
         }
     )
@@ -129,11 +183,7 @@ def test_non_review_steps_reject_expected_values() -> None:
         StepSchema.model_validate(
             {
                 "description": "Turn on the heater.",
-                "action": {
-                    "type": "execute",
-                    "target": "turn_on_heater",
-                    "params": [],
-                },
+                "action": execute_action(),
                 "expected": "The temperature rises.",
             }
         )
@@ -160,15 +210,76 @@ def test_hypothesis_rejects_non_snake_case_variables(
 
 
 def test_action_parameter_rejects_non_snake_case_variable() -> None:
+    action = execute_action()
+    action["trial_calls"][0]["arguments"][0]["variable"] = "sample count"
+
     with pytest.raises(ValidationError, match="string_pattern_mismatch"):
         StepSchema.model_validate(
             {
                 "description": "Set the sample count.",
-                "action": {
-                    "type": "execute",
-                    "target": "read_temperature",
-                    "params": [{"variable": "sample count", "value": 3}],
-                },
+                "action": action,
+                "expected": None,
+            }
+        )
+
+
+def test_execute_action_requires_trial_call() -> None:
+    action = execute_action()
+    action["trial_calls"] = []
+
+    with pytest.raises(ValidationError, match="too_short"):
+        StepSchema.model_validate(
+            {
+                "description": "Run a trial.",
+                "action": action,
+                "expected": None,
+            }
+        )
+
+
+def test_execute_action_requires_positive_repetitions() -> None:
+    action = execute_action()
+    action["repetitions"] = 0
+
+    with pytest.raises(ValidationError, match="greater_than_equal"):
+        StepSchema.model_validate(
+            {
+                "description": "Run a trial.",
+                "action": action,
+                "expected": None,
+            }
+        )
+
+
+def test_execute_action_requires_independent_variable_binding() -> None:
+    action = execute_action()
+    action["trial_calls"][0]["arguments"][0]["variable"] = None
+
+    with pytest.raises(
+        ValidationError,
+        match="do not manipulate independent variables",
+    ):
+        StepSchema.model_validate(
+            {
+                "description": "Run a trial.",
+                "action": action,
+                "expected": None,
+            }
+        )
+
+
+def test_execute_action_requires_dependent_variable_capture() -> None:
+    action = execute_action()
+    action["trial_calls"][0]["captures"] = []
+
+    with pytest.raises(
+        ValidationError,
+        match="do not capture dependent variables",
+    ):
+        StepSchema.model_validate(
+            {
+                "description": "Run a trial.",
+                "action": action,
                 "expected": None,
             }
         )

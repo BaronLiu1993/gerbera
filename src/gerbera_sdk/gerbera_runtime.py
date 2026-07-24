@@ -49,6 +49,7 @@ class GerberaRuntime:
             board_runtime=board_runtime,
             event_worker=event_worker,
         )
+        event_listener_started = False
 
         try:
             board_runtime.start()
@@ -56,13 +57,15 @@ class GerberaRuntime:
             server_runtime._register_events()
             GerberaRuntime._register_server_runtime_tools(server_runtime)
             server_runtime._start_event_listener()
+            event_listener_started = True
             server_runtime.app.run(
                 transport=transport,
                 **transport_kwargs,
             )
         finally:
             try:
-                server_runtime._stop_event_listener()
+                if event_listener_started:
+                    server_runtime._stop_event_listener()
             finally:
                 try:
                     try:

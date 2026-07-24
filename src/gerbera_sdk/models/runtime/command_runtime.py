@@ -37,7 +37,9 @@ class CommandCompiler:
             if spec.method.strip().upper() == normalized_action:
                 return spec
 
-        return CommandSpec(method=normalized_action)
+        raise ValueError(
+            f"Unsupported command for {connection.name}: {normalized_action}"
+        )
 
     @staticmethod
     def _validate_numeric_bounds(
@@ -250,31 +252,6 @@ class CommandCompiler:
             payload[key.strip()] = value.strip()
 
         return payload
-
-    @staticmethod
-    def describe_command(connection: Connection, action: str) -> str:
-        command_spec = CommandCompiler._command_spec_for_action(connection, action)
-        allowed_params = command_spec.params
-
-        if not allowed_params:
-            return f"{action.strip().upper()},{connection.name}"
-
-        param_descriptions = [
-            (
-                f"{key} ({metadata.type.value})"
-                + (" required" if metadata.required else " optional")
-                + (f': {", ".join(metadata.enum)}' if metadata.enum else "")
-                + (f" min={metadata.min}" if metadata.min is not None else "")
-                + (f" max={metadata.max}" if metadata.max is not None else "")
-                + (f" - {metadata.description}" if metadata.description else "")
-            )
-            for key, metadata in allowed_params.items()
-        ]
-        return (
-            f'{action.strip().upper()},{connection.name} with params '
-            + "; ".join(param_descriptions)
-        )
-
 
 CommandCompiler._COERCERS = {
     ParameterType.STRING: CommandCompiler._coerce_string_value,

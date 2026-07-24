@@ -23,8 +23,8 @@ SnakeCaseVariable = Annotated[
         description="Lowercase snake_case variable name.",
     ),
 ]
-ParameterValue = bool | int | float | str
 
+ParameterValue = bool | int | float | str
 
 class ActionParameterSchema(StrictSchema):
     variable: SnakeCaseVariable

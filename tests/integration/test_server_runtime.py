@@ -30,10 +30,11 @@ class FakeApp:
 class FakeSerialConnection:
     def __init__(self) -> None:
         self.commands = []
+        self.on_write = lambda: None
 
-    def send(self, command: str) -> str:
+    def write(self, command: str) -> None:
         self.commands.append(command)
-        return "state:on"
+        self.on_write()
 
 
 def test_server_registers_tools_that_execute_through_the_board_runtime(
@@ -61,6 +62,10 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
 
     runtime._register_events()
     GerberaRuntime._register_server_runtime_tools(runtime)
+    event = event_bus.get_handler(
+        ("MCP", board.id, board.connections[0].event_name)
+    )
+    serial_connection.on_write = lambda: event.perform_work({"state": "on"})
     response = app.tools["turn_on_status_led"]()
 
     assert response == {"state": "on"}
@@ -115,3 +120,24 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
 
     with pytest.raises(ValueError, match="less than or equal to 180"):
         asyncio.run(tool.run({"params": {"angle": 181}}))
+
+
+def test_event_listener_lifecycle_is_strict() -> None:
+    event_bus = EventBus()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(),
+        board_runtime=SimpleNamespace(serial_pool={}),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=FakeApp(),
+    )
+
+    with pytest.raises(RuntimeError, match="not running"):
+        runtime._stop_event_listener()
+
+    runtime._start_event_listener()
+    with pytest.raises(RuntimeError, match="already running"):
+        runtime._start_event_listener()
+
+    runtime._stop_event_listener()

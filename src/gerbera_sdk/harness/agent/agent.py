@@ -52,11 +52,11 @@ class Agent:
 
                 decision = message["decision"]
                 next_state = message["next_state"]
-                #print(json.dumps(message, indent=4))
+                print(json.dumps(message, indent=4))
 
                 if decision == DecisionEnum.ACCEPTED.value:
-                    #print(decision)
-                    #print(next_state)
+                    print(decision)
+                    print(next_state)
                     break
                 else:
                     print("breaking")
