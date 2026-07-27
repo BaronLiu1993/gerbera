@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, Collection
+from typing import ClassVar
 
-from pydantic import BaseModel, RootModel
+from pydantic import RootModel
 
 PROMPT_DIRECTORY = Path(__file__).resolve().parents[3] / "prompts"
 
@@ -23,42 +23,13 @@ class DecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
+class WorkflowEnum(str, Enum):
+    COMPLETED = "completed"
+    PENDING = "pending"
+    FAILED = "failed"
 
 class TextResponseSchema(RootModel[str]):
     pass
-
-
-def build_valid_schema(
-    valid_transitions: Collection[LoopStateEnum],
-    structured_schema: type[BaseModel],
-) -> dict:
-    response_schema = structured_schema.model_json_schema()
-    definitions = response_schema.pop("$defs", None)
-    response_schema = {
-        "anyOf": [response_schema, {"type": "null"}],
-    }
-
-    schema = {
-        "type": "object",
-        "properties": {
-            "next_state": {
-                "type": "string",
-                "enum": sorted(state.value for state in valid_transitions),
-            },
-            "response": response_schema,
-            "decision": {
-                "type": "string",
-                "enum": [decision.value for decision in DecisionEnum],
-            },
-        },
-        "required": ["next_state", "response", "decision"],
-        "additionalProperties": False,
-    }
-
-    if definitions is not None:
-        schema["$defs"] = definitions
-
-    return schema
 
 
 @dataclass(frozen=True)
@@ -79,5 +50,5 @@ class ExperimentState:
     def prompt(self) -> str:
         return self.system_prompt
 
-    def valid_transition(self, state: LoopStateEnum) -> bool:
-        return state in self.valid_transition_states
+    def valid_transition(self, new_state: LoopStateEnum) -> bool:
+        return new_state in self.valid_transition_states

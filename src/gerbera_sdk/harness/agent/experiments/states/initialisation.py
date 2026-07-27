@@ -5,11 +5,11 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
     DecisionEnum,
     ExperimentState,
     LoopStateEnum,
-    build_valid_schema,
 )
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis import (
     HypothesisSchema,
 )
+from gerbera_sdk.harness.agent.experiments.states.utils import build_valid_schema
 
 
 @dataclass(frozen=True)

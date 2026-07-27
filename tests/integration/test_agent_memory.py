@@ -123,4 +123,4 @@ def test_agent_runs_initialisation_end_to_end(monkeypatch) -> None:
     result = asyncio.run(agent.run_agent("Test the sensor"))
 
     assert result is None
-    assert session.state.state is LoopStateEnum.INITIALISATION
+    assert session.state.state is LoopStateEnum.EXECUTION

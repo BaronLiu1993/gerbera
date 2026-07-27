@@ -159,7 +159,7 @@ def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     result = asyncio.run(agent.run_agent("Test the heater."))
 
     assert result is None
-    assert session.state.state is LoopStateEnum.INITIALISATION
+    assert session.state.state is LoopStateEnum.EXECUTION
     assert model.client.system_prompt.startswith("# Initialisation")
     assert model.client.valid_schema == Initialisation.valid_schema
     assert len(FakeExecutionProcess.instances) == 1

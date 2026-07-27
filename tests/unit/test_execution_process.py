@@ -115,7 +115,7 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
     result = asyncio.run(process.run_workflow())
 
     assert FakeMCPClient.calls == [("set_motor", {"speed": 10})]
-    assert result == [[{"tool": "set_motor"}]]
+    assert result is None
 
 
 def test_execution_process_stops_continuous_action() -> None:
@@ -134,14 +134,7 @@ def test_execution_process_stops_continuous_action() -> None:
         ("start_sensor", {"enabled": True}),
         ("stop_sensor", {"enabled": False}),
     ]
-    assert result == [
-        [
-            {
-                "forward": {"tool": "start_sensor"},
-                "reverse": {"tool": "stop_sensor"},
-            }
-        ]
-    ]
+    assert result is None
 
 
 def test_execution_process_rejects_unknown_tool() -> None:

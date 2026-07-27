@@ -1,3 +1,5 @@
+import pytest
+
 from gerbera_sdk.harness.agent.experiments.states import (
     Complete,
     Execution,
@@ -8,6 +10,7 @@ from gerbera_sdk.harness.agent.experiments.states import (
 from gerbera_sdk.harness.agent.experiments.states.base import (
     DecisionEnum,
 )
+from gerbera_sdk.harness.agent.experiments.session import Session
 
 
 def test_each_experiment_state_loads_its_markdown_prompt() -> None:
@@ -35,6 +38,30 @@ def test_experiment_cycle_enforces_valid_transitions() -> None:
     assert Review().valid_transition(Complete.state)
     assert Review().valid_transition(Failed.state)
     assert not Review().valid_transition(Initialisation.state)
+
+
+def test_session_replaces_state_during_transition() -> None:
+    session = Session()
+    initial_state = session.state
+
+    new_state = session.perform_transition(Execution.state)
+
+    assert isinstance(new_state, Execution)
+    assert session.state is new_state
+    assert session.state is not initial_state
+
+
+def test_session_rejects_invalid_transition() -> None:
+    session = Session()
+    initial_state = session.state
+
+    with pytest.raises(
+        ValueError,
+        match="initialisation -> review",
+    ):
+        session.perform_transition(Review.state)
+
+    assert session.state is initial_state
 
 
 def test_initialisation_accepts_only_readiness_decisions() -> None:

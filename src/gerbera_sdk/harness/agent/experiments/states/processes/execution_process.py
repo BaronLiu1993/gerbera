@@ -12,11 +12,20 @@ from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schem
 )
 from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
 
+from gerbera_sdk.harness.agent.experiments.states import (
+    ExperimentState,
+    LoopStateEnum,
+    DecisionEnum,
+)
+
+# ONLY CONCURRENT FOR NOW, WE NEED TO ACHIEVE PARALLELISM LATER
 
 @dataclass
 class ExecutionProcess:
     mcp_url: str
     actions_list: list[ExecuteActionGroupSchema]
+    decision: DecisionEnum = DecisionEnum.REJECTED
+
 
     async def run_workflow(self) -> None:
         if not self._verify_valid_execute_actions():

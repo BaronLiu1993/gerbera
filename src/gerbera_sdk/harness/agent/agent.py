@@ -14,20 +14,12 @@ from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.hypothesis_s
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
-
 from gerbera_sdk.harness.agent.experiments.states import (
     ExperimentState,
     LoopStateEnum,
     DecisionEnum,
 )
 from gerbera_sdk.harness.agent.model.model import Model
-
-from gerbera_sdk.harness.memory.event import (
-    Event,
-    EventTypeEnum,
-    SourceTypeEnum,
-)
-
 from gerbera_sdk.harness.memory.memory import Memory
 
 
@@ -60,25 +52,30 @@ class Agent:
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         client = self.model.get_agent_client()
-        while self.session.state.state != LoopStateEnum.COMPLETE.value:
-
+        while self.session.state.state is not LoopStateEnum.COMPLETE:
             current_state = self.session.state
 
-            system_prompt = current_state.system_prompt
-            valid_schema = current_state.valid_schema
-
-            if self.session.state.state == LoopStateEnum.INITIALISATION.value:
+            if current_state.state is LoopStateEnum.INITIALISATION:
+                print(current_state)
                 await self.prepare_initialisation_context(initial_user_prompt)
-                raw_response = client.send(self.messages, system_prompt, valid_schema)
+                raw_response = client.send(
+                    self.messages,
+                    current_state.system_prompt,
+                    current_state.valid_schema,
+                )
+
                 message = json.loads(raw_response)
-                next_state = message["next_state"]
+                next_state = LoopStateEnum(message["next_state"])
+                decision = DecisionEnum(message["decision"])
+
                 self.current_hypothesis = HypothesisSchema.model_validate(
                     message["response"]
                 )
-                current_state.perform_transition(next_state)
-            elif self.session.state.state == LoopStateEnum.EXECUTION.value:
+                self.session.perform_transition(next_state)
+
+            elif current_state.state is LoopStateEnum.EXECUTION:
+
                 print(current_state)
-                
                 execute_groups = [
                     group
                     for group in self.current_hypothesis.method.steps
@@ -89,10 +86,13 @@ class Agent:
                     mcp_url=self.initialisation_process.mcp_url,
                     actions_list=execute_groups,
                 )
+
+                await execution_process.run_workflow()
                 break
-                    
-                
-        
+            elif current_state.state is LoopStateEnum.REVIEW.value:
+                                
+
+                break
 
 
 

@@ -4,9 +4,8 @@ from typing import ClassVar
 from gerbera_sdk.harness.agent.experiments.states.base import (
     ExperimentState,
     LoopStateEnum,
-    TextResponseSchema,
-    build_valid_schema,
 )
+from gerbera_sdk.harness.agent.experiments.states.utils import build_valid_schema
 
 
 
@@ -23,5 +22,4 @@ class Review(ExperimentState):
     )
     valid_schema: ClassVar[dict] = build_valid_schema(
         valid_transition_states,
-        TextResponseSchema,
     )
