@@ -27,6 +27,7 @@ def discrete_execute_action() -> dict:
         "description": "Command the motor to 90 degrees.",
         "action_type": "execute",
         "execution_type": "discrete",
+        "start_offset_seconds": 0,
         "dependent_variables": ["acknowledged_angle"],
         "independent_variables": ["commanded_angle"],
         "forward_tool_call": "write_motor",
@@ -46,6 +47,7 @@ def continuous_execute_action() -> dict:
         "description": "Run the heater for 30 seconds.",
         "action_type": "execute",
         "execution_type": "continuous",
+        "start_offset_seconds": 0,
         "duration_seconds": 30,
         "dependent_variables": ["temperature"],
         "independent_variables": ["heater_state"],
@@ -319,6 +321,14 @@ def test_continuous_execute_action_requires_positive_duration() -> None:
     action["duration_seconds"] = 0
 
     with pytest.raises(ValidationError, match="greater_than"):
+        HypothesisSchema.model_validate(hypothesis_data(action))
+
+
+def test_execute_action_requires_non_negative_start_offset() -> None:
+    action = discrete_execute_action()
+    action["start_offset_seconds"] = -1
+
+    with pytest.raises(ValidationError, match="greater_than_equal"):
         HypothesisSchema.model_validate(hypothesis_data(action))
 
 

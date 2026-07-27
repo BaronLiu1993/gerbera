@@ -66,3 +66,13 @@ def test_initialisation_prompt_requires_continuous_time_series() -> None:
     assert "repeated timestamped readings" in prompt
     assert "IR sensor output remains stable over 30 seconds" in prompt
     assert "Do not represent a time-series experiment" in prompt
+
+
+def test_initialisation_prompt_requires_parameter_lists() -> None:
+    prompt = Initialisation().system_prompt
+
+    assert "Parameter-list fields are mandatory" in prompt
+    assert "Every `discrete` action must include `params`" in prompt
+    assert "both `forward_tool_call_params` and" in prompt
+    assert "`reverse_tool_call_params`" in prompt
+    assert "Never omit a parameter-list field" in prompt

@@ -36,6 +36,12 @@ class ContinuousExecuteSchema(StrictSchema):
     description: str
     action_type: Literal["execute"]
     execution_type: Literal["continuous"]
+    start_offset_seconds: float = Field(
+        ge=0,
+        description=(
+            "Seconds after the execution group begins before this action starts."
+        ),
+    )
     duration_seconds: float = Field(gt=0)
     dependent_variables: list[SnakeCaseVariable]
     independent_variables: list[SnakeCaseVariable]
@@ -49,6 +55,12 @@ class DiscreteExecuteSchema(StrictSchema):
     description: str
     action_type: Literal["execute"]
     execution_type: Literal["discrete"]
+    start_offset_seconds: float = Field(
+        ge=0,
+        description=(
+            "Seconds after the execution group begins before this action starts."
+        ),
+    )
     dependent_variables: list[SnakeCaseVariable]
     independent_variables: list[SnakeCaseVariable]
     forward_tool_call: str = Field(min_length=1)
