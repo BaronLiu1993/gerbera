@@ -87,13 +87,20 @@ class FakeMCPClient:
             SimpleNamespace(name="stop_sensor"),
         ]
 
-    async def call_tool(self, name: str, arguments: dict):
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict,
+        allowed_tool_names: frozenset[str],
+    ):
+        if name not in allowed_tool_names:
+            raise ValueError(f"MCP tool is not allowed: {name}")
+
         type(self).calls.append((name, arguments))
-        return SimpleNamespace(
-            is_error=name in type(self).failing_tools,
-            content=[SimpleNamespace(text="tool failed")],
-            data={"tool": name},
-        )
+        if name in type(self).failing_tools:
+            raise RuntimeError(f"MCP tool {name!r} failed: tool failed")
+
+        return {"tool": name}
 
 
 @pytest.fixture(autouse=True)

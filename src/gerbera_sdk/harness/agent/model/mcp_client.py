@@ -1,9 +1,14 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterable, Protocol
 from urllib.parse import urlsplit
 
 from fastmcp import Client
-from mcp.types import CallToolResult, Tool
+from mcp.types import Tool
+
+
+class _MCPToolParameter(Protocol):
+    variable: str
+    value: Any
 
 
 @dataclass
@@ -31,12 +36,37 @@ class MCPClient:
     async def list_tools(self) -> list[Tool]:
         return await self._require_client().list_tools()
 
+    @staticmethod
+    def build_arguments(
+        parameters: Iterable[_MCPToolParameter],
+    ) -> dict[str, Any]:
+        arguments: dict[str, Any] = {}
+
+        for parameter in parameters:
+            if parameter.variable in arguments:
+                raise ValueError(
+                    f"Duplicate MCP tool parameter: {parameter.variable}"
+                )
+
+            arguments[parameter.variable] = parameter.value
+
+        return arguments
+
     async def call_tool(
         self,
         name: str,
-        arguments: dict[str, Any] | None = None,
-    ) -> CallToolResult:
-        return await self._require_client().call_tool(name, arguments)
+        arguments: dict[str, Any],
+        allowed_tool_names: frozenset[str],
+    ) -> Any:
+        if name not in allowed_tool_names:
+            raise ValueError(f"MCP tool is not allowed: {name}")
+
+        result = await self._require_client().call_tool(name, arguments)
+
+        if result.is_error:
+            raise RuntimeError(f"MCP tool {name!r} failed: {result.content}")
+
+        return result.data
 
     def _require_client(self) -> Client:
         if self._client is None:

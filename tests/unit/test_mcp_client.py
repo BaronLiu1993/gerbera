@@ -20,7 +20,11 @@ class FakeFastMCPClient:
         return [SimpleNamespace(name="read_temperature")]
 
     async def call_tool(self, name: str, arguments=None):
-        return SimpleNamespace(data={"value": "21.5"})
+        return SimpleNamespace(
+            is_error=False,
+            content=[],
+            data={"value": "21.5"},
+        )
 
 
 def test_mcp_client_lists_and_calls_hardware_tools(monkeypatch) -> None:
@@ -32,10 +36,14 @@ def test_mcp_client_lists_and_calls_hardware_tools(monkeypatch) -> None:
     async def use_client() -> None:
         async with MCPClient("https://hardware.example.com/mcp") as client:
             tools = await client.list_tools()
-            result = await client.call_tool("read_temperature")
+            result = await client.call_tool(
+                "read_temperature",
+                {},
+                frozenset({"read_temperature"}),
+            )
 
             assert [tool.name for tool in tools] == ["read_temperature"]
-            assert result.data == {"value": "21.5"}
+            assert result == {"value": "21.5"}
 
     asyncio.run(use_client())
 
@@ -45,6 +53,75 @@ def test_mcp_client_requires_an_active_connection() -> None:
 
     with pytest.raises(RuntimeError, match="not connected"):
         asyncio.run(client.list_tools())
+
+
+def test_mcp_client_builds_tool_arguments() -> None:
+    parameters = [
+        SimpleNamespace(variable="enabled", value=True),
+        SimpleNamespace(variable="sample_rate", value=10),
+    ]
+
+    assert MCPClient.build_arguments(parameters) == {
+        "enabled": True,
+        "sample_rate": 10,
+    }
+
+
+def test_mcp_client_rejects_duplicate_tool_arguments() -> None:
+    parameters = [
+        SimpleNamespace(variable="enabled", value=True),
+        SimpleNamespace(variable="enabled", value=False),
+    ]
+
+    with pytest.raises(ValueError, match="Duplicate MCP tool parameter"):
+        MCPClient.build_arguments(parameters)
+
+
+def test_mcp_client_rejects_disallowed_tool(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        FakeFastMCPClient,
+    )
+
+    async def use_client() -> None:
+        async with MCPClient("https://hardware.example.com/mcp") as client:
+            with pytest.raises(ValueError, match="MCP tool is not allowed"):
+                await client.call_tool(
+                    "set_temperature",
+                    {"value": 25},
+                    frozenset({"read_temperature"}),
+                )
+
+    asyncio.run(use_client())
+
+
+def test_mcp_client_raises_when_tool_call_fails(monkeypatch) -> None:
+    async def fail_tool_call(self, name: str, arguments=None):
+        return SimpleNamespace(
+            is_error=True,
+            content=[SimpleNamespace(text="tool failed")],
+            data=None,
+        )
+
+    monkeypatch.setattr(FakeFastMCPClient, "call_tool", fail_tool_call)
+    monkeypatch.setattr(
+        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        FakeFastMCPClient,
+    )
+
+    async def use_client() -> None:
+        async with MCPClient("https://hardware.example.com/mcp") as client:
+            with pytest.raises(
+                RuntimeError,
+                match="'read_temperature' failed",
+            ):
+                await client.call_tool(
+                    "read_temperature",
+                    {},
+                    frozenset({"read_temperature"}),
+                )
+
+    asyncio.run(use_client())
 
 
 @pytest.mark.parametrize(

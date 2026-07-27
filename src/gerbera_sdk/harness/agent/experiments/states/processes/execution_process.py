@@ -5,7 +5,6 @@ from typing import Any
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
-    ExecuteActionParameterSchema,
 )
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
@@ -86,18 +85,16 @@ class ExecutionProcess:
         if isinstance(action, DiscreteExecuteSchema):
 
             # Return Immediately if Discrete
-            return await self._call_tool(
-                client,
-                allowed_tool_names,
+            return await client.call_tool(
                 action.forward_tool_call,
-                self._build_arguments(action.params),
+                client.build_arguments(action.params),
+                allowed_tool_names,
             )
         else:
-            await self._call_tool(
-                client,
-                allowed_tool_names,
+            await client.call_tool(
                 action.forward_tool_call,
-                self._build_arguments(action.forward_tool_call_params),
+                client.build_arguments(action.forward_tool_call_params),
+                allowed_tool_names,
             )
 
         try:
@@ -107,7 +104,7 @@ class ExecutionProcess:
                 client,
                 allowed_tool_names,
                 action.reverse_tool_call,
-                self._build_arguments(action.reverse_tool_call_params),
+                client.build_arguments(action.reverse_tool_call_params),
             )
 
     async def _call_reverse_tool(
@@ -118,11 +115,10 @@ class ExecutionProcess:
         arguments: dict[str, Any],
     ) -> Any:
         reverse_task = asyncio.create_task(
-            self._call_tool(
-                client,
-                allowed_tool_names,
+            client.call_tool(
                 tool_name,
                 arguments,
+                allowed_tool_names,
             )
         )
 
@@ -131,41 +127,6 @@ class ExecutionProcess:
         except asyncio.CancelledError:
             await reverse_task
             raise
-
-    @staticmethod
-    async def _call_tool(
-        client: MCPClient,
-        allowed_tool_names: frozenset[str],
-        tool_name: str,
-        arguments: dict[str, Any],
-    ) -> Any:
-        if tool_name not in allowed_tool_names:
-            raise ValueError(f"MCP tool is not allowed: {tool_name}")
-
-        result = await client.call_tool(tool_name, arguments)
-
-        if result.is_error:
-            raise RuntimeError(
-                f"MCP tool {tool_name!r} failed: {result.content}"
-            )
-
-        return result.data
-
-    @staticmethod
-    def _build_arguments(
-        parameters: list[ExecuteActionParameterSchema],
-    ) -> dict[str, Any]:
-        arguments: dict[str, Any] = {}
-
-        for parameter in parameters:
-            if parameter.variable in arguments:
-                raise ValueError(
-                    f"Duplicate MCP tool parameter: {parameter.variable}"
-                )
-
-            arguments[parameter.variable] = parameter.value
-
-        return arguments
 
     def _verify_valid_execute_actions(self) -> bool:
         if not self.actions_list:
