@@ -47,7 +47,6 @@ class InitialisationProcess:
                 sections.extend([f"### {url}", content.strip()])
         else:
             sections.append("No research sources were provided.")
-        print(sections)
         return "\n\n".join(sections)
 
     def fetch_url(self, fetch_url: str) -> str:

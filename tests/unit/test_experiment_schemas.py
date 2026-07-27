@@ -103,11 +103,26 @@ def review_action() -> dict:
 
 
 def hypothesis_data(action: dict) -> dict:
-    steps = (
-        [action]
+    execute_action = (
+        discrete_execute_action()
         if action["action_type"] == "review"
-        else [action, review_action()]
+        else action
     )
+    final_review_action = (
+        action
+        if action["action_type"] == "review"
+        else review_action()
+    )
+    steps = [
+        {
+            "action_type": "execute",
+            "actions": [execute_action],
+        },
+        {
+            "action_type": "review",
+            "actions": [final_review_action],
+        },
+    ]
     return {
         "hypothesis": "Heating increases measured temperature.",
         "dependent_variables": ["temperature"],
@@ -127,7 +142,7 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
         hypothesis_data(discrete_execute_action())
     )
 
-    action = hypothesis.method.steps[0]
+    action = hypothesis.method.steps[0].actions[0]
     assert action.forward_tool_call == "write_motor"
     assert action.params[0].value == 90
 
@@ -137,7 +152,7 @@ def test_hypothesis_schema_models_a_review_step() -> None:
         hypothesis_data(review_action())
     )
 
-    action = hypothesis.method.steps[0]
+    action = hypothesis.method.steps[-1].actions[0]
     assert isinstance(action, ReviewSchema)
     assert action.dependent_variables[0].table_name == "temperature_readings"
     assert action.expected.startswith("Average temperature")
@@ -153,10 +168,30 @@ def test_method_requires_at_least_one_step() -> None:
 
 def test_method_requires_review_as_final_step() -> None:
     data = hypothesis_data(discrete_execute_action())
-    data["method"]["steps"] = [discrete_execute_action()]
+    data["method"]["steps"] = [
+        {
+            "action_type": "execute",
+            "actions": [discrete_execute_action()],
+        },
+        {
+            "action_type": "execute",
+            "actions": [continuous_execute_action()],
+        },
+    ]
 
-    with pytest.raises(ValidationError, match="final method step"):
+    with pytest.raises(ValidationError, match="final action group"):
         HypothesisSchema.model_validate(data)
+
+
+def test_execute_group_supports_parallel_actions() -> None:
+    data = hypothesis_data(discrete_execute_action())
+    data["method"]["steps"][0]["actions"].append(
+        continuous_execute_action()
+    )
+
+    hypothesis = HypothesisSchema.model_validate(data)
+
+    assert len(hypothesis.method.steps[0].actions) == 2
 
 
 def test_hypothesis_schema_excludes_application_owned_fields() -> None:
@@ -202,6 +237,27 @@ def test_hypothesis_output_schema_is_strict() -> None:
             assert_strict_objects(value)
 
     assert_strict_objects(Initialisation.valid_schema)
+
+
+def test_hypothesis_output_schema_uses_supported_union_keywords() -> None:
+    from gerbera_sdk.harness.agent.experiments.states import Initialisation
+
+    def assert_no_discriminated_union_keywords(node: object) -> None:
+        if isinstance(node, list):
+            for item in node:
+                assert_no_discriminated_union_keywords(item)
+            return
+
+        if not isinstance(node, dict):
+            return
+
+        assert "discriminator" not in node
+        assert "oneOf" not in node
+
+        for value in node.values():
+            assert_no_discriminated_union_keywords(value)
+
+    assert_no_discriminated_union_keywords(Initialisation.valid_schema)
 
 
 def test_review_action_requires_an_expected_criterion() -> None:
@@ -278,5 +334,5 @@ def test_action_schema_rejects_unknown_action_type() -> None:
     action = review_action()
     action["action_type"] = "observe"
 
-    with pytest.raises(ValidationError, match="union_tag_invalid"):
+    with pytest.raises(ValidationError, match="literal_error"):
         TypeAdapter(ActionSchema).validate_python(action)

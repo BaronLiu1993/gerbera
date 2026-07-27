@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import Field
 
@@ -54,6 +54,8 @@ class DiscreteExecuteSchema(StrictSchema):
     forward_tool_call: str = Field(min_length=1)
     params: list[ExecuteActionParameterSchema]
 
+
+
 # Review Schema
 class ReviewVariableSchema(StrictSchema):
     variable: SnakeCaseVariable
@@ -80,13 +82,6 @@ class ReviewSchema(StrictSchema):
         ),
     )
 
-# Annotated Combined Schemas
-ExecuteSchema = Annotated[
-    ContinuousExecuteSchema | DiscreteExecuteSchema,
-    Field(discriminator="execution_type"),
-]
-
-ActionSchema = Annotated[
-    ExecuteSchema | ReviewSchema,
-    Field(discriminator="action_type"),
-]
+# Combined Schemas
+ExecuteSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
+ActionSchema = ExecuteSchema | ReviewSchema
