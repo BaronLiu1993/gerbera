@@ -62,6 +62,17 @@ Every tool call must:
 - Use only parameters declared by the tool schemas. Never invent tools or
   parameters.
 
+Parameter-list fields are mandatory and must never be omitted:
+
+- Every `discrete` action must include `params`. Add one entry for every input
+  required by its `forward_tool_call`. Use `params: []` when that tool accepts
+  no inputs.
+- Every `continuous` action must include both `forward_tool_call_params` and
+  `reverse_tool_call_params`. Add one entry for every input required by the
+  corresponding tool. Use an empty list for either tool when it accepts no
+  inputs.
+- Never omit a parameter-list field merely because its list is empty.
+
 Create separate execute steps when testing different independent-variable
 values.
 

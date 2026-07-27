@@ -232,6 +232,7 @@ class ServerRuntime:
                     microcontroller,
                     connection,
                 )
+                self.event_worker.wait_until_idle()
 
             return response
 

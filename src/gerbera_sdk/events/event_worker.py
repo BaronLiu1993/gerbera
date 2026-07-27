@@ -34,6 +34,12 @@ class EventWorker:
     )
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)
     _running: bool = field(default=False, init=False, repr=False)
+    _error: Exception | None = field(default=None, init=False, repr=False)
+    _error_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+    )
 
     def configure_writer(self, writer: DatabaseWriter) -> None:
         self._writer = writer
@@ -41,6 +47,9 @@ class EventWorker:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
+
+        with self._error_lock:
+            self._error = None
 
         self._running = True
         self._thread = threading.Thread(
@@ -75,10 +84,20 @@ class EventWorker:
             try:
                 job = self._queue.get_nowait()
             except Empty:
-                return
+                break
 
-            self._process_job(job)
-            self._queue.task_done()
+            try:
+                self._process_job(job)
+            except Exception as exc:
+                self._record_error(exc)
+            finally:
+                self._queue.task_done()
+
+        self._raise_if_failed()
+
+    def wait_until_idle(self) -> None:
+        self._queue.join()
+        self._raise_if_failed()
 
     def _run(self) -> None:
         while self._running:
@@ -87,8 +106,24 @@ class EventWorker:
             except Empty:
                 continue
 
-            self._process_job(job)
-            self._queue.task_done()
+            try:
+                self._process_job(job)
+            except Exception as exc:
+                self._record_error(exc)
+            finally:
+                self._queue.task_done()
+
+    def _record_error(self, error: Exception) -> None:
+        with self._error_lock:
+            if self._error is None:
+                self._error = error
+
+    def _raise_if_failed(self) -> None:
+        with self._error_lock:
+            error = self._error
+
+        if error is not None:
+            raise RuntimeError("EventWorker database write failed") from error
 
     def _process_job(self, job: WriteJob) -> None:
         if self._writer is None:

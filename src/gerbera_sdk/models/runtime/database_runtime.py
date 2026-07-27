@@ -29,8 +29,10 @@ class DatabaseRuntime:
         if not self._table_databases:
             return
 
-        self.event_worker.flush_now()
-        self.event_worker.stop()
+        try:
+            self.event_worker.wait_until_idle()
+        finally:
+            self.event_worker.stop()
 
     def write_database_table(
         self,

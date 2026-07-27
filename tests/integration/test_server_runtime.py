@@ -170,3 +170,40 @@ def test_event_listener_lifecycle_is_strict() -> None:
         runtime._start_event_listener()
 
     runtime._stop_event_listener()
+
+
+def test_stream_off_waits_for_buffered_database_writes() -> None:
+    calls: list[str] = []
+    connection = SimpleNamespace(
+        perform_action=lambda action, params: (
+            calls.append("hardware.off") or {"status": "off"}
+        )
+    )
+    stream_controller = SimpleNamespace(
+        stop_stream=lambda microcontroller, stream_connection: calls.append(
+            "stream.flush"
+        )
+    )
+    event_worker = SimpleNamespace(
+        wait_until_idle=lambda: calls.append("database.wait")
+    )
+    runtime = ServerRuntime(
+        hardware_system=object(),
+        board_runtime=object(),
+        event_bus=EventBus(),
+        stream_controller=stream_controller,
+        event_worker=event_worker,
+        app=FakeApp(),
+    )
+    tool = runtime._build_stream_toggle_tool_function(
+        microcontroller=object(),
+        connection=connection,
+        state="off",
+    )
+
+    assert tool() == {"status": "off"}
+    assert calls == [
+        "hardware.off",
+        "stream.flush",
+        "database.wait",
+    ]
