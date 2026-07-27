@@ -10,6 +10,7 @@ from gerbera_sdk.harness.agent.experiments.states import (
 
 
 class FakeInitialisationProcess:
+    mcp_url = "https://hardware.example.com/mcp"
     available_tool_names = frozenset()
 
     async def run(self, user_prompt: str) -> str:
@@ -37,6 +38,20 @@ class FakeModel:
         return self.client
 
 
+class FakeExecutionProcess:
+    instances = []
+
+    def __init__(self, mcp_url: str, actions_list: list) -> None:
+        self.mcp_url = mcp_url
+        self.actions_list = actions_list
+        self.ran = False
+        type(self).instances.append(self)
+
+    async def run_workflow(self) -> list:
+        self.ran = True
+        return []
+
+
 def hypothesis_response() -> dict:
     return {
         "hypothesis": "Heating increases temperature.",
@@ -49,27 +64,53 @@ def hypothesis_response() -> dict:
             "name": "heating_test",
             "steps": [
                 {
-                    "description": "Review the collected temperature readings.",
+                    "action_type": "execute",
+                    "actions": [
+                        {
+                            "description": "Turn on the heater.",
+                            "action_type": "execute",
+                            "execution_type": "discrete",
+                            "start_offset_seconds": 0,
+                            "dependent_variables": ["temperature"],
+                            "independent_variables": ["heater_state"],
+                            "forward_tool_call": "turn_on_heater",
+                            "params": [],
+                        }
+                    ],
+                },
+                {
                     "action_type": "review",
-                    "analysis_goal": "Compare temperature by heater state.",
-                    "independent_variables": [
+                    "actions": [
                         {
-                            "variable": "heater_state",
-                            "table_name": "temperature_readings",
-                            "unit": None,
-                            "type": "bool",
+                            "description": (
+                                "Review the collected temperature readings."
+                            ),
+                            "action_type": "review",
+                            "analysis_goal": (
+                                "Compare temperature by heater state."
+                            ),
+                            "independent_variables": [
+                                {
+                                    "variable": "heater_state",
+                                    "table_name": "temperature_readings",
+                                    "unit": None,
+                                    "type": "bool",
+                                }
+                            ],
+                            "dependent_variables": [
+                                {
+                                    "variable": "temperature",
+                                    "table_name": "temperature_readings",
+                                    "unit": "celsius",
+                                    "type": "float",
+                                }
+                            ],
+                            "expected": (
+                                "Temperature is higher when the heater is on."
+                            ),
                         }
                     ],
-                    "dependent_variables": [
-                        {
-                            "variable": "temperature",
-                            "table_name": "temperature_readings",
-                            "unit": "celsius",
-                            "type": "float",
-                        }
-                    ],
-                    "expected": "Temperature is higher when the heater is on.",
-                }
+                },
             ],
         },
     }
@@ -94,7 +135,12 @@ def test_agent_prepares_initialisation_context_without_transitioning() -> None:
     assert session.state is initial_state
 
 
-def test_agent_accepts_valid_initialisation() -> None:
+def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
+    FakeExecutionProcess.instances = []
+    monkeypatch.setattr(
+        "gerbera_sdk.harness.agent.agent.ExecutionProcess",
+        FakeExecutionProcess,
+    )
     session = Session()
     model = FakeModel(
         {
@@ -116,6 +162,11 @@ def test_agent_accepts_valid_initialisation() -> None:
     assert session.state.state is LoopStateEnum.INITIALISATION
     assert model.client.system_prompt.startswith("# Initialisation")
     assert model.client.valid_schema == Initialisation.valid_schema
+    assert len(FakeExecutionProcess.instances) == 1
+    execution = FakeExecutionProcess.instances[0]
+    assert execution.mcp_url == "https://hardware.example.com/mcp"
+    assert len(execution.actions_list) == 1
+    assert execution.ran
 
 
 def test_agent_stops_after_rejected_initialisation() -> None:
