@@ -31,7 +31,7 @@ class RuleBuffer:
 
         self.buffer[event_key] = None
 
-    def update_buffer_value(
+    async def update_buffer_value(
         self,
         event_type: str,
         microcontroller_id: str,
@@ -49,7 +49,7 @@ class RuleBuffer:
 
         value = next(iter(payload.values()))
         self.buffer[event_key] = value
-        return self.rule_bus.emit_evaluation_event(event_key, value)
+        return await self.rule_bus.emit_evaluation_event(event_key, value)
 
     def read_buffer_value(
         self,

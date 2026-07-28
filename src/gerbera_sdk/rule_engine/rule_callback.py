@@ -1,5 +1,6 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 import uuid
 
 from gerbera_sdk.rule_engine.rule_condition import RuleValue
@@ -7,13 +8,13 @@ from gerbera_sdk.rule_engine.rule_condition import RuleValue
 
 @dataclass
 class RuleCallback:
-    callback: Callable[[RuleValue], Any]
+    callback: Callable[[RuleValue], Awaitable[Any]]
     val: RuleValue | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def define(self, val: RuleValue) -> Any:
-        return self.callback(val)
+    async def define(self, val: RuleValue) -> Any:
+        return await self.callback(val)
 
-    def __call__(self, val: RuleValue) -> Any:
+    async def __call__(self, val: RuleValue) -> Any:
         self.val = val
-        return self.define(val)
+        return await self.define(val)

@@ -1,3 +1,5 @@
+import asyncio
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +10,9 @@ from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker, WriteJob
 from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
 from gerbera_sdk.rule_engine.rule_bus import RuleBus
+from gerbera_sdk.rule_engine.rule import Rule
+from gerbera_sdk.rule_engine.rule_callback import RuleCallback
+from gerbera_sdk.rule_engine.rule_condition import OperatorEnum, RuleCondition
 
 
 @pytest.mark.parametrize(
@@ -86,17 +91,67 @@ def test_listener_updates_registered_rule_buffer_value() -> None:
         _rule_buffer=rule_buffer,
     )
 
-    listener._dispatch_event_to_rule_buffer(
+    rule_future = listener._dispatch_event_to_rule_buffer(
+        "STREAM",
+        "board-1",
+        "sensor",
+        {"value": "1"},
+    )
+    rule_future.result(timeout=1)
+
+    assert (
+        rule_buffer.read_buffer_value("STREAM", "board-1", "sensor")
+        == "1"
+    )
+    listener.stop_listeners()
+
+
+def test_listener_does_not_wait_for_async_rule_callback() -> None:
+    callback_started = threading.Event()
+    release_callback = threading.Event()
+
+    async def callback(value):
+        callback_started.set()
+        while not release_callback.is_set():
+            await asyncio.sleep(0.001)
+        return value
+
+    rule_bus = RuleBus()
+    rule_bus.register_rule(
+        "STREAM",
+        "board-1",
+        "sensor",
+        Rule(
+            condition=RuleCondition(
+                expected="1",
+                operator=OperatorEnum.EQUAL,
+            ),
+            callback=RuleCallback(callback=callback),
+        ),
+    )
+    rule_buffer = RuleBuffer(rule_bus)
+    rule_buffer.register_event_in_buffer("STREAM", "board-1", "sensor")
+    listener = EventListener(
+        hardware_system=SimpleNamespace(microcontrollers=[]),
+        _serial_pool={},
+        _threads={},
+        _event_bus=EventBus(),
+        _rule_buffer=rule_buffer,
+    )
+
+    rule_future = listener._dispatch_event_to_rule_buffer(
         "STREAM",
         "board-1",
         "sensor",
         {"value": "1"},
     )
 
-    assert (
-        rule_buffer.read_buffer_value("STREAM", "board-1", "sensor")
-        == "1"
-    )
+    assert callback_started.wait(timeout=1)
+    assert rule_future.done() is False
+
+    release_callback.set()
+    assert rule_future.result(timeout=1) == "1"
+    listener.stop_listeners()
 
 
 def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:

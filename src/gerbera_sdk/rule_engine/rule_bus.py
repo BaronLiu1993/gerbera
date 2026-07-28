@@ -33,7 +33,7 @@ class RuleBus:
     def get_rule(self, event_key: EventKey) -> Rule | None:
         return self.rule_bus.get(event_key)
 
-    def emit_evaluation_event(
+    async def emit_evaluation_event(
         self,
         event_key: EventKey,
         actual: RuleValue,
@@ -45,4 +45,4 @@ class RuleBus:
         if not rule.condition.evaluate_condition(actual):
             return
 
-        return rule.callback(val=actual)
+        return await rule.callback(val=actual)

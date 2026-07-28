@@ -1,5 +1,8 @@
+import asyncio
 from collections.abc import Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from typing import Any
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -18,6 +21,12 @@ class EventListener:
     _threads: dict[str, threading.Thread]
     _event_bus: EventBus
     _rule_buffer: RuleBuffer
+    _rule_executor: ThreadPoolExecutor = field(
+        default_factory=lambda: ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="gerbera-rule-callback",
+        )
+    )
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     _stop_event: threading.Event = field(default_factory=threading.Event)
 
@@ -46,6 +55,7 @@ class EventListener:
                 thread.join(timeout=1)
 
             self._threads.clear()
+            self._rule_executor.shutdown(wait=True)
 
     def _parse_payload(self, line: str):
         res_payload = {}
@@ -85,12 +95,15 @@ class EventListener:
         microcontroller_id: str,
         event_name: str,
         payload: dict[str, str],
-    ) -> None:
-        self._rule_buffer.update_buffer_value(
-            event_type,
-            microcontroller_id,
-            event_name,
-            payload,
+    ) -> Future[Any]:
+        return self._rule_executor.submit(
+            asyncio.run,
+            self._rule_buffer.update_buffer_value(
+                event_type,
+                microcontroller_id,
+                event_name,
+                payload,
+            ),
         )
 
     def _listen_loop(self, microcontroller_id):

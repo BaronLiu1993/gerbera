@@ -1,3 +1,7 @@
+import asyncio
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 import pytest
 
 from gerbera_sdk.rule_engine import (
@@ -12,6 +16,15 @@ from gerbera_sdk.rule_engine import (
 
 
 EVENT_KEY = ("STREAM", "board-1", "temperature")
+
+
+def async_callback(
+    callback: Callable[[RuleValue], Any],
+) -> Callable[[RuleValue], Awaitable[Any]]:
+    async def run(value: RuleValue) -> Any:
+        return callback(value)
+
+    return run
 
 
 @pytest.mark.parametrize(
@@ -56,9 +69,11 @@ def test_rule_condition_rejects_non_numeric_values() -> None:
 
 
 def test_rule_callback_stores_value_and_returns_callable_result() -> None:
-    callback = RuleCallback(callback=lambda value: value * 2)
+    callback = RuleCallback(
+        callback=async_callback(lambda value: value * 2),
+    )
 
-    result = callback(4)
+    result = asyncio.run(callback(4))
 
     assert result == 8
     assert callback.val == 4
@@ -74,12 +89,17 @@ def test_rule_bus_evaluates_rule_registered_for_event() -> None:
                 operator=OperatorEnum.GREATER_THAN,
             ),
             callback=RuleCallback(
-                callback=lambda value: f"high:{value}",
+                callback=async_callback(
+                    lambda value: f"high:{value}",
+                ),
             ),
         ),
     )
 
-    assert rule_bus.emit_evaluation_event(EVENT_KEY, 30) == "high:30"
+    assert (
+        asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 30))
+        == "high:30"
+    )
 
 
 def test_rule_bus_rejects_second_rule_for_same_event() -> None:
@@ -89,7 +109,9 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
             expected=20,
             operator=OperatorEnum.GREATER_THAN,
         ),
-        callback=RuleCallback(callback=lambda value: value),
+        callback=RuleCallback(
+            callback=async_callback(lambda value: value),
+        ),
     )
     rule_bus.register_rule(*EVENT_KEY, rule)
 
@@ -101,7 +123,9 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
                     expected=50,
                     operator=OperatorEnum.GREATER_THAN,
                 ),
-                callback=RuleCallback(callback=lambda value: value),
+                callback=RuleCallback(
+                    callback=async_callback(lambda value: value),
+                ),
             ),
         )
 
@@ -116,18 +140,24 @@ def test_rule_bus_returns_none_when_rule_does_not_match() -> None:
                 operator=OperatorEnum.GREATER_THAN,
             ),
             callback=RuleCallback(
-                callback=lambda value: f"very-high:{value}",
+                callback=async_callback(
+                    lambda value: f"very-high:{value}",
+                ),
             ),
         ),
     )
 
-    assert rule_bus.emit_evaluation_event(EVENT_KEY, 30) is None
+    assert asyncio.run(
+        rule_bus.emit_evaluation_event(EVENT_KEY, 30)
+    ) is None
 
 
 def test_rule_bus_returns_no_results_for_unknown_event() -> None:
     rule_bus = RuleBus()
 
-    assert rule_bus.emit_evaluation_event(EVENT_KEY, 30) is None
+    assert asyncio.run(
+        rule_bus.emit_evaluation_event(EVENT_KEY, 30)
+    ) is None
 
 
 def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
@@ -139,13 +169,17 @@ def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
                 expected=20,
                 operator=OperatorEnum.GREATER_THAN,
             ),
-            callback=RuleCallback(callback=lambda value: value),
+            callback=RuleCallback(
+                callback=async_callback(lambda value: value),
+            ),
         ),
     )
     rule_buffer = RuleBuffer(rule_bus)
     rule_buffer.register_event_in_buffer(*EVENT_KEY)
 
-    result = rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+    result = asyncio.run(
+        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+    )
 
     assert result == 30
     assert rule_buffer.read_buffer_value(*EVENT_KEY) == 30
@@ -154,7 +188,9 @@ def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
 def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
     rule_buffer = RuleBuffer(RuleBus())
     rule_buffer.register_event_in_buffer(*EVENT_KEY)
-    rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 10})
+    asyncio.run(
+        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 10})
+    )
     rule_buffer.register_event_in_buffer(*EVENT_KEY)
 
     assert rule_buffer.read_buffer_value(*EVENT_KEY) == 10
@@ -163,7 +199,9 @@ def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
 def test_rule_buffer_ignores_unknown_event() -> None:
     rule_buffer = RuleBuffer(RuleBus())
 
-    result = rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+    result = asyncio.run(
+        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+    )
 
     assert result is None
     assert rule_buffer.buffer == {}

@@ -25,6 +25,8 @@ An `EventKey` is:
 ## Basic usage
 
 ```python
+import asyncio
+
 from gerbera_sdk.rule_engine import (
     OperatorEnum,
     Rule,
@@ -36,13 +38,18 @@ from gerbera_sdk.rule_engine import (
 event_key = ("STREAM", "board-1", "temperature")
 rule_bus = RuleBus()
 
+
+async def report_high_temperature(value):
+    return f"Temperature is high: {value}"
+
+
 rule = Rule(
     condition=RuleCondition(
         expected=30,
         operator=OperatorEnum.GREATER_THAN,
     ),
     callback=RuleCallback(
-        callback=lambda value: f"Temperature is high: {value}",
+        callback=report_high_temperature,
     ),
 )
 
@@ -52,7 +59,9 @@ rule_bus.register_rule(
     event_name=event_key[2],
     rule=rule,
 )
-result = rule_bus.emit_evaluation_event(event_key, 32)
+result = asyncio.run(
+    rule_bus.emit_evaluation_event(event_key, 32)
+)
 ```
 
 `result` contains the matching callback's return value:
@@ -77,11 +86,19 @@ the actual and expected values to `float` before comparing them.
 
 ## Custom callbacks
 
-Pass any trusted local callable:
+Pass any trusted local async callable:
 
 ```python
+async def fetch_external_data(value):
+    response = await http_client.get(
+        "https://example.com/data",
+        params={"value": value},
+    )
+    return response.json()
+
+
 callback = RuleCallback(
-    callback=lambda value: call_external_api(value),
+    callback=fetch_external_data,
 )
 ```
 
@@ -98,7 +115,9 @@ from gerbera_sdk.rule_engine import RuleBuffer
 buffer = RuleBuffer(rule_bus)
 buffer.register_event_in_buffer(*event_key)
 
-result = buffer.update_buffer_value(*event_key, 32)
+result = asyncio.run(
+    buffer.update_buffer_value(*event_key, {"value": 32})
+)
 latest_value = buffer.read_buffer_value(*event_key)
 ```
 
@@ -113,9 +132,12 @@ Each `ServerRuntime` starts with one empty `RuleBus` and one connected
 Unregistered event keys are ignored. Rules and watched buffer keys can be added
 to these shared runtime objects later.
 
+The listener submits rule evaluation to a dedicated executor. Serial listener
+threads continue reading hardware events while async callbacks wait for I/O.
+
 ## Current scope
 
-- synchronous callbacks
+- async callbacks
 - one condition per rule
 - one rule per event key
 - latest-value storage, not event history
