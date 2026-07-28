@@ -6,6 +6,8 @@ from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker, WriteJob
+from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
+from gerbera_sdk.rule_engine.rule_bus import RuleBus
 
 
 @pytest.mark.parametrize(
@@ -65,11 +67,36 @@ def test_listener_rejects_duplicate_payload_keys() -> None:
         _serial_pool={},
         _threads={},
         _event_bus=EventBus(),
+        _rule_buffer=RuleBuffer(RuleBus()),
     )
 
     assert listener._parse_payload("invalid") is None
     with pytest.raises(ValueError, match="Key already exists"):
         listener._parse_payload("MCP,sensor,value:1,value:2")
+
+
+def test_listener_updates_registered_rule_buffer_value() -> None:
+    rule_buffer = RuleBuffer(RuleBus())
+    rule_buffer.register_event_in_buffer("STREAM", "board-1", "sensor")
+    listener = EventListener(
+        hardware_system=SimpleNamespace(microcontrollers=[]),
+        _serial_pool={},
+        _threads={},
+        _event_bus=EventBus(),
+        _rule_buffer=rule_buffer,
+    )
+
+    listener._dispatch_event_to_rule_buffer(
+        "STREAM",
+        "board-1",
+        "sensor",
+        {"value": "1"},
+    )
+
+    assert (
+        rule_buffer.read_buffer_value("STREAM", "board-1", "sensor")
+        == "1"
+    )
 
 
 def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:
@@ -89,6 +116,7 @@ def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:
         _serial_pool={"board-1": FailingConnection()},
         _threads={"board-1": thread},
         _event_bus=EventBus(),
+        _rule_buffer=RuleBuffer(RuleBus()),
     )
 
     with pytest.raises(OSError, match="close failed"):

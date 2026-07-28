@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
+from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
 from gerbera_sdk.utils import build_event_key
 import threading
 import uuid
@@ -16,6 +17,7 @@ class EventListener:
     _serial_pool: Mapping[str, SerialConnection]
     _threads: dict[str, threading.Thread]
     _event_bus: EventBus
+    _rule_buffer: RuleBuffer
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     _stop_event: threading.Event = field(default_factory=threading.Event)
 
@@ -77,6 +79,20 @@ class EventListener:
         handler = self._event_bus.get_handler(event_key)
         handler.perform_work(payload)
 
+    def _dispatch_event_to_rule_buffer(
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+        payload: dict[str, str],
+    ) -> None:
+        self._rule_buffer.update_buffer_value(
+            event_type,
+            microcontroller_id,
+            event_name,
+            payload,
+        )
+
     def _listen_loop(self, microcontroller_id):
         serial_connection = self._serial_pool[microcontroller_id]
         while not self._stop_event.is_set():
@@ -100,6 +116,13 @@ class EventListener:
             event_type, event_name, payload = parsed_payload
 
             self._dispatch_event_to_event_bus(
+                event_type,
+                microcontroller_id,
+                event_name,
+                payload,
+            )
+
+            self._dispatch_event_to_rule_buffer(
                 event_type,
                 microcontroller_id,
                 event_name,

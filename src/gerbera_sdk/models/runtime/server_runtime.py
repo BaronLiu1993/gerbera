@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
@@ -19,6 +19,8 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
+from gerbera_sdk.rule_engine.rule_bus import RuleBus
 
 _PARAMETER_TYPES: dict[ParameterType, type] = {
     ParameterType.STRING: str,
@@ -36,7 +38,12 @@ class ServerRuntime:
     stream_controller: StreamController
     event_worker: EventWorker
     app: FastMCP
+    rule_bus: RuleBus = field(default_factory=RuleBus)
+    rule_buffer: RuleBuffer = field(init=False)
     event_listener: EventListener | None = None
+
+    def __post_init__(self) -> None:
+        self.rule_buffer = RuleBuffer(rule_bus=self.rule_bus)
 
     def _register_mcp_event(
         self,
@@ -93,6 +100,7 @@ class ServerRuntime:
             _serial_pool=self.board_runtime.serial_pool,
             _threads={},
             _event_bus=self.event_bus,
+            _rule_buffer=self.rule_buffer,
         )
         event_listener.create_listeners()
         self.event_listener = event_listener

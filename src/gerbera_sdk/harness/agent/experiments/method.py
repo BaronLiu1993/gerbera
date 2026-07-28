@@ -11,8 +11,9 @@ class MethodStateEnum(Enum):
 
 @dataclass
 class Method:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     description: str
     name: str
     steps: list[Step]
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
     

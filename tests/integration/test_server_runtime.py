@@ -162,10 +162,16 @@ def test_event_listener_lifecycle_is_strict() -> None:
         app=FakeApp(),
     )
 
+    assert runtime.rule_bus.rule_bus == {}
+    assert runtime.rule_buffer.buffer == {}
+
     with pytest.raises(RuntimeError, match="not running"):
         runtime._stop_event_listener()
 
     runtime._start_event_listener()
+    assert runtime.event_listener is not None
+    assert runtime.event_listener._rule_buffer is runtime.rule_buffer
+
     with pytest.raises(RuntimeError, match="already running"):
         runtime._start_event_listener()
 
