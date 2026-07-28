@@ -12,7 +12,11 @@ from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
 from gerbera_sdk.rule_engine.rule_bus import RuleBus
 from gerbera_sdk.rule_engine.rule import Rule
 from gerbera_sdk.rule_engine.rule_callback import RuleCallback
-from gerbera_sdk.rule_engine.rule_condition import OperatorEnum, RuleCondition
+from gerbera_sdk.rule_engine.rule_condition import (
+    OperatorEnum,
+    RuleCondition,
+    RuleValue,
+)
 
 
 @pytest.mark.parametrize(
@@ -110,7 +114,7 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
     callback_started = threading.Event()
     release_callback = threading.Event()
 
-    async def callback(value):
+    async def callback(value: RuleValue) -> RuleValue:
         callback_started.set()
         while not release_callback.is_set():
             await asyncio.sleep(0.001)
