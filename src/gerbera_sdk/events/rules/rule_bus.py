@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import Any
 import uuid
 
-from gerbera_sdk.rule_engine.rule import Rule
-from gerbera_sdk.rule_engine.rule_condition import RuleValue
+from gerbera_sdk.events.rules.rule import Rule
+from gerbera_sdk.events.rules.rule_condition import RuleValue
 from gerbera_sdk.utils import EventKey, build_event_key
 
 

@@ -7,7 +7,7 @@ from typing import Any
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
-from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
+from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.utils import build_event_key
 import threading
 import uuid

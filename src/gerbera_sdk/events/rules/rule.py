@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 import uuid
 
-from gerbera_sdk.rule_engine.rule_callback import RuleCallback
-from gerbera_sdk.rule_engine.rule_condition import RuleCondition
+from gerbera_sdk.events.rules.rule_callback import RuleCallback
+from gerbera_sdk.events.rules.rule_condition import RuleCondition
 
 
 @dataclass

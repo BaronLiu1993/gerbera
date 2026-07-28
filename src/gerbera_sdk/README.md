@@ -14,9 +14,9 @@ It is the layer that turns a declared hardware system into:
 
 ```text
 contracts/          Shared typed contracts for commands, firmware, and schemas.
-events/             Event bus, listener, buffers, and stream flushing.
+events/             Event routing, stream buffering, and event rules.
 firmware/           Firmware generation, flashing, and device builders.
-harness/            Agent and rule-engine support around the SDK runtime.
+harness/            Agent, experiment, and memory support.
 models/             Hardware declarations and board, database, and server runtimes.
 utils.py            Cross-cutting helpers such as event naming and identifiers.
 gerbera_runtime.py  Top-level composition root for setup and run.

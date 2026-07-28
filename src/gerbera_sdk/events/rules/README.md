@@ -27,7 +27,7 @@ An `EventKey` is:
 ```python
 import asyncio
 
-from gerbera_sdk.rule_engine import (
+from gerbera_sdk.events.rules import (
     OperatorEnum,
     Rule,
     RuleBus,
@@ -110,7 +110,7 @@ The most recently received value is available as `callback.val`.
 latest value must also be retained for future stateful or cross-event rules:
 
 ```python
-from gerbera_sdk.rule_engine import RuleBuffer
+from gerbera_sdk.events.rules import RuleBuffer
 
 buffer = RuleBuffer(rule_bus)
 buffer.register_event_in_buffer(*event_key)

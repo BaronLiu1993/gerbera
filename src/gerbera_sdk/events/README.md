@@ -11,6 +11,7 @@ event.py                MCP response events and STREAM buffer events.
 buffer.py               In-memory batch buffer.
 event_worker.py         Injected write queue consumed under DatabaseRuntime lifecycle.
 stream_controller.py    Stream lifecycle operations such as flush on stop.
+rules/                  Event rules, conditions, callbacks, and latest values.
 ```
 
 ## Ownership
@@ -22,6 +23,7 @@ This folder owns:
 - buffering stream payloads
 - flushing partial stream buffers
 - queueing stream batches for the database runtime
+- evaluating registered event rules without blocking serial listeners
 
 This folder does not own:
 
@@ -40,6 +42,8 @@ flowchart TD
     C -->|STREAM| E[EventBus STREAM event]
     D --> F[Event response queue]
     E --> G[Buffer]
+    B --> R[Rule buffer]
+    R --> S[Async rule callback]
     G --> H[EventWorker]
     H --> I[Database]
 ```

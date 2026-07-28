@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 DATABASE_PATH = Path(__file__).resolve().with_name("memory.db")
 SCHEMA_PATH = Path(__file__).resolve().with_name("schema.sql")
 
-
+# No need for sqlite we can use postgres
 @dataclass
 class Memory:
     connection: sqlite3.Connection = field(repr=False)

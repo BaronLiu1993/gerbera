@@ -19,8 +19,8 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.rule_engine.rule_buffer import RuleBuffer
-from gerbera_sdk.rule_engine.rule_bus import RuleBus
+from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
+from gerbera_sdk.events.rules.rule_bus import RuleBus
 
 _PARAMETER_TYPES: dict[ParameterType, type] = {
     ParameterType.STRING: str,

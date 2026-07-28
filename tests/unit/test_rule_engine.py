@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from gerbera_sdk.rule_engine import (
+from gerbera_sdk.events.rules import (
     OperatorEnum,
     Rule,
     RuleBuffer,
