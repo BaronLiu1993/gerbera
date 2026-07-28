@@ -157,6 +157,7 @@ def setup(port: str = "8000", local_endpoint: str = "127.0.0.1") -> None:
         GerberaRuntime.run(
             hardware_system,
             transport="http",
+            mcp_url=f"{public_endpoint.rstrip('/')}/mcp",
             host="127.0.0.1",
             port=int(port),
         )

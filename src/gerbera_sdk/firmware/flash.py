@@ -4,6 +4,7 @@ from pathlib import Path
 
 from gerbera_sdk.firmware.generator import Generator
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.paths import FIRMWARE_PATH
 
 DEFAULT_BUILD_DIRNAME = "build"
 
@@ -15,7 +16,7 @@ class Flash:
 
         for microcontroller in hardware_system.microcontrollers:
             firmware_code = Generator.build_firmware(microcontroller)
-            microcontroller_root = Path(microcontroller.id)
+            microcontroller_root = FIRMWARE_PATH / microcontroller.id
             microcontroller_root.mkdir(parents=True, exist_ok=True)
             sketch_path = microcontroller_root / f"{microcontroller.id}.ino"
             sketch_path.write_text(firmware_code)

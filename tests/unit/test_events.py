@@ -103,10 +103,7 @@ def test_listener_updates_registered_rule_buffer_value() -> None:
     )
     rule_future.result(timeout=1)
 
-    assert (
-        rule_buffer.read_buffer_value("STREAM", "board-1", "sensor")
-        == "1"
-    )
+    assert rule_buffer.buffer[("STREAM", "board-1", "sensor")] == "1"
     listener.stop_listeners()
 
 
@@ -114,7 +111,10 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
     callback_started = threading.Event()
     release_callback = threading.Event()
 
-    async def callback(value: RuleValue) -> RuleValue:
+    async def callback(
+        mcp_url: str,
+        value: RuleValue,
+    ) -> RuleValue:
         callback_started.set()
         while not release_callback.is_set():
             await asyncio.sleep(0.001)
@@ -130,7 +130,10 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
                 expected="1",
                 operator=OperatorEnum.EQUAL,
             ),
-            callback=RuleCallback(callback=callback),
+            callback=RuleCallback(
+                callback=callback,
+                mcp_url="https://hardware.example.com/mcp",
+            ),
         ),
     )
     rule_buffer = RuleBuffer(rule_bus)

@@ -6,6 +6,7 @@ import questionary
 import typer
 
 from gerbera_cli.utils import CONFIG_PATH, _load_config
+from gerbera_sdk.paths import create_project_directories
 
 
 def _default_config() -> dict:
@@ -122,9 +123,11 @@ def init():
     config["harness"] = {"id": "", "ip_address": "", "created_at": ""}
 
     try:
+        create_project_directories(CONFIG_PATH.parent)
         CONFIG_PATH.write_text(json.dumps(config, indent=4))
         typer.secho(
-            f"✓ Successfully updated config! Currently managing {len(device_json)} device(s) in config.json.",
+            "✓ Successfully updated config and .gerbera workspace! "
+            f"Currently managing {len(device_json)} device(s) in config.json.",
             fg=typer.colors.GREEN,
             bold=True,
         )

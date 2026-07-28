@@ -4,15 +4,20 @@ from fastmcp import FastMCP
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
+from gerbera_sdk.events.rules import OperatorEnum
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.server_runtime import (
+    EventCatalog,
+    ServerRuntime,
+)
 
 
 class GerberaRuntime:
@@ -35,6 +40,7 @@ class GerberaRuntime:
     def run(
         hardware_system: HardwareSystem,
         transport: str = "stdio",
+        mcp_url: str = "",
         **transport_kwargs,
     ) -> None:
         GerberaRuntime._validate_unique_connection_names(hardware_system)
@@ -49,6 +55,10 @@ class GerberaRuntime:
             board_runtime=board_runtime,
             event_worker=event_worker,
         )
+        server_runtime.agent_runtime = GerberaRuntime._build_agent_runtime(
+            server_runtime=server_runtime,
+            mcp_url=mcp_url,
+        )
         event_listener_started = False
 
         try:
@@ -56,6 +66,8 @@ class GerberaRuntime:
             database_runtime.start()
             server_runtime._register_events()
             GerberaRuntime._register_server_runtime_tools(server_runtime)
+            GerberaRuntime._register_agent_runtime_tool(server_runtime)
+            GerberaRuntime._register_event_catalog_tool(server_runtime)
             server_runtime._start_event_listener()
             event_listener_started = True
             server_runtime.app.run(
@@ -127,6 +139,17 @@ class GerberaRuntime:
         return EventWorker()
 
     @staticmethod
+    def _build_agent_runtime(
+        server_runtime: ServerRuntime,
+        mcp_url: str,
+    ) -> AgentRuntime:
+        return AgentRuntime(
+            mcp_url=mcp_url,
+            rule_bus=server_runtime.rule_bus,
+            rule_buffer=server_runtime.rule_buffer,
+        )
+
+    @staticmethod
     def _build_database_runtime(
         hardware_system: HardwareSystem,
         event_worker: EventWorker,
@@ -166,6 +189,57 @@ class GerberaRuntime:
                     microcontroller=microcontroller,
                     connection=connection,
                 )
+
+    @staticmethod
+    def _register_agent_runtime_tool(
+        server_runtime: ServerRuntime,
+    ) -> None:
+        agent_runtime = server_runtime.agent_runtime
+        if agent_runtime is None:
+            raise RuntimeError("Agent runtime is not configured")
+
+        def insert_rule(
+            event_type: str,
+            microcontroller_id: str,
+            event_name: str,
+            expected_value: bool | int | float | str,
+            operator: OperatorEnum,
+            callback_script: str,
+        ) -> dict[str, str]:
+            return agent_runtime.insert_rule(
+                event_type=event_type,
+                microcontroller_id=microcontroller_id,
+                event_name=event_name,
+                expected_value=expected_value,
+                operator=operator,
+                callback_script=callback_script,
+            )
+
+        server_runtime._register_tool(
+            name="insert_rule",
+            description=(
+                "Create and register a rule for a hardware event. "
+                "callback_script must be Python source defining "
+                "async callback(mcp_url, value)."
+            ),
+            tool_function=insert_rule,
+        )
+
+    @staticmethod
+    def _register_event_catalog_tool(
+        server_runtime: ServerRuntime,
+    ) -> None:
+        def list_rule_events() -> EventCatalog:
+            return server_runtime.get_event_catalog()
+
+        server_runtime._register_tool(
+            name="list_rule_events",
+            description=(
+                "List the registered hardware events that can be used "
+                "when creating rules."
+            ),
+            tool_function=list_rule_events,
+        )
 
     @staticmethod
     def _register_connection_tools(

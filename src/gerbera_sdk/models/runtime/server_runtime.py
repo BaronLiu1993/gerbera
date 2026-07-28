@@ -19,6 +19,7 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
 
@@ -28,6 +29,12 @@ _PARAMETER_TYPES: dict[ParameterType, type] = {
     ParameterType.FLOAT: float,
     ParameterType.BOOL: bool,
 }
+
+EventMetadata = dict[str, str | bool]
+EventCatalog = dict[
+    str,
+    dict[str, dict[str, EventMetadata]],
+]
 
 
 @dataclass
@@ -40,6 +47,7 @@ class ServerRuntime:
     app: FastMCP
     rule_bus: RuleBus = field(default_factory=RuleBus)
     rule_buffer: RuleBuffer = field(init=False)
+    agent_runtime: AgentRuntime | None = None
     event_listener: EventListener | None = None
 
     def __post_init__(self) -> None:
@@ -90,6 +98,37 @@ class ServerRuntime:
             for connection in microcontroller.connections:
                 self._register_mcp_event(microcontroller, connection)
                 self._register_stream_event(microcontroller, connection)
+
+    def get_event_catalog(self) -> EventCatalog:
+        connections = {
+            (microcontroller.id, connection.event_name): connection
+            for microcontroller in self.hardware_system.microcontrollers
+            for connection in microcontroller.connections
+        }
+        catalog: EventCatalog = {}
+
+        for event_key, event in self.event_bus.events.items():
+            event_type, microcontroller_id, event_name = event_key
+            connection = connections.get(
+                (microcontroller_id, event_name)
+            )
+            metadata: EventMetadata = {
+                "event_type": event_type,
+                "microcontroller_id": microcontroller_id,
+                "event_name": event_name,
+                "connection_name": connection.name if connection else "",
+                "component_type": (
+                    connection.component_type if connection else ""
+                ),
+                "description": connection.description if connection else "",
+                "streamable": event.streamable,
+            }
+            catalog.setdefault(event_type, {}).setdefault(
+                microcontroller_id,
+                {},
+            )[event_name] = metadata
+
+        return catalog
 
     def _start_event_listener(self) -> None:
         if self.event_listener is not None:
@@ -289,7 +328,7 @@ class ServerRuntime:
         self,
         name: str,
         description: str,
-        tool_function: Callable[..., dict[str, str]],
+        tool_function: Callable[..., Any],
     ) -> None:
         tool_function.__name__ = name
         tool_function.__doc__ = description

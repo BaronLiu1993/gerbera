@@ -39,7 +39,7 @@ event_key = ("STREAM", "board-1", "temperature")
 rule_bus = RuleBus()
 
 
-async def report_high_temperature(value):
+async def report_high_temperature(mcp_url, value):
     return f"Temperature is high: {value}"
 
 
@@ -50,6 +50,7 @@ rule = Rule(
     ),
     callback=RuleCallback(
         callback=report_high_temperature,
+        mcp_url="https://hardware.example.com/mcp",
     ),
 )
 
@@ -89,7 +90,7 @@ the actual and expected values to `float` before comparing them.
 Pass any trusted local async callable:
 
 ```python
-async def fetch_external_data(value):
+async def fetch_external_data(mcp_url, value):
     response = await http_client.get(
         "https://example.com/data",
         params={"value": value},
@@ -99,10 +100,44 @@ async def fetch_external_data(value):
 
 callback = RuleCallback(
     callback=fetch_external_data,
+    mcp_url="https://hardware.example.com/mcp",
 )
 ```
 
-The most recently received value is available as `callback.val`.
+The callback receives `mcp_url` and the triggering value. The most recently
+received value is also available as `callback.val`.
+
+### Calling an MCP tool from the script
+
+The script can implement its MCP behavior directly:
+
+```python
+from gerbera_sdk.events.rules import RuleCallback
+from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
+
+
+async def turn_off_motor(mcp_url, value):
+    async with MCPClient(mcp_url) as client:
+        tools = await client.list_tools()
+        allowed_tool_names = frozenset(tool.name for tool in tools)
+
+        return await client.call_tool(
+            "turn_off_motor",
+            {
+                "trigger_value": value,
+            },
+            allowed_tool_names,
+        )
+
+
+callback = RuleCallback(
+    mcp_url="https://hardware.example.com/mcp",
+    callback=turn_off_motor,
+)
+```
+
+The generated script controls which tool to call, how to build arguments, and
+what result to return.
 
 ## Optional latest-value buffer
 
@@ -118,16 +153,32 @@ buffer.register_event_in_buffer(*event_key)
 result = asyncio.run(
     buffer.update_buffer_value(*event_key, {"value": 32})
 )
-latest_value = buffer.read_buffer_value(*event_key)
 ```
 
 Registering an event again does not overwrite its current value. Updates for
-unregistered events are ignored, while explicitly reading one raises `KeyError`.
+unregistered events are ignored.
 
 ## Runtime ownership
 
 Each `ServerRuntime` starts with one empty `RuleBus` and one connected
 `RuleBuffer`. The runtime injects that buffer into `EventListener`.
+
+`GerberaRuntime` also registers an `insert_rule` MCP tool. Agents can pass the
+event key, condition, operator, and Python callback source to this tool. The
+source must define:
+
+```python
+async def callback(mcp_url, value):
+    return value
+```
+
+The tool stores the source under `.gerbera/rules/<rule-id>.py`, loads the
+callback, and registers the rule against the same live bus and buffer.
+
+Agents can call `list_rule_events` first to retrieve the registered event keys
+as a nested `event_type → microcontroller_id → event_name` dictionary. Each
+event entry includes the connection name, component type, description, and
+whether it is streamable.
 
 Unregistered event keys are ignored. Rules and watched buffer keys can be added
 to these shared runtime objects later.

@@ -50,20 +50,3 @@ class RuleBuffer:
         value = next(iter(payload.values()))
         self.buffer[event_key] = value
         return await self.rule_bus.emit_evaluation_event(event_key, value)
-
-    def read_buffer_value(
-        self,
-        event_type: str,
-        microcontroller_id: str,
-        event_name: str,
-    ) -> RuleValue | None:
-        event_key = build_event_key(
-            event_type,
-            microcontroller_id,
-            event_name,
-        )
-
-        if event_key not in self.buffer:
-            raise KeyError(f"Event is not registered in rule buffer: {event_key}")
-
-        return self.buffer[event_key]

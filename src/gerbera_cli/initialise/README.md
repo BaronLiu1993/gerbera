@@ -10,6 +10,7 @@ Commands may:
 
 - inspect local hardware
 - write local registry files
+- create `.gerbera/firmware/` and `.gerbera/rules/`
 - call setup helpers
 - print actionable user output
 
@@ -25,5 +26,5 @@ Commands should not:
 flowchart TD
     A[CLI entrypoint] --> B[Command function]
     B --> C[Local system action]
-    C --> D[config.json or user output]
+    C --> D[config.json, .gerbera, or user output]
 ```

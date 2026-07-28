@@ -1,9 +1,9 @@
 import subprocess
 import shutil
-from pathlib import Path
 
 from gerbera_sdk.firmware.function.generator import Generator
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.paths import FIRMWARE_PATH
 
 DEFAULT_BUILD_DIRNAME = "build"
 
@@ -15,7 +15,7 @@ class Flash:
 
         for microcontroller in hardware_system.microcontrollers:
             firmware_code = Generator.build_firmware(microcontroller)
-            sketch_dir = Path(microcontroller.id)
+            sketch_dir = FIRMWARE_PATH / microcontroller.id
             sketch_dir.mkdir(parents=True, exist_ok=True)
             sketch_path = sketch_dir / f"{microcontroller.id}.ino"
             sketch_path.write_text(firmware_code)
@@ -33,7 +33,11 @@ class Flash:
                 port = microcontroller.port
                 fqbn = microcontroller.fqbn
                 sketch_path = microcontroller.firmware_file_path
-                build_path = Path(microcontroller.id) / DEFAULT_BUILD_DIRNAME
+                build_path = (
+                    FIRMWARE_PATH
+                    / microcontroller.id
+                    / DEFAULT_BUILD_DIRNAME
+                )
 
                 if not sketch_path:
                     raise ValueError(

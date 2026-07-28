@@ -12,6 +12,7 @@ from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 
@@ -121,6 +122,103 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
 
     with pytest.raises(ValueError, match="less than or equal to 180"):
         asyncio.run(tool.run({"params": {"angle": 181}}))
+
+
+def test_server_registers_agent_rule_tool(tmp_path) -> None:
+    event_bus = EventBus()
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=object(),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+    )
+    runtime.agent_runtime = AgentRuntime(
+        mcp_url="https://hardware.example.com/mcp",
+        rule_bus=runtime.rule_bus,
+        rule_buffer=runtime.rule_buffer,
+        rules_path=tmp_path / ".gerbera" / "rules",
+    )
+
+    GerberaRuntime._register_agent_runtime_tool(runtime)
+
+    tool = asyncio.run(app.get_tool("insert_rule"))
+    asyncio.run(
+        tool.run(
+            {
+                "event_type": "STREAM",
+                "microcontroller_id": "board-1",
+                "event_name": "temperature",
+                "expected_value": 20,
+                "operator": "greater_than",
+                "callback_script": (
+                    "async def callback(mcp_url, value):\n"
+                    "    return value\n"
+                ),
+            }
+        )
+    )
+
+    event_key = ("STREAM", "board-1", "temperature")
+    assert runtime.rule_bus.get_rule(event_key) is not None
+    assert event_key in runtime.rule_buffer.buffer
+    assert len(list(runtime.agent_runtime.rules_path.glob("*.py"))) == 1
+
+
+def test_server_exposes_registered_events_as_nested_catalog(
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    database = Database("localhost", 5432, "user", "password", "gerbera")
+    connection = Connection(
+        "front_distance",
+        "hcsr04",
+        {"trigger": "7", "echo": "8"},
+        description="Distance readings from the front sensor.",
+        database=database,
+    )
+    board = Microcontroller(
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+    )
+    board.add_connections([connection])
+    event_bus = EventBus()
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(microcontrollers=[board]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+    )
+    runtime._register_events()
+
+    GerberaRuntime._register_event_catalog_tool(runtime)
+
+    tool = asyncio.run(app.get_tool("list_rule_events"))
+    result = asyncio.run(tool.run({}))
+    catalog = result.structured_content
+    expected_metadata = {
+        "event_type": "MCP",
+        "microcontroller_id": "board-1",
+        "event_name": connection.event_name,
+        "connection_name": "front_distance",
+        "component_type": "hcsr04",
+        "description": "Distance readings from the front sensor.",
+        "streamable": False,
+    }
+    assert catalog["MCP"]["board-1"][connection.event_name] == (
+        expected_metadata
+    )
+
+    expected_metadata["event_type"] = "STREAM"
+    expected_metadata["streamable"] = True
+    assert catalog["STREAM"]["board-1"][connection.event_name] == (
+        expected_metadata
+    )
 
 
 def test_database_backed_tool_description_includes_table_name() -> None:

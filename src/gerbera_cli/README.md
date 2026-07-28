@@ -25,7 +25,17 @@ The `init` command detects attached boards and asks for:
 - the Python hardware entry point, such as `index.py`
 - the `HardwareSystem` variable name, such as `hardware`
 
-It writes those choices to `config.json`. Next, define that hardware variable in
+It writes those choices to `config.json` and creates the project-local Gerbera
+workspace:
+
+```text
+.gerbera/
+├── firmware/
+└── rules/
+```
+
+Generated board firmware is stored under `.gerbera/firmware/`. Custom rule
+scripts belong under `.gerbera/rules/`. Next, define the hardware variable in
 the selected entry-point file and start local setup:
 
 ```bash
@@ -73,6 +83,7 @@ The CLI owns:
 
 - detecting attached boards
 - writing local board declarations into `config.json`
+- creating `.gerbera/firmware/` and `.gerbera/rules/`
 - loading the user-declared hardware entry point
 - local setup and runtime orchestration
 - external deployment commands
@@ -89,7 +100,7 @@ The CLI does not own:
 ```mermaid
 flowchart TD
     A[gerbera init] --> B[Detect boards]
-    B --> C[Write config.json]
+    B --> C[Write config.json and create .gerbera]
     C --> D[gerbera setup]
     D --> E[Load hardware object]
     E --> F[Flash firmware]

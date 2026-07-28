@@ -52,8 +52,23 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
     )
     monkeypatch.setattr(
         GerberaRuntime,
+        "_build_agent_runtime",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        GerberaRuntime,
         "_register_server_runtime_tools",
         lambda runtime: calls.append("tools.register"),
+    )
+    monkeypatch.setattr(
+        GerberaRuntime,
+        "_register_agent_runtime_tool",
+        lambda runtime: calls.append("agent_tool.register"),
+    )
+    monkeypatch.setattr(
+        GerberaRuntime,
+        "_register_event_catalog_tool",
+        lambda runtime: calls.append("event_catalog_tool.register"),
     )
 
     if server_fails:
@@ -67,6 +82,8 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         "database.start",
         "events.register",
         "tools.register",
+        "agent_tool.register",
+        "event_catalog_tool.register",
         "listener.start",
         "server.run",
         "listener.stop",

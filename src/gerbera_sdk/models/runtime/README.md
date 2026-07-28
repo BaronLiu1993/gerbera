@@ -22,6 +22,7 @@ It is not responsible for:
 
 ```text
 server_runtime.py       MCP tools, events, listeners, and command dispatch.
+agent_runtime.py        Agent-created rule scripts and live rule registration.
 board_runtime.py        Per-process board transport pool and lifecycle.
 database_runtime.py     Database table provisioning and write lifecycle.
 command_runtime.py      Command compilation and response parsing.
@@ -38,9 +39,16 @@ command_runtime.py      Command compilation and response parsing.
 
 - MCP app/tool registration
 - event registration
+- building the nested runtime event catalog used by agents
 - event listener lifecycle
 - binding executable actions onto connections
 - command dispatch through board transport
+
+`AgentRuntime` owns:
+
+- writing generated callback scripts to `.gerbera/rules/`
+- loading the script's async `callback(mcp_url, value)` function
+- registering the resulting rule with the live rule bus and buffer
 
 `BoardRuntime` owns:
 

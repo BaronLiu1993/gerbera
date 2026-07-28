@@ -16,12 +16,13 @@ from gerbera_sdk.events.rules import (
 
 
 EVENT_KEY = ("STREAM", "board-1", "temperature")
+MCP_URL = "https://hardware.example.com/mcp"
 
 
 def async_callback(
     callback: Callable[[RuleValue], Any],
-) -> Callable[[RuleValue], Awaitable[Any]]:
-    async def run(value: RuleValue) -> Any:
+) -> Callable[[str, RuleValue], Awaitable[Any]]:
+    async def run(mcp_url: str, value: RuleValue) -> Any:
         return callback(value)
 
     return run
@@ -71,12 +72,35 @@ def test_rule_condition_rejects_non_numeric_values() -> None:
 def test_rule_callback_stores_value_and_returns_callable_result() -> None:
     callback = RuleCallback(
         callback=async_callback(lambda value: value * 2),
+        mcp_url=MCP_URL,
     )
 
     result = asyncio.run(callback(4))
 
     assert result == 8
     assert callback.val == 4
+
+
+def test_rule_callback_passes_mcp_url_and_value_to_script() -> None:
+    calls: list[tuple[str, RuleValue]] = []
+
+    async def script_callback(
+        mcp_url: str,
+        value: RuleValue,
+    ) -> dict[str, RuleValue]:
+        calls.append((mcp_url, value))
+        return {"trigger_value": value}
+
+    callback = RuleCallback(
+        callback=script_callback,
+        mcp_url=MCP_URL,
+    )
+
+    result = asyncio.run(callback(1))
+
+    assert result == {"trigger_value": 1}
+    assert callback.val == 1
+    assert calls == [(MCP_URL, 1)]
 
 
 def test_rule_bus_evaluates_rule_registered_for_event() -> None:
@@ -92,6 +116,7 @@ def test_rule_bus_evaluates_rule_registered_for_event() -> None:
                 callback=async_callback(
                     lambda value: f"high:{value}",
                 ),
+                mcp_url=MCP_URL,
             ),
         ),
     )
@@ -111,6 +136,7 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
         ),
         callback=RuleCallback(
             callback=async_callback(lambda value: value),
+            mcp_url=MCP_URL,
         ),
     )
     rule_bus.register_rule(*EVENT_KEY, rule)
@@ -125,6 +151,7 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
                 ),
                 callback=RuleCallback(
                     callback=async_callback(lambda value: value),
+                    mcp_url=MCP_URL,
                 ),
             ),
         )
@@ -143,6 +170,7 @@ def test_rule_bus_returns_none_when_rule_does_not_match() -> None:
                 callback=async_callback(
                     lambda value: f"very-high:{value}",
                 ),
+                mcp_url=MCP_URL,
             ),
         ),
     )
@@ -171,6 +199,7 @@ def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
             ),
             callback=RuleCallback(
                 callback=async_callback(lambda value: value),
+                mcp_url=MCP_URL,
             ),
         ),
     )
@@ -182,7 +211,7 @@ def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
     )
 
     assert result == 30
-    assert rule_buffer.read_buffer_value(*EVENT_KEY) == 30
+    assert rule_buffer.buffer[EVENT_KEY] == 30
 
 
 def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
@@ -193,7 +222,7 @@ def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
     )
     rule_buffer.register_event_in_buffer(*EVENT_KEY)
 
-    assert rule_buffer.read_buffer_value(*EVENT_KEY) == 10
+    assert rule_buffer.buffer[EVENT_KEY] == 10
 
 
 def test_rule_buffer_ignores_unknown_event() -> None:
