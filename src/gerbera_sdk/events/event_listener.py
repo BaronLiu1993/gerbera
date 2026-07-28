@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any
+import logging
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -12,6 +12,9 @@ from gerbera_sdk.utils import build_event_key
 import threading
 import uuid
 from serial import SerialException
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -95,8 +98,8 @@ class EventListener:
         microcontroller_id: str,
         event_name: str,
         payload: dict[str, str],
-    ) -> Future[Any]:
-        return self._rule_executor.submit(
+    ) -> Future[object | None]:
+        future = self._rule_executor.submit(
             asyncio.run,
             self._rule_buffer.update_buffer_value(
                 event_type,
@@ -105,6 +108,21 @@ class EventListener:
                 payload,
             ),
         )
+        future.add_done_callback(self._log_rule_failure)
+        return future
+
+    @staticmethod
+    def _log_rule_failure(future: Future[object | None]) -> None:
+        exception = future.exception()
+        if exception is not None:
+            logger.error(
+                "Rule evaluation failed",
+                exc_info=(
+                    type(exception),
+                    exception,
+                    exception.__traceback__,
+                ),
+            )
 
     def _listen_loop(self, microcontroller_id):
         serial_connection = self._serial_pool[microcontroller_id]

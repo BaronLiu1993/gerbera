@@ -159,7 +159,10 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     )
 
     event_key = ("STREAM", "board-1", "temperature")
-    assert runtime.rule_bus.get_rule(event_key) is not None
+    rule = runtime.rule_bus.get_rule(event_key)
+    assert rule is not None
+    assert rule.condition.expected == 20.0
+    assert type(rule.condition.expected) is float
     assert event_key in runtime.rule_buffer.buffer
     assert len(list(runtime.agent_runtime.rules_path.glob("*.py"))) == 1
 

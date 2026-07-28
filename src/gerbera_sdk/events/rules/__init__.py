@@ -9,7 +9,7 @@ from gerbera_sdk.events.rules.rule_callback import RuleCallback
 from gerbera_sdk.events.rules.rule_condition import (
     OperatorEnum,
     RuleCondition,
-    RuleValue,
+    parse_rule_value,
 )
 
 __all__ = [
@@ -19,7 +19,7 @@ __all__ = [
     "RuleBus",
     "RuleCallback",
     "RuleCondition",
-    "RuleValue",
     "build_rule_callback_script",
     "normalize_rule_callback_body",
+    "parse_rule_value",
 ]

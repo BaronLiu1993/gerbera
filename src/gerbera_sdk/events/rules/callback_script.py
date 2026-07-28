@@ -2,7 +2,12 @@ import ast
 from textwrap import dedent, indent
 
 
+RULE_CALLBACK_IMPORTS = (
+    "import httpx\n"
+    "from fastmcp import Client"
+)
 RULE_CALLBACK_HEADER = "async def callback(mcp_url, value):"
+RULE_CALLBACK_PARAMETERS = frozenset({"mcp_url", "value"})
 
 
 def normalize_rule_callback_body(callback_body: str) -> str:
@@ -30,6 +35,8 @@ def normalize_rule_callback_body(callback_body: str) -> str:
         ast.AsyncFunctionDef,
         ast.ClassDef,
         ast.FunctionDef,
+        ast.Import,
+        ast.ImportFrom,
         ast.Yield,
         ast.YieldFrom,
     )
@@ -39,9 +46,23 @@ def normalize_rule_callback_body(callback_body: str) -> str:
             for node in ast.walk(statement)
         ):
             raise ValueError(
-                "Rule callback body cannot define functions or classes "
-                "and cannot yield"
+                "Rule callback body cannot define functions or classes, "
+                "contain imports, or yield"
             )
+
+    reassigned_parameters = {
+        node.id
+        for statement in callback.body
+        for node in ast.walk(statement)
+        if isinstance(node, ast.Name)
+        and isinstance(node.ctx, ast.Store)
+        and node.id in RULE_CALLBACK_PARAMETERS
+    }
+    if reassigned_parameters:
+        names = ", ".join(sorted(reassigned_parameters))
+        raise ValueError(
+            f"Rule callback body cannot reassign injected parameters: {names}"
+        )
 
     return normalized_body
 
@@ -49,6 +70,7 @@ def normalize_rule_callback_body(callback_body: str) -> str:
 def build_rule_callback_script(callback_body: str) -> str:
     normalized_body = normalize_rule_callback_body(callback_body)
     return (
+        f"{RULE_CALLBACK_IMPORTS}\n\n\n"
         f"{RULE_CALLBACK_HEADER}\n"
         f"{indent(normalized_body, '    ')}\n"
     )

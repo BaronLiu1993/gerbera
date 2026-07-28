@@ -35,10 +35,11 @@ A rule is a deterministic runtime check with the form:
 
 `when actual_event_value <operator> expected_value, run callback`
 
-The condition compares one incoming hardware event value with one concrete
-`expected` value. The callback runs only when that comparison is true. A rule
-must not perform interpretation, probabilistic reasoning, or post-experiment
-analysis.
+The condition compares one incoming hardware event value with one concrete,
+finite numeric `expected` value. The runtime converts the watched sensor value
+to `float` before evaluating the condition and passes that float to the
+callback. A rule must not perform interpretation, probabilistic reasoning, or
+post-experiment analysis.
 
 When the method requires this conditional behaviour:
 
@@ -59,14 +60,23 @@ When the method requires this conditional behaviour:
 - Set `event_key.event_type`, `event_key.microcontroller_id`, and
   `event_key.event_name` from the available event and tool context. Do not
   invent an event key.
-- Set a concrete `expected` and use only an operator accepted by the tool
-  schema, such as `equal`, `not_equal`, `less_than`, `greater_than`,
+- Set a concrete numeric `expected` and use only an operator accepted by the
+  tool schema, such as `equal`, `not_equal`, `less_than`, `greater_than`,
   `less_than_equal`, or `greater_than_equal`.
 - Put only the Python function body in `callable`. Do not include `async def`,
-  the callback name, parameters, or outer indentation. For a no-op callback,
-  use:
+  the callback name, parameters, imports, or outer indentation. The runtime
+  always imports `httpx` and `Client` from `fastmcp`. It also injects `mcp_url`
+  from the configured runtime endpoint and passes the watched sensor reading
+  as a finite float in `value`. Do not hardcode or reassign either parameter.
+  For a no-op callback, use:
 
   `return None`
+
+  For an MCP call, use `async with Client(mcp_url) as client`, await
+  `client.call_tool` with the exact available tool name and argument shape,
+  check `result.is_error`, and return `result.data`. For HTTP calls, use
+  `httpx.AsyncClient`, await all I/O, set an explicit timeout, and check the
+  response status.
 
   The body is transported as an escaped JSON string in the plan and sent as
   the MCP `callback_body` argument. The runtime validates it, places it inside

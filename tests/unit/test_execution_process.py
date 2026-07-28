@@ -197,7 +197,7 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
             "insert_rule",
             {
                 **event_key,
-                "expected_value": 20,
+                "expected_value": 20.0,
                 "operator": "greater_than",
                 "callback_body": NO_OP_RULE_CALLBACK_BODY,
             },

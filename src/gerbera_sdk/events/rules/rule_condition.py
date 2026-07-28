@@ -2,8 +2,17 @@ from dataclasses import dataclass, field
 from enum import Enum
 import uuid
 
+from pydantic import FiniteFloat, TypeAdapter, ValidationError
 
-RuleValue = bool | int | float | str
+
+_RULE_VALUE_ADAPTER = TypeAdapter(FiniteFloat)
+
+
+def parse_rule_value(value: object) -> float:
+    try:
+        return _RULE_VALUE_ADAPTER.validate_python(value)
+    except ValidationError as exc:
+        raise ValueError("Rule values must be finite numbers") from exc
 
 
 class OperatorEnum(str, Enum):
@@ -17,11 +26,14 @@ class OperatorEnum(str, Enum):
 
 @dataclass
 class RuleCondition:
-    expected: RuleValue
+    expected: float
     operator: OperatorEnum
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def evaluate_condition(self, actual: RuleValue | None) -> bool:
+    def __post_init__(self) -> None:
+        self.expected = parse_rule_value(self.expected)
+
+    def evaluate_condition(self, actual: float | None) -> bool:
         if actual is None:
             return False
 
@@ -31,24 +43,16 @@ class RuleCondition:
         if self.operator == OperatorEnum.NOT_EQUAL:
             return actual != self.expected
 
-        try:
-            parsed_actual = float(actual)
-            parsed_expected = float(self.expected)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "Numeric operators require actual and expected values to be numeric."
-            ) from exc
-
         if self.operator == OperatorEnum.LESS_THAN:
-            return parsed_actual < parsed_expected
+            return actual < self.expected
 
         if self.operator == OperatorEnum.GREATER_THAN:
-            return parsed_actual > parsed_expected
+            return actual > self.expected
 
         if self.operator == OperatorEnum.LESS_THAN_EQUAL:
-            return parsed_actual <= parsed_expected
+            return actual <= self.expected
 
         if self.operator == OperatorEnum.GREATER_THAN_EQUAL:
-            return parsed_actual >= parsed_expected
+            return actual >= self.expected
 
         raise ValueError(f"Unsupported operator: {self.operator}")

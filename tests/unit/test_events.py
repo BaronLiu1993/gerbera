@@ -15,7 +15,6 @@ from gerbera_sdk.events.rules.rule_callback import RuleCallback
 from gerbera_sdk.events.rules.rule_condition import (
     OperatorEnum,
     RuleCondition,
-    RuleValue,
 )
 
 
@@ -103,7 +102,7 @@ def test_listener_updates_registered_rule_buffer_value() -> None:
     )
     rule_future.result(timeout=1)
 
-    assert rule_buffer.buffer[("STREAM", "board-1", "sensor")] == "1"
+    assert rule_buffer.buffer[("STREAM", "board-1", "sensor")] == 1.0
     listener.stop_listeners()
 
 
@@ -113,8 +112,8 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
 
     async def callback(
         mcp_url: str,
-        value: RuleValue,
-    ) -> RuleValue:
+        value: float,
+    ) -> float:
         callback_started.set()
         while not release_callback.is_set():
             await asyncio.sleep(0.001)
@@ -127,7 +126,7 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
         "sensor",
         Rule(
             condition=RuleCondition(
-                expected="1",
+                expected=1.0,
                 operator=OperatorEnum.EQUAL,
             ),
             callback=RuleCallback(
@@ -157,8 +156,53 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
     assert rule_future.done() is False
 
     release_callback.set()
-    assert rule_future.result(timeout=1) == "1"
+    assert rule_future.result(timeout=1) == 1.0
     listener.stop_listeners()
+
+
+def test_listener_logs_async_rule_callback_failure(caplog) -> None:
+    async def callback(mcp_url: str, value: float) -> None:
+        raise RuntimeError("servo unavailable")
+
+    rule_bus = RuleBus()
+    rule_bus.register_rule(
+        "STREAM",
+        "board-1",
+        "sensor",
+        Rule(
+            condition=RuleCondition(
+                expected=1.0,
+                operator=OperatorEnum.EQUAL,
+            ),
+            callback=RuleCallback(
+                callback=callback,
+                mcp_url="https://hardware.example.com/mcp",
+            ),
+        ),
+    )
+    rule_buffer = RuleBuffer(rule_bus)
+    rule_buffer.register_event_in_buffer("STREAM", "board-1", "sensor")
+    listener = EventListener(
+        hardware_system=SimpleNamespace(microcontrollers=[]),
+        _serial_pool={},
+        _threads={},
+        _event_bus=EventBus(),
+        _rule_buffer=rule_buffer,
+    )
+
+    rule_future = listener._dispatch_event_to_rule_buffer(
+        "STREAM",
+        "board-1",
+        "sensor",
+        {"value": "1"},
+    )
+
+    with pytest.raises(RuntimeError, match="servo unavailable"):
+        rule_future.result(timeout=1)
+
+    listener.stop_listeners()
+    assert "Rule evaluation failed" in caplog.text
+    assert "servo unavailable" in caplog.text
 
 
 def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:

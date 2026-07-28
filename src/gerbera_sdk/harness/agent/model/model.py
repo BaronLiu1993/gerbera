@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol
 import uuid
 
 from gerbera_sdk.harness.agent.model.model_adapters import (

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, FiniteFloat, field_validator
 
 from gerbera_sdk.events.event_key import EventKey
 from gerbera_sdk.events.rules import (
@@ -52,12 +52,15 @@ class RuleCreationSchema(StrictSchema):
         min_length=1,
         description=(
             "Python statements for the body of "
-            "async callback(mcp_url, value). Do not include the function "
-            "definition or indentation for the outer function."
+            "async callback(mcp_url, value). The runtime imports httpx and "
+            "fastmcp.Client, injects the configured MCP URL, and passes the "
+            "watched sensor value as a finite float. Do not include imports, "
+            "the function definition, outer indentation, or assignments to "
+            "mcp_url or value."
         ),
     )
     operator: OperatorEnum
-    expected: bool | int | float | str
+    expected: FiniteFloat
 
     @field_validator("callable")
     @classmethod

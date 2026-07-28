@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+from urllib.parse import urlsplit
 
 
 MAX_EVENT_NAME_LENGTH = 63
@@ -22,6 +23,20 @@ def hash_event_key(event_key: EventKey) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(serialized_key.encode("utf-8")).hexdigest()
+
+
+def require_configured_mcp_url(mcp_url: str) -> str:
+    configured_mcp_url = mcp_url.strip()
+    parsed_url = urlsplit(configured_mcp_url)
+    if (
+        parsed_url.scheme not in {"http", "https"}
+        or not parsed_url.hostname
+    ):
+        raise RuntimeError(
+            "Rule registration requires the configured HTTP(S) MCP URL"
+        )
+
+    return configured_mcp_url
 
 
 def build_connection_event_name(

@@ -1,6 +1,7 @@
 import subprocess
 
 from fastmcp import FastMCP
+from pydantic import FiniteFloat
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
@@ -147,6 +148,7 @@ class GerberaRuntime:
             mcp_url=mcp_url,
             rule_bus=server_runtime.rule_bus,
             rule_buffer=server_runtime.rule_buffer,
+            valid_event_keys=server_runtime.event_bus.events,
         )
 
     @staticmethod
@@ -202,7 +204,7 @@ class GerberaRuntime:
             event_type: str,
             microcontroller_id: str,
             event_name: str,
-            expected_value: bool | int | float | str,
+            expected_value: FiniteFloat,
             operator: OperatorEnum,
             callback_body: str,
         ) -> dict[str, str]:
@@ -220,8 +222,11 @@ class GerberaRuntime:
             description=(
                 "Create and register a rule for a hardware event. "
                 "callback_body must contain only the Python statements for "
-                "async callback(mcp_url, value); the runtime adds the fixed "
-                "function definition."
+                "async callback(mcp_url, value). The runtime imports httpx "
+                "and fastmcp.Client, adds the fixed function definition, and "
+                "binds the configured MCP URL and finite-float sensor value. "
+                "The agent must use the mcp_url parameter and must not provide "
+                "or hardcode an endpoint."
             ),
             tool_function=insert_rule,
         )

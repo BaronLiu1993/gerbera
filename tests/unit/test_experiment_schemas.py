@@ -180,6 +180,19 @@ def test_hypothesis_schema_models_a_rule_creation_step() -> None:
     assert isinstance(action.event_key, EventKey)
     assert action.event_key.event_name == "temperature"
     assert action.callable == NO_OP_RULE_CALLBACK_BODY
+    assert action.expected == 20.0
+    assert type(action.expected) is float
+
+
+@pytest.mark.parametrize("expected", ["on", float("inf"), float("nan")])
+def test_rule_creation_requires_a_finite_numeric_expected(
+    expected: object,
+) -> None:
+    action = rule_creation_action()
+    action["expected"] = expected
+
+    with pytest.raises(ValidationError):
+        RuleCreationSchema.model_validate(action)
 
 
 def test_rule_creation_rejects_a_complete_function() -> None:
@@ -190,6 +203,25 @@ def test_rule_creation_rejects_a_complete_function() -> None:
     )
 
     with pytest.raises(ValidationError, match="cannot define functions"):
+        RuleCreationSchema.model_validate(action)
+
+
+def test_rule_creation_rejects_callback_imports() -> None:
+    action = rule_creation_action()
+    action["callable"] = "import httpx\nreturn None"
+
+    with pytest.raises(ValidationError, match="contain imports"):
+        RuleCreationSchema.model_validate(action)
+
+
+@pytest.mark.parametrize("parameter", ["mcp_url", "value"])
+def test_rule_creation_rejects_reassigned_callback_parameters(
+    parameter: str,
+) -> None:
+    action = rule_creation_action()
+    action["callable"] = f"{parameter} = None\nreturn None"
+
+    with pytest.raises(ValidationError, match="cannot reassign"):
         RuleCreationSchema.model_validate(action)
 
 

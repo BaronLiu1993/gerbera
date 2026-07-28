@@ -1,17 +1,16 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
 import uuid
 
 from gerbera_sdk.events.rules.rule_bus import RuleBus
-from gerbera_sdk.events.rules.rule_condition import RuleValue
+from gerbera_sdk.events.rules.rule_condition import parse_rule_value
 from gerbera_sdk.utils import EventKey, build_event_key
 
 
 @dataclass
 class RuleBuffer:
     rule_bus: RuleBus
-    buffer: dict[EventKey, RuleValue | None] = field(default_factory=dict)
+    buffer: dict[EventKey, float | None] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def register_event_in_buffer(
@@ -49,8 +48,8 @@ class RuleBuffer:
         event_type: str,
         microcontroller_id: str,
         event_name: str,
-        payload: Mapping[str, RuleValue],
-    ) -> Any:
+        payload: Mapping[str, object],
+    ) -> object | None:
         event_key = build_event_key(
             event_type,
             microcontroller_id,
@@ -60,6 +59,6 @@ class RuleBuffer:
         if event_key not in self.buffer or len(payload) != 1:
             return
 
-        value = next(iter(payload.values()))
+        value = parse_rule_value(next(iter(payload.values())))
         self.buffer[event_key] = value
         return await self.rule_bus.emit_evaluation_event(event_key, value)

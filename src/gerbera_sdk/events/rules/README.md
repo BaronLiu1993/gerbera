@@ -76,14 +76,16 @@ second rule for the same key raises `ValueError`.
 
 ## Values and comparisons
 
-Rule values are limited to:
+Rule values are finite floating-point numbers:
 
 ```python
-bool | int | float | str
+float
 ```
 
-Equality operators compare the original values. Numeric operators convert both
-the actual and expected values to `float` before comparing them.
+When an event reaches the rule buffer, its single watched value is validated
+and converted to `float`. Numeric strings and integers are accepted; text and
+non-finite values are rejected. Conditions and callbacks therefore receive
+only floats.
 
 ## Custom callbacks
 
@@ -179,10 +181,14 @@ against the same live bus and buffer.
 The callback source is transported as text, not as a file upload. A plan places
 the Python source in a JSON string, the MCP client sends that string as the
 `callback_body` argument, and `AgentRuntime.insert_rule` validates and places
-it inside a fixed `async def callback(mcp_url, value):` template before writing
-it into the runtime's local `.gerbera/rules/` directory. This keeps the
-function signature and filesystem ownership under runtime control and does not
-require the model to know or access a local path.
+it inside a fixed `async def callback(mcp_url, value):` template. Generated
+scripts always import `httpx` and `Client` from `fastmcp`. The configured MCP
+URL and normalized finite-float sensor value are injected when the callback
+runs.
+The completed source is then written into the runtime's local
+`.gerbera/rules/` directory. This keeps imports, function signature, and
+filesystem ownership under runtime control and does not require the model to
+know or access a local path.
 
 The `delete_rule` MCP tool accepts the same three-part event key. It unregisters
 the rule and removes its generated callback file. Workflow-scoped rule actions

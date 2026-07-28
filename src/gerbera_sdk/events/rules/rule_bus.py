@@ -1,9 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Any
 import uuid
 
 from gerbera_sdk.events.rules.rule import Rule
-from gerbera_sdk.events.rules.rule_condition import RuleValue
 from gerbera_sdk.utils import EventKey, build_event_key
 
 
@@ -54,8 +52,8 @@ class RuleBus:
     async def emit_evaluation_event(
         self,
         event_key: EventKey,
-        actual: RuleValue,
-    ) -> Any:
+        actual: float,
+    ) -> object | None:
         rule = self.get_rule(event_key)
         if rule is None:
             return

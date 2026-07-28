@@ -1,10 +1,10 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Container
 from dataclasses import dataclass, field
 import inspect
 from pathlib import Path
 import sys
 from types import ModuleType
-from typing import Any, cast
+from typing import cast
 import uuid
 
 from gerbera_sdk.events.rules import (
@@ -14,14 +14,19 @@ from gerbera_sdk.events.rules import (
     RuleBus,
     RuleCallback,
     RuleCondition,
-    RuleValue,
     build_rule_callback_script,
+    parse_rule_value,
 )
 from gerbera_sdk.paths import RULES_PATH
-from gerbera_sdk.utils import EventKey, build_event_key, hash_event_key
+from gerbera_sdk.utils import (
+    EventKey,
+    build_event_key,
+    hash_event_key,
+    require_configured_mcp_url,
+)
 
 
-RuleScriptCallback = Callable[[str, RuleValue], Awaitable[Any]]
+RuleScriptCallback = Callable[[str, float], Awaitable[object]]
 
 
 @dataclass
@@ -30,21 +35,29 @@ class AgentRuntime:
     rule_bus: RuleBus
     rule_buffer: RuleBuffer
     rules_path: Path = field(default_factory=lambda: RULES_PATH)
+    valid_event_keys: Container[EventKey] | None = None
 
     def insert_rule(
         self,
         event_type: str,
         microcontroller_id: str,
         event_name: str,
-        expected_value: RuleValue,
+        expected_value: float,
         operator: OperatorEnum,
         callback_body: str,
     ) -> dict[str, str]:
+        configured_mcp_url = require_configured_mcp_url(self.mcp_url)
+        normalized_expected = parse_rule_value(expected_value)
         event_key = build_event_key(
             event_type,
             microcontroller_id,
             event_name,
         )
+        if (
+            self.valid_event_keys is not None
+            and event_key not in self.valid_event_keys
+        ):
+            raise ValueError(f"Event key is not registered: {event_key}")
         if self.rule_bus.get_rule(event_key) is not None:
             raise ValueError(f"Rule already registered for event: {event_key}")
 
@@ -57,12 +70,12 @@ class AgentRuntime:
         )
         rule = Rule(
             condition=RuleCondition(
-                expected=expected_value,
+                expected=normalized_expected,
                 operator=operator,
             ),
             callback=RuleCallback(
                 callback=callback,
-                mcp_url=self.mcp_url,
+                mcp_url=configured_mcp_url,
             ),
             id=rule_id,
         )

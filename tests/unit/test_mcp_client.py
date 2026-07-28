@@ -24,6 +24,7 @@ class FakeFastMCPClient:
             is_error=False,
             content=[],
             data={"value": "21.5"},
+            structured_content={"value": "21.5", "unit": "celsius"},
         )
 
 
@@ -44,6 +45,26 @@ def test_mcp_client_lists_and_calls_hardware_tools(monkeypatch) -> None:
 
             assert [tool.name for tool in tools] == ["read_temperature"]
             assert result == {"value": "21.5"}
+
+    asyncio.run(use_client())
+
+
+def test_mcp_client_can_return_structured_content(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        FakeFastMCPClient,
+    )
+
+    async def use_client() -> None:
+        async with MCPClient("https://hardware.example.com/mcp") as client:
+            result = await client.call_tool(
+                "read_temperature",
+                {},
+                frozenset({"read_temperature"}),
+                structured=True,
+            )
+
+            assert result == {"value": "21.5", "unit": "celsius"}
 
     asyncio.run(use_client())
 

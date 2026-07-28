@@ -1,6 +1,5 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 import pytest
 
@@ -11,7 +10,7 @@ from gerbera_sdk.events.rules import (
     RuleBus,
     RuleCallback,
     RuleCondition,
-    RuleValue,
+    parse_rule_value,
 )
 
 
@@ -20,9 +19,9 @@ MCP_URL = "https://hardware.example.com/mcp"
 
 
 def async_callback(
-    callback: Callable[[RuleValue], Any],
-) -> Callable[[str, RuleValue], Awaitable[Any]]:
-    async def run(mcp_url: str, value: RuleValue) -> Any:
+    callback: Callable[[float], object],
+) -> Callable[[str, float], Awaitable[object]]:
+    async def run(mcp_url: str, value: float) -> object:
         return callback(value)
 
     return run
@@ -31,18 +30,18 @@ def async_callback(
 @pytest.mark.parametrize(
     ("operator", "actual", "expected", "matches"),
     [
-        (OperatorEnum.EQUAL, "on", "on", True),
-        (OperatorEnum.NOT_EQUAL, "off", "on", True),
-        (OperatorEnum.LESS_THAN, "9", 10, True),
-        (OperatorEnum.GREATER_THAN, 11, "10", True),
-        (OperatorEnum.LESS_THAN_EQUAL, 10, 10, True),
-        (OperatorEnum.GREATER_THAN_EQUAL, 10, 10, True),
+        (OperatorEnum.EQUAL, 1.0, 1.0, True),
+        (OperatorEnum.NOT_EQUAL, 0.0, 1.0, True),
+        (OperatorEnum.LESS_THAN, 9.0, 10.0, True),
+        (OperatorEnum.GREATER_THAN, 11.0, 10.0, True),
+        (OperatorEnum.LESS_THAN_EQUAL, 10.0, 10.0, True),
+        (OperatorEnum.GREATER_THAN_EQUAL, 10.0, 10.0, True),
     ],
 )
 def test_rule_condition_evaluates_supported_operators(
     operator: OperatorEnum,
-    actual: RuleValue,
-    expected: RuleValue,
+    actual: float,
+    expected: float,
     matches: bool,
 ) -> None:
     condition = RuleCondition(expected=expected, operator=operator)
@@ -52,21 +51,33 @@ def test_rule_condition_evaluates_supported_operators(
 
 def test_rule_condition_does_not_match_missing_value() -> None:
     condition = RuleCondition(
-        expected="on",
+        expected=1.0,
         operator=OperatorEnum.NOT_EQUAL,
     )
 
     assert condition.evaluate_condition(None) is False
 
 
-def test_rule_condition_rejects_non_numeric_values() -> None:
-    condition = RuleCondition(
-        expected=10,
-        operator=OperatorEnum.GREATER_THAN,
-    )
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("1", 1.0),
+        (1, 1.0),
+        (1.25, 1.25),
+        (True, 1.0),
+    ],
+)
+def test_parse_rule_value_returns_a_float(value: object, expected: float) -> None:
+    parsed = parse_rule_value(value)
 
-    with pytest.raises(ValueError, match="to be numeric"):
-        condition.evaluate_condition("not-a-number")
+    assert parsed == expected
+    assert type(parsed) is float
+
+
+@pytest.mark.parametrize("value", ["on", float("inf"), float("nan")])
+def test_parse_rule_value_rejects_non_finite_numbers(value: object) -> None:
+    with pytest.raises(ValueError, match="finite numbers"):
+        parse_rule_value(value)
 
 
 def test_rule_callback_stores_value_and_returns_callable_result() -> None:
@@ -75,19 +86,19 @@ def test_rule_callback_stores_value_and_returns_callable_result() -> None:
         mcp_url=MCP_URL,
     )
 
-    result = asyncio.run(callback(4))
+    result = asyncio.run(callback(4.0))
 
-    assert result == 8
-    assert callback.val == 4
+    assert result == 8.0
+    assert callback.val == 4.0
 
 
 def test_rule_callback_passes_mcp_url_and_value_to_script() -> None:
-    calls: list[tuple[str, RuleValue]] = []
+    calls: list[tuple[str, float]] = []
 
     async def script_callback(
         mcp_url: str,
-        value: RuleValue,
-    ) -> dict[str, RuleValue]:
+        value: float,
+    ) -> dict[str, float]:
         calls.append((mcp_url, value))
         return {"trigger_value": value}
 
@@ -96,11 +107,11 @@ def test_rule_callback_passes_mcp_url_and_value_to_script() -> None:
         mcp_url=MCP_URL,
     )
 
-    result = asyncio.run(callback(1))
+    result = asyncio.run(callback(1.0))
 
-    assert result == {"trigger_value": 1}
-    assert callback.val == 1
-    assert calls == [(MCP_URL, 1)]
+    assert result == {"trigger_value": 1.0}
+    assert callback.val == 1.0
+    assert calls == [(MCP_URL, 1.0)]
 
 
 def test_rule_bus_evaluates_rule_registered_for_event() -> None:
@@ -109,7 +120,7 @@ def test_rule_bus_evaluates_rule_registered_for_event() -> None:
         *EVENT_KEY,
         Rule(
             condition=RuleCondition(
-                expected=20,
+                expected=20.0,
                 operator=OperatorEnum.GREATER_THAN,
             ),
             callback=RuleCallback(
@@ -122,8 +133,8 @@ def test_rule_bus_evaluates_rule_registered_for_event() -> None:
     )
 
     assert (
-        asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 30))
-        == "high:30"
+        asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 30.0))
+        == "high:30.0"
     )
 
 
@@ -131,7 +142,7 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
     rule_bus = RuleBus()
     rule = Rule(
         condition=RuleCondition(
-            expected=20,
+            expected=20.0,
             operator=OperatorEnum.GREATER_THAN,
         ),
         callback=RuleCallback(
@@ -146,7 +157,7 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
             *EVENT_KEY,
             Rule(
                 condition=RuleCondition(
-                    expected=50,
+                    expected=50.0,
                     operator=OperatorEnum.GREATER_THAN,
                 ),
                 callback=RuleCallback(
@@ -163,7 +174,7 @@ def test_rule_bus_returns_none_when_rule_does_not_match() -> None:
         *EVENT_KEY,
         Rule(
             condition=RuleCondition(
-                expected=50,
+                expected=50.0,
                 operator=OperatorEnum.GREATER_THAN,
             ),
             callback=RuleCallback(
@@ -176,7 +187,7 @@ def test_rule_bus_returns_none_when_rule_does_not_match() -> None:
     )
 
     assert asyncio.run(
-        rule_bus.emit_evaluation_event(EVENT_KEY, 30)
+        rule_bus.emit_evaluation_event(EVENT_KEY, 30.0)
     ) is None
 
 
@@ -184,7 +195,7 @@ def test_rule_bus_returns_no_results_for_unknown_event() -> None:
     rule_bus = RuleBus()
 
     assert asyncio.run(
-        rule_bus.emit_evaluation_event(EVENT_KEY, 30)
+        rule_bus.emit_evaluation_event(EVENT_KEY, 30.0)
     ) is None
 
 
@@ -194,7 +205,7 @@ def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
         *EVENT_KEY,
         Rule(
             condition=RuleCondition(
-                expected=20,
+                expected=20.0,
                 operator=OperatorEnum.GREATER_THAN,
             ),
             callback=RuleCallback(
@@ -207,11 +218,11 @@ def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
     rule_buffer.register_event_in_buffer(*EVENT_KEY)
 
     result = asyncio.run(
-        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": "30"})
     )
 
-    assert result == 30
-    assert rule_buffer.buffer[EVENT_KEY] == 30
+    assert result == 30.0
+    assert rule_buffer.buffer[EVENT_KEY] == 30.0
 
 
 def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
@@ -222,7 +233,7 @@ def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
     )
     rule_buffer.register_event_in_buffer(*EVENT_KEY)
 
-    assert rule_buffer.buffer[EVENT_KEY] == 10
+    assert rule_buffer.buffer[EVENT_KEY] == 10.0
 
 
 def test_rule_buffer_ignores_unknown_event() -> None:
@@ -234,3 +245,18 @@ def test_rule_buffer_ignores_unknown_event() -> None:
 
     assert result is None
     assert rule_buffer.buffer == {}
+
+
+def test_rule_buffer_rejects_non_numeric_sensor_value() -> None:
+    rule_buffer = RuleBuffer(RuleBus())
+    rule_buffer.register_event_in_buffer(*EVENT_KEY)
+
+    with pytest.raises(ValueError, match="finite numbers"):
+        asyncio.run(
+            rule_buffer.update_buffer_value(
+                *EVENT_KEY,
+                {"value": "on"},
+            )
+        )
+
+    assert rule_buffer.buffer[EVENT_KEY] is None

@@ -57,6 +57,8 @@ class MCPClient:
         name: str,
         arguments: dict[str, Any],
         allowed_tool_names: frozenset[str],
+        *,
+        structured: bool = False,
     ) -> Any:
         if name not in allowed_tool_names:
             raise ValueError(f"MCP tool is not allowed: {name}")
@@ -65,6 +67,9 @@ class MCPClient:
 
         if result.is_error:
             raise RuntimeError(f"MCP tool {name!r} failed: {result.content}")
+
+        if structured:
+            return result.structured_content
 
         return result.data
 
