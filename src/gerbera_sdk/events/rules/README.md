@@ -74,6 +74,11 @@ result = asyncio.run(
 For the MVP, one rule can be registered for each event key. Registering a
 second rule for the same key raises `ValueError`.
 
+Each rule has a trigger mode. `once` atomically claims the first matching event
+and invokes the callback at most once per registration. `repeat` invokes the
+callback for every matching event and preserves the original level-triggered
+behavior.
+
 ## Values and comparisons
 
 Rule values are finite floating-point numbers:
@@ -210,6 +215,7 @@ threads continue reading hardware events while async callbacks wait for I/O.
 - async callbacks
 - one condition per rule
 - one rule per event key
+- `once` and `repeat` trigger modes
 - latest-value storage, not event history
 - one callback result returned to the event publisher
 - trusted local developer code

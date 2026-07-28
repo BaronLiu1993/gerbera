@@ -1,6 +1,8 @@
 import asyncio
 import json
 
+import pytest
+
 from gerbera_sdk.harness.agent.agent import Agent
 from gerbera_sdk.harness.agent.experiments.session import Session
 from gerbera_sdk.harness.agent.experiments.states import (
@@ -62,7 +64,7 @@ def hypothesis_response() -> dict:
         "method": {
             "description": "Collect and review temperature readings.",
             "name": "heating_test",
-            "steps": [
+            "execute_steps": [
                 {
                     "action_type": "execute",
                     "actions": [
@@ -78,40 +80,40 @@ def hypothesis_response() -> dict:
                         }
                     ],
                 },
-                {
-                    "action_type": "review",
-                    "actions": [
-                        {
-                            "description": (
-                                "Review the collected temperature readings."
-                            ),
-                            "action_type": "review",
-                            "analysis_goal": (
-                                "Compare temperature by heater state."
-                            ),
-                            "independent_variables": [
-                                {
-                                    "variable": "heater_state",
-                                    "table_name": "temperature_readings",
-                                    "unit": None,
-                                    "type": "bool",
-                                }
-                            ],
-                            "dependent_variables": [
-                                {
-                                    "variable": "temperature",
-                                    "table_name": "temperature_readings",
-                                    "unit": "celsius",
-                                    "type": "float",
-                                }
-                            ],
-                            "expected": (
-                                "Temperature is higher when the heater is on."
-                            ),
-                        }
-                    ],
-                },
             ],
+            "final_review": {
+                "action_type": "review",
+                "actions": [
+                    {
+                        "description": (
+                            "Review the collected temperature readings."
+                        ),
+                        "action_type": "review",
+                        "analysis_goal": (
+                            "Compare temperature by heater state."
+                        ),
+                        "independent_variables": [
+                            {
+                                "variable": "heater_state",
+                                "table_name": "temperature_readings",
+                                "unit": None,
+                                "type": "bool",
+                            }
+                        ],
+                        "dependent_variables": [
+                            {
+                                "variable": "temperature",
+                                "table_name": "temperature_readings",
+                                "unit": "celsius",
+                                "type": "float",
+                            }
+                        ],
+                        "expected": (
+                            "Temperature is higher when the heater is on."
+                        ),
+                    }
+                ],
+            },
         },
     }
 
@@ -167,6 +169,72 @@ def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     assert execution.mcp_url == "https://hardware.example.com/mcp"
     assert len(execution.actions_list) == 1
     assert execution.ran
+
+
+def test_agent_retries_plan_without_final_review(monkeypatch) -> None:
+    FakeExecutionProcess.instances = []
+    monkeypatch.setattr(
+        "gerbera_sdk.harness.agent.agent.ExecutionProcess",
+        FakeExecutionProcess,
+    )
+    invalid_hypothesis = hypothesis_response()
+    invalid_hypothesis["method"].pop("final_review")
+    model = FakeModel(
+        [
+            {
+                "decision": "accepted",
+                "next_state": "execution",
+                "response": invalid_hypothesis,
+            },
+            {
+                "decision": "accepted",
+                "next_state": "execution",
+                "response": hypothesis_response(),
+            },
+        ]
+    )
+    agent = Agent(
+        session=Session(),
+        model=model,
+        initialisation_process=FakeInitialisationProcess(),
+    )
+
+    asyncio.run(agent.run_agent("Test the heater."))
+
+    assert agent.session.state.state is LoopStateEnum.EXECUTION
+    assert len(FakeExecutionProcess.instances) == 1
+    assert [message["role"] for message in agent.messages] == [
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert "final_review" in (
+        agent.messages[-1]["content"].lower()
+    )
+
+
+def test_agent_limits_invalid_initialisation_retries() -> None:
+    invalid_hypothesis = hypothesis_response()
+    invalid_hypothesis["method"].pop("final_review")
+    invalid_response = {
+        "decision": "accepted",
+        "next_state": "execution",
+        "response": invalid_hypothesis,
+    }
+    agent = Agent(
+        session=Session(),
+        model=FakeModel([invalid_response, invalid_response]),
+        initialisation_process=FakeInitialisationProcess(),
+        max_initialisation_attempts=2,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="invalid experiment plan after 2 attempts",
+    ):
+        asyncio.run(agent.run_agent("Test the heater."))
+
+    assert agent.session.state.state is LoopStateEnum.INITIALISATION
 
 
 def test_agent_stops_after_rejected_initialisation() -> None:

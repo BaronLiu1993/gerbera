@@ -1,17 +1,24 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Annotated
 import uuid
 
-from pydantic import FiniteFloat, TypeAdapter, ValidationError
+from pydantic import Field, StrictFloat, TypeAdapter, ValidationError
 
 
-_RULE_VALUE_ADAPTER = TypeAdapter(FiniteFloat)
+_RULE_FLOAT_ADAPTER = TypeAdapter(
+    Annotated[StrictFloat, Field(allow_inf_nan=False)]
+)
 
 
 def parse_rule_value(value: object) -> float:
+    if isinstance(value, bool):
+        raise ValueError("Rule values must be finite numbers")
+
     try:
-        return _RULE_VALUE_ADAPTER.validate_python(value)
-    except ValidationError as exc:
+        normalized_value = float(value)
+        return _RULE_FLOAT_ADAPTER.validate_python(normalized_value)
+    except (TypeError, ValueError, ValidationError) as exc:
         raise ValueError("Rule values must be finite numbers") from exc
 
 

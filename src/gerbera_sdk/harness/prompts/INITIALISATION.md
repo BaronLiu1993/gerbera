@@ -59,10 +59,17 @@ When the method requires this conditional behaviour:
   watched event.
 - Set `event_key.event_type`, `event_key.microcontroller_id`, and
   `event_key.event_name` from the available event and tool context. Do not
-  invent an event key.
+  invent an event key. For every rule, `event_key.event_type` must be
+  `STREAM`. Never use an `MCP` event for a rule because MCP events are tool
+  command responses, not the continuous sensor readings watched by rules.
 - Set a concrete numeric `expected` and use only an operator accepted by the
   tool schema, such as `equal`, `not_equal`, `less_than`, `greater_than`,
   `less_than_equal`, or `greater_than_equal`.
+- Set `trigger_mode` to `once` when the side effect should happen only for the
+  first matching event after registration. Use `repeat` only when the callback
+  must run for every matching event while the rule remains registered. Prefer
+  `once` for one-time actuator commands such as moving a servo to a target
+  angle.
 - Put only the Python function body in `callable`. Do not include `async def`,
   the callback name, parameters, imports, or outer indentation. The runtime
   always imports `httpx` and `Client` from `fastmcp`. It also injects `mcp_url`

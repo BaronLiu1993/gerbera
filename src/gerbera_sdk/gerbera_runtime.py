@@ -1,11 +1,12 @@
 import subprocess
+from typing import Annotated
 
 from fastmcp import FastMCP
-from pydantic import FiniteFloat
+from pydantic import Field, StrictFloat
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
-from gerbera_sdk.events.rules import OperatorEnum
+from gerbera_sdk.events.rules import OperatorEnum, RuleTriggerModeEnum
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.connection import Connection
@@ -204,9 +205,13 @@ class GerberaRuntime:
             event_type: str,
             microcontroller_id: str,
             event_name: str,
-            expected_value: FiniteFloat,
+            expected_value: Annotated[
+                StrictFloat,
+                Field(allow_inf_nan=False),
+            ],
             operator: OperatorEnum,
             callback_body: str,
+            trigger_mode: RuleTriggerModeEnum = RuleTriggerModeEnum.REPEAT,
         ) -> dict[str, str]:
             return agent_runtime.insert_rule(
                 event_type=event_type,
@@ -215,6 +220,7 @@ class GerberaRuntime:
                 expected_value=expected_value,
                 operator=operator,
                 callback_body=callback_body,
+                trigger_mode=trigger_mode,
             )
 
         server_runtime._register_tool(

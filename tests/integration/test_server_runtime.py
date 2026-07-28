@@ -163,6 +163,7 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     assert rule is not None
     assert rule.condition.expected == 20.0
     assert type(rule.condition.expected) is float
+    assert rule.trigger_mode.value == "repeat"
     assert event_key in runtime.rule_buffer.buffer
     assert len(list(runtime.agent_runtime.rules_path.glob("*.py"))) == 1
 

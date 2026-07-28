@@ -84,6 +84,7 @@ def rule_creation_action() -> RuleCreationSchema:
             "callable": NO_OP_RULE_CALLBACK_BODY,
             "operator": "greater_than",
             "expected": 20,
+            "trigger_mode": "repeat",
         }
     )
 
@@ -200,6 +201,7 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
                 "expected_value": 20.0,
                 "operator": "greater_than",
                 "callback_body": NO_OP_RULE_CALLBACK_BODY,
+                "trigger_mode": "repeat",
             },
         ),
         ("set_motor", {"speed": 10}),

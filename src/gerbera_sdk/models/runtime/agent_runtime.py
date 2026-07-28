@@ -14,6 +14,7 @@ from gerbera_sdk.events.rules import (
     RuleBus,
     RuleCallback,
     RuleCondition,
+    RuleTriggerModeEnum,
     build_rule_callback_script,
     parse_rule_value,
 )
@@ -45,6 +46,7 @@ class AgentRuntime:
         expected_value: float,
         operator: OperatorEnum,
         callback_body: str,
+        trigger_mode: RuleTriggerModeEnum = RuleTriggerModeEnum.REPEAT,
     ) -> dict[str, str]:
         configured_mcp_url = require_configured_mcp_url(self.mcp_url)
         normalized_expected = parse_rule_value(expected_value)
@@ -77,6 +79,7 @@ class AgentRuntime:
                 callback=callback,
                 mcp_url=configured_mcp_url,
             ),
+            trigger_mode=trigger_mode,
             id=rule_id,
         )
 

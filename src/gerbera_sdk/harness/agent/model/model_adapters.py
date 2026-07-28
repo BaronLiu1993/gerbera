@@ -80,7 +80,14 @@ class OpenAIAdapter:
             },
             timeout=self.timeout_seconds,
         )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise httpx.HTTPStatusError(
+                f"{exc}\nOpenAI response: {resp.text}",
+                request=exc.request,
+                response=exc.response,
+            ) from exc
         return resp.json()["choices"][0]["message"]["content"]
 
 

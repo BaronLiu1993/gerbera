@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -10,6 +11,7 @@ from gerbera_sdk.events.rules import (
     RuleBus,
     RuleCallback,
     RuleCondition,
+    RuleTriggerModeEnum,
     parse_rule_value,
 )
 
@@ -64,7 +66,6 @@ def test_rule_condition_does_not_match_missing_value() -> None:
         ("1", 1.0),
         (1, 1.0),
         (1.25, 1.25),
-        (True, 1.0),
     ],
 )
 def test_parse_rule_value_returns_a_float(value: object, expected: float) -> None:
@@ -74,7 +75,10 @@ def test_parse_rule_value_returns_a_float(value: object, expected: float) -> Non
     assert type(parsed) is float
 
 
-@pytest.mark.parametrize("value", ["on", float("inf"), float("nan")])
+@pytest.mark.parametrize(
+    "value",
+    ["on", True, False, float("inf"), float("nan")],
+)
 def test_parse_rule_value_rejects_non_finite_numbers(value: object) -> None:
     with pytest.raises(ValueError, match="finite numbers"):
         parse_rule_value(value)
@@ -136,6 +140,81 @@ def test_rule_bus_evaluates_rule_registered_for_event() -> None:
         asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 30.0))
         == "high:30.0"
     )
+
+
+def test_repeat_rule_runs_for_every_matching_event() -> None:
+    callback_values: list[float] = []
+    rule_bus = RuleBus()
+    rule_bus.register_rule(
+        *EVENT_KEY,
+        Rule(
+            condition=RuleCondition(
+                expected=1.0,
+                operator=OperatorEnum.EQUAL,
+            ),
+            callback=RuleCallback(
+                callback=async_callback(
+                    lambda value: callback_values.append(value),
+                ),
+                mcp_url=MCP_URL,
+            ),
+            trigger_mode=RuleTriggerModeEnum.REPEAT,
+        ),
+    )
+
+    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 1.0))
+    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 1.0))
+
+    assert callback_values == [1.0, 1.0]
+
+
+def test_once_rule_runs_only_for_first_matching_event() -> None:
+    callback_values: list[float] = []
+    rule = Rule(
+        condition=RuleCondition(
+            expected=1.0,
+            operator=OperatorEnum.EQUAL,
+        ),
+        callback=RuleCallback(
+            callback=async_callback(
+                lambda value: callback_values.append(value),
+            ),
+            mcp_url=MCP_URL,
+        ),
+        trigger_mode=RuleTriggerModeEnum.ONCE,
+    )
+    rule_bus = RuleBus()
+    rule_bus.register_rule(*EVENT_KEY, rule)
+
+    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 0.0))
+    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 1.0))
+    second_result = asyncio.run(
+        rule_bus.emit_evaluation_event(EVENT_KEY, 1.0)
+    )
+
+    assert callback_values == [1.0]
+    assert rule.has_triggered is True
+    assert second_result is None
+
+
+def test_once_rule_claim_is_atomic() -> None:
+    rule = Rule(
+        condition=RuleCondition(
+            expected=1.0,
+            operator=OperatorEnum.EQUAL,
+        ),
+        callback=RuleCallback(
+            callback=async_callback(lambda value: value),
+            mcp_url=MCP_URL,
+        ),
+        trigger_mode=RuleTriggerModeEnum.ONCE,
+    )
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        claims = list(executor.map(lambda _: rule.claim_trigger(), range(32)))
+
+    assert claims.count(True) == 1
+    assert claims.count(False) == 31
 
 
 def test_rule_bus_rejects_second_rule_for_same_event() -> None:

@@ -61,4 +61,7 @@ class RuleBus:
         if not rule.condition.evaluate_condition(actual):
             return
 
+        if not rule.claim_trigger():
+            return
+
         return await rule.callback(val=actual)

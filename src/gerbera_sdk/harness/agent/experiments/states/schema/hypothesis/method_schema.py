@@ -20,31 +20,15 @@ class ReviewActionGroupSchema(StrictSchema):
     actions: list[ReviewSchema] = Field(min_length=1, max_length=1)
 
 
-ActionGroupSchema = ExecuteActionGroupSchema | ReviewActionGroupSchema
-
-
 class MethodSchema(StrictSchema):
     description: str
     name: str
-    steps: list[ActionGroupSchema] = Field(min_length=2)
+    execute_steps: list[ExecuteActionGroupSchema] = Field(min_length=1)
+    final_review: ReviewActionGroupSchema
 
     @model_validator(mode="after")
-    def require_final_review(self) -> "MethodSchema":
-        if not isinstance(self.steps[-1], ReviewActionGroupSchema):
-            raise ValueError("The final action group must be a review group")
-
-        if any(
-            isinstance(group, ReviewActionGroupSchema)
-            for group in self.steps[:-1]
-        ):
-            raise ValueError(
-                "Review groups may only appear as the final method step"
-            )
-
-        for group_index, group in enumerate(self.steps[:-1]):
-            if not isinstance(group, ExecuteActionGroupSchema):
-                continue
-
+    def require_rules_in_first_execute_group(self) -> "MethodSchema":
+        for group_index, group in enumerate(self.execute_steps):
             rule_actions = [
                 action
                 for action in group.actions

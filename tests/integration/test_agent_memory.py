@@ -31,7 +31,7 @@ class FakeClient:
                     "method": {
                         "description": "Collect and review temperature readings.",
                         "name": "heating_test",
-                        "steps": [
+                        "execute_steps": [
                             {
                                 "action_type": "execute",
                                 "actions": [
@@ -47,46 +47,46 @@ class FakeClient:
                                     }
                                 ],
                             },
-                            {
-                                "action_type": "review",
-                                "actions": [
-                                    {
-                                        "description": (
-                                            "Review the collected temperature "
-                                            "readings."
-                                        ),
-                                        "action_type": "review",
-                                        "analysis_goal": (
-                                            "Compare temperature by heater state."
-                                        ),
-                                        "independent_variables": [
-                                            {
-                                                "variable": "heater_state",
-                                                "table_name": (
-                                                    "temperature_readings"
-                                                ),
-                                                "unit": None,
-                                                "type": "bool",
-                                            }
-                                        ],
-                                        "dependent_variables": [
-                                            {
-                                                "variable": "temperature",
-                                                "table_name": (
-                                                    "temperature_readings"
-                                                ),
-                                                "unit": "celsius",
-                                                "type": "float",
-                                            }
-                                        ],
-                                        "expected": (
-                                            "Temperature is higher when the "
-                                            "heater is on."
-                                        ),
-                                    }
-                                ],
-                            },
                         ],
+                        "final_review": {
+                            "action_type": "review",
+                            "actions": [
+                                {
+                                    "description": (
+                                        "Review the collected temperature "
+                                        "readings."
+                                    ),
+                                    "action_type": "review",
+                                    "analysis_goal": (
+                                        "Compare temperature by heater state."
+                                    ),
+                                    "independent_variables": [
+                                        {
+                                            "variable": "heater_state",
+                                            "table_name": (
+                                                "temperature_readings"
+                                            ),
+                                            "unit": None,
+                                            "type": "bool",
+                                        }
+                                    ],
+                                    "dependent_variables": [
+                                        {
+                                            "variable": "temperature",
+                                            "table_name": (
+                                                "temperature_readings"
+                                            ),
+                                            "unit": "celsius",
+                                            "type": "float",
+                                        }
+                                    ],
+                                    "expected": (
+                                        "Temperature is higher when the "
+                                        "heater is on."
+                                    ),
+                                }
+                            ],
+                        },
                     },
                 },
             }

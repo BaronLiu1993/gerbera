@@ -3,7 +3,12 @@ from typing import Any
 
 import pytest
 
-from gerbera_sdk.events.rules import OperatorEnum, RuleBuffer, RuleBus
+from gerbera_sdk.events.rules import (
+    OperatorEnum,
+    RuleBuffer,
+    RuleBus,
+    RuleTriggerModeEnum,
+)
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.utils import hash_event_key
 
@@ -67,6 +72,7 @@ def test_agent_runtime_writes_and_registers_rule_script(tmp_path) -> None:
         callback_body=(
             "return {'mcp_url': mcp_url, 'value': value}\n"
         ),
+        trigger_mode=RuleTriggerModeEnum.ONCE,
     )
 
     script_path = runtime.rules_path / f"{hash_event_key(EVENT_KEY)}.py"
@@ -85,6 +91,7 @@ def test_agent_runtime_writes_and_registers_rule_script(tmp_path) -> None:
     assert rule is not None
     assert rule.condition.expected == 20.0
     assert type(rule.condition.expected) is float
+    assert rule.trigger_mode == RuleTriggerModeEnum.ONCE
     assert asyncio.run(
         rule_bus.emit_evaluation_event(EVENT_KEY, 21.0)
     ) == {
@@ -93,7 +100,10 @@ def test_agent_runtime_writes_and_registers_rule_script(tmp_path) -> None:
     }
 
 
-@pytest.mark.parametrize("expected_value", ["on", float("inf"), float("nan")])
+@pytest.mark.parametrize(
+    "expected_value",
+    ["on", True, False, float("inf"), float("nan")],
+)
 def test_agent_runtime_rejects_non_finite_expected_before_writing_script(
     tmp_path,
     expected_value: Any,

@@ -1,11 +1,12 @@
 from enum import Enum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, FiniteFloat, field_validator
+from pydantic import Field, StrictFloat, field_validator
 
 from gerbera_sdk.events.event_key import EventKey
 from gerbera_sdk.events.rules import (
     OperatorEnum,
+    RuleTriggerModeEnum,
     normalize_rule_callback_body,
 )
 
@@ -60,7 +61,11 @@ class RuleCreationSchema(StrictSchema):
         ),
     )
     operator: OperatorEnum
-    expected: FiniteFloat
+    expected: Annotated[
+        StrictFloat,
+        Field(allow_inf_nan=False),
+    ]
+    trigger_mode: RuleTriggerModeEnum
 
     @field_validator("callable")
     @classmethod

@@ -2,6 +2,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from gerbera_sdk.events.event_key import EventKey
+from gerbera_sdk.events.rules import RuleTriggerModeEnum
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis import (
     ActionSchema,
     HypothesisSchema,
@@ -82,6 +83,7 @@ def rule_creation_action() -> dict:
         "callable": NO_OP_RULE_CALLBACK_BODY,
         "operator": "greater_than",
         "expected": 20,
+        "trigger_mode": "repeat",
     }
 
 
@@ -136,16 +138,16 @@ def hypothesis_data(action: dict) -> dict:
         if action["action_type"] == "review"
         else review_action()
     )
-    steps = [
+    execute_steps = [
         {
             "action_type": "execute",
             "actions": [execute_action],
         },
-        {
-            "action_type": "review",
-            "actions": [final_review_action],
-        },
     ]
+    final_review = {
+        "action_type": "review",
+        "actions": [final_review_action],
+    }
     return {
         "hypothesis": "Heating increases measured temperature.",
         "dependent_variables": ["temperature"],
@@ -155,7 +157,8 @@ def hypothesis_data(action: dict) -> dict:
         "method": {
             "name": "heating_test",
             "description": "Compare temperature before and after heating.",
-            "steps": steps,
+            "execute_steps": execute_steps,
+            "final_review": final_review,
         },
     }
 
@@ -165,7 +168,7 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
         hypothesis_data(discrete_execute_action())
     )
 
-    action = hypothesis.method.steps[0].actions[0]
+    action = hypothesis.method.execute_steps[0].actions[0]
     assert action.forward_tool_call == "write_motor"
     assert action.params[0].value == 90
 
@@ -175,16 +178,29 @@ def test_hypothesis_schema_models_a_rule_creation_step() -> None:
         hypothesis_data(rule_creation_action())
     )
 
-    action = hypothesis.method.steps[0].actions[0]
+    action = hypothesis.method.execute_steps[0].actions[0]
     assert isinstance(action, RuleCreationSchema)
     assert isinstance(action.event_key, EventKey)
     assert action.event_key.event_name == "temperature"
     assert action.callable == NO_OP_RULE_CALLBACK_BODY
     assert action.expected == 20.0
     assert type(action.expected) is float
+    assert action.trigger_mode == RuleTriggerModeEnum.REPEAT
 
 
-@pytest.mark.parametrize("expected", ["on", float("inf"), float("nan")])
+def test_rule_creation_accepts_once_trigger_mode() -> None:
+    action = rule_creation_action()
+    action["trigger_mode"] = "once"
+
+    rule = RuleCreationSchema.model_validate(action)
+
+    assert rule.trigger_mode == RuleTriggerModeEnum.ONCE
+
+
+@pytest.mark.parametrize(
+    "expected",
+    ["on", "1", True, False, float("inf"), float("nan")],
+)
 def test_rule_creation_requires_a_finite_numeric_expected(
     expected: object,
 ) -> None:
@@ -236,7 +252,7 @@ def test_rule_creation_normalizes_a_multiline_callback_body() -> None:
 
 def test_rule_creation_must_be_in_first_execute_group() -> None:
     data = hypothesis_data(discrete_execute_action())
-    data["method"]["steps"].insert(
+    data["method"]["execute_steps"].insert(
         1,
         {
             "action_type": "execute",
@@ -250,13 +266,13 @@ def test_rule_creation_must_be_in_first_execute_group() -> None:
 
 def test_rule_creation_can_share_the_first_execute_group() -> None:
     data = hypothesis_data(rule_creation_action())
-    data["method"]["steps"][0]["actions"].append(
+    data["method"]["execute_steps"][0]["actions"].append(
         discrete_execute_action()
     )
 
     hypothesis = HypothesisSchema.model_validate(data)
 
-    assert len(hypothesis.method.steps[0].actions) == 2
+    assert len(hypothesis.method.execute_steps[0].actions) == 2
 
 
 def test_hypothesis_schema_models_a_review_step() -> None:
@@ -264,46 +280,37 @@ def test_hypothesis_schema_models_a_review_step() -> None:
         hypothesis_data(review_action())
     )
 
-    action = hypothesis.method.steps[-1].actions[0]
+    action = hypothesis.method.final_review.actions[0]
     assert isinstance(action, ReviewSchema)
     assert action.dependent_variables[0].table_name == "temperature_readings"
     assert action.expected.startswith("Average temperature")
 
 
-def test_method_requires_at_least_one_step() -> None:
+def test_method_requires_at_least_one_execute_step() -> None:
     data = hypothesis_data(review_action())
-    data["method"]["steps"] = []
+    data["method"]["execute_steps"] = []
 
     with pytest.raises(ValidationError, match="too_short"):
         HypothesisSchema.model_validate(data)
 
 
-def test_method_requires_review_as_final_step() -> None:
+def test_method_requires_final_review() -> None:
     data = hypothesis_data(discrete_execute_action())
-    data["method"]["steps"] = [
-        {
-            "action_type": "execute",
-            "actions": [discrete_execute_action()],
-        },
-        {
-            "action_type": "execute",
-            "actions": [continuous_execute_action()],
-        },
-    ]
+    data["method"].pop("final_review")
 
-    with pytest.raises(ValidationError, match="final action group"):
+    with pytest.raises(ValidationError, match="final_review"):
         HypothesisSchema.model_validate(data)
 
 
 def test_execute_group_supports_parallel_actions() -> None:
     data = hypothesis_data(discrete_execute_action())
-    data["method"]["steps"][0]["actions"].append(
+    data["method"]["execute_steps"][0]["actions"].append(
         continuous_execute_action()
     )
 
     hypothesis = HypothesisSchema.model_validate(data)
 
-    assert len(hypothesis.method.steps[0].actions) == 2
+    assert len(hypothesis.method.execute_steps[0].actions) == 2
 
 
 def test_hypothesis_schema_excludes_application_owned_fields() -> None:
@@ -327,6 +334,18 @@ def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
     assert "DiscreteExecuteSchema" in Initialisation.valid_schema["$defs"]
     assert "RuleCreationSchema" in Initialisation.valid_schema["$defs"]
     assert "ReviewSchema" in Initialisation.valid_schema["$defs"]
+
+
+def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
+    from gerbera_sdk.harness.agent.experiments.states import Initialisation
+
+    trigger_mode_schema = Initialisation.valid_schema["$defs"][
+        "RuleCreationSchema"
+    ]["properties"]["trigger_mode"]
+
+    assert trigger_mode_schema == {
+        "$ref": "#/$defs/RuleTriggerModeEnum",
+    }
 
 
 def test_hypothesis_output_schema_is_strict() -> None:

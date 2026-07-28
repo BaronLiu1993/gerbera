@@ -201,6 +201,7 @@ class ExecutionProcess:
             "expected_value": action.expected,
             "operator": action.operator.value,
             "callback_body": action.callable,
+            "trigger_mode": action.trigger_mode.value,
         }
 
     def _verify_valid_execute_actions(self) -> bool:
