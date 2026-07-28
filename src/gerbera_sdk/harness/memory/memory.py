@@ -1,14 +1,11 @@
 from dataclasses import dataclass, field
 import json
-import sqlite3
 from gerbera_sdk.harness.memory.event import Event
 
 
 # No need for sqlite we can use postgres
 @dataclass
 class Memory:
-    @classmethod
-
     def append_event(self, state: str, event: Event) -> None:
         timestamp = event.timestamp.isoformat()
 

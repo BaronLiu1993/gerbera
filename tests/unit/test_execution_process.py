@@ -12,6 +12,8 @@ from gerbera_sdk.harness.agent.experiments.states.processes.execution_process im
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
+    NO_OP_RULE_CALLBACK_BODY,
+    RuleCreationSchema,
 )
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
@@ -66,6 +68,26 @@ def continuous_action() -> ContinuousExecuteSchema:
     )
 
 
+def rule_creation_action() -> RuleCreationSchema:
+    return RuleCreationSchema.model_validate(
+        {
+            "description": "Watch for excessive temperature.",
+            "action_type": "execute",
+            "execution_type": "continuous",
+            "create_tool_call": "insert_rule",
+            "delete_tool_call": "delete_rule",
+            "event_key": {
+                "event_type": "STREAM",
+                "microcontroller_id": "board-1",
+                "event_name": "temperature",
+            },
+            "callable": NO_OP_RULE_CALLBACK_BODY,
+            "operator": "greater_than",
+            "expected": 20,
+        }
+    )
+
+
 class FakeMCPClient:
     calls: list[tuple[str, dict]] = []
     failing_tools: set[str] = set()
@@ -85,7 +107,16 @@ class FakeMCPClient:
             SimpleNamespace(name="set_motor"),
             SimpleNamespace(name="start_sensor"),
             SimpleNamespace(name="stop_sensor"),
+            SimpleNamespace(name="insert_rule"),
+            SimpleNamespace(name="delete_rule"),
         ]
+
+    @staticmethod
+    def build_arguments(parameters) -> dict:
+        return {
+            parameter.variable: parameter.value
+            for parameter in parameters
+        }
 
     async def call_tool(
         self,
@@ -142,6 +173,87 @@ def test_execution_process_stops_continuous_action() -> None:
         ("stop_sensor", {"enabled": False}),
     ]
     assert result is None
+
+
+def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
+    group = ExecuteActionGroupSchema(
+        action_type="execute",
+        actions=[discrete_action(), rule_creation_action()],
+    )
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[group],
+    )
+
+    result = asyncio.run(process.run_workflow())
+
+    event_key = {
+        "event_type": "STREAM",
+        "microcontroller_id": "board-1",
+        "event_name": "temperature",
+    }
+    assert FakeMCPClient.calls == [
+        (
+            "insert_rule",
+            {
+                **event_key,
+                "expected_value": 20,
+                "operator": "greater_than",
+                "callback_body": NO_OP_RULE_CALLBACK_BODY,
+            },
+        ),
+        ("set_motor", {"speed": 10}),
+        ("delete_rule", event_key),
+    ]
+    assert result is None
+
+
+def test_execution_process_deletes_rule_when_later_group_fails() -> None:
+    FakeMCPClient.failing_tools = {"set_motor"}
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[
+            ExecuteActionGroupSchema(
+                action_type="execute",
+                actions=[rule_creation_action()],
+            ),
+            ExecuteActionGroupSchema(
+                action_type="execute",
+                actions=[discrete_action()],
+            ),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="Execution group 1 failed"):
+        asyncio.run(process.run_workflow())
+
+    assert FakeMCPClient.calls[-1] == (
+        "delete_rule",
+        {
+            "event_type": "STREAM",
+            "microcontroller_id": "board-1",
+            "event_name": "temperature",
+        },
+    )
+
+
+def test_execution_process_rejects_rule_after_first_group() -> None:
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[
+            ExecuteActionGroupSchema(
+                action_type="execute",
+                actions=[discrete_action()],
+            ),
+            ExecuteActionGroupSchema(
+                action_type="execute",
+                actions=[rule_creation_action()],
+            ),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="first execute group"):
+        asyncio.run(process.run_workflow())
 
 
 def test_execution_process_rejects_unknown_tool() -> None:

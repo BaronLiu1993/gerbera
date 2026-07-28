@@ -153,10 +153,7 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
                 "event_name": "temperature",
                 "expected_value": 20,
                 "operator": "greater_than",
-                "callback_script": (
-                    "async def callback(mcp_url, value):\n"
-                    "    return value\n"
-                ),
+                "callback_body": "return value",
             }
         )
     )
@@ -165,6 +162,21 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     assert runtime.rule_bus.get_rule(event_key) is not None
     assert event_key in runtime.rule_buffer.buffer
     assert len(list(runtime.agent_runtime.rules_path.glob("*.py"))) == 1
+
+    delete_tool = asyncio.run(app.get_tool("delete_rule"))
+    asyncio.run(
+        delete_tool.run(
+            {
+                "event_type": "STREAM",
+                "microcontroller_id": "board-1",
+                "event_name": "temperature",
+            }
+        )
+    )
+
+    assert runtime.rule_bus.get_rule(event_key) is None
+    assert event_key not in runtime.rule_buffer.buffer
+    assert list(runtime.agent_runtime.rules_path.glob("*.py")) == []
 
 
 def test_server_exposes_registered_events_as_nested_catalog(

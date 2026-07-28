@@ -33,6 +33,24 @@ class RuleBus:
     def get_rule(self, event_key: EventKey) -> Rule | None:
         return self.rule_bus.get(event_key)
 
+    def unregister_rule(
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+    ) -> Rule:
+        event_key = build_event_key(
+            event_type,
+            microcontroller_id,
+            event_name,
+        )
+        try:
+            return self.rule_bus.pop(event_key)
+        except KeyError as exc:
+            raise ValueError(
+                f"Rule is not registered for event: {event_key}"
+            ) from exc
+
     async def emit_evaluation_event(
         self,
         event_key: EventKey,

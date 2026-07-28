@@ -204,7 +204,7 @@ class GerberaRuntime:
             event_name: str,
             expected_value: bool | int | float | str,
             operator: OperatorEnum,
-            callback_script: str,
+            callback_body: str,
         ) -> dict[str, str]:
             return agent_runtime.insert_rule(
                 event_type=event_type,
@@ -212,17 +212,38 @@ class GerberaRuntime:
                 event_name=event_name,
                 expected_value=expected_value,
                 operator=operator,
-                callback_script=callback_script,
+                callback_body=callback_body,
             )
 
         server_runtime._register_tool(
             name="insert_rule",
             description=(
                 "Create and register a rule for a hardware event. "
-                "callback_script must be Python source defining "
-                "async callback(mcp_url, value)."
+                "callback_body must contain only the Python statements for "
+                "async callback(mcp_url, value); the runtime adds the fixed "
+                "function definition."
             ),
             tool_function=insert_rule,
+        )
+
+        def delete_rule(
+            event_type: str,
+            microcontroller_id: str,
+            event_name: str,
+        ) -> dict[str, str]:
+            return agent_runtime.delete_rule(
+                event_type=event_type,
+                microcontroller_id=microcontroller_id,
+                event_name=event_name,
+            )
+
+        server_runtime._register_tool(
+            name="delete_rule",
+            description=(
+                "Delete the rule registered for a hardware event and remove "
+                "its local callback script."
+            ),
+            tool_function=delete_rule,
         )
 
     @staticmethod

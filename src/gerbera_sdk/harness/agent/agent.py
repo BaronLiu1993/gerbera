@@ -27,7 +27,7 @@ from gerbera_sdk.harness.memory.memory import Memory
 class Agent:
     session: Session
     model: Model
-    memory: Memory
+    #memory: Memory
     initialisation_process: InitialisationProcess | None = None
 
     # Messages
@@ -68,11 +68,14 @@ class Agent:
                 next_state = LoopStateEnum(message["next_state"])
                 decision = DecisionEnum(message["decision"])
 
+                print(message)
+
                 self.current_hypothesis = HypothesisSchema.model_validate(
                     message["response"]
                 )
-                self.session.perform_transition(next_state)
 
+                if decision == DecisionEnum.ACCEPTED.value:
+                    self.session.perform_transition(next_state)
             elif current_state.state is LoopStateEnum.EXECUTION:
 
                 print(current_state)
@@ -90,7 +93,7 @@ class Agent:
                 await execution_process.run_workflow()
                 break
             elif current_state.state is LoopStateEnum.REVIEW.value:
-                                
+
 
                 break
 

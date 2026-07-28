@@ -1,12 +1,21 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
+
+from gerbera_sdk.events.event_key import EventKey
+from gerbera_sdk.events.rules import (
+    OperatorEnum,
+    normalize_rule_callback_body,
+)
 
 from gerbera_sdk.harness.agent.experiments.states.schema.utils import (
     SnakeCaseVariable,
     StrictSchema,
 )
+
+NO_OP_RULE_CALLBACK_BODY = "return None"
+
 
 # Type Schemas
 class ActionTypeEnum(str, Enum):
@@ -30,6 +39,30 @@ class ExecuteActionParameterSchema(StrictSchema):
     value: bool | int | float | str
     unit: str | None
     type: ParameterTypeSchema
+
+
+class RuleCreationSchema(StrictSchema):
+    description: str
+    action_type: Literal["execute"]
+    execution_type: Literal["continuous"]
+    create_tool_call: str = Field(min_length=1)
+    delete_tool_call: str = Field(min_length=1)
+    event_key: EventKey
+    callable: str = Field(
+        min_length=1,
+        description=(
+            "Python statements for the body of "
+            "async callback(mcp_url, value). Do not include the function "
+            "definition or indentation for the outer function."
+        ),
+    )
+    operator: OperatorEnum
+    expected: bool | int | float | str
+
+    @field_validator("callable")
+    @classmethod
+    def validate_callable_body(cls, value: str) -> str:
+        return normalize_rule_callback_body(value)
 
 
 class ContinuousExecuteSchema(StrictSchema):
@@ -95,5 +128,7 @@ class ReviewSchema(StrictSchema):
     )
 
 # Combined Schemas
-ExecuteSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
+ExecuteSchema = (
+    RuleCreationSchema | ContinuousExecuteSchema | DiscreteExecuteSchema
+)
 ActionSchema = ExecuteSchema | ReviewSchema

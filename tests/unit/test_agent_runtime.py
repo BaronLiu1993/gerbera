@@ -4,6 +4,7 @@ import pytest
 
 from gerbera_sdk.events.rules import OperatorEnum, RuleBuffer, RuleBus
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
+from gerbera_sdk.utils import hash_event_key
 
 
 EVENT_KEY = ("STREAM", "board-1", "temperature")
@@ -25,15 +26,18 @@ def test_agent_runtime_writes_and_registers_rule_script(tmp_path) -> None:
         event_name=EVENT_KEY[2],
         expected_value=20,
         operator=OperatorEnum.GREATER_THAN,
-        callback_script=(
-            "async def callback(mcp_url, value):\n"
-            "    return {'mcp_url': mcp_url, 'value': value}\n"
+        callback_body=(
+            "return {'mcp_url': mcp_url, 'value': value}\n"
         ),
     )
 
-    script_path = runtime.rules_path / f"{result['rule_id']}.py"
+    script_path = runtime.rules_path / f"{hash_event_key(EVENT_KEY)}.py"
     assert result["script_path"] == str(script_path)
     assert script_path.exists()
+    assert script_path.read_text() == (
+        "async def callback(mcp_url, value):\n"
+        "    return {'mcp_url': mcp_url, 'value': value}\n"
+    )
     assert EVENT_KEY in rule_buffer.buffer
     assert asyncio.run(
         rule_bus.emit_evaluation_event(EVENT_KEY, 21)
@@ -43,7 +47,7 @@ def test_agent_runtime_writes_and_registers_rule_script(tmp_path) -> None:
     }
 
 
-def test_agent_runtime_rejects_script_without_async_callback(
+def test_agent_runtime_rejects_complete_callback_function(
     tmp_path,
 ) -> None:
     rule_bus = RuleBus()
@@ -54,15 +58,50 @@ def test_agent_runtime_rejects_script_without_async_callback(
         rules_path=tmp_path / ".gerbera" / "rules",
     )
 
-    with pytest.raises(TypeError, match="must define async callback"):
+    with pytest.raises(ValueError, match="cannot define functions"):
         runtime.insert_rule(
             event_type=EVENT_KEY[0],
             microcontroller_id=EVENT_KEY[1],
             event_name=EVENT_KEY[2],
             expected_value=20,
             operator=OperatorEnum.GREATER_THAN,
-            callback_script="def callback(mcp_url, value):\n    return value\n",
+            callback_body=(
+                "def callback(mcp_url, value):\n"
+                "    return value\n"
+            ),
         )
 
-    assert list(runtime.rules_path.iterdir()) == []
+    assert not runtime.rules_path.exists()
     assert rule_bus.rule_bus == {}
+
+
+def test_agent_runtime_deletes_rule_and_local_script(tmp_path) -> None:
+    rule_bus = RuleBus()
+    rule_buffer = RuleBuffer(rule_bus)
+    runtime = AgentRuntime(
+        mcp_url="https://hardware.example.com/mcp",
+        rule_bus=rule_bus,
+        rule_buffer=rule_buffer,
+        rules_path=tmp_path / ".gerbera" / "rules",
+    )
+    created = runtime.insert_rule(
+        event_type=EVENT_KEY[0],
+        microcontroller_id=EVENT_KEY[1],
+        event_name=EVENT_KEY[2],
+        expected_value=20,
+        operator=OperatorEnum.GREATER_THAN,
+        callback_body="return None",
+    )
+
+    deleted = runtime.delete_rule(
+        event_type=EVENT_KEY[0],
+        microcontroller_id=EVENT_KEY[1],
+        event_name=EVENT_KEY[2],
+    )
+
+    assert deleted == created
+    assert rule_bus.get_rule(EVENT_KEY) is None
+    assert EVENT_KEY not in rule_buffer.buffer
+    assert not (
+        runtime.rules_path / f"{hash_event_key(EVENT_KEY)}.py"
+    ).exists()

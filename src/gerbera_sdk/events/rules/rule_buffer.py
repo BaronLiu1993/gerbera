@@ -31,6 +31,19 @@ class RuleBuffer:
 
         self.buffer[event_key] = None
 
+    def unregister_event_from_buffer(
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+    ) -> None:
+        event_key = build_event_key(
+            event_type,
+            microcontroller_id,
+            event_name,
+        )
+        self.buffer.pop(event_key, None)
+
     async def update_buffer_value(
         self,
         event_type: str,

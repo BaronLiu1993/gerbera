@@ -164,16 +164,29 @@ Each `ServerRuntime` starts with one empty `RuleBus` and one connected
 `RuleBuffer`. The runtime injects that buffer into `EventListener`.
 
 `GerberaRuntime` also registers an `insert_rule` MCP tool. Agents can pass the
-event key, condition, operator, and Python callback source to this tool. The
-source must define:
+event key, condition, operator, and Python callback body to this tool. The
+runtime places that body inside:
 
 ```python
 async def callback(mcp_url, value):
     return value
 ```
 
-The tool stores the source under `.gerbera/rules/<rule-id>.py`, loads the
-callback, and registers the rule against the same live bus and buffer.
+The tool hashes the three-part event key with SHA-256, stores the source under
+`.gerbera/rules/<event-key-hash>.py`, loads the callback, and registers the rule
+against the same live bus and buffer.
+
+The callback source is transported as text, not as a file upload. A plan places
+the Python source in a JSON string, the MCP client sends that string as the
+`callback_body` argument, and `AgentRuntime.insert_rule` validates and places
+it inside a fixed `async def callback(mcp_url, value):` template before writing
+it into the runtime's local `.gerbera/rules/` directory. This keeps the
+function signature and filesystem ownership under runtime control and does not
+require the model to know or access a local path.
+
+The `delete_rule` MCP tool accepts the same three-part event key. It unregisters
+the rule and removes its generated callback file. Workflow-scoped rule actions
+use it for cleanup after execution.
 
 Agents can call `list_rule_events` first to retrieve the registered event keys
 as a nested `event_type → microcontroller_id → event_name` dictionary. Each

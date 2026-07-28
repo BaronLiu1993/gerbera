@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 
 
@@ -12,6 +13,15 @@ def build_event_key(
     event_name: str,
 ) -> EventKey:
     return (event_type, microcontroller_id, event_name)
+
+
+def hash_event_key(event_key: EventKey) -> str:
+    serialized_key = json.dumps(
+        event_key,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized_key.encode("utf-8")).hexdigest()
 
 
 def build_connection_event_name(

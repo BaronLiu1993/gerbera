@@ -5,6 +5,7 @@ from typing import Any
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
+    RuleCreationSchema,
 )
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
@@ -29,6 +30,7 @@ class ExecutionProcess:
     async def run_workflow(self) -> None:
         if not self._verify_valid_execute_actions():
             raise ValueError("ExecutionProcess requires execute action groups")
+        self._validate_rule_placement()
 
         async with MCPClient(self.mcp_url) as client:
 
@@ -37,29 +39,57 @@ class ExecutionProcess:
             allowed_tool_names = frozenset(
                 tool.name for tool in available_tools
             )
+            active_rules: list[RuleCreationSchema] = []
 
-            for group_index, group in enumerate(self.actions_list):
-                try:
+            try:
+                for group_index, group in enumerate(self.actions_list):
                     await self._execute_group(
                         client,
                         allowed_tool_names,
                         group,
+                        active_rules,
                     )
-                except Exception as exc:
-                    raise RuntimeError(
-                        f"Execution group {group_index} failed"
-                    ) from exc
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Execution group {group_index} failed"
+                ) from exc
+            finally:
+                await self._delete_active_rules(
+                    client,
+                    allowed_tool_names,
+                    active_rules,
+                )
 
     async def _execute_group(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
         group: ExecuteActionGroupSchema,
+        active_rules: list[RuleCreationSchema],
     ) -> None:
+        rule_actions = [
+            action
+            for action in group.actions
+            if isinstance(action, RuleCreationSchema)
+        ]
+        ordinary_actions = [
+            action
+            for action in group.actions
+            if not isinstance(action, RuleCreationSchema)
+        ]
+
+        for action in rule_actions:
+            await self._create_rule(
+                client,
+                allowed_tool_names,
+                action,
+                active_rules,
+            )
+
         group_start = asyncio.get_running_loop().time()
 
         async with asyncio.TaskGroup() as task_group:
-            for action in group.actions:
+            for action in ordinary_actions:
                 task_group.create_task(
                     self._execute_task(
                         client,
@@ -69,6 +99,19 @@ class ExecutionProcess:
                     )
                 )
 
+    async def _create_rule(
+        self,
+        client: MCPClient,
+        allowed_tool_names: frozenset[str],
+        action: RuleCreationSchema,
+        active_rules: list[RuleCreationSchema],
+    ) -> None:
+        await client.call_tool(
+            action.create_tool_call,
+            self._build_rule_create_arguments(action),
+            allowed_tool_names,
+        )
+        active_rules.append(action)
 
     async def _execute_task(
         self,
@@ -128,6 +171,38 @@ class ExecutionProcess:
             await reverse_task
             raise
 
+    async def _delete_active_rules(
+        self,
+        client: MCPClient,
+        allowed_tool_names: frozenset[str],
+        active_rules: list[RuleCreationSchema],
+    ) -> None:
+        for action in reversed(active_rules):
+            await self._call_reverse_tool(
+                client,
+                allowed_tool_names,
+                action.delete_tool_call,
+                self._build_rule_event_arguments(action),
+            )
+
+    @staticmethod
+    def _build_rule_event_arguments(
+        action: RuleCreationSchema,
+    ) -> dict[str, str]:
+        return action.event_key.model_dump()
+
+    @classmethod
+    def _build_rule_create_arguments(
+        cls,
+        action: RuleCreationSchema,
+    ) -> dict[str, Any]:
+        return {
+            **cls._build_rule_event_arguments(action),
+            "expected_value": action.expected,
+            "operator": action.operator.value,
+            "callback_body": action.callable,
+        }
+
     def _verify_valid_execute_actions(self) -> bool:
         if not self.actions_list:
             return False
@@ -142,10 +217,24 @@ class ExecutionProcess:
             if not all(
                 isinstance(
                     action,
-                    (ContinuousExecuteSchema, DiscreteExecuteSchema),
+                    (
+                        RuleCreationSchema,
+                        ContinuousExecuteSchema,
+                        DiscreteExecuteSchema,
+                    ),
                 )
                 for action in group.actions
             ):
                 return False
 
         return True
+
+    def _validate_rule_placement(self) -> None:
+        for group in self.actions_list[1:]:
+            if any(
+                isinstance(action, RuleCreationSchema)
+                for action in group.actions
+            ):
+                raise ValueError(
+                    "Rule creation must be in the first execute group"
+                )

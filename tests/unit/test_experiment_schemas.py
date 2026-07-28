@@ -1,10 +1,13 @@
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
+from gerbera_sdk.events.event_key import EventKey
 from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis import (
     ActionSchema,
     HypothesisSchema,
+    NO_OP_RULE_CALLBACK_BODY,
     ReviewSchema,
+    RuleCreationSchema,
 )
 
 
@@ -61,6 +64,24 @@ def continuous_execute_action() -> dict:
             )
         ],
         "reverse_tool_call_params": [],
+    }
+
+
+def rule_creation_action() -> dict:
+    return {
+        "description": "Watch for excessive temperature.",
+        "action_type": "execute",
+        "execution_type": "continuous",
+        "create_tool_call": "insert_rule",
+        "delete_tool_call": "delete_rule",
+        "event_key": {
+            "event_type": "STREAM",
+            "microcontroller_id": "board-1",
+            "event_name": "temperature",
+        },
+        "callable": NO_OP_RULE_CALLBACK_BODY,
+        "operator": "greater_than",
+        "expected": 20,
     }
 
 
@@ -149,6 +170,63 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
     assert action.params[0].value == 90
 
 
+def test_hypothesis_schema_models_a_rule_creation_step() -> None:
+    hypothesis = HypothesisSchema.model_validate(
+        hypothesis_data(rule_creation_action())
+    )
+
+    action = hypothesis.method.steps[0].actions[0]
+    assert isinstance(action, RuleCreationSchema)
+    assert isinstance(action.event_key, EventKey)
+    assert action.event_key.event_name == "temperature"
+    assert action.callable == NO_OP_RULE_CALLBACK_BODY
+
+
+def test_rule_creation_rejects_a_complete_function() -> None:
+    action = rule_creation_action()
+    action["callable"] = (
+        "async def callback(mcp_url, value):\n"
+        "    return value\n"
+    )
+
+    with pytest.raises(ValidationError, match="cannot define functions"):
+        RuleCreationSchema.model_validate(action)
+
+
+def test_rule_creation_normalizes_a_multiline_callback_body() -> None:
+    action = rule_creation_action()
+    action["callable"] = "  if value:\n      return value\n  return None"
+
+    rule = RuleCreationSchema.model_validate(action)
+
+    assert rule.callable == "if value:\n    return value\nreturn None"
+
+
+def test_rule_creation_must_be_in_first_execute_group() -> None:
+    data = hypothesis_data(discrete_execute_action())
+    data["method"]["steps"].insert(
+        1,
+        {
+            "action_type": "execute",
+            "actions": [rule_creation_action()],
+        },
+    )
+
+    with pytest.raises(ValidationError, match="first execute group"):
+        HypothesisSchema.model_validate(data)
+
+
+def test_rule_creation_can_share_the_first_execute_group() -> None:
+    data = hypothesis_data(rule_creation_action())
+    data["method"]["steps"][0]["actions"].append(
+        discrete_execute_action()
+    )
+
+    hypothesis = HypothesisSchema.model_validate(data)
+
+    assert len(hypothesis.method.steps[0].actions) == 2
+
+
 def test_hypothesis_schema_models_a_review_step() -> None:
     hypothesis = HypothesisSchema.model_validate(
         hypothesis_data(review_action())
@@ -215,6 +293,7 @@ def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
     assert "methods" not in response_schema["properties"]
     assert "ContinuousExecuteSchema" in Initialisation.valid_schema["$defs"]
     assert "DiscreteExecuteSchema" in Initialisation.valid_schema["$defs"]
+    assert "RuleCreationSchema" in Initialisation.valid_schema["$defs"]
     assert "ReviewSchema" in Initialisation.valid_schema["$defs"]
 
 

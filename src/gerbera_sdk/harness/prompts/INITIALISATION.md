@@ -19,28 +19,85 @@ Create the immutable research foundation and an ordered experimental workflow.
     must not collect new hardware data.
 - Write every variable name in lowercase `snake_case`, with underscores between
   words.
-- Put `expected` inside each `review` action. Execute actions do not have an
-  `expected` field.
+- Put `expected` inside each `review` action. Ordinary execute actions do not
+  have an `expected` field; `RuleCreationSchema.expected` is the rule's
+  comparison value and is the only exception.
 - Make the first checklist action an `execute` action.
 - Make the final checklist action a `review` action.
+- If the workflow uses a rule, register it before any action that can emit the
+  watched event or depends on the rule's callback.
 - Define the evidence required for completion or failure.
 - Do not execute any step or claim any observation.
 
+## Rule Planning
+
+A rule is a deterministic runtime check with the form:
+
+`when actual_event_value <operator> expected_value, run callback`
+
+The condition compares one incoming hardware event value with one concrete
+`expected` value. The callback runs only when that comparison is true. A rule
+must not perform interpretation, probabilistic reasoning, or post-experiment
+analysis.
+
+When the method requires this conditional behaviour:
+
+- Use `RuleCreationSchema`, with `action_type` set to `execute` and
+  `execution_type` set to `continuous`. A rule is continuous because it stays
+  active across the later execute groups, not because it has a
+  `duration_seconds`.
+- Set `create_tool_call` to the exact available rule-creation tool and
+  `delete_tool_call` to the exact available rule-deletion tool. The executor
+  creates the rule when it reaches this action and deletes it after all execute
+  groups finish, including when a later group fails.
+- Put rule registration in the first execute group. It may share that group
+  with ordinary execute actions because the executor always creates every rule
+  in the group before starting any of its other actions.
+- Register every required rule before starting a stream, monitoring an event,
+  applying a stimulus, or performing any other action that could emit its
+  watched event.
+- Set `event_key.event_type`, `event_key.microcontroller_id`, and
+  `event_key.event_name` from the available event and tool context. Do not
+  invent an event key.
+- Set a concrete `expected` and use only an operator accepted by the tool
+  schema, such as `equal`, `not_equal`, `less_than`, `greater_than`,
+  `less_than_equal`, or `greater_than_equal`.
+- Put only the Python function body in `callable`. Do not include `async def`,
+  the callback name, parameters, or outer indentation. For a no-op callback,
+  use:
+
+  `return None`
+
+  The body is transported as an escaped JSON string in the plan and sent as
+  the MCP `callback_body` argument. The runtime validates it, places it inside
+  the fixed `async def callback(mcp_url, value):` template, and writes the
+  resulting script to a local `.py` file. Do not put a local path in the plan
+  and do not claim the file already exists.
+- Account for the current rule model: one condition per rule and one rule per
+  event key. Do not plan multiple rules for the same event key.
+- Do not use a rule as a substitute for the final `review` action. A rule
+  reacts during execution; review analyzes persisted evidence after collection.
+
+If no deterministic condition-triggered response is needed, do not create a
+rule.
+
 ## Execute Contract
 
-Each `execute` action must set `action_type` to `execute`, classify its
-`execution_type` as `continuous` or `discrete`, and list the dependent and
-independent variable names involved.
+Each `execute` action must set `action_type` to `execute` and classify its
+`execution_type` as `continuous` or `discrete`. Ordinary execute actions list
+the dependent and independent variable names involved. Rule creation actions
+instead use the fields defined in the Rule Planning section.
 
 Choose the execution type from the experiment's data-collection semantics:
 
 - You MUST use `continuous` when the objective involves a duration, change over
   time, repeated timestamped readings, streaming, monitoring, trends,
   stability, or variation during an interval.
-- A `continuous` action runs for a positive `duration_seconds`. Its
+- An ordinary `continuous` action runs for a positive `duration_seconds`. Its
   `forward_tool_call` starts collection or streaming and its
   `reverse_tool_call` stops it safely. Use the corresponding start/stop stream
-  tools when they are available.
+  tools when they are available. `RuleCreationSchema` is the exception because
+  its lifetime spans the remaining execute groups.
 - You MUST use `discrete` only for a single bounded command or one-shot reading
   that does not collect a time series. A discrete action defines one
   `forward_tool_call` and its parameter list.
@@ -53,7 +110,7 @@ Example: measuring whether an IR sensor output remains stable over 30 seconds
 is `continuous`, with the stream-on tool as `forward_tool_call`, the stream-off
 tool as `reverse_tool_call`, and `duration_seconds` set to `30`.
 
-Every tool call must:
+Every ordinary execute tool call must:
 
 - Set the tool-call field to an exact available tool name.
 - Represent every input as a parameter containing its lowercase snake_case
@@ -67,11 +124,15 @@ Parameter-list fields are mandatory and must never be omitted:
 - Every `discrete` action must include `params`. Add one entry for every input
   required by its `forward_tool_call`. Use `params: []` when that tool accepts
   no inputs.
-- Every `continuous` action must include both `forward_tool_call_params` and
+- Every ordinary `continuous` action must include both `forward_tool_call_params` and
   `reverse_tool_call_params`. Add one entry for every input required by the
   corresponding tool. Use an empty list for either tool when it accepts no
   inputs.
 - Never omit a parameter-list field merely because its list is empty.
+
+`RuleCreationSchema` does not use parameter-list fields. The executor maps its
+event key, condition, and callable fields to the create and delete tool
+arguments.
 
 Create separate execute steps when testing different independent-variable
 values.

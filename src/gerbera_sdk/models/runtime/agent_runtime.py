@@ -15,9 +15,10 @@ from gerbera_sdk.events.rules import (
     RuleCallback,
     RuleCondition,
     RuleValue,
+    build_rule_callback_script,
 )
 from gerbera_sdk.paths import RULES_PATH
-from gerbera_sdk.utils import build_event_key
+from gerbera_sdk.utils import EventKey, build_event_key, hash_event_key
 
 
 RuleScriptCallback = Callable[[str, RuleValue], Awaitable[Any]]
@@ -37,7 +38,7 @@ class AgentRuntime:
         event_name: str,
         expected_value: RuleValue,
         operator: OperatorEnum,
-        callback_script: str,
+        callback_body: str,
     ) -> dict[str, str]:
         event_key = build_event_key(
             event_type,
@@ -48,11 +49,11 @@ class AgentRuntime:
             raise ValueError(f"Rule already registered for event: {event_key}")
 
         rule_id = str(uuid.uuid4())
-        script_path = self.rules_path / f"{rule_id}.py"
+        script_path = self._rule_script_path(event_key)
         callback = self._write_and_load_callback(
             script_path=script_path,
             module_name=f"_gerbera_rule_{rule_id.replace('-', '_')}",
-            callback_script=callback_script,
+            callback_script=build_rule_callback_script(callback_body),
         )
         rule = Rule(
             condition=RuleCondition(
@@ -82,6 +83,46 @@ class AgentRuntime:
             "rule_id": rule.id,
             "script_path": str(script_path),
         }
+
+    def delete_rule(
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+    ) -> dict[str, str]:
+        event_key = build_event_key(
+            event_type,
+            microcontroller_id,
+            event_name,
+        )
+        rule = self.rule_bus.get_rule(event_key)
+        if rule is None:
+            raise ValueError(f"Rule is not registered for event: {event_key}")
+
+        script_path = self._rule_script_path(event_key)
+        self.rule_bus.unregister_rule(
+            event_type=event_type,
+            microcontroller_id=microcontroller_id,
+            event_name=event_name,
+        )
+        self.rule_buffer.unregister_event_from_buffer(
+            event_type=event_type,
+            microcontroller_id=microcontroller_id,
+            event_name=event_name,
+        )
+        sys.modules.pop(f"_gerbera_rule_{rule.id.replace('-', '_')}", None)
+        script_path.unlink(missing_ok=True)
+
+        return {
+            "rule_id": rule.id,
+            "script_path": str(script_path),
+        }
+
+    def _rule_script_path(
+        self,
+        event_key: EventKey,
+    ) -> Path:
+        return self.rules_path / f"{hash_event_key(event_key)}.py"
 
     def _write_and_load_callback(
         self,
