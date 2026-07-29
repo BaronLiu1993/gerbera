@@ -2,17 +2,17 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     RuleCreationSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
-from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
+from gerbera_harness.agent.model.mcp_client import MCPClient
 
-from gerbera_sdk.harness.agent.experiments.states import (
+from gerbera_harness.agent.experiments.states import (
     ExperimentState,
     LoopStateEnum,
     DecisionEnum,

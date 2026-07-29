@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import uuid
 
-from gerbera_sdk.harness.agent.model.model_adapters import (
+from gerbera_harness.agent.model.model_adapters import (
     AnthropicAdapter,
     GeminiAdapter,
     OpenAIAdapter,

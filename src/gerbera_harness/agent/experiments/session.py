@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 import uuid
 
-from gerbera_sdk.harness.agent.experiments.states import (
+from gerbera_harness.agent.experiments.states import (
     ExperimentState,
     Initialisation,
     LoopStateEnum,
 )
-from gerbera_sdk.harness.agent.experiments.states.utils import create_state
+from gerbera_harness.agent.experiments.states.utils import create_state
 
 
 @dataclass

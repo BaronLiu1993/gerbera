@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from gerbera_sdk.harness.agent.model import model_adapters
-from gerbera_sdk.harness.agent.model.model_adapters import (
+from gerbera_harness.agent.model import model_adapters
+from gerbera_harness.agent.model.model_adapters import (
     AnthropicAdapter,
     GeminiAdapter,
     OpenAIAdapter,

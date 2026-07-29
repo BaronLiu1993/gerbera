@@ -120,7 +120,7 @@ The script can implement its MCP behavior directly:
 
 ```python
 from gerbera_sdk.events.rules import RuleCallback
-from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
+from gerbera_harness.agent.model.mcp_client import MCPClient
 
 
 async def turn_off_motor(mcp_url, value):

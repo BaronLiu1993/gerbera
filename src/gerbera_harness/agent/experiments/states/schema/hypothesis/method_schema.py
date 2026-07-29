@@ -2,12 +2,12 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ExecuteSchema,
     ReviewSchema,
     RuleCreationSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.utils import StrictSchema
+from gerbera_harness.agent.experiments.states.schema.utils import StrictSchema
 
 
 class ExecuteActionGroupSchema(StrictSchema):

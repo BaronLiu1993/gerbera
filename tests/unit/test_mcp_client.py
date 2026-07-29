@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
+from gerbera_harness.agent.model.mcp_client import MCPClient
 
 
 class FakeFastMCPClient:
@@ -30,7 +30,7 @@ class FakeFastMCPClient:
 
 def test_mcp_client_lists_and_calls_hardware_tools(monkeypatch) -> None:
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        "gerbera_harness.agent.model.mcp_client.Client",
         FakeFastMCPClient,
     )
 
@@ -51,7 +51,7 @@ def test_mcp_client_lists_and_calls_hardware_tools(monkeypatch) -> None:
 
 def test_mcp_client_can_return_structured_content(monkeypatch) -> None:
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        "gerbera_harness.agent.model.mcp_client.Client",
         FakeFastMCPClient,
     )
 
@@ -100,7 +100,7 @@ def test_mcp_client_rejects_duplicate_tool_arguments() -> None:
 
 def test_mcp_client_rejects_disallowed_tool(monkeypatch) -> None:
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        "gerbera_harness.agent.model.mcp_client.Client",
         FakeFastMCPClient,
     )
 
@@ -126,7 +126,7 @@ def test_mcp_client_raises_when_tool_call_fails(monkeypatch) -> None:
 
     monkeypatch.setattr(FakeFastMCPClient, "call_tool", fail_tool_call)
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.model.mcp_client.Client",
+        "gerbera_harness.agent.model.mcp_client.Client",
         FakeFastMCPClient,
     )
 

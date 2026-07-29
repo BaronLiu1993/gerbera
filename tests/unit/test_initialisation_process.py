@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from gerbera_sdk.harness.agent.experiments.states.processes.initialisation_process import (
+from gerbera_harness.agent.experiments.states.processes.initialisation_process import (
     InitialisationProcess,
 )
 
@@ -96,7 +96,7 @@ def test_run_inspects_hardware_then_builds_context(monkeypatch) -> None:
             }
 
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.experiments.states.processes.initialisation_process.MCPClient",
+        "gerbera_harness.agent.experiments.states.processes.initialisation_process.MCPClient",
         FakeMCPClient,
     )
     process = InitialisationProcess(

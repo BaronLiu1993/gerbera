@@ -3,7 +3,7 @@ from typing import Collection
 
 from pydantic import BaseModel
 
-from gerbera_sdk.harness.agent.experiments.states.base import (
+from gerbera_harness.agent.experiments.states.base import (
     DecisionEnum,
     ExperimentState,
     LoopStateEnum,
@@ -45,13 +45,13 @@ def build_valid_schema(
 
 @cache
 def _state_registry() -> dict[LoopStateEnum, type[ExperimentState]]:
-    from gerbera_sdk.harness.agent.experiments.states.complete import Complete
-    from gerbera_sdk.harness.agent.experiments.states.execution import Execution
-    from gerbera_sdk.harness.agent.experiments.states.failed import Failed
-    from gerbera_sdk.harness.agent.experiments.states.initialisation import (
+    from gerbera_harness.agent.experiments.states.complete import Complete
+    from gerbera_harness.agent.experiments.states.execution import Execution
+    from gerbera_harness.agent.experiments.states.failed import Failed
+    from gerbera_harness.agent.experiments.states.initialisation import (
         Initialisation,
     )
-    from gerbera_sdk.harness.agent.experiments.states.review import Review
+    from gerbera_harness.agent.experiments.states.review import Review
 
     return {
         LoopStateEnum.INITIALISATION: Initialisation,

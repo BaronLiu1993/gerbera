@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from gerbera_sdk.harness.agent.experiments.states.base import (
+from gerbera_harness.agent.experiments.states.base import (
     ExperimentState,
     LoopStateEnum,
 )

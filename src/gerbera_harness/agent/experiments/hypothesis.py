@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 from enum import Enum
 
-from gerbera_sdk.harness.agent.experiments.method import Method
+from gerbera_harness.agent.experiments.method import Method
 
 class HypothesisStateEnum(Enum):
     DRAFT = "draft"

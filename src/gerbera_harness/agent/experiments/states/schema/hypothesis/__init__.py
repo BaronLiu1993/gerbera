@@ -1,4 +1,4 @@
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ActionSchema,
     ActionTypeEnum,
     ContinuousExecuteSchema,
@@ -12,10 +12,10 @@ from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schem
     ReviewVariableSchema,
     RuleCreationSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.hypothesis_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.hypothesis_schema import (
     HypothesisSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.method_schema import (
     MethodSchema,
 )
 

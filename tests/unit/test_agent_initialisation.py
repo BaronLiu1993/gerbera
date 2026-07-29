@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from gerbera_sdk.harness.agent.agent import Agent
-from gerbera_sdk.harness.agent.experiments.session import Session
-from gerbera_sdk.harness.agent.experiments.states import (
+from gerbera_harness.agent.agent import Agent
+from gerbera_harness.agent.experiments.session import Session
+from gerbera_harness.agent.experiments.states import (
     Initialisation,
     LoopStateEnum,
 )
@@ -140,7 +140,7 @@ def test_agent_prepares_initialisation_context_without_transitioning() -> None:
 def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.agent.ExecutionProcess",
+        "gerbera_harness.agent.agent.ExecutionProcess",
         FakeExecutionProcess,
     )
     session = Session()
@@ -174,7 +174,7 @@ def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
 def test_agent_retries_plan_without_final_review(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     monkeypatch.setattr(
-        "gerbera_sdk.harness.agent.agent.ExecutionProcess",
+        "gerbera_harness.agent.agent.ExecutionProcess",
         FakeExecutionProcess,
     )
     invalid_hypothesis = hypothesis_response()

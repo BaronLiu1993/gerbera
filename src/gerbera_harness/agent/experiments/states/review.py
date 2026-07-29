@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from gerbera_sdk.harness.agent.experiments.states.base import (
+from gerbera_harness.agent.experiments.states.base import (
     ExperimentState,
     LoopStateEnum,
     TextResponseSchema,
     DecisionEnum
 )
-from gerbera_sdk.harness.agent.experiments.states.utils import build_valid_schema
+from gerbera_harness.agent.experiments.states.utils import build_valid_schema
 
 
 @dataclass(frozen=True)

@@ -3,19 +3,19 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_sdk.harness.agent.experiments.states.processes import (
+from gerbera_harness.agent.experiments.states.processes import (
     execution_process,
 )
-from gerbera_sdk.harness.agent.experiments.states.processes.execution_process import (
+from gerbera_harness.agent.experiments.states.processes.execution_process import (
     ExecutionProcess,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.action_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     NO_OP_RULE_CALLBACK_BODY,
     RuleCreationSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
 

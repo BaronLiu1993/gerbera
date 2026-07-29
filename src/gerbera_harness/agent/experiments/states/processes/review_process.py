@@ -1,10 +1,27 @@
-import Database
+from gerbera_harness.agent.model.database import Database
 
 class ReviewProcess:
     database: Database
 
-    def read_sql_tool(self):
-        with client as P
+    def select_rows(self, query: str):
+        with self.database.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET LOCAL statement_timeout = '5s'")
+                cur.execute(query)
 
-    def run_agent_loop(self):
+                return cur.fetchmany()
+    
+    def average_rows(self, query: str):
+        pass
+
+    def minimum_rows(self, query: str):
+        pass
+
+    def maxiumum_rows(self, query: str):
+        pass
+
+    def generate_
+
+
+
         

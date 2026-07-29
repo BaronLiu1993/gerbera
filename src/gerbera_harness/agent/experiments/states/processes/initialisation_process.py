@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import json
 import httpx
 
-from gerbera_sdk.harness.agent.model.mcp_client import MCPClient
+from gerbera_harness.agent.model.mcp_client import MCPClient
 
 # Deterministic Scripts for Agents
 @dataclass

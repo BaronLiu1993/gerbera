@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 from enum import Enum
 
-from gerbera_sdk.harness.agent.experiments.step import Step
+from gerbera_harness.agent.experiments.step import Step
 
 class MethodStateEnum(Enum):
     PENDING = "pending"

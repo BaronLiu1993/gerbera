@@ -10,7 +10,7 @@ from gerbera_sdk.events.rules import (
     normalize_rule_callback_body,
 )
 
-from gerbera_sdk.harness.agent.experiments.states.schema.utils import (
+from gerbera_harness.agent.experiments.states.schema.utils import (
     SnakeCaseVariable,
     StrictSchema,
 )

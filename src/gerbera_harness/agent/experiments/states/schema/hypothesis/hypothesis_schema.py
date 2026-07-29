@@ -1,7 +1,7 @@
-from gerbera_sdk.harness.agent.experiments.states.schema.hypothesis.method_schema import (
+from gerbera_harness.agent.experiments.states.schema.hypothesis.method_schema import (
     MethodSchema,
 )
-from gerbera_sdk.harness.agent.experiments.states.schema.utils import (
+from gerbera_harness.agent.experiments.states.schema.utils import (
     SnakeCaseVariable,
     StrictSchema,
 )
