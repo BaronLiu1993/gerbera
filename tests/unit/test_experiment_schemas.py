@@ -6,7 +6,6 @@ from gerbera_sdk.events.rules import RuleTriggerModeEnum
 from gerbera_harness.agent.experiments.states.schema.hypothesis import (
     ActionSchema,
     HypothesisSchema,
-    NO_OP_RULE_CALLBACK_BODY,
     ReviewSchema,
     RuleCreationSchema,
 )
@@ -72,7 +71,7 @@ def rule_creation_action() -> dict:
     return {
         "description": "Watch for excessive temperature.",
         "action_type": "execute",
-        "execution_type": "continuous",
+        "execution_type": "rule",
         "create_tool_call": "insert_rule",
         "delete_tool_call": "delete_rule",
         "event_key": {
@@ -80,7 +79,7 @@ def rule_creation_action() -> dict:
             "microcontroller_id": "board-1",
             "event_name": "temperature",
         },
-        "callable": NO_OP_RULE_CALLBACK_BODY,
+        "callable": "return None",
         "operator": "greater_than",
         "expected": 20,
         "trigger_mode": "repeat",
@@ -182,7 +181,7 @@ def test_hypothesis_schema_models_a_rule_creation_step() -> None:
     assert isinstance(action, RuleCreationSchema)
     assert isinstance(action.event_key, EventKey)
     assert action.event_key.event_name == "temperature"
-    assert action.callable == NO_OP_RULE_CALLBACK_BODY
+    assert action.callable == "return None"
     assert action.expected == 20.0
     assert type(action.expected) is float
     assert action.trigger_mode == RuleTriggerModeEnum.REPEAT

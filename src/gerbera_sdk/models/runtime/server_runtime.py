@@ -141,8 +141,15 @@ class ServerRuntime:
             _event_bus=self.event_bus,
             _rule_buffer=self.rule_buffer,
         )
-        event_listener.create_listeners()
         self.event_listener = event_listener
+        try:
+            event_listener.create_listeners()
+        except Exception:
+            try:
+                event_listener.stop_listeners()
+            finally:
+                self.event_listener = None
+            raise
 
     def _stop_event_listener(self) -> None:
         if self.event_listener is None:

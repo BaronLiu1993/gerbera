@@ -1,17 +1,16 @@
 from dataclasses import dataclass, field
-from typing import Any
 import uuid
 
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.camera import Camera
 from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
-from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
-
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
 @dataclass
 class HardwareSystem:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     description: str = ""
     microcontrollers: list[Microcontroller] = field(default_factory=list)
+    cameras: list[Camera] = field(default_factory=list)
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def _get_required_microcontroller_libraries(self) -> list[str]:
         libraries: list[str] = []
@@ -47,3 +46,20 @@ class HardwareSystem:
 
             seen_ids.add(microcontroller.id)
             self.microcontrollers.append(microcontroller)
+
+    def add_cameras(self, cameras: list[Camera]) -> None:
+        existing_ids = {camera.id for camera in self.cameras}
+        seen_ids: set[str] = set()
+
+        for camera in cameras:
+            if camera.id in seen_ids:
+                raise ValueError(f"Duplicate camera in input: {camera.id}")
+
+            if camera.id in existing_ids:
+                raise ValueError(
+                    f"Camera already exists in hardware system {self.id}: "
+                    f"{camera.id}"
+                )
+
+            seen_ids.add(camera.id)
+            self.cameras.append(camera)

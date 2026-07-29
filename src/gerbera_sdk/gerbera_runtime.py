@@ -14,8 +14,10 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
+from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
+from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import (
     EventCatalog,
     ServerRuntime,
@@ -47,47 +49,40 @@ class GerberaRuntime:
     ) -> None:
         GerberaRuntime._validate_unique_connection_names(hardware_system)
         board_runtime = GerberaRuntime._build_board_runtime(hardware_system)
+        camera_runtime = GerberaRuntime._build_camera_runtime(hardware_system)
         event_worker = GerberaRuntime._build_event_worker()
         database_runtime = GerberaRuntime._build_database_runtime(
             hardware_system,
             event_worker,
         )
+        runtime_lifecycle = RuntimeLifecycle(
+            board_runtime=board_runtime,
+            camera_runtime=camera_runtime,
+            database_runtime=database_runtime,
+        )
         server_runtime = GerberaRuntime._build_server_runtime(
             hardware_system=hardware_system,
             board_runtime=board_runtime,
             event_worker=event_worker,
+            runtime_lifecycle=runtime_lifecycle,
         )
         server_runtime.agent_runtime = GerberaRuntime._build_agent_runtime(
             server_runtime=server_runtime,
             mcp_url=mcp_url,
         )
-        event_listener_started = False
 
-        try:
-            board_runtime.start()
-            database_runtime.start()
-            server_runtime._register_events()
-            GerberaRuntime._register_server_runtime_tools(server_runtime)
-            GerberaRuntime._register_agent_runtime_tool(server_runtime)
-            GerberaRuntime._register_event_catalog_tool(server_runtime)
-            server_runtime._start_event_listener()
-            event_listener_started = True
-            server_runtime.app.run(
-                transport=transport,
-                **transport_kwargs,
-            )
-        finally:
-            try:
-                if event_listener_started:
-                    server_runtime._stop_event_listener()
-            finally:
-                try:
-                    try:
-                        server_runtime.stream_controller.flush_all()
-                    finally:
-                        database_runtime.stop()
-                finally:
-                    board_runtime.close()
+        server_runtime._register_events()
+        GerberaRuntime._register_server_runtime_tools(server_runtime)
+        GerberaRuntime._register_camera_runtime_tools(
+            server_runtime,
+            camera_runtime,
+        )
+        GerberaRuntime._register_agent_runtime_tool(server_runtime)
+        GerberaRuntime._register_event_catalog_tool(server_runtime)
+        server_runtime.app.run(
+            transport=transport,
+            **transport_kwargs,
+        )
 
     @staticmethod
     def _validate_unique_connection_names(
@@ -118,16 +113,26 @@ class GerberaRuntime:
         return BoardRuntime(hardware_system=hardware_system)
 
     @staticmethod
+    def _build_camera_runtime(
+        hardware_system: HardwareSystem,
+    ) -> CameraRuntime:
+        return CameraRuntime(hardware_system=hardware_system)
+
+    @staticmethod
     def _build_server_runtime(
         hardware_system: HardwareSystem,
         board_runtime: BoardRuntime,
         event_worker: EventWorker,
+        runtime_lifecycle: RuntimeLifecycle,
     ) -> ServerRuntime:
         event_bus = EventBus()
         stream_controller = StreamController(event_bus)
-        app = FastMCP(hardware_system.description)
+        app = FastMCP(
+            hardware_system.description,
+            lifespan=runtime_lifecycle,
+        )
 
-        return ServerRuntime(
+        server_runtime = ServerRuntime(
             hardware_system=hardware_system,
             board_runtime=board_runtime,
             event_bus=event_bus,
@@ -135,6 +140,8 @@ class GerberaRuntime:
             event_worker=event_worker,
             app=app,
         )
+        runtime_lifecycle.bind_server_runtime(server_runtime)
+        return server_runtime
 
     @staticmethod
     def _build_event_worker() -> EventWorker:
@@ -192,6 +199,55 @@ class GerberaRuntime:
                     microcontroller=microcontroller,
                     connection=connection,
                 )
+
+    @staticmethod
+    def _register_camera_runtime_tools(
+        server_runtime: ServerRuntime,
+        camera_runtime: CameraRuntime,
+    ) -> None:
+        for camera in server_runtime.hardware_system.cameras:
+            normalized_name = camera.name.strip().lower().replace(" ", "_")
+            if not normalized_name:
+                raise ValueError("Camera name cannot be empty")
+
+            server_runtime._register_tool(
+                name=f"turn_on_{normalized_name}_stream",
+                description=f"Start streaming frames from {camera.name}.",
+                tool_function=GerberaRuntime._build_camera_stream_tool(
+                    camera_runtime=camera_runtime,
+                    camera_id=camera.id,
+                    enabled=True,
+                ),
+            )
+
+            server_runtime._register_tool(
+                name=f"turn_off_{normalized_name}_stream",
+                description=f"Stop streaming frames from {camera.name}.",
+                tool_function=GerberaRuntime._build_camera_stream_tool(
+                    camera_runtime=camera_runtime,
+                    camera_id=camera.id,
+                    enabled=False,
+                ),
+            )
+
+    @staticmethod
+    def _build_camera_stream_tool(
+        camera_runtime: CameraRuntime,
+        camera_id: str,
+        enabled: bool,
+    ):
+        def tool_function() -> dict[str, str]:
+            if enabled:
+                camera_runtime.start_stream(camera_id)
+            else:
+                camera_runtime.stop_stream(camera_id)
+
+            return {
+                "camera_id": camera_id,
+                "streaming": str(enabled).lower(),
+            }
+
+        return tool_function
 
     @staticmethod
     def _register_agent_runtime_tool(

@@ -12,7 +12,6 @@ from gerbera_harness.agent.experiments.states.processes.execution_process import
 from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
-    NO_OP_RULE_CALLBACK_BODY,
     RuleCreationSchema,
 )
 from gerbera_harness.agent.experiments.states.schema.hypothesis.method_schema import (
@@ -73,7 +72,7 @@ def rule_creation_action() -> RuleCreationSchema:
         {
             "description": "Watch for excessive temperature.",
             "action_type": "execute",
-            "execution_type": "continuous",
+            "execution_type": "rule",
             "create_tool_call": "insert_rule",
             "delete_tool_call": "delete_rule",
             "event_key": {
@@ -81,7 +80,7 @@ def rule_creation_action() -> RuleCreationSchema:
                 "microcontroller_id": "board-1",
                 "event_name": "temperature",
             },
-            "callable": NO_OP_RULE_CALLBACK_BODY,
+            "callable": "return None",
             "operator": "greater_than",
             "expected": 20,
             "trigger_mode": "repeat",
@@ -200,7 +199,7 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
                 **event_key,
                 "expected_value": 20.0,
                 "operator": "greater_than",
-                "callback_body": NO_OP_RULE_CALLBACK_BODY,
+                "callback_body": "return None",
                 "trigger_mode": "repeat",
             },
         ),

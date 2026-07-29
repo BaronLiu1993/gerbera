@@ -32,33 +32,62 @@ class EventListener:
     )
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     _stop_event: threading.Event = field(default_factory=threading.Event)
+    _lifecycle_lock: threading.RLock = field(
+        default_factory=threading.RLock,
+        init=False,
+        repr=False,
+    )
 
-    def create_listeners(self):
-        self._stop_event.clear()
-        for microcontroller in self.hardware_system.microcontrollers:
-            microcontroller_id = microcontroller.id
+    def create_listeners(self) -> None:
+        with self._lifecycle_lock:
+            self._stop_event.clear()
+            for microcontroller in self.hardware_system.microcontrollers:
+                microcontroller_id = microcontroller.id
 
-            thread = threading.Thread(
-                target=self._listen_loop,
-                args=(microcontroller_id,),
-                daemon=True,
-                name=f"serial-listener-{microcontroller_id}",
-            )
+                thread = threading.Thread(
+                    target=self._listen_loop,
+                    args=(microcontroller_id,),
+                    daemon=False,
+                    name=f"serial-listener-{microcontroller_id}",
+                )
 
-            self._threads[microcontroller_id] = thread
-            thread.start()
+                self._threads[microcontroller_id] = thread
+                thread.start()
 
-    def stop_listeners(self):
-        self._stop_event.set()
+    def stop_listeners(self, timeout: float = 2.0) -> None:
+        with self._lifecycle_lock:
+            self._stop_event.set()
+            threads = list(self._threads.items())
+
+        first_error: Exception | None = None
         try:
             for serial_connection in self._serial_pool.values():
-                serial_connection.destroy()
+                try:
+                    serial_connection.destroy()
+                except Exception as exc:
+                    if first_error is None:
+                        first_error = exc
         finally:
-            for thread in self._threads.values():
-                thread.join(timeout=1)
+            alive_threads: dict[str, threading.Thread] = {}
+            for microcontroller_id, thread in threads:
+                thread.join(timeout=timeout)
+                if thread.is_alive():
+                    alive_threads[microcontroller_id] = thread
+                    if first_error is None:
+                        first_error = RuntimeError(
+                            f"Event listener thread did not stop: {thread.name}"
+                        )
 
-            self._threads.clear()
-            self._rule_executor.shutdown(wait=True)
+            with self._lifecycle_lock:
+                self._threads = alive_threads
+
+            self._rule_executor.shutdown(
+                wait=True,
+                cancel_futures=True,
+            )
+
+        if first_error is not None:
+            raise first_error
 
     def _parse_payload(self, line: str):
         res_payload = {}

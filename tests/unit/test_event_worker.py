@@ -44,6 +44,7 @@ def test_wait_until_idle_waits_for_active_database_write() -> None:
 
     wait_thread.join(timeout=1)
     worker.stop()
+    assert worker._thread is None
     assert writer.payloads == [[{"value": "1"}]]
 
 

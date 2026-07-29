@@ -15,9 +15,6 @@ from gerbera_harness.agent.experiments.states.schema.utils import (
     StrictSchema,
 )
 
-NO_OP_RULE_CALLBACK_BODY = "return None"
-
-
 # Type Schemas
 class ActionTypeEnum(str, Enum):
     EXECUTE = "execute"
@@ -45,7 +42,7 @@ class ExecuteActionParameterSchema(StrictSchema):
 class RuleCreationSchema(StrictSchema):
     description: str
     action_type: Literal["execute"]
-    execution_type: Literal["continuous"]
+    execution_type: Literal["rule"]
     create_tool_call: str = Field(min_length=1)
     delete_tool_call: str = Field(min_length=1)
     event_key: EventKey
@@ -72,6 +69,18 @@ class RuleCreationSchema(StrictSchema):
     def validate_callable_body(cls, value: str) -> str:
         return normalize_rule_callback_body(value)
 
+# For executing agent/non-deterministic 
+class AgentExecuteSchema(StrictSchema):
+    description: str
+    action_type: Literal["execute"]
+
+# For now this emits events specifying what it is
+class ObservationExecuteSchema(StrictSchema):
+    description: str
+    action_type: Literal["execute"]
+    turn_on_vision_tool: str = Field(min_length=1)
+    turn_off_vision_tool: str = Field(min_length=1)
+    model: str # This is the model that is being deployed and what it is sensing
 
 class ContinuousExecuteSchema(StrictSchema):
     description: str
@@ -117,7 +126,7 @@ class ReviewVariableSchema(StrictSchema):
     type: ParameterTypeSchema
 
 
-
+# this needs to change for decisions and how it loops back to which step in execute stage
 class ReviewSchema(StrictSchema):
     description: str
     action_type: Literal["review"]
@@ -135,8 +144,9 @@ class ReviewSchema(StrictSchema):
         ),
     )
 
-# Combined Schemas
+# Union Schemas
 ExecuteSchema = (
     RuleCreationSchema | ContinuousExecuteSchema | DiscreteExecuteSchema
 )
+
 ActionSchema = ExecuteSchema | ReviewSchema

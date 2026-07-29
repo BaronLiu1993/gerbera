@@ -3,6 +3,9 @@ from gerbera_harness.agent.model.database import Database
 class ReviewProcess:
     database: Database
 
+    def complete_goal(self):
+        pass
+
     def select_rows(self, query: str):
         with self.database.connect() as conn:
             with conn.cursor() as cur:
@@ -19,8 +22,6 @@ class ReviewProcess:
 
     def maxiumum_rows(self, query: str):
         pass
-
-    def generate_
 
 
 

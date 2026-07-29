@@ -33,7 +33,11 @@ class EventWorker:
         repr=False,
     )
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)
-    _running: bool = field(default=False, init=False, repr=False)
+    _stop_event: threading.Event = field(
+        default_factory=threading.Event,
+        init=False,
+        repr=False,
+    )
     _error: Exception | None = field(default=None, init=False, repr=False)
     _error_lock: threading.Lock = field(
         default_factory=threading.Lock,
@@ -51,18 +55,25 @@ class EventWorker:
         with self._error_lock:
             self._error = None
 
-        self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._run,
-            daemon=True,
+            daemon=False,
             name="gerbera-event-worker",
         )
         self._thread.start()
 
     def stop(self, timeout: float = 2.0) -> None:
-        self._running = False
-        if self._thread is not None:
-            self._thread.join(timeout=timeout)
+        self._stop_event.set()
+        thread = self._thread
+        if thread is None:
+            return
+
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            raise RuntimeError("EventWorker thread did not stop")
+
+        self._thread = None
 
     def write_to_db(
         self,
@@ -100,7 +111,7 @@ class EventWorker:
         self._raise_if_failed()
 
     def _run(self) -> None:
-        while self._running:
+        while not self._stop_event.is_set():
             try:
                 job = self._queue.get(timeout=0.5)
             except Empty:

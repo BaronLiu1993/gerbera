@@ -19,6 +19,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+camera = [
+    "opencv-python-headless",
+]
 dev = [
     "pytest>=8.0",
 ]

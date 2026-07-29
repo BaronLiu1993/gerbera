@@ -212,9 +212,13 @@ def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:
 
     class Thread:
         joined = False
+        name = "test-listener"
 
         def join(self, timeout: float) -> None:
             self.joined = True
+
+        def is_alive(self) -> bool:
+            return False
 
     thread = Thread()
     listener = EventListener(
@@ -230,3 +234,28 @@ def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:
 
     assert thread.joined is True
     assert listener._threads == {}
+
+
+def test_listener_keeps_a_thread_tracked_when_join_times_out() -> None:
+    class Thread:
+        name = "stuck-listener"
+
+        def join(self, timeout: float) -> None:
+            return None
+
+        def is_alive(self) -> bool:
+            return True
+
+    thread = Thread()
+    listener = EventListener(
+        hardware_system=SimpleNamespace(microcontrollers=[]),
+        _serial_pool={},
+        _threads={"board-1": thread},
+        _event_bus=EventBus(),
+        _rule_buffer=RuleBuffer(RuleBus()),
+    )
+
+    with pytest.raises(RuntimeError, match="did not stop"):
+        listener.stop_listeners(timeout=0)
+
+    assert listener._threads == {"board-1": thread}

@@ -44,9 +44,8 @@ post-experiment analysis.
 When the method requires this conditional behaviour:
 
 - Use `RuleCreationSchema`, with `action_type` set to `execute` and
-  `execution_type` set to `continuous`. A rule is continuous because it stays
-  active across the later execute groups, not because it has a
-  `duration_seconds`.
+  `execution_type` set to `rule`. A rule stays active across later execute
+  groups and does not have a `duration_seconds`.
 - Set `create_tool_call` to the exact available rule-creation tool and
   `delete_tool_call` to the exact available rule-deletion tool. The executor
   creates the rule when it reaches this action and deletes it after all execute
@@ -100,10 +99,10 @@ rule.
 
 ## Execute Contract
 
-Each `execute` action must set `action_type` to `execute` and classify its
-`execution_type` as `continuous` or `discrete`. Ordinary execute actions list
-the dependent and independent variable names involved. Rule creation actions
-instead use the fields defined in the Rule Planning section.
+Each `execute` action must set `action_type` to `execute`. Ordinary execute
+actions classify `execution_type` as `continuous` or `discrete` and list the
+dependent and independent variable names involved. Rule creation actions use
+`execution_type: rule` and the fields defined in the Rule Planning section.
 
 Choose the execution type from the experiment's data-collection semantics:
 

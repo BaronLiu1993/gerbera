@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+from typing import Optional
 
 from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec
@@ -13,7 +14,7 @@ class Microcontroller:
     port: str
     fqbn: str
     baud_rate: int = 115200
-    description: str = ""
+    description: Optional[str] = None
     connections: list[Connection] = field(default_factory=list)
 
     @property
