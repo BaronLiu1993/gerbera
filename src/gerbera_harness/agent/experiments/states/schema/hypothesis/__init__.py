@@ -1,6 +1,7 @@
 from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
     ActionSchema,
     ActionTypeEnum,
+    AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     ExecuteActionParameterSchema,
@@ -21,6 +22,7 @@ from gerbera_harness.agent.experiments.states.schema.hypothesis.method_schema im
 __all__ = [
     "ActionSchema",
     "ActionTypeEnum",
+    "AgentExecuteSchema",
     "ContinuousExecuteSchema",
     "DiscreteExecuteSchema",
     "ExecuteActionParameterSchema",

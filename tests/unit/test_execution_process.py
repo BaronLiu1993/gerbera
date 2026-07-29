@@ -10,6 +10,7 @@ from gerbera_harness.agent.experiments.states.processes.execution_process import
     ExecutionProcess,
 )
 from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
+    AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     RuleCreationSchema,
@@ -63,6 +64,36 @@ def continuous_action() -> ContinuousExecuteSchema:
             "reverse_tool_call_params": [
                 parameter("enabled", False, "bool")
             ],
+            "emitted_event_keys": [
+                {
+                    "event_type": "STREAM",
+                    "microcontroller_id": "board-1",
+                    "event_name": "sensor_value",
+                }
+            ],
+        }
+    )
+
+
+def agent_action() -> AgentExecuteSchema:
+    return AgentExecuteSchema.model_validate(
+        {
+            "description": "Approach the detected block.",
+            "action_type": "execute",
+            "execution_type": "agent",
+            "start_offset_seconds": 0,
+            "goal": "Move within grasping range of the block.",
+            "completion_criteria": "The block is centered and within reach.",
+            "input_event_keys": [
+                {
+                    "event_type": "VISION",
+                    "microcontroller_id": "camera-1",
+                    "event_name": "block_detected",
+                }
+            ],
+            "allowed_tool_calls": ["set_motor"],
+            "max_iterations": 10,
+            "timeout_seconds": 30,
         }
     )
 
@@ -173,6 +204,23 @@ def test_execution_process_stops_continuous_action() -> None:
         ("stop_sensor", {"enabled": False}),
     ]
     assert result is None
+
+
+def test_execution_process_reports_unimplemented_agent_loop() -> None:
+    group = ExecuteActionGroupSchema(
+        action_type="execute",
+        actions=[agent_action()],
+    )
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[group],
+    )
+
+    with pytest.raises(RuntimeError, match="Execution group 0 failed") as exc:
+        asyncio.run(process.run_workflow())
+
+    assert isinstance(exc.value.__cause__, ExceptionGroup)
+    assert isinstance(exc.value.__cause__.exceptions[0], NotImplementedError)
 
 
 def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:

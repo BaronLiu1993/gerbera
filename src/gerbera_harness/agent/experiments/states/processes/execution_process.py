@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from gerbera_harness.agent.experiments.states.schema.hypothesis.action_schema import (
+    AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     RuleCreationSchema,
@@ -117,17 +118,24 @@ class ExecutionProcess:
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
-        action: ContinuousExecuteSchema | DiscreteExecuteSchema,
+        action: (
+            AgentExecuteSchema
+            | ContinuousExecuteSchema
+            | DiscreteExecuteSchema
+        ),
         group_start: float,
     ) -> None:
         start_at = group_start + action.start_offset_seconds
         delay = max(0.0, start_at - asyncio.get_running_loop().time())
-        
+
         await asyncio.sleep(delay)
 
-        if isinstance(action, DiscreteExecuteSchema):
+        if isinstance(action, AgentExecuteSchema):
+            raise NotImplementedError(
+                "Agent execute loops are not implemented yet"
+            )
 
-            # Return Immediately if Discrete
+        if isinstance(action, DiscreteExecuteSchema):
             return await client.call_tool(
                 action.forward_tool_call,
                 client.build_arguments(action.params),
@@ -220,6 +228,7 @@ class ExecutionProcess:
                     action,
                     (
                         RuleCreationSchema,
+                        AgentExecuteSchema,
                         ContinuousExecuteSchema,
                         DiscreteExecuteSchema,
                     ),

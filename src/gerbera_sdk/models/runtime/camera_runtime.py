@@ -79,17 +79,10 @@ class CameraRuntime:
         with self._lock:
             connections = list(self.connection_pool.items())
 
-        first_error: Exception | None = None
         for camera_id, capture in connections:
             try:
                 capture.release()
-            except Exception as exc:
-                if first_error is None:
-                    first_error = exc
-            else:
+            finally:
                 with self._lock:
                     if self.connection_pool.get(camera_id) is capture:
                         self.connection_pool.pop(camera_id)
-
-        if first_error is not None:
-            raise RuntimeError("Could not stop camera runtime") from first_error

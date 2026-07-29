@@ -2,11 +2,14 @@ from dataclasses import dataclass, field
 import uuid
 
 from gerbera_harness.agent.experiments.states import (
+    Complete,
+    Execution,
     ExperimentState,
+    Failed,
     Initialisation,
     LoopStateEnum,
+    Review,
 )
-from gerbera_harness.agent.experiments.states.utils import create_state
 
 
 @dataclass
@@ -32,5 +35,16 @@ class Session:
                 f"-> {target_state.value}"
             )
 
-        self.state = create_state(target_state)
+        match target_state:
+            case LoopStateEnum.INITIALISATION:
+                self.state = Initialisation()
+            case LoopStateEnum.EXECUTION:
+                self.state = Execution()
+            case LoopStateEnum.REVIEW:
+                self.state = Review()
+            case LoopStateEnum.COMPLETE:
+                self.state = Complete()
+            case LoopStateEnum.FAILED:
+                self.state = Failed()
+
         return self.state

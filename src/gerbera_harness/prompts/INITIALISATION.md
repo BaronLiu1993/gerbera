@@ -99,7 +99,7 @@ rule.
 
 ## Execute Contract
 
-Each `execute` action must set `action_type` to `execute`. Ordinary execute
+Each `execute` action must set `action_type` to `execute`. Deterministic execute
 actions classify `execution_type` as `continuous` or `discrete` and list the
 dependent and independent variable names involved. Rule creation actions use
 `execution_type: rule` and the fields defined in the Rule Planning section.
@@ -112,8 +112,11 @@ Choose the execution type from the experiment's data-collection semantics:
 - An ordinary `continuous` action runs for a positive `duration_seconds`. Its
   `forward_tool_call` starts collection or streaming and its
   `reverse_tool_call` stops it safely. Use the corresponding start/stop stream
-  tools when they are available. `RuleCreationSchema` is the exception because
-  its lifetime spans the remaining execute groups.
+  tools when they are available. Declare every observation channel produced
+  while it runs in `emitted_event_keys`; use an empty list if it emits none.
+  Streamed observations arrive through those event channels rather than as one
+  final tool result. `RuleCreationSchema` is the exception because its lifetime
+  spans the remaining execute groups.
 - You MUST use `discrete` only for a single bounded command or one-shot reading
   that does not collect a time series. A discrete action defines one
   `forward_tool_call` and its parameter list.
@@ -145,6 +148,11 @@ Parameter-list fields are mandatory and must never be omitted:
   corresponding tool. Use an empty list for either tool when it accepts no
   inputs.
 - Never omit a parameter-list field merely because its list is empty.
+
+Use `execution_type: agent` only when the next action cannot be determined
+before runtime. Define its `goal`, concrete `completion_criteria`, observed
+`input_event_keys`, `allowed_tool_calls`, positive `max_iterations`, and
+positive `timeout_seconds`. These bounds contain its observe-decide-act loop.
 
 `RuleCreationSchema` does not use parameter-list fields. The executor maps its
 event key, condition, and callable fields to the create and delete tool

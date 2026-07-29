@@ -27,8 +27,10 @@ class ParameterTypeSchema(str, Enum):
     FLOAT = "float"
     STRING = "string"
 
+
 # Execute Action Schema
 class ExecutionTypeEnum(str, Enum):
+    AGENT = "agent"
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
 
@@ -69,18 +71,19 @@ class RuleCreationSchema(StrictSchema):
     def validate_callable_body(cls, value: str) -> str:
         return normalize_rule_callback_body(value)
 
-# For executing agent/non-deterministic 
+
 class AgentExecuteSchema(StrictSchema):
     description: str
     action_type: Literal["execute"]
+    execution_type: Literal["agent"]
+    start_offset_seconds: float = Field(ge=0)
+    goal: str = Field(min_length=1)
+    completion_criteria: str = Field(min_length=1)
+    input_event_keys: list[EventKey] = Field(min_length=1)
+    allowed_tool_calls: list[str] = Field(min_length=1)
+    max_iterations: int = Field(ge=1)
+    timeout_seconds: float = Field(gt=0)
 
-# For now this emits events specifying what it is
-class ObservationExecuteSchema(StrictSchema):
-    description: str
-    action_type: Literal["execute"]
-    turn_on_vision_tool: str = Field(min_length=1)
-    turn_off_vision_tool: str = Field(min_length=1)
-    model: str # This is the model that is being deployed and what it is sensing
 
 class ContinuousExecuteSchema(StrictSchema):
     description: str
@@ -99,6 +102,11 @@ class ContinuousExecuteSchema(StrictSchema):
     reverse_tool_call: str = Field(min_length=1)
     forward_tool_call_params: list[ExecuteActionParameterSchema]
     reverse_tool_call_params: list[ExecuteActionParameterSchema]
+    emitted_event_keys: list[EventKey] = Field(
+        description=(
+            "Event channels that emit observations while this action runs."
+        ),
+    )
 
 
 class DiscreteExecuteSchema(StrictSchema):
@@ -115,7 +123,6 @@ class DiscreteExecuteSchema(StrictSchema):
     independent_variables: list[SnakeCaseVariable]
     forward_tool_call: str = Field(min_length=1)
     params: list[ExecuteActionParameterSchema]
-
 
 
 # Review Schema
@@ -144,9 +151,13 @@ class ReviewSchema(StrictSchema):
         ),
     )
 
+
 # Union Schemas
 ExecuteSchema = (
-    RuleCreationSchema | ContinuousExecuteSchema | DiscreteExecuteSchema
+    RuleCreationSchema
+    | AgentExecuteSchema
+    | ContinuousExecuteSchema
+    | DiscreteExecuteSchema
 )
 
 ActionSchema = ExecuteSchema | ReviewSchema

@@ -5,6 +5,7 @@ from gerbera_sdk.events.event_key import EventKey
 from gerbera_sdk.events.rules import RuleTriggerModeEnum
 from gerbera_harness.agent.experiments.states.schema.hypothesis import (
     ActionSchema,
+    AgentExecuteSchema,
     HypothesisSchema,
     ReviewSchema,
     RuleCreationSchema,
@@ -64,6 +65,34 @@ def continuous_execute_action() -> dict:
             )
         ],
         "reverse_tool_call_params": [],
+        "emitted_event_keys": [
+            {
+                "event_type": "STREAM",
+                "microcontroller_id": "board-1",
+                "event_name": "temperature",
+            }
+        ],
+    }
+
+
+def agent_execute_action() -> dict:
+    return {
+        "description": "Approach the detected block.",
+        "action_type": "execute",
+        "execution_type": "agent",
+        "start_offset_seconds": 0,
+        "goal": "Move within grasping range of the block.",
+        "completion_criteria": "The block is centered and within reach.",
+        "input_event_keys": [
+            {
+                "event_type": "VISION",
+                "microcontroller_id": "camera-1",
+                "event_name": "block_detected",
+            }
+        ],
+        "allowed_tool_calls": ["move_arm", "capture_frame"],
+        "max_iterations": 10,
+        "timeout_seconds": 30,
     }
 
 
@@ -312,6 +341,53 @@ def test_execute_group_supports_parallel_actions() -> None:
     assert len(hypothesis.method.execute_steps[0].actions) == 2
 
 
+def test_hypothesis_schema_models_a_bounded_agent_execute_step() -> None:
+    hypothesis = HypothesisSchema.model_validate(
+        hypothesis_data(agent_execute_action())
+    )
+
+    action = hypothesis.method.execute_steps[0].actions[0]
+    assert isinstance(action, AgentExecuteSchema)
+    assert action.max_iterations == 10
+    assert action.timeout_seconds == 30
+    assert action.input_event_keys[0].event_type == "VISION"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_iterations", 0),
+        ("timeout_seconds", 0),
+        ("input_event_keys", []),
+        ("allowed_tool_calls", []),
+    ],
+)
+def test_agent_execute_action_requires_loop_bounds(
+    field: str,
+    value: object,
+) -> None:
+    action = agent_execute_action()
+    action[field] = value
+
+    with pytest.raises(ValidationError):
+        HypothesisSchema.model_validate(hypothesis_data(action))
+
+
+def test_continuous_execute_action_declares_emitted_event_keys() -> None:
+    hypothesis = HypothesisSchema.model_validate(
+        hypothesis_data(continuous_execute_action())
+    )
+
+    action = hypothesis.method.execute_steps[0].actions[0]
+    assert action.emitted_event_keys == [
+        EventKey(
+            event_type="STREAM",
+            microcontroller_id="board-1",
+            event_name="temperature",
+        )
+    ]
+
+
 def test_hypothesis_schema_excludes_application_owned_fields() -> None:
     schema = HypothesisSchema.model_json_schema()
 
@@ -331,6 +407,7 @@ def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
     assert "methods" not in response_schema["properties"]
     assert "ContinuousExecuteSchema" in Initialisation.valid_schema["$defs"]
     assert "DiscreteExecuteSchema" in Initialisation.valid_schema["$defs"]
+    assert "AgentExecuteSchema" in Initialisation.valid_schema["$defs"]
     assert "RuleCreationSchema" in Initialisation.valid_schema["$defs"]
     assert "ReviewSchema" in Initialisation.valid_schema["$defs"]
 

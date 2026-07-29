@@ -1,11 +1,9 @@
-from functools import cache
 from typing import Collection
 
 from pydantic import BaseModel
 
 from gerbera_harness.agent.experiments.states.base import (
     DecisionEnum,
-    ExperimentState,
     LoopStateEnum,
 )
 
@@ -41,26 +39,3 @@ def build_valid_schema(
         schema["$defs"] = definitions
 
     return schema
-
-
-@cache
-def _state_registry() -> dict[LoopStateEnum, type[ExperimentState]]:
-    from gerbera_harness.agent.experiments.states.complete import Complete
-    from gerbera_harness.agent.experiments.states.execution import Execution
-    from gerbera_harness.agent.experiments.states.failed import Failed
-    from gerbera_harness.agent.experiments.states.initialisation import (
-        Initialisation,
-    )
-    from gerbera_harness.agent.experiments.states.review import Review
-
-    return {
-        LoopStateEnum.INITIALISATION: Initialisation,
-        LoopStateEnum.EXECUTION: Execution,
-        LoopStateEnum.REVIEW: Review,
-        LoopStateEnum.COMPLETE: Complete,
-        LoopStateEnum.FAILED: Failed,
-    }
-
-
-def create_state(state: LoopStateEnum) -> ExperimentState:
-    return _state_registry()[state]()
