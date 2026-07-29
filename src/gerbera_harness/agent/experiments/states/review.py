@@ -5,6 +5,7 @@ from gerbera_sdk.harness.agent.experiments.states.base import (
     ExperimentState,
     LoopStateEnum,
     TextResponseSchema,
+    DecisionEnum
 )
 from gerbera_sdk.harness.agent.experiments.states.utils import build_valid_schema
 
@@ -19,6 +20,9 @@ class Review(ExperimentState):
             LoopStateEnum.COMPLETE,
             LoopStateEnum.FAILED,
         }
+    )
+    valid_decisions: ClassVar[frozenset[DecisionEnum]] = frozenset(
+        {DecisionEnum.ACCEPTED, DecisionEnum.REJECTED}
     )
     valid_schema: ClassVar[dict] = build_valid_schema(
         valid_transition_states,
