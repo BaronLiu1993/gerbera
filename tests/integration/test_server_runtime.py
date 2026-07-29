@@ -9,7 +9,6 @@ from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
@@ -78,45 +77,6 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         "turn_on_status_led",
         "turn_off_status_led",
     }
-
-
-def test_server_registers_camera_stream_lifecycle_tools() -> None:
-    calls: list[tuple[str, str]] = []
-    camera = Camera(
-        id="camera-1",
-        name="Laptop Camera",
-        description="Built-in camera",
-        source=DeviceCameraSource(),
-    )
-    hardware_system = HardwareSystem(cameras=[camera])
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=hardware_system,
-        board_runtime=object(),
-        event_bus=EventBus(),
-        stream_controller=object(),
-        event_worker=EventWorker(),
-        app=app,
-    )
-    camera_runtime = SimpleNamespace(
-        start_stream=lambda camera_id: calls.append(("start", camera_id)),
-        stop_stream=lambda camera_id: calls.append(("stop", camera_id)),
-    )
-
-    GerberaRuntime._register_camera_runtime_tools(runtime, camera_runtime)
-
-    assert app.tools["turn_on_laptop_camera_stream"]() == {
-        "camera_id": "camera-1",
-        "streaming": "true",
-    }
-    assert app.tools["turn_off_laptop_camera_stream"]() == {
-        "camera_id": "camera-1",
-        "streaming": "false",
-    }
-    assert calls == [
-        ("start", "camera-1"),
-        ("stop", "camera-1"),
-    ]
 
 
 def test_server_registers_command_spec_as_mcp_tool_schema() -> None:

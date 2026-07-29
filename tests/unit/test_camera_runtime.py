@@ -1,6 +1,3 @@
-import threading
-import time
-
 import pytest
 
 from gerbera_sdk.models.hardware.camera import (
@@ -9,11 +6,7 @@ from gerbera_sdk.models.hardware.camera import (
     MJPEGSource,
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.camera_runtime import (
-    CameraRuntime,
-    CameraSession,
-    camera_address,
-)
+from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 
 
 class FakeCapture:
@@ -21,20 +14,19 @@ class FakeCapture:
         self,
         *,
         opened: bool = True,
+        read_success: bool = True,
         frame: object = "frame",
     ) -> None:
         self.opened = opened
+        self.read_success = read_success
         self.frame = frame
         self.released = False
-        self.frame_read = threading.Event()
 
     def isOpened(self) -> bool:
         return self.opened
 
     def read(self) -> tuple[bool, object]:
-        self.frame_read.set()
-        time.sleep(0.001)
-        return not self.released, self.frame
+        return self.read_success, self.frame
 
     def release(self) -> None:
         self.released = True
@@ -53,58 +45,20 @@ def _camera(
 
 
 def test_camera_address_resolves_supported_sources() -> None:
-    assert camera_address(DeviceCameraSource(device_index=2)) == 2
+    assert CameraRuntime._get_camera_address(
+        DeviceCameraSource(device_index=2)
+    ) == 2
     assert (
-        camera_address(MJPEGSource(stream_url="http://camera/stream"))
+        CameraRuntime._get_camera_address(
+            MJPEGSource(stream_url="http://camera/stream")
+        )
         == "http://camera/stream"
     )
 
 
-def test_camera_session_starts_disabled_and_keeps_only_latest_frame() -> None:
-    capture = FakeCapture(frame=object())
-    session = CameraSession(
-        camera=_camera(),
-        capture_factory=lambda _: capture,
-    )
-
-    session.start()
-
-    assert session.is_enabled is False
-    assert session.get_latest_frame() is None
-    assert session._thread is not None
-    assert session._thread.daemon is False
-
-    session.enable()
-    assert capture.frame_read.wait(timeout=1)
-
-    deadline = time.monotonic() + 1
-    while session.get_latest_frame() is None and time.monotonic() < deadline:
-        time.sleep(0.001)
-
-    assert session.get_latest_frame() is capture.frame
-
-    session.disable()
-    assert session.is_enabled is False
-
-    session.close()
-    assert capture.released
-    assert session._thread is None
-
-
-def test_camera_session_releases_capture_that_did_not_open() -> None:
-    capture = FakeCapture(opened=False)
-    session = CameraSession(
-        camera=_camera(),
-        capture_factory=lambda _: capture,
-    )
-
-    with pytest.raises(RuntimeError, match="Could not open camera"):
-        session.start()
-
-    assert capture.released
-
-
-def test_camera_runtime_manages_one_session_per_camera() -> None:
+def test_camera_runtime_opens_captures_and_closes_cameras(
+    monkeypatch,
+) -> None:
     cameras = [
         _camera("laptop"),
         _camera(
@@ -112,66 +66,77 @@ def test_camera_runtime_manages_one_session_per_camera() -> None:
             MJPEGSource(stream_url="http://camera/stream"),
         ),
     ]
-    system = HardwareSystem(cameras=cameras)
-    captures: dict[str, FakeCapture] = {}
+    captures = {
+        0: FakeCapture(frame="laptop-frame"),
+        "http://camera/stream": FakeCapture(frame="robot-frame"),
+    }
+    addresses: list[int | str] = []
 
-    def session_factory(camera: Camera) -> CameraSession:
-        capture = FakeCapture(frame=camera.id)
-        captures[camera.id] = capture
-        return CameraSession(
-            camera=camera,
-            capture_factory=lambda _: capture,
-        )
+    def capture_factory(address: int | str) -> FakeCapture:
+        addresses.append(address)
+        return captures[address]
 
-    runtime = CameraRuntime(
-        hardware_system=system,
-        session_factory=session_factory,
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        capture_factory,
     )
+    runtime = CameraRuntime(hardware_system=HardwareSystem(cameras=cameras))
 
     runtime.start()
     runtime.start()
 
-    assert set(runtime.sessions) == {"laptop", "robot"}
-    assert len(captures) == 2
+    assert addresses == [0, "http://camera/stream"]
+    assert runtime.capture_frame("laptop") == "laptop-frame"
+    assert runtime.capture_frame("robot") == "robot-frame"
 
-    runtime.start_stream("laptop")
-    assert captures["laptop"].frame_read.wait(timeout=1)
-
-    deadline = time.monotonic() + 1
-    while runtime.get_latest_frame("laptop") is None:
-        if time.monotonic() >= deadline:
-            pytest.fail("Camera did not publish a frame")
-        time.sleep(0.001)
-
-    assert runtime.get_latest_frame("laptop") == "laptop"
-    assert runtime.get_session("laptop").is_enabled
-    assert runtime.get_session("robot").is_enabled is False
-
-    runtime.stop_stream("laptop")
     runtime.close()
 
     assert all(capture.released for capture in captures.values())
-    assert runtime.sessions == {}
+    assert runtime.connection_pool == {}
 
 
-def test_camera_runtime_keeps_session_tracked_when_shutdown_fails() -> None:
-    class FailingSession:
-        def __init__(self, camera: Camera) -> None:
-            self.camera = camera
-
-        def start(self) -> None:
-            return None
-
-        def close(self) -> None:
-            raise RuntimeError("worker still running")
-
-    runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=[_camera()]),
-        session_factory=FailingSession,
+def test_camera_runtime_releases_connections_when_start_fails(
+    monkeypatch,
+) -> None:
+    first_capture = FakeCapture()
+    failed_capture = FakeCapture(opened=False)
+    captures = iter([first_capture, failed_capture])
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda _: next(captures),
     )
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(
+            cameras=[_camera("first"), _camera("second")]
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="Could not start camera runtime"):
+        runtime.start()
+
+    assert first_capture.released
+    assert failed_capture.released
+    assert runtime.connection_pool == {}
+
+
+def test_camera_runtime_raises_when_frame_capture_fails(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda _: FakeCapture(read_success=False),
+    )
+    runtime = CameraRuntime(hardware_system=HardwareSystem(cameras=[_camera()]))
     runtime.start()
 
-    with pytest.raises(RuntimeError, match="Could not stop camera runtime"):
-        runtime.close()
+    with pytest.raises(RuntimeError, match="Could not read camera frame"):
+        runtime.capture_frame("laptop")
 
-    assert set(runtime.sessions) == {"laptop"}
+    runtime.close()
+
+
+def test_camera_runtime_rejects_unknown_camera() -> None:
+    runtime = CameraRuntime(hardware_system=HardwareSystem())
+
+    with pytest.raises(RuntimeError, match="Camera does not exist"):
+        runtime.capture_frame("missing")

@@ -83,11 +83,6 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
     )
     monkeypatch.setattr(
         GerberaRuntime,
-        "_register_camera_runtime_tools",
-        lambda runtime, cameras: calls.append("camera_tools.register"),
-    )
-    monkeypatch.setattr(
-        GerberaRuntime,
         "_register_agent_runtime_tool",
         lambda runtime: calls.append("agent_tool.register"),
     )
@@ -106,7 +101,6 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
     assert calls == [
         "events.register",
         "tools.register",
-        "camera_tools.register",
         "agent_tool.register",
         "event_catalog_tool.register",
         "board.start",

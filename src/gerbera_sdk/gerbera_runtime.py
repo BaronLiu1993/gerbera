@@ -73,10 +73,6 @@ class GerberaRuntime:
 
         server_runtime._register_events()
         GerberaRuntime._register_server_runtime_tools(server_runtime)
-        GerberaRuntime._register_camera_runtime_tools(
-            server_runtime,
-            camera_runtime,
-        )
         GerberaRuntime._register_agent_runtime_tool(server_runtime)
         GerberaRuntime._register_event_catalog_tool(server_runtime)
         server_runtime.app.run(
@@ -199,55 +195,6 @@ class GerberaRuntime:
                     microcontroller=microcontroller,
                     connection=connection,
                 )
-
-    @staticmethod
-    def _register_camera_runtime_tools(
-        server_runtime: ServerRuntime,
-        camera_runtime: CameraRuntime,
-    ) -> None:
-        for camera in server_runtime.hardware_system.cameras:
-            normalized_name = camera.name.strip().lower().replace(" ", "_")
-            if not normalized_name:
-                raise ValueError("Camera name cannot be empty")
-
-            server_runtime._register_tool(
-                name=f"turn_on_{normalized_name}_stream",
-                description=f"Start streaming frames from {camera.name}.",
-                tool_function=GerberaRuntime._build_camera_stream_tool(
-                    camera_runtime=camera_runtime,
-                    camera_id=camera.id,
-                    enabled=True,
-                ),
-            )
-
-            server_runtime._register_tool(
-                name=f"turn_off_{normalized_name}_stream",
-                description=f"Stop streaming frames from {camera.name}.",
-                tool_function=GerberaRuntime._build_camera_stream_tool(
-                    camera_runtime=camera_runtime,
-                    camera_id=camera.id,
-                    enabled=False,
-                ),
-            )
-
-    @staticmethod
-    def _build_camera_stream_tool(
-        camera_runtime: CameraRuntime,
-        camera_id: str,
-        enabled: bool,
-    ):
-        def tool_function() -> dict[str, str]:
-            if enabled:
-                camera_runtime.start_stream(camera_id)
-            else:
-                camera_runtime.stop_stream(camera_id)
-
-            return {
-                "camera_id": camera_id,
-                "streaming": str(enabled).lower(),
-            }
-
-        return tool_function
 
     @staticmethod
     def _register_agent_runtime_tool(
