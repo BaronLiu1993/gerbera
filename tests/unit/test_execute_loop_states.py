@@ -1,62 +1,57 @@
 import pytest
+from pydantic import ValidationError
 
 from gerbera_harness.agent.experiments.states.schema.execute import (
     ActState,
-    CompletedState,
+    DecideResultSchema,
     DecideState,
     ExecuteLoop,
+    ExecuteLoopDecisionEnum,
     ExecuteLoopStateEnum,
-    IncompleteState,
     ObserveState,
 )
 
 
-def test_execute_loop_continues_when_observation_is_incomplete() -> None:
+def test_continue_decision_advances_to_act_and_observe() -> None:
     loop = ExecuteLoop()
 
     assert isinstance(loop.state, ObserveState)
     assert isinstance(
-        loop.perform_transition(ExecuteLoopStateEnum.INCOMPLETE),
-        IncompleteState,
-    )
-    assert isinstance(
         loop.perform_transition(ExecuteLoopStateEnum.DECIDE),
         DecideState,
     )
-    assert isinstance(loop.perform_transition("act"), ActState)
+    assert loop.resolve_decision("continue") is ExecuteLoopDecisionEnum.CONTINUE
+    assert isinstance(loop.state, ActState)
     assert isinstance(loop.perform_transition("observe"), ObserveState)
+    assert loop.decision is None
 
 
-def test_execute_loop_finishes_when_observation_is_completed() -> None:
+@pytest.mark.parametrize("decision", ["complete", "incomplete"])
+def test_terminal_decision_stops_execute_loop(decision: str) -> None:
+    loop = ExecuteLoop(state=DecideState())
+
+    loop.resolve_decision(decision)
+
+    assert loop.terminated is True
+    assert loop.valid_transition(ExecuteLoopStateEnum.ACT) is False
+    with pytest.raises(ValueError, match="Invalid execute-loop transition"):
+        loop.perform_transition(ExecuteLoopStateEnum.ACT)
+
+
+def test_decision_can_only_be_resolved_in_decide_state() -> None:
     loop = ExecuteLoop()
 
-    assert isinstance(loop.perform_transition("completed"), CompletedState)
-    assert loop.state.valid_transition_states == frozenset()
+    with pytest.raises(ValueError, match="only be resolved in decide state"):
+        loop.resolve_decision("continue")
 
 
-@pytest.mark.parametrize(
-    ("state", "invalid_target"),
-    [
-        (ObserveState(), ExecuteLoopStateEnum.ACT),
-        (IncompleteState(), ExecuteLoopStateEnum.ACT),
-        (DecideState(), ExecuteLoopStateEnum.OBSERVE),
-        (ActState(), ExecuteLoopStateEnum.DECIDE),
-        (CompletedState(), ExecuteLoopStateEnum.OBSERVE),
-    ],
-)
-def test_execute_loop_rejects_out_of_order_transitions(
-    state: (
-        ObserveState
-        | IncompleteState
-        | DecideState
-        | ActState
-        | CompletedState
-    ),
-    invalid_target: ExecuteLoopStateEnum,
-) -> None:
-    loop = ExecuteLoop(state=state)
+@pytest.mark.parametrize("decision", ["complete", "incomplete", "continue"])
+def test_decide_result_schema_accepts_loop_decisions(decision: str) -> None:
+    result = DecideResultSchema.model_validate({"decision": decision})
 
-    with pytest.raises(ValueError, match="Invalid execute-loop transition"):
-        loop.perform_transition(invalid_target)
+    assert result.decision.value == decision
 
-    assert loop.state is state
+
+def test_decide_result_schema_rejects_unknown_decision() -> None:
+    with pytest.raises(ValidationError):
+        DecideResultSchema.model_validate({"decision": "retry"})

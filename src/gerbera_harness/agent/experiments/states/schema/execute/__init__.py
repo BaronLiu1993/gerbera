@@ -5,14 +5,10 @@ from gerbera_harness.agent.experiments.states.schema.execute.base import (
     ExecuteLoopState,
     ExecuteLoopStateEnum,
 )
-from gerbera_harness.agent.experiments.states.schema.execute.completed import (
-    CompletedState,
-)
 from gerbera_harness.agent.experiments.states.schema.execute.decide import (
+    DecideResultSchema,
     DecideState,
-)
-from gerbera_harness.agent.experiments.states.schema.execute.incomplete import (
-    IncompleteState,
+    ExecuteLoopDecisionEnum,
 )
 from gerbera_harness.agent.experiments.states.schema.execute.observe import (
     ObserveState,
@@ -22,11 +18,11 @@ from gerbera_harness.agent.experiments.states.schema.execute.session import (
 )
 __all__ = [
     "ActState",
-    "CompletedState",
+    "DecideResultSchema",
     "DecideState",
     "ExecuteLoop",
+    "ExecuteLoopDecisionEnum",
     "ExecuteLoopState",
     "ExecuteLoopStateEnum",
-    "IncompleteState",
     "ObserveState",
 ]
