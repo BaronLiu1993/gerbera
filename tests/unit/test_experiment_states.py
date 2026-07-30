@@ -1,16 +1,14 @@
 import pytest
 
-from gerbera_harness.agent.experiments.states import (
+from gerbera_harness.agent.driver.main_loop import (
     Complete,
+    DecisionEnum,
     Execution,
     Failed,
     Initialisation,
+    Session,
     Review,
 )
-from gerbera_harness.agent.experiments.states.base import (
-    DecisionEnum,
-)
-from gerbera_harness.agent.experiments.session import Session
 
 
 def test_each_experiment_state_loads_its_markdown_prompt() -> None:

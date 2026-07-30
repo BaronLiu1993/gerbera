@@ -3,20 +3,20 @@ import json
 
 from pydantic import ValidationError
 
-from gerbera_harness.agent.experiments.session import Session
-from gerbera_harness.agent.experiments.states.processes.initialisation_process import (
-    InitialisationProcess,
-)
-from gerbera_harness.agent.experiments.states.processes.execution_process import (
-    ExecutionProcess,
-)
-from gerbera_harness.agent.experiments.states.schema.hypothesis.hypothesis_schema import (
-    HypothesisSchema,
-)
-from gerbera_harness.agent.experiments.states import (
+from gerbera_harness.agent.driver.main_loop import (
+    DecisionEnum,
     ExperimentState,
     LoopStateEnum,
-    DecisionEnum,
+    Session,
+)
+from gerbera_harness.agent.driver.main_loop.processes.initialisation_process import (
+    InitialisationProcess,
+)
+from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
+    ExecutionProcess,
+)
+from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
+    HypothesisSchema,
 )
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.memory.memory import Memory

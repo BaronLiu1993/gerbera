@@ -2,8 +2,10 @@ import asyncio
 import json
 
 from gerbera_harness.agent.agent import Agent
-from gerbera_harness.agent.experiments.session import Session
-from gerbera_harness.agent.experiments.states import LoopStateEnum
+from gerbera_harness.agent.driver.main_loop import (
+    LoopStateEnum,
+    Session,
+)
 
 
 class FakeInitialisationProcess:

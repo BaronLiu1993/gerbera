@@ -4,10 +4,10 @@ import json
 import pytest
 
 from gerbera_harness.agent.agent import Agent
-from gerbera_harness.agent.experiments.session import Session
-from gerbera_harness.agent.experiments.states import (
+from gerbera_harness.agent.driver.main_loop import (
     Initialisation,
     LoopStateEnum,
+    Session,
 )
 
 

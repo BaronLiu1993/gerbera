@@ -3,7 +3,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from gerbera_sdk.events.event_key import EventKey
 from gerbera_sdk.events.rules import RuleTriggerModeEnum
-from gerbera_harness.agent.experiments.states.schema.hypothesis import (
+from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
     ActionSchema,
     AgentExecuteSchema,
     HypothesisSchema,
@@ -397,7 +397,7 @@ def test_hypothesis_schema_excludes_application_owned_fields() -> None:
 
 
 def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
-    from gerbera_harness.agent.experiments.states import Initialisation
+    from gerbera_harness.agent.driver.main_loop import Initialisation
 
     response_schema = Initialisation.valid_schema["properties"]["response"][
         "anyOf"
@@ -413,7 +413,7 @@ def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
 
 
 def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
-    from gerbera_harness.agent.experiments.states import Initialisation
+    from gerbera_harness.agent.driver.main_loop import Initialisation
 
     trigger_mode_schema = Initialisation.valid_schema["$defs"][
         "RuleCreationSchema"
@@ -425,7 +425,7 @@ def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
 
 
 def test_hypothesis_output_schema_is_strict() -> None:
-    from gerbera_harness.agent.experiments.states import Initialisation
+    from gerbera_harness.agent.driver.main_loop import Initialisation
 
     def assert_strict_objects(node: object) -> None:
         if isinstance(node, list):
@@ -448,7 +448,7 @@ def test_hypothesis_output_schema_is_strict() -> None:
 
 
 def test_hypothesis_output_schema_uses_supported_union_keywords() -> None:
-    from gerbera_harness.agent.experiments.states import Initialisation
+    from gerbera_harness.agent.driver.main_loop import Initialisation
 
     def assert_no_discriminated_union_keywords(node: object) -> None:
         if isinstance(node, list):
