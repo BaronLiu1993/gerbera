@@ -20,8 +20,8 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         close=lambda: calls.append("board.close"),
     )
     camera_runtime = SimpleNamespace(
-        start=lambda: calls.append("camera.start"),
-        close=lambda: calls.append("camera.close"),
+        register_cameras=lambda: calls.append("cameras.register"),
+        clean_up_cameras=lambda: calls.append("cameras.clean_up"),
     )
     database_runtime = SimpleNamespace(
         start=lambda: calls.append("database.start"),
@@ -104,13 +104,13 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         "agent_tool.register",
         "event_catalog_tool.register",
         "board.start",
-        "camera.start",
+        "cameras.register",
         "database.start",
         "listener.start",
         "server.run",
         "listener.stop",
         "streams.flush",
         "database.stop",
-        "camera.close",
+        "cameras.clean_up",
         "board.close",
     ]

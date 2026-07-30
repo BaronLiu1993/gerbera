@@ -1,8 +1,10 @@
 """Observe-decide-act execution subloop."""
 
 from gerbera_harness.agent.driver.subloop.schema import (
+    ActSchema,
     DecideResultSchema,
     ExecuteLoopDecisionEnum,
+    ObserveSchema,
 )
 from gerbera_harness.agent.driver.subloop.states import (
     ActState,
@@ -14,6 +16,7 @@ from gerbera_harness.agent.driver.subloop.states import (
 )
 
 __all__ = [
+    "ActSchema",
     "ActState",
     "DecideResultSchema",
     "DecideState",
@@ -21,5 +24,6 @@ __all__ = [
     "ExecuteLoopDecisionEnum",
     "ExecuteLoopState",
     "ExecuteLoopStateEnum",
+    "ObserveSchema",
     "ObserveState",
 ]

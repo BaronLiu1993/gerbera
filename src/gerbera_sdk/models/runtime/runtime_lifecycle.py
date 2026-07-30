@@ -1,24 +1,13 @@
 from contextlib import ExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Protocol
+from typing import AsyncGenerator
 
 from fastmcp import FastMCP
 
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
-
-
-class StreamController(Protocol):
-    def flush_all(self) -> None: ...
-
-
-class ServerRuntime(Protocol):
-    stream_controller: StreamController
-
-    def _start_event_listener(self) -> None: ...
-
-    def _stop_event_listener(self) -> None: ...
+from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 
 
 @dataclass
@@ -37,7 +26,7 @@ class RuntimeLifecycle:
     async def __call__(
         self,
         server: FastMCP,
-    ) -> AsyncIterator[dict[str, object]]:
+    ) -> AsyncGenerator[dict[str, object], None]:
         server_runtime = self.server_runtime
         if server_runtime is None:
             raise RuntimeError("Server runtime is not bound")
@@ -58,8 +47,8 @@ class RuntimeLifecycle:
             self.board_runtime.start()
             cleanup.callback(self.board_runtime.close)
 
-            self.camera_runtime.start()
-            cleanup.callback(self.camera_runtime.close)
+            self.camera_runtime.register_cameras()
+            cleanup.callback(self.camera_runtime.clean_up_cameras)
 
             self.database_runtime.start()
             cleanup.callback(self.database_runtime.stop)

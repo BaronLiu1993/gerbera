@@ -10,5 +10,5 @@ from gerbera_harness.agent.driver.subloop.states.base import (
 class DecideState(ExecuteLoopState):
     state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.DECIDE
     valid_transition_states: ClassVar[
-        frozenset[ExecuteLoopStateEnum]
+        frozenset[ExecuteLoopStateEnum.ACT]
     ] = frozenset()
