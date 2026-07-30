@@ -9,7 +9,7 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
     HypothesisSchema,
 )
-from gerbera_harness.agent.driver.main_loop.schema.response import (
+from gerbera_harness.agent.driver.main_loop.schema.utils import (
     build_valid_schema,
 )
 

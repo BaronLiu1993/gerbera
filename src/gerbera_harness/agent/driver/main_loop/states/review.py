@@ -7,7 +7,7 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
     TextResponseSchema,
     DecisionEnum
 )
-from gerbera_harness.agent.driver.main_loop.schema.response import (
+from gerbera_harness.agent.driver.main_loop.schema.utils import (
     build_valid_schema,
 )
 

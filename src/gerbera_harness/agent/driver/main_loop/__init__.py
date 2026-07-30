@@ -10,6 +10,8 @@ from gerbera_harness.agent.driver.main_loop.states import (
     LoopStateEnum,
     Review,
     Session,
+    TextResponseSchema,
+    WorkflowEnum,
 )
 
 __all__ = [
@@ -22,4 +24,6 @@ __all__ = [
     "LoopStateEnum",
     "Review",
     "Session",
+    "TextResponseSchema",
+    "WorkflowEnum",
 ]

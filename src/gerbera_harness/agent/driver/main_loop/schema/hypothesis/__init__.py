@@ -16,7 +16,9 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema 
     HypothesisSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
+    ExecuteActionGroupSchema,
     MethodSchema,
+    ReviewActionGroupSchema,
 )
 
 __all__ = [
@@ -26,12 +28,14 @@ __all__ = [
     "ContinuousExecuteSchema",
     "DiscreteExecuteSchema",
     "ExecuteActionParameterSchema",
+    "ExecuteActionGroupSchema",
     "ExecuteSchema",
     "ExecutionTypeEnum",
     "HypothesisSchema",
     "MethodSchema",
     "ParameterTypeSchema",
     "ReviewSchema",
+    "ReviewActionGroupSchema",
     "ReviewVariableSchema",
     "RuleCreationSchema",
 ]
