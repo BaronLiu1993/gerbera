@@ -92,7 +92,7 @@ class OpenAIAdapter:
 
 
 @dataclass
-class GeminiAdapter:
+class GoogleAdapter:
     api_key: str
     model: str
     max_tokens: int

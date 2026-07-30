@@ -4,7 +4,7 @@ import uuid
 
 from gerbera_harness.agent.model.model_adapters import (
     AnthropicAdapter,
-    GeminiAdapter,
+    GoogleAdapter,
     OpenAIAdapter,
 )
 
@@ -12,13 +12,13 @@ from gerbera_harness.agent.model.model_adapters import (
 class ModelProviderEnum(Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
-    GEMINI = "gemini"
+    GOOGLE = "google"
 
 
 MODEL_MAP = {
     ModelProviderEnum.ANTHROPIC: AnthropicAdapter,
     ModelProviderEnum.OPENAI: OpenAIAdapter,
-    ModelProviderEnum.GEMINI: GeminiAdapter,
+    ModelProviderEnum.GOOGLE: GoogleAdapter,
 }
 
 

@@ -31,7 +31,7 @@ class CameraRuntime:
     )
 
     @staticmethod
-    def _get_camera_address(source: CameraSource) -> str:
+    def _get_camera_address(source: CameraSource) -> int | str:
         if isinstance(source, DeviceCameraSource):
             return source.device_index
         if isinstance(source, MJPEGSource):
@@ -66,35 +66,51 @@ class CameraRuntime:
         if first_error is not None:
             raise RuntimeError("Could not clean up cameras") from first_error
 
-    def get_camera_session(self, camera_key: str) -> Camera:
+    def get_camera_session(self, camera_key: str) -> CameraSession:
         with self._lock:
             camera_session = self.camera_registry.get(camera_key)
 
         if camera_session is None:
-            raise RuntimeError("Camera Does Not Exist")
+            raise RuntimeError("Camera does not exist")
 
         return camera_session
 
     def _capture_loop(self, camera_key: str) -> None:
-        camera = self.get_camera_session(camera_key).camera
+        camera_session = self.get_camera_session(camera_key)
+        camera = camera_session.camera
+        stop_event = camera_session._stop_event
+        if stop_event is None:
+            raise RuntimeError(f"Camera is not running: {camera_key}")
+
         camera_address = self._get_camera_address(camera.source)
         capture = cv2.VideoCapture(camera_address)
         try:
-            while not camera.stop_event.is_set():
-                success, frame = capture.read()
+            if not capture.isOpened():
+                raise RuntimeError(f"Could not open camera: {camera_key}")
 
-                print(success, frame)
+            while not stop_event.is_set():
+                success, frame = capture.read()
+                if not success:
+                    raise RuntimeError(
+                        f"Could not read camera frame: {camera_key}"
+                    )
+
                 latest_frame = Frame(image=frame, timestamp=datetime.datetime.now())
 
-                print(latest_frame)
                 with self._lock:
                     camera.latest_frame = latest_frame
+                    subscribed_models = tuple(camera.subscribed_models)
+
+                for model in subscribed_models:
+                    model.predict(latest_frame)
 
         finally:
             capture.release()
 
-    def turn_on_camera_stream(self, camera_key: str):
-        camera_session = self.get_camera(camera_key)
+    def turn_on_camera_stream(self, camera_key: str) -> None:
+        camera_session = self.get_camera_session(camera_key)
+        if camera_session._thread is not None:
+            raise RuntimeError(f"Camera is already running: {camera_key}")
 
         stop_event = threading.Event()
         thread = threading.Thread(
@@ -109,10 +125,12 @@ class CameraRuntime:
         try:
             thread.start()
         except RuntimeError as exc:
-            self.turn_off_camera_stream(camera_key)
+            with self._lock:
+                camera_session._stop_event = None
+                camera_session._thread = None
             raise RuntimeError(f"Could Not Start Camera Thread {camera_key}") from exc
 
-    def turn_off_camera_stream(self, camera_key: str):
+    def turn_off_camera_stream(self, camera_key: str) -> None:
         camera_session = self.get_camera_session(camera_key)
 
         stop_event = camera_session._stop_event

@@ -1,3 +1,7 @@
+import threading
+from types import SimpleNamespace
+
+import numpy as np
 import pytest
 
 from gerbera_sdk.models.hardware.camera import (
@@ -15,17 +19,25 @@ class FakeCapture:
         *,
         opened: bool = True,
         read_success: bool = True,
-        frame: object = "frame",
+        frame=None,
+        on_read=None,
     ) -> None:
         self.opened = opened
         self.read_success = read_success
-        self.frame = frame
+        self.frame = (
+            frame
+            if frame is not None
+            else np.zeros((2, 2, 3), dtype=np.uint8)
+        )
+        self.on_read = on_read
         self.released = False
 
     def isOpened(self) -> bool:
         return self.opened
 
-    def read(self) -> tuple[bool, object]:
+    def read(self):
+        if self.on_read is not None:
+            self.on_read()
         return self.read_success, self.frame
 
     def release(self) -> None:
@@ -35,12 +47,14 @@ class FakeCapture:
 def _camera(
     camera_id: str = "laptop",
     source=None,
+    subscribed_models=None,
 ) -> Camera:
     return Camera(
         id=camera_id,
         name=camera_id,
         description=f"{camera_id} camera",
-        source=source or DeviceCameraSource(),
+        source=source or DeviceCameraSource(device_index=0),
+        subscribed_models=subscribed_models or [],
     )
 
 
@@ -56,87 +70,70 @@ def test_camera_address_resolves_supported_sources() -> None:
     )
 
 
-def test_camera_runtime_opens_captures_and_closes_cameras(
-    monkeypatch,
-) -> None:
-    cameras = [
-        _camera("laptop"),
-        _camera(
-            "robot",
-            MJPEGSource(stream_url="http://camera/stream"),
-        ),
-    ]
-    captures = {
-        0: FakeCapture(frame="laptop-frame"),
-        "http://camera/stream": FakeCapture(frame="robot-frame"),
-    }
-    addresses: list[int | str] = []
-
-    def capture_factory(address: int | str) -> FakeCapture:
-        addresses.append(address)
-        return captures[address]
-
-    monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
-        capture_factory,
-    )
-    runtime = CameraRuntime(hardware_system=HardwareSystem(cameras=cameras))
-
-    runtime.start()
-    runtime.start()
-
-    assert addresses == [0, "http://camera/stream"]
-    assert runtime.capture_frame("laptop") == "laptop-frame"
-    assert runtime.capture_frame("robot") == "robot-frame"
-
-    runtime.close()
-
-    assert all(capture.released for capture in captures.values())
-    assert runtime.connection_pool == {}
-
-
-def test_camera_runtime_releases_connections_when_start_fails(
-    monkeypatch,
-) -> None:
-    first_capture = FakeCapture()
-    failed_capture = FakeCapture(opened=False)
-    captures = iter([first_capture, failed_capture])
-    monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
-        lambda _: next(captures),
-    )
+def test_register_cameras_is_idempotent() -> None:
+    camera = _camera()
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(
-            cameras=[_camera("first"), _camera("second")]
-        )
+        hardware_system=HardwareSystem(cameras=[camera])
     )
 
-    with pytest.raises(RuntimeError, match="Could not start camera runtime"):
-        runtime.start()
+    runtime.register_cameras()
+    first_session = runtime.get_camera_session(camera.id)
+    runtime.register_cameras()
 
-    assert first_capture.released
-    assert failed_capture.released
-    assert runtime.connection_pool == {}
+    assert runtime.get_camera_session(camera.id) is first_session
+    assert first_session.camera is camera
 
 
-def test_camera_runtime_raises_when_frame_capture_fails(
+def test_capture_loop_updates_frame_and_runs_subscribed_models(
     monkeypatch,
 ) -> None:
+    predictions = []
+    model = SimpleNamespace(
+        predict=lambda frame: predictions.append(frame)
+    )
+    camera = _camera(subscribed_models=[model])
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(cameras=[camera])
+    )
+    runtime.register_cameras()
+    session = runtime.get_camera_session(camera.id)
+    session._stop_event = threading.Event()
+    capture = FakeCapture(on_read=session._stop_event.set)
     monkeypatch.setattr(
         "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
-        lambda _: FakeCapture(read_success=False),
+        lambda _: capture,
     )
-    runtime = CameraRuntime(hardware_system=HardwareSystem(cameras=[_camera()]))
-    runtime.start()
 
-    with pytest.raises(RuntimeError, match="Could not read camera frame"):
-        runtime.capture_frame("laptop")
+    runtime._capture_loop(camera.id)
 
-    runtime.close()
+    assert camera.latest_frame is predictions[0]
+    assert capture.released
+
+
+def test_clean_up_cameras_stops_streams_and_clears_registry(
+    monkeypatch,
+) -> None:
+    cameras = [_camera("first"), _camera("second")]
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(cameras=cameras)
+    )
+    runtime.register_cameras()
+    stopped = []
+    runtime.get_camera_session("first")._thread = SimpleNamespace()
+    monkeypatch.setattr(
+        runtime,
+        "turn_off_camera_stream",
+        lambda camera_key: stopped.append(camera_key),
+    )
+
+    runtime.clean_up_cameras()
+
+    assert stopped == ["first"]
+    assert runtime.camera_registry == {}
 
 
 def test_camera_runtime_rejects_unknown_camera() -> None:
     runtime = CameraRuntime(hardware_system=HardwareSystem())
 
     with pytest.raises(RuntimeError, match="Camera does not exist"):
-        runtime.capture_frame("missing")
+        runtime.get_camera_session("missing")

@@ -4,6 +4,9 @@ import numpy as np
 from numpy.typing import NDArray
 from datetime import datetime
 
+from gerbera_sdk.inference.model import Model
+
+# Camera Sources
 @dataclass(frozen=True)
 class DeviceCameraSource:
     device_index: int
@@ -12,20 +15,7 @@ class DeviceCameraSource:
 class MJPEGSource:
     stream_url: str
 
-@dataclass(frozen=True)
-class APIModel:
-    name: str
-    description: str
-    model_url: str
-
-@dataclass(frozen=True)
-class LocalModel:
-    name: str
-    description: str
-
 CameraSource = DeviceCameraSource | MJPEGSource
-Model = APIModel | LocalModel
-    
 
 @dataclass
 class Frame:
