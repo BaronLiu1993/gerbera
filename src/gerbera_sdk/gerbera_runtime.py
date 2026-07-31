@@ -220,36 +220,51 @@ class GerberaRuntime:
         for camera in cameras:
             camera_key = camera.id
 
-            def build_capture_tool(camera_key: str):
-                def capture_from_camera(
+            def serialize_camera_output(camera_key: str) -> str:
+                output = camera_runtime.get_camera_session(
+                    camera_key
+                ).camera.latest_output
+                if isinstance(output, BaseModel):
+                    return output.model_dump_json()
+                return json.dumps(output)
+
+            def build_capture_frames_tool(camera_key: str):
+                def capture_frames_from_camera(
                     running_models: list[str] | None = None,
+                    image_count: Annotated[
+                        int,
+                        Field(ge=1, le=20),
+                    ] = 1,
+                    interval_seconds: Annotated[
+                        float,
+                        Field(ge=0.0, le=60.0),
+                    ] = 0.0,
                 ) -> str:
                     selected_models = {
                         name: True
                         for name in (running_models or [])
                     }
-                    camera_runtime.capture_frame(
-                        camera_key,
-                        selected_models,
+                    camera_runtime.capture_frames(
+                        camera_key=camera_key,
+                        running_models=selected_models,
+                        image_count=image_count,
+                        interval_seconds=interval_seconds,
                     )
-                    output = camera_runtime.get_camera_session(
-                        camera_key
-                    ).camera.latest_output
-                    if isinstance(output, BaseModel):
-                        return output.model_dump_json()
-                    return json.dumps(output)
+                    return serialize_camera_output(camera_key)
 
-                return capture_from_camera
+                return capture_frames_from_camera
 
             server_runtime._register_tool(
-                name=f"capture_from_{camera.name}",
+                name=f"capture_frames_from_{camera.name}",
                 description=(
-                    f"Capture one frame from {camera.name}. "
+                    f"Capture and batch one or more images from {camera.name}. "
+                    "image_count controls the batch size and interval_seconds "
+                    "controls the delay between images. "
                     "Optionally provide running_models using subscribed "
                     "inference names. Returns the camera's latest inference "
                     "output as a JSON string."
                 ),
-                tool_function=build_capture_tool(camera_key),
+                tool_function=build_capture_frames_tool(camera_key),
             )
 
             def build_start_stream_tool(camera_key: str):

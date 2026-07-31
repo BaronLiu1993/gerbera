@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
-import threading
 import datetime
+import threading
+import time
+
 import cv2
 
 from gerbera_sdk.inference.frame import Frame
@@ -75,7 +77,18 @@ class CameraRuntime:
 
         return camera_session
 
-    def capture_frame(self, camera_key: str, running_models: dict[str]) -> None:
+    def _capture_frames(
+        self,
+        camera_key: str,
+        running_models: dict[str],
+        image_count: int = 1,
+        interval_seconds: float = 0.0,
+    ) -> None:
+        if image_count < 1:
+            raise ValueError("image_count must be at least 1")
+        if interval_seconds < 0:
+            raise ValueError("interval_seconds cannot be negative")
+
         camera = self.get_camera_session(camera_key).camera
         camera_address = self._get_camera_address(camera.source)
         capture = cv2.VideoCapture(camera_address)
@@ -84,27 +97,52 @@ class CameraRuntime:
             if not capture.isOpened():
                 raise RuntimeError(f"Could not open camera: {camera_key}")
 
-            success, image = capture.read()
-            if not success:
-                raise RuntimeError(
-                    f"Could not read camera frame: {camera_key}"
+            frames = []
+            for image_index in range(image_count):
+                success, image = capture.read()
+                if not success:
+                    raise RuntimeError(
+                        f"Could not read camera frame: {camera_key}"
+                    )
+
+                frames.append(
+                    Frame(
+                        image=image,
+                        timestamp=datetime.datetime.now(),
+                    )
                 )
 
-            frame = Frame(
-                image=image,
-                timestamp=datetime.datetime.now(),
-            )
+                if (
+                    interval_seconds > 0
+                    and image_index < image_count - 1
+                ):
+                    time.sleep(interval_seconds)
+
             with self._lock:
-                camera.latest_frame = frame
+                camera.latest_frame = frames[-1]
                 camera.latest_output = None
                 subscribed_models = camera.subscribed_models
 
                 for inference in subscribed_models:
                     if inference.name in running_models:
-                        camera.latest_output = inference.predict(frame)
+                        camera.latest_output = inference.predict(frames)
 
         finally:
             capture.release()
+
+    def capture_frames(
+        self,
+        camera_key: str,
+        running_models: dict[str],
+        image_count: int = 1,
+        interval_seconds: float = 0.0,
+    ) -> None:
+        self._capture_frames(
+            camera_key=camera_key,
+            running_models=running_models,
+            image_count=image_count,
+            interval_seconds=interval_seconds,
+        )
 
     def _capture_loop(self, camera_key: str, running_models: dict[str]) -> None:
         camera_session = self.get_camera_session(camera_key)
@@ -139,7 +177,7 @@ class CameraRuntime:
                     for inference in subscribed_models:
                         if inference.name in running_models:
                             camera.latest_output = inference.predict(
-                                latest_frame
+                                [latest_frame]
                             )
 
         finally:

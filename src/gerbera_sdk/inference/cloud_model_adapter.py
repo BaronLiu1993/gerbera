@@ -52,7 +52,7 @@ class CloudModelAdapter(ABC):
     @abstractmethod
     def predict(
         self,
-        model_input: object,
+        model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
         output_schema: dict[str, object],
@@ -73,7 +73,7 @@ class AnthropicCloudModelAdapter(CloudModelAdapter):
 
     def predict(
         self,
-        model_input: object,
+        model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
         output_schema: dict[str, object],
@@ -99,7 +99,7 @@ class AnthropicCloudModelAdapter(CloudModelAdapter):
                     {
                         "role": "user",
                         "content": [
-                            model_input,
+                            *model_input,
                             {"type": "text", "text": user_prompt},
                         ],
                     }
@@ -122,7 +122,7 @@ class OpenAICloudModelAdapter(CloudModelAdapter):
 
     def predict(
         self,
-        model_input: object,
+        model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
         output_schema: dict[str, object],
@@ -148,15 +148,22 @@ class OpenAICloudModelAdapter(CloudModelAdapter):
                     {
                         "role": "user",
                         "content": [
-                            model_input,
                             {"type": "input_text", "text": user_prompt},
+                            *model_input,
                         ],
                     }
                 ],
             },
             timeout=self.timeout_seconds,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            raise requests.HTTPError(
+                f"{exc}\nOpenAI response: {response.text}",
+                request=exc.request,
+                response=exc.response,
+            ) from exc
         payload = response.json()
         for output in payload.get("output", []):
             for content in output.get("content", []):
@@ -175,7 +182,7 @@ class GoogleCloudModelAdapter(CloudModelAdapter):
 
     def predict(
         self,
-        model_input: object,
+        model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
         output_schema: dict[str, object],
@@ -195,7 +202,7 @@ class GoogleCloudModelAdapter(CloudModelAdapter):
                     "schema": output_schema,
                 },
                 "input": [
-                    model_input,
+                    *model_input,
                     {"type": "text", "text": user_prompt},
                 ],
             },

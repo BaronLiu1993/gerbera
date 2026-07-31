@@ -51,7 +51,7 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
         description="Built-in camera",
         source=DeviceCameraSource(device_index=0),
     )
-    captured_camera_keys = []
+    captured_batches = []
     started_streams = []
     stopped_streams = []
     camera_output = VisionLanguageModelFrameEnvironment(
@@ -60,8 +60,8 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
         objects=[],
     )
     camera_runtime = SimpleNamespace(
-        capture_frame=lambda camera_key, running_models: (
-            captured_camera_keys.append((camera_key, running_models))
+        capture_frames=lambda **kwargs: (
+            captured_batches.append(kwargs)
         ),
         get_camera_session=lambda camera_key: SimpleNamespace(
             camera=SimpleNamespace(latest_output=camera_output)
@@ -86,15 +86,21 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
-    result = app.tools["capture_from_local_camera"](
+    result = app.tools["capture_frames_from_local_camera"](
         ["openai-vision-language-model"],
+        3,
+        0.25,
     )
 
-    assert captured_camera_keys == [
-        (
-            "local-camera",
-            {"openai-vision-language-model": True},
-        )
+    assert captured_batches == [
+        {
+            "camera_key": "local-camera",
+            "running_models": {
+                "openai-vision-language-model": True,
+            },
+            "image_count": 3,
+            "interval_seconds": 0.25,
+        }
     ]
     assert json.loads(result) == camera_output.model_dump()
 
@@ -112,6 +118,52 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
     assert stopped_streams == ["local-camera"]
 
 
+def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
+    camera = Camera(
+        id="local-camera",
+        name="local_camera",
+        description="Built-in camera",
+        source=DeviceCameraSource(device_index=0),
+    )
+    camera_runtime = SimpleNamespace(
+        capture_frames=lambda **kwargs: None,
+        get_camera_session=lambda camera_key: SimpleNamespace(
+            camera=SimpleNamespace(latest_output=None)
+        ),
+        turn_on_camera_stream=lambda camera_key, running_models: None,
+        turn_off_camera_stream=lambda camera_key: None,
+    )
+    event_bus = EventBus()
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(cameras=[camera]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+        camera_runtime=camera_runtime,
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+    tool = asyncio.run(app.get_tool("capture_frames_from_local_camera"))
+    properties = tool.parameters["properties"]
+
+    assert asyncio.run(app.get_tool("capture_from_local_camera")) is None
+    assert properties["image_count"] == {
+        "default": 1,
+        "maximum": 20,
+        "minimum": 1,
+        "type": "integer",
+    }
+    assert properties["interval_seconds"] == {
+        "default": 0.0,
+        "maximum": 60.0,
+        "minimum": 0.0,
+        "type": "number",
+    }
+
+
 def test_server_does_not_register_capture_frame_without_cameras() -> None:
     event_bus = EventBus()
     app = FakeApp()
@@ -127,7 +179,7 @@ def test_server_does_not_register_capture_frame_without_cameras() -> None:
     GerberaRuntime._register_server_runtime_tools(runtime)
 
     assert {
-        "capture_from_local_camera",
+        "capture_frames_from_local_camera",
         "turn_on_local_camera_stream",
         "turn_off_local_camera_stream",
     }.isdisjoint(app.tools)
