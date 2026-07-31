@@ -84,6 +84,59 @@ def test_register_cameras_is_idempotent() -> None:
     assert first_session.camera is camera
 
 
+def test_capture_frame_reads_one_image_and_releases_capture(
+    monkeypatch,
+) -> None:
+    image = np.ones((3, 4, 3), dtype=np.uint8)
+    capture = FakeCapture(frame=image)
+    captured_addresses = []
+    camera = _camera(source=DeviceCameraSource(device_index=2))
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(cameras=[camera])
+    )
+    runtime.register_cameras()
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda address: captured_addresses.append(address) or capture,
+    )
+
+    frame = runtime.capture_frame(camera.id)
+
+    assert captured_addresses == [2]
+    assert frame.image is image
+    assert camera.latest_frame is frame
+    assert capture.released
+
+
+@pytest.mark.parametrize(
+    ("capture", "message"),
+    [
+        (FakeCapture(opened=False), "Could not open camera: laptop"),
+        (FakeCapture(read_success=False), "Could not read camera frame: laptop"),
+    ],
+)
+def test_capture_frame_releases_capture_on_failure(
+    monkeypatch,
+    capture,
+    message: str,
+) -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(cameras=[camera])
+    )
+    runtime.register_cameras()
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda _: capture,
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        runtime.capture_frame(camera.id)
+
+    assert camera.latest_frame is None
+    assert capture.released
+
+
 def test_capture_loop_updates_frame_and_runs_subscribed_models(
     monkeypatch,
 ) -> None:

@@ -53,7 +53,9 @@ class CloudModelAdapter(ABC):
     def _parse_json_output(output_text: str) -> dict[str, object]:
         output = json.loads(output_text)
         if not isinstance(output, dict):
-            raise RuntimeError("VLM output must be a JSON object")
+            raise RuntimeError(
+                "Vision language model output must be a JSON object"
+            )
         return output
 
 
@@ -136,7 +138,7 @@ class OpenAICloudModelAdapter(CloudModelAdapter):
                 "text": {
                     "format": {
                         "type": "json_schema",
-                        "name": "vlm_frame_environment",
+                        "name": "vision_language_model_frame_environment",
                         "schema": output_schema,
                         "strict": True,
                     }

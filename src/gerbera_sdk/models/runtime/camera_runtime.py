@@ -75,7 +75,37 @@ class CameraRuntime:
 
         return camera_session
 
-    def _capture_loop(self, camera_key: str) -> None:
+    def capture_frame(self, camera_key: str, running_models: dict[str]) -> None:
+        camera = self.get_camera_session(camera_key).camera
+        camera_address = self._get_camera_address(camera.source)
+        capture = cv2.VideoCapture(camera_address)
+
+        try:
+            if not capture.isOpened():
+                raise RuntimeError(f"Could not open camera: {camera_key}")
+
+            success, image = capture.read()
+            if not success:
+                raise RuntimeError(
+                    f"Could not read camera frame: {camera_key}"
+                )
+
+            frame = Frame(
+                image=image,
+                timestamp=datetime.datetime.now(),
+            )
+            with self._lock:
+                camera.latest_frame = frame
+                subscribed_models = camera.subscribed_models
+                
+                for inference in subscribed_models:
+                    if inference.model_name in running_models:
+                        inference.predict(frame)
+            
+        finally:
+            capture.release()
+
+    def _capture_loop(self, camera_key: str, running_models: dict[str]) -> None:
         camera_session = self.get_camera_session(camera_key)
         camera = camera_session.camera
         stop_event = camera_session._stop_event
@@ -100,7 +130,10 @@ class CameraRuntime:
                 with self._lock:
                     camera.latest_frame = latest_frame
                     subscribed_models = camera.subscribed_models
-                    print(latest_frame)
+
+                    for inference in subscribed_models:
+                        if inference.model in running_models:
+                            inference.predict(latest_frame)
 
         finally:
             capture.release()

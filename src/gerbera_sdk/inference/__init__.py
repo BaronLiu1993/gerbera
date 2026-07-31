@@ -7,10 +7,15 @@ from gerbera_sdk.inference.cloud_model_adapter import (
     OpenAICloudModelAdapter,
 )
 from gerbera_sdk.inference.inference import (
-    Model,
-    VLMFrameEnvironment,
-    VLMFrameObject,
-    VLMInference,
+    Inference,
+    ModelAdapters,
+    ModelTypes,
+)
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
+    VisionLanguageModelBoundingBox,
+    VisionLanguageModelFrameEnvironment,
+    VisionLanguageModelFrameObject,
+    VisionLanguageModelInference,
 )
 from gerbera_sdk.inference.local_model_adapter import LocalModelAdapter
 from gerbera_sdk.inference.model_registry import ModelRegistry, ModelTypeEnum
@@ -20,13 +25,16 @@ __all__ = [
     "CloudModelAdapter",
     "CloudModelAdapterRegistry",
     "GoogleCloudModelAdapter",
+    "Inference",
     "LocalModelAdapter",
-    "Model",
+    "ModelAdapters",
     "ModelProviderEnum",
     "ModelRegistry",
     "ModelTypeEnum",
+    "ModelTypes",
     "OpenAICloudModelAdapter",
-    "VLMFrameEnvironment",
-    "VLMFrameObject",
-    "VLMInference",
+    "VisionLanguageModelBoundingBox",
+    "VisionLanguageModelFrameEnvironment",
+    "VisionLanguageModelFrameObject",
+    "VisionLanguageModelInference",
 ]
