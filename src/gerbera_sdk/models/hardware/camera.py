@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 import uuid
 import numpy as np
 from numpy.typing import NDArray
 from datetime import datetime
 
-from gerbera_sdk.inference.inference import Inference
+if TYPE_CHECKING:
+    from gerbera_sdk.inference.inference import VLMInference
 
 # Camera Sources
 @dataclass(frozen=True)
@@ -28,5 +32,5 @@ class Camera:
     description: str
     source: CameraSource
     latest_frame: Frame | None = None
-    subscribed_models: list[Inference] = field(default_factory=list)
+    subscribed_models: list[VLMInference] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

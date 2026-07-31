@@ -1,0 +1,2 @@
+class LocalModelAdapter:
+    pass

@@ -6,7 +6,12 @@ from gerbera_sdk.inference.cloud_model_adapter import (
     ModelProviderEnum,
     OpenAICloudModelAdapter,
 )
-from gerbera_sdk.inference.inference import Inference, Model
+from gerbera_sdk.inference.inference import (
+    Model,
+    VLMFrameEnvironment,
+    VLMFrameObject,
+    VLMInference,
+)
 from gerbera_sdk.inference.local_model_adapter import LocalModelAdapter
 from gerbera_sdk.inference.model_registry import ModelRegistry, ModelTypeEnum
 
@@ -15,11 +20,13 @@ __all__ = [
     "CloudModelAdapter",
     "CloudModelAdapterRegistry",
     "GoogleCloudModelAdapter",
-    "Inference",
     "LocalModelAdapter",
     "Model",
     "ModelProviderEnum",
     "ModelRegistry",
     "ModelTypeEnum",
     "OpenAICloudModelAdapter",
+    "VLMFrameEnvironment",
+    "VLMFrameObject",
+    "VLMInference",
 ]
