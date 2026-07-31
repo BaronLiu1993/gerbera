@@ -1,9 +1,12 @@
 import subprocess
 from typing import Annotated
 
+import cv2
 from fastmcp import FastMCP
+from fastmcp.utilities.types import Image
 from pydantic import Field, StrictFloat
 
+from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules import OperatorEnum, RuleTriggerModeEnum
@@ -135,6 +138,7 @@ class GerberaRuntime:
             stream_controller=stream_controller,
             event_worker=event_worker,
             app=app,
+            camera_runtime=runtime_lifecycle.camera_runtime,
         )
         runtime_lifecycle.bind_server_runtime(server_runtime)
         return server_runtime
@@ -168,16 +172,20 @@ class GerberaRuntime:
     @staticmethod
     def _connection_supports_state_toggle(connection: Connection) -> bool:
         for command in CommandCompiler.command_specs(connection):
-            if command.method.strip().upper() != "WRITE":
-                continue
-
-            state_param = command.params.get("state")
-            if state_param is None:
-                continue
-
-            return {"on", "off"}.issubset(set(state_param.enum))
+            if GerberaRuntime._command_is_state_toggle(command):
+                return True
 
         return False
+
+    @staticmethod
+    def _command_is_state_toggle(command: CommandSpec) -> bool:
+        if command.method.strip().upper() != "WRITE":
+            return False
+
+        state_param = command.params.get("state")
+        return state_param is not None and {"on", "off"}.issubset(
+            set(state_param.enum)
+        )
 
     @staticmethod
     def _connection_supports_stream_toggle(connection: Connection) -> bool:
@@ -195,6 +203,100 @@ class GerberaRuntime:
                     microcontroller=microcontroller,
                     connection=connection,
                 )
+
+        GerberaRuntime._register_camera_tools(server_runtime)
+
+    @staticmethod
+    def _register_camera_tools(
+        server_runtime: ServerRuntime,
+    ) -> None:
+        cameras = server_runtime.hardware_system.cameras
+        if not cameras:
+            return
+
+        camera_runtime = server_runtime.camera_runtime
+        if camera_runtime is None:
+            raise RuntimeError("Camera runtime is not configured")
+
+        def capture_frame(
+            camera_key: str,
+            running_models: list[str] | None = None,
+        ) -> Image:
+            selected_models = {
+                model_name: True
+                for model_name in (running_models or [])
+            }
+            camera_runtime.capture_frame(camera_key, selected_models)
+            frame = camera_runtime.get_camera_session(
+                camera_key
+            ).camera.latest_frame
+            if frame is None:
+                raise RuntimeError(
+                    f"Camera did not produce a frame: {camera_key}"
+                )
+            success, encoded_image = cv2.imencode(".jpg", frame.image)
+            if not success:
+                raise RuntimeError(
+                    f"Could not encode camera frame: {camera_key}"
+                )
+            return Image(
+                data=encoded_image.tobytes(),
+                format="jpeg",
+            )
+
+        camera_keys = ", ".join(camera.id for camera in cameras)
+        server_runtime._register_tool(
+            name="capture_frame",
+            description=(
+                "Capture and return one JPEG image from a registered camera. "
+                f"camera_key must be one of: {camera_keys}. "
+                "Optionally provide running_models using subscribed model names."
+            ),
+            tool_function=capture_frame,
+        )
+
+        def turn_on_camera_stream(
+            camera_key: str,
+            running_models: list[str] | None = None,
+        ) -> dict[str, str]:
+            selected_models = {
+                model_name: True
+                for model_name in (running_models or [])
+            }
+            camera_runtime.turn_on_camera_stream(
+                camera_key,
+                selected_models,
+            )
+            return {
+                "camera_key": camera_key,
+                "status": "streaming",
+            }
+
+        server_runtime._register_tool(
+            name="turn_on_camera_stream",
+            description=(
+                "Start continuous capture from a registered camera. "
+                f"camera_key must be one of: {camera_keys}. "
+                "Optionally provide running_models using subscribed model names."
+            ),
+            tool_function=turn_on_camera_stream,
+        )
+
+        def turn_off_camera_stream(camera_key: str) -> dict[str, str]:
+            camera_runtime.turn_off_camera_stream(camera_key)
+            return {
+                "camera_key": camera_key,
+                "status": "stopped",
+            }
+
+        server_runtime._register_tool(
+            name="turn_off_camera_stream",
+            description=(
+                "Stop continuous capture from a registered camera. "
+                f"camera_key must be one of: {camera_keys}."
+            ),
+            tool_function=turn_off_camera_stream,
+        )
 
     @staticmethod
     def _register_agent_runtime_tool(
@@ -282,22 +384,28 @@ class GerberaRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
+        supports_stream_toggle = (
+            GerberaRuntime._connection_supports_stream_toggle(connection)
+        )
         for command in CommandCompiler.command_specs(connection):
             server_runtime._register_connection_action(
                 microcontroller,
                 connection,
                 command,
             )
-            server_runtime._register_connection_tool(connection, command)
+            if not (
+                supports_stream_toggle
+                and GerberaRuntime._command_is_state_toggle(command)
+            ):
+                server_runtime._register_connection_tool(connection, command)
 
-        if GerberaRuntime._connection_supports_state_toggle(connection):
-            server_runtime._register_state_toggle_tools(connection)
-
-        if GerberaRuntime._connection_supports_stream_toggle(connection):
+        if supports_stream_toggle:
             server_runtime._register_stream_toggle_tools(
                 microcontroller,
                 connection,
             )
+        elif GerberaRuntime._connection_supports_state_toggle(connection):
+            server_runtime._register_state_toggle_tools(connection)
 
     @staticmethod
     def _install_dependencies(hardware_system: HardwareSystem) -> None:

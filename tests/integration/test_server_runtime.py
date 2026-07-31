@@ -1,13 +1,18 @@
 import asyncio
+import base64
+from datetime import datetime
 from types import SimpleNamespace
 
 from fastmcp import FastMCP
+from fastmcp.utilities.types import Image
+import numpy as np
 import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
+from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource, Frame
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -37,6 +42,105 @@ class FakeSerialConnection:
     def write(self, command: str) -> None:
         self.commands.append(command)
         self.on_write()
+
+
+def test_server_registers_capture_frame_tool_when_camera_exists() -> None:
+    camera = Camera(
+        id="local-camera",
+        name="local_camera",
+        description="Built-in camera",
+        source=DeviceCameraSource(device_index=0),
+    )
+    captured_camera_keys = []
+    started_streams = []
+    stopped_streams = []
+    frame = Frame(
+        timestamp=datetime.now(),
+        image=np.zeros((2, 2, 3), dtype=np.uint8),
+    )
+    camera_runtime = SimpleNamespace(
+        capture_frame=lambda camera_key, running_models: (
+            captured_camera_keys.append((camera_key, running_models))
+        ),
+        get_camera_session=lambda camera_key: SimpleNamespace(
+            camera=SimpleNamespace(latest_frame=frame)
+        ),
+        turn_on_camera_stream=lambda camera_key, running_models: (
+            started_streams.append((camera_key, running_models))
+        ),
+        turn_off_camera_stream=lambda camera_key: (
+            stopped_streams.append(camera_key)
+        ),
+    )
+    event_bus = EventBus()
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(cameras=[camera]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+        camera_runtime=camera_runtime,
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+    result = app.tools["capture_frame"](
+        "local-camera",
+        ["openai-vision-language-model"],
+    )
+
+    assert captured_camera_keys == [
+        (
+            "local-camera",
+            {"openai-vision-language-model": True},
+        )
+    ]
+    assert isinstance(result, Image)
+    image_content = result.to_image_content()
+    assert image_content.mimeType == "image/jpeg"
+    assert base64.b64decode(image_content.data)
+
+    assert app.tools["turn_on_camera_stream"](
+        "local-camera",
+        ["openai-vision-language-model"],
+    ) == {
+        "camera_key": "local-camera",
+        "status": "streaming",
+    }
+    assert started_streams == [
+        (
+            "local-camera",
+            {"openai-vision-language-model": True},
+        )
+    ]
+
+    assert app.tools["turn_off_camera_stream"]("local-camera") == {
+        "camera_key": "local-camera",
+        "status": "stopped",
+    }
+    assert stopped_streams == ["local-camera"]
+
+
+def test_server_does_not_register_capture_frame_without_cameras() -> None:
+    event_bus = EventBus()
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+
+    assert {
+        "capture_frame",
+        "turn_on_camera_stream",
+        "turn_off_camera_stream",
+    }.isdisjoint(app.tools)
 
 
 def test_server_registers_tools_that_execute_through_the_board_runtime(
@@ -76,6 +180,48 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         "write_status_led",
         "turn_on_status_led",
         "turn_off_status_led",
+    }
+
+
+def test_streaming_sensor_exposes_only_read_and_stream_controls(
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    database = Database(
+        "localhost",
+        5432,
+        "user",
+        "password",
+        "gerbera",
+    )
+    sensor = Connection(
+        "ir_sensor",
+        "hw201",
+        {"out": "7"},
+        database=database,
+    )
+    board = Microcontroller(
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+    )
+    board.add_connections([sensor])
+    event_bus = EventBus()
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(microcontrollers=[board]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+
+    assert set(app.tools) == {
+        "read_ir_sensor",
+        "turn_on_ir_sensor_stream",
+        "turn_off_ir_sensor_stream",
     }
 
 

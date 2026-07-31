@@ -18,6 +18,7 @@ from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
+from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
@@ -45,6 +46,7 @@ class ServerRuntime:
     stream_controller: StreamController
     event_worker: EventWorker
     app: FastMCP
+    camera_runtime: CameraRuntime | None = None
     rule_bus: RuleBus = field(default_factory=RuleBus)
     rule_buffer: RuleBuffer = field(init=False)
     agent_runtime: AgentRuntime | None = None

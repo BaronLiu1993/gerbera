@@ -132,13 +132,17 @@ class CameraRuntime:
                     subscribed_models = camera.subscribed_models
 
                     for inference in subscribed_models:
-                        if inference.model in running_models:
+                        if inference.model_name in running_models:
                             inference.predict(latest_frame)
 
         finally:
             capture.release()
 
-    def turn_on_camera_stream(self, camera_key: str) -> None:
+    def turn_on_camera_stream(
+        self,
+        camera_key: str,
+        running_models: dict[str] | None = None,
+    ) -> None:
         camera_session = self.get_camera_session(camera_key)
         if camera_session._thread is not None:
             raise RuntimeError(f"Camera is already running: {camera_key}")
@@ -146,7 +150,7 @@ class CameraRuntime:
         stop_event = threading.Event()
         thread = threading.Thread(
             target=self._capture_loop,
-            args=(camera_key,),
+            args=(camera_key, running_models or {}),
             name=f"camera-{camera_key}",
             daemon=False,
         )

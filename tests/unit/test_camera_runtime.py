@@ -100,9 +100,11 @@ def test_capture_frame_reads_one_image_and_releases_capture(
         lambda address: captured_addresses.append(address) or capture,
     )
 
-    frame = runtime.capture_frame(camera.id)
+    runtime.capture_frame(camera.id, {})
+    frame = camera.latest_frame
 
     assert captured_addresses == [2]
+    assert frame is not None
     assert frame.image is image
     assert camera.latest_frame is frame
     assert capture.released
@@ -131,7 +133,7 @@ def test_capture_frame_releases_capture_on_failure(
     )
 
     with pytest.raises(RuntimeError, match=message):
-        runtime.capture_frame(camera.id)
+        runtime.capture_frame(camera.id, {})
 
     assert camera.latest_frame is None
     assert capture.released
@@ -142,6 +144,7 @@ def test_capture_loop_updates_frame_and_runs_subscribed_models(
 ) -> None:
     predictions = []
     model = SimpleNamespace(
+        model_name="test-model",
         predict=lambda frame: predictions.append(frame)
     )
     camera = _camera(subscribed_models=[model])
@@ -157,10 +160,46 @@ def test_capture_loop_updates_frame_and_runs_subscribed_models(
         lambda _: capture,
     )
 
-    runtime._capture_loop(camera.id)
+    runtime._capture_loop(camera.id, {"test-model": True})
 
     assert camera.latest_frame is predictions[0]
     assert capture.released
+
+
+def test_turn_on_camera_stream_passes_models_to_capture_thread(
+    monkeypatch,
+) -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(cameras=[camera])
+    )
+    runtime.register_cameras()
+    created_threads = []
+
+    def build_thread(**kwargs):
+        thread = SimpleNamespace(
+            start=lambda: None,
+            is_alive=lambda: False,
+            **kwargs,
+        )
+        created_threads.append(thread)
+        return thread
+
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.threading.Thread",
+        build_thread,
+    )
+
+    runtime.turn_on_camera_stream(
+        camera.id,
+        {"openai-vision-language-model": True},
+    )
+
+    assert created_threads[0].target == runtime._capture_loop
+    assert created_threads[0].args == (
+        camera.id,
+        {"openai-vision-language-model": True},
+    )
 
 
 def test_clean_up_cameras_stops_streams_and_clears_registry(

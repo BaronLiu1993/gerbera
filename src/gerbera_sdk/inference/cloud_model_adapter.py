@@ -35,6 +35,16 @@ class CloudModelAdapter(ABC):
 
         return base64.b64encode(encoded.tobytes()).decode("ascii")
 
+
+    @staticmethod
+    def _parse_json_output(output_text: str) -> dict[str, object]:
+        output = json.loads(output_text)
+        if not isinstance(output, dict):
+            raise RuntimeError(
+                "Vision language model output must be a JSON object"
+            )
+        return output
+
     @abstractmethod
     def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
         pass
@@ -48,15 +58,6 @@ class CloudModelAdapter(ABC):
         output_schema: dict[str, object],
     ) -> dict[str, object]:
         pass
-
-    @staticmethod
-    def _parse_json_output(output_text: str) -> dict[str, object]:
-        output = json.loads(output_text)
-        if not isinstance(output, dict):
-            raise RuntimeError(
-                "Vision language model output must be a JSON object"
-            )
-        return output
 
 
 class AnthropicCloudModelAdapter(CloudModelAdapter):
