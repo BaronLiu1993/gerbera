@@ -1,6 +1,11 @@
 from dataclasses import dataclass, field
 
-from gerbera_sdk.models.hardware.table import Table
+from gerbera_sdk.contracts.firmware_contract import ColumnSpec
+
+@dataclass(frozen=True)
+class Table:
+    name: str
+    schema: dict[str, ColumnSpec]
 
 
 @dataclass

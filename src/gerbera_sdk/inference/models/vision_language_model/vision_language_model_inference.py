@@ -107,4 +107,8 @@ class VisionLanguageModelInference:
         if not frames:
             raise ValueError("At least one Base64 frame is required for inference")
 
-        return self.predict(frames)
+        decoded_frames = [
+            Frame.from_base64_string(frame)
+            for frame in frames
+        ]
+        return self.predict(decoded_frames)

@@ -8,7 +8,7 @@ from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.table import Table
+from gerbera_sdk.models.hardware.database import Table
 
 
 FRAMES_TABLE_NAME = "frames"
