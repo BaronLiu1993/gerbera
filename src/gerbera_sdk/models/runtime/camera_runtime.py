@@ -3,12 +3,12 @@ import threading
 import datetime
 import cv2
 
+from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.models.hardware.camera import (
     CameraSource,
     DeviceCameraSource,
     MJPEGSource,
     Camera,
-    Frame,
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
@@ -96,12 +96,13 @@ class CameraRuntime:
             )
             with self._lock:
                 camera.latest_frame = frame
+                camera.latest_output = None
                 subscribed_models = camera.subscribed_models
-                
+
                 for inference in subscribed_models:
-                    if inference.model_name in running_models:
-                        inference.predict(frame)
-            
+                    if inference.name in running_models:
+                        camera.latest_output = inference.predict(frame)
+
         finally:
             capture.release()
 
@@ -125,15 +126,21 @@ class CameraRuntime:
                         f"Could not read camera frame: {camera_key}"
                     )
 
-                latest_frame = Frame(image=frame, timestamp=datetime.datetime.now())
+                latest_frame = Frame(
+                    image=frame,
+                    timestamp=datetime.datetime.now(),
+                )
 
                 with self._lock:
                     camera.latest_frame = latest_frame
+                    camera.latest_output = None
                     subscribed_models = camera.subscribed_models
 
                     for inference in subscribed_models:
-                        if inference.model_name in running_models:
-                            inference.predict(latest_frame)
+                        if inference.name in running_models:
+                            camera.latest_output = inference.predict(
+                                latest_frame
+                            )
 
         finally:
             capture.release()

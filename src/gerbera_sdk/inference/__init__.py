@@ -1,3 +1,4 @@
+from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.cloud_model_adapter import (
     AnthropicCloudModelAdapter,
     CloudModelAdapter,
@@ -24,6 +25,7 @@ __all__ = [
     "AnthropicCloudModelAdapter",
     "CloudModelAdapter",
     "CloudModelAdapterRegistry",
+    "Frame",
     "GoogleCloudModelAdapter",
     "Inference",
     "LocalModelAdapter",

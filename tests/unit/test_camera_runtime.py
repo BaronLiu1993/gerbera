@@ -110,6 +110,29 @@ def test_capture_frame_reads_one_image_and_releases_capture(
     assert capture.released
 
 
+def test_capture_frame_stores_subscribed_model_output(
+    monkeypatch,
+) -> None:
+    expected_output = {"environment_name": "workshop"}
+    model = SimpleNamespace(
+        name="test-model",
+        predict=lambda frame: expected_output,
+    )
+    camera = _camera(subscribed_models=[model])
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(cameras=[camera])
+    )
+    runtime.register_cameras()
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda _: FakeCapture(),
+    )
+
+    runtime.capture_frame(camera.id, {"test-model": True})
+
+    assert camera.latest_output is expected_output
+
+
 @pytest.mark.parametrize(
     ("capture", "message"),
     [
@@ -144,7 +167,7 @@ def test_capture_loop_updates_frame_and_runs_subscribed_models(
 ) -> None:
     predictions = []
     model = SimpleNamespace(
-        model_name="test-model",
+        name="test-model",
         predict=lambda frame: predictions.append(frame)
     )
     camera = _camera(subscribed_models=[model])
@@ -163,6 +186,7 @@ def test_capture_loop_updates_frame_and_runs_subscribed_models(
     runtime._capture_loop(camera.id, {"test-model": True})
 
     assert camera.latest_frame is predictions[0]
+    assert camera.latest_output is None
     assert capture.released
 
 

@@ -1,18 +1,18 @@
 import asyncio
-import base64
-from datetime import datetime
+import json
 from types import SimpleNamespace
 
 from fastmcp import FastMCP
-from fastmcp.utilities.types import Image
-import numpy as np
 import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
-from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource, Frame
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
+    VisionLanguageModelFrameEnvironment,
+)
+from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -44,7 +44,7 @@ class FakeSerialConnection:
         self.on_write()
 
 
-def test_server_registers_capture_frame_tool_when_camera_exists() -> None:
+def test_server_registers_named_camera_tools_when_camera_exists() -> None:
     camera = Camera(
         id="local-camera",
         name="local_camera",
@@ -54,16 +54,17 @@ def test_server_registers_capture_frame_tool_when_camera_exists() -> None:
     captured_camera_keys = []
     started_streams = []
     stopped_streams = []
-    frame = Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((2, 2, 3), dtype=np.uint8),
+    camera_output = VisionLanguageModelFrameEnvironment(
+        environment_name="workshop",
+        description="A workbench",
+        objects=[],
     )
     camera_runtime = SimpleNamespace(
         capture_frame=lambda camera_key, running_models: (
             captured_camera_keys.append((camera_key, running_models))
         ),
         get_camera_session=lambda camera_key: SimpleNamespace(
-            camera=SimpleNamespace(latest_frame=frame)
+            camera=SimpleNamespace(latest_output=camera_output)
         ),
         turn_on_camera_stream=lambda camera_key, running_models: (
             started_streams.append((camera_key, running_models))
@@ -85,8 +86,7 @@ def test_server_registers_capture_frame_tool_when_camera_exists() -> None:
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
-    result = app.tools["capture_frame"](
-        "local-camera",
+    result = app.tools["capture_from_local_camera"](
         ["openai-vision-language-model"],
     )
 
@@ -96,18 +96,11 @@ def test_server_registers_capture_frame_tool_when_camera_exists() -> None:
             {"openai-vision-language-model": True},
         )
     ]
-    assert isinstance(result, Image)
-    image_content = result.to_image_content()
-    assert image_content.mimeType == "image/jpeg"
-    assert base64.b64decode(image_content.data)
+    assert json.loads(result) == camera_output.model_dump()
 
-    assert app.tools["turn_on_camera_stream"](
-        "local-camera",
+    assert app.tools["turn_on_local_camera_stream"](
         ["openai-vision-language-model"],
-    ) == {
-        "camera_key": "local-camera",
-        "status": "streaming",
-    }
+    ) is None
     assert started_streams == [
         (
             "local-camera",
@@ -115,10 +108,7 @@ def test_server_registers_capture_frame_tool_when_camera_exists() -> None:
         )
     ]
 
-    assert app.tools["turn_off_camera_stream"]("local-camera") == {
-        "camera_key": "local-camera",
-        "status": "stopped",
-    }
+    assert app.tools["turn_off_local_camera_stream"]() is None
     assert stopped_streams == ["local-camera"]
 
 
@@ -137,9 +127,9 @@ def test_server_does_not_register_capture_frame_without_cameras() -> None:
     GerberaRuntime._register_server_runtime_tools(runtime)
 
     assert {
-        "capture_frame",
-        "turn_on_camera_stream",
-        "turn_off_camera_stream",
+        "capture_from_local_camera",
+        "turn_on_local_camera_stream",
+        "turn_off_local_camera_stream",
     }.isdisjoint(app.tools)
 
 

@@ -1,10 +1,9 @@
+import json
 import subprocess
 from typing import Annotated
 
-import cv2
 from fastmcp import FastMCP
-from fastmcp.utilities.types import Image
-from pydantic import Field, StrictFloat
+from pydantic import BaseModel, Field, StrictFloat
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.events.event_bus import EventBus
@@ -218,85 +217,77 @@ class GerberaRuntime:
         if camera_runtime is None:
             raise RuntimeError("Camera runtime is not configured")
 
-        def capture_frame(
-            camera_key: str,
-            running_models: list[str] | None = None,
-        ) -> Image:
-            selected_models = {
-                model_name: True
-                for model_name in (running_models or [])
-            }
-            camera_runtime.capture_frame(camera_key, selected_models)
-            frame = camera_runtime.get_camera_session(
-                camera_key
-            ).camera.latest_frame
-            if frame is None:
-                raise RuntimeError(
-                    f"Camera did not produce a frame: {camera_key}"
-                )
-            success, encoded_image = cv2.imencode(".jpg", frame.image)
-            if not success:
-                raise RuntimeError(
-                    f"Could not encode camera frame: {camera_key}"
-                )
-            return Image(
-                data=encoded_image.tobytes(),
-                format="jpeg",
+        for camera in cameras:
+            camera_key = camera.id
+
+            def build_capture_tool(camera_key: str):
+                def capture_from_camera(
+                    running_models: list[str] | None = None,
+                ) -> str:
+                    selected_models = {
+                        name: True
+                        for name in (running_models or [])
+                    }
+                    camera_runtime.capture_frame(
+                        camera_key,
+                        selected_models,
+                    )
+                    output = camera_runtime.get_camera_session(
+                        camera_key
+                    ).camera.latest_output
+                    if isinstance(output, BaseModel):
+                        return output.model_dump_json()
+                    return json.dumps(output)
+
+                return capture_from_camera
+
+            server_runtime._register_tool(
+                name=f"capture_from_{camera.name}",
+                description=(
+                    f"Capture one frame from {camera.name}. "
+                    "Optionally provide running_models using subscribed "
+                    "inference names. Returns the camera's latest inference "
+                    "output as a JSON string."
+                ),
+                tool_function=build_capture_tool(camera_key),
             )
 
-        camera_keys = ", ".join(camera.id for camera in cameras)
-        server_runtime._register_tool(
-            name="capture_frame",
-            description=(
-                "Capture and return one JPEG image from a registered camera. "
-                f"camera_key must be one of: {camera_keys}. "
-                "Optionally provide running_models using subscribed model names."
-            ),
-            tool_function=capture_frame,
-        )
+            def build_start_stream_tool(camera_key: str):
+                def turn_on_stream(
+                    running_models: list[str] | None = None,
+                ) -> None:
+                    selected_models = {
+                        name: True
+                        for name in (running_models or [])
+                    }
+                    camera_runtime.turn_on_camera_stream(
+                        camera_key,
+                        selected_models,
+                    )
 
-        def turn_on_camera_stream(
-            camera_key: str,
-            running_models: list[str] | None = None,
-        ) -> dict[str, str]:
-            selected_models = {
-                model_name: True
-                for model_name in (running_models or [])
-            }
-            camera_runtime.turn_on_camera_stream(
-                camera_key,
-                selected_models,
+                return turn_on_stream
+
+            server_runtime._register_tool(
+                name=f"turn_on_{camera.name}_stream",
+                description=(
+                    f"Start continuous capture from {camera.name}. "
+                    "Optionally provide running_models using subscribed "
+                    "inference names."
+                ),
+                tool_function=build_start_stream_tool(camera_key),
             )
-            return {
-                "camera_key": camera_key,
-                "status": "streaming",
-            }
 
-        server_runtime._register_tool(
-            name="turn_on_camera_stream",
-            description=(
-                "Start continuous capture from a registered camera. "
-                f"camera_key must be one of: {camera_keys}. "
-                "Optionally provide running_models using subscribed model names."
-            ),
-            tool_function=turn_on_camera_stream,
-        )
+            def build_stop_stream_tool(camera_key: str):
+                def turn_off_stream() -> None:
+                    camera_runtime.turn_off_camera_stream(camera_key)
 
-        def turn_off_camera_stream(camera_key: str) -> dict[str, str]:
-            camera_runtime.turn_off_camera_stream(camera_key)
-            return {
-                "camera_key": camera_key,
-                "status": "stopped",
-            }
+                return turn_off_stream
 
-        server_runtime._register_tool(
-            name="turn_off_camera_stream",
-            description=(
-                "Stop continuous capture from a registered camera. "
-                f"camera_key must be one of: {camera_keys}."
-            ),
-            tool_function=turn_off_camera_stream,
-        )
+            server_runtime._register_tool(
+                name=f"turn_off_{camera.name}_stream",
+                description=f"Stop continuous capture from {camera.name}.",
+                tool_function=build_stop_stream_tool(camera_key),
+            )
 
     @staticmethod
     def _register_agent_runtime_tool(

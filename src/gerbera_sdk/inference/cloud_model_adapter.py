@@ -7,7 +7,7 @@ from enum import Enum
 import cv2
 import requests
 
-from gerbera_sdk.models.hardware.camera import Frame
+from gerbera_sdk.inference.frame import Frame
 
 
 class ModelProviderEnum(Enum):

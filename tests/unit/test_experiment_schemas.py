@@ -90,7 +90,7 @@ def agent_execute_action() -> dict:
                 "event_name": "block_detected",
             }
         ],
-        "allowed_tool_calls": ["move_arm", "capture_frame"],
+        "allowed_tool_calls": ["move_arm", "capture_from_local_camera"],
         "max_iterations": 10,
         "timeout_seconds": 30,
     }

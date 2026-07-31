@@ -4,7 +4,7 @@ import pytest
 from gerbera_harness.agent.model import model_adapters
 from gerbera_harness.agent.model.model_adapters import (
     AnthropicAdapter,
-    GeminiAdapter,
+    GoogleAdapter,
     OpenAIAdapter,
 )
 
@@ -35,7 +35,7 @@ class FakeResponse:
             lambda request: request["response_format"]["json_schema"]["schema"],
         ),
         (
-            GeminiAdapter("key", "gemini", 100),
+            GoogleAdapter("key", "gemini", 100),
             {"content": [{"text": "{}"}]},
             lambda request: request["response_format"]["schema"],
         ),

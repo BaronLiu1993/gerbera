@@ -1,4 +1,3 @@
-import base64
 from datetime import datetime
 
 import cv2
@@ -6,72 +5,87 @@ import numpy as np
 import pytest
 
 from gerbera_sdk.inference import (
-    APIModel,
-    APIModelAdapter,
-    LocalModelAdapter,
-    Model,
-    ModelAdapter,
+    CloudModelAdapter,
+    Frame,
+    OpenAICloudModelAdapter,
+    VisionLanguageModelFrameEnvironment,
+    VisionLanguageModelInference,
 )
-from gerbera_sdk.models.hardware.camera import Frame
 
 
-class RecordingAPIAdapter(APIModelAdapter):
+class RecordingCloudModelAdapter(CloudModelAdapter):
     def __init__(self) -> None:
-        self.model_input = None
+        super().__init__(api_key="key", model="test-model")
+        self.frame = None
+        self.prediction_args = None
 
-    def predict(self, model_input: object) -> object:
-        self.model_input = model_input
-        return {"accepted": True}
+    def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
+        self.frame = frame
+        return {"converted": True}
+
+    def predict(
+        self,
+        model_input: object,
+        system_prompt: str,
+        user_prompt: str,
+        output_schema: dict[str, object],
+    ) -> dict[str, object]:
+        self.prediction_args = {
+            "model_input": model_input,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "output_schema": output_schema,
+        }
+        return {
+            "environment_name": "workshop",
+            "description": "A workbench",
+            "objects": [],
+        }
 
 
-def test_base_model_and_adapters_are_abstract() -> None:
+def test_cloud_model_adapter_is_abstract() -> None:
     with pytest.raises(TypeError):
-        Model(name="model", description="test")
-
-    with pytest.raises(TypeError):
-        ModelAdapter()
-
-    with pytest.raises(TypeError):
-        APIModelAdapter()
-
-    with pytest.raises(TypeError):
-        LocalModelAdapter()
+        CloudModelAdapter(api_key="key", model="test-model")
 
 
-def test_api_model_converts_then_predicts() -> None:
+def test_vision_language_model_converts_then_predicts() -> None:
     frame = Frame(
         timestamp=datetime.now(),
         image=np.zeros((4, 6, 3), dtype=np.uint8),
     )
-    adapter = RecordingAPIAdapter()
-    model = APIModel(
-        name="api",
-        description="test",
-        adapter=adapter,
+    adapter = RecordingCloudModelAdapter()
+    inference = VisionLanguageModelInference(
+        model=adapter,
+        name="vision",
+        description="Test vision model",
+        user_prompt="Describe the frame",
     )
 
-    result = model.predict(frame)
-    prefix = "data:image/jpeg;base64,"
-    assert isinstance(adapter.model_input, str)
-    assert adapter.model_input.startswith(prefix)
-    decoded = cv2.imdecode(
-        np.frombuffer(
-            base64.b64decode(adapter.model_input.removeprefix(prefix)),
-            dtype=np.uint8,
+    result = inference.predict(frame)
+
+    assert adapter.frame is frame
+    assert adapter.prediction_args == {
+        "model_input": {"converted": True},
+        "system_prompt": inference.system_prompt,
+        "user_prompt": "Describe the frame",
+        "output_schema": (
+            VisionLanguageModelFrameEnvironment.model_json_schema()
         ),
-        cv2.IMREAD_COLOR,
+    }
+    assert result == VisionLanguageModelFrameEnvironment(
+        environment_name="workshop",
+        description="A workbench",
+        objects=[],
     )
 
-    assert result == {"accepted": True}
-    assert decoded.shape == frame.image.shape
 
-
-def test_api_model_raises_when_frame_encoding_fails(monkeypatch) -> None:
+def test_cloud_model_adapter_raises_when_frame_encoding_fails(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(cv2, "imencode", lambda *args: (False, None))
-    model = APIModel(
-        name="api",
-        description="test",
-        adapter=RecordingAPIAdapter(),
+    adapter = OpenAICloudModelAdapter(
+        api_key="key",
+        model="test-model",
     )
     frame = Frame(
         timestamp=datetime.now(),
@@ -79,4 +93,4 @@ def test_api_model_raises_when_frame_encoding_fails(monkeypatch) -> None:
     )
 
     with pytest.raises(RuntimeError, match="Could not encode camera frame"):
-        model.predict(frame)
+        adapter.convert_to_valid_input(frame)

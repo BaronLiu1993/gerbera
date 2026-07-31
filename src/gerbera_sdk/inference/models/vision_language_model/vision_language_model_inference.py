@@ -3,8 +3,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.inference import ModelAdapters, ModelTypes
-from gerbera_sdk.models.hardware.camera import Frame
 
 
 VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH = (
@@ -38,8 +38,8 @@ class VisionLanguageModelFrameEnvironment(BaseModel):
 @dataclass
 class VisionLanguageModelInference:
     model: ModelAdapters
-    model_name: str
-    model_description: str
+    name: str
+    description: str
     user_prompt: str
     model_type: ModelTypes = ModelTypes.VISION_LANGUAGE_MODEL
     max_concurrent_model_inference: int = 1
