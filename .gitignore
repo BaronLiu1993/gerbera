@@ -7,4 +7,5 @@ serve_mcp.py
 index.py
 gerbera.egg-info
 test_initialisation_openai.py
+test_camera.py
 .gerbera

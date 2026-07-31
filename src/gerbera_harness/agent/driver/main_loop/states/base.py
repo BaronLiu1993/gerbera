@@ -7,7 +7,7 @@ from typing import ClassVar
 
 from pydantic import RootModel
 
-PROMPT_DIRECTORY = Path(__file__).resolve().parents[4] / "prompts"
+PROMPT_DIRECTORY = Path(__file__).resolve().parents[4] / "prompts" / "main"
 
 
 class LoopStateEnum(str, Enum):

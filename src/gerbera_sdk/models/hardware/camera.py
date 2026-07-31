@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 from datetime import datetime
 
-from gerbera_sdk.inference.model import Model
+from gerbera_sdk.inference.inference import Inference
 
 # Camera Sources
 @dataclass(frozen=True)
@@ -28,5 +28,5 @@ class Camera:
     description: str
     source: CameraSource
     latest_frame: Frame | None = None
-    subscribed_models: list[Model] = field(default_factory=list)
+    subscribed_models: list[Inference] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

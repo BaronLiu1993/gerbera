@@ -99,10 +99,8 @@ class CameraRuntime:
 
                 with self._lock:
                     camera.latest_frame = latest_frame
-                    subscribed_models = tuple(camera.subscribed_models)
-
-                for model in subscribed_models:
-                    model.predict(latest_frame)
+                    subscribed_models = camera.subscribed_models
+                    print(latest_frame)
 
         finally:
             capture.release()
