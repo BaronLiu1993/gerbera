@@ -1,3 +1,4 @@
+import base64
 import json
 from datetime import datetime
 
@@ -25,7 +26,10 @@ class RecordingCloudModelAdapter(CloudModelAdapter):
         self.frames = []
         self.prediction_args = None
 
-    def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
+    def convert_to_valid_input(
+        self,
+        frame: Frame,
+    ) -> dict[str, object]:
         self.frames.append(frame)
         return {"frame_index": len(self.frames) - 1}
 
@@ -117,6 +121,33 @@ def test_vision_language_model_requires_at_least_one_frame() -> None:
 
     with pytest.raises(ValueError, match="At least one frame"):
         inference.predict([])
+
+
+def test_vision_language_model_predicts_with_base64_strings() -> None:
+    adapter = RecordingCloudModelAdapter()
+    inference = VisionLanguageModelInference(
+        model=adapter,
+        name="vision",
+        description="Test vision model",
+        user_prompt="Describe the frames",
+    )
+
+    image = np.zeros((2, 2, 3), dtype=np.uint8)
+    success, encoded = cv2.imencode(".jpg", image)
+    assert success
+    base64_string = base64.b64encode(encoded.tobytes()).decode("ascii")
+
+    result = inference.predict_with_base64(
+        [base64_string, f"data:image/jpeg;base64,{base64_string}"]
+    )
+
+    assert adapter.prediction_args["model_input"] == [
+        {"frame_index": 0},
+        {"frame_index": 1},
+    ]
+    assert len(adapter.frames) == 2
+    assert all(frame.image.shape == image.shape for frame in adapter.frames)
+    assert result.environment_name == "workshop"
 
 
 @pytest.mark.parametrize(

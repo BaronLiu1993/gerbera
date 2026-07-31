@@ -35,7 +35,6 @@ class CloudModelAdapter(ABC):
 
         return base64.b64encode(encoded.tobytes()).decode("ascii")
 
-
     @staticmethod
     def _parse_json_output(output_text: str) -> dict[str, object]:
         output = json.loads(output_text)
@@ -46,7 +45,10 @@ class CloudModelAdapter(ABC):
         return output
 
     @abstractmethod
-    def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
+    def convert_to_valid_input(
+        self,
+        frame: Frame,
+    ) -> dict[str, object]:
         pass
 
     @abstractmethod
@@ -61,7 +63,10 @@ class CloudModelAdapter(ABC):
 
 
 class AnthropicCloudModelAdapter(CloudModelAdapter):
-    def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
+    def convert_to_valid_input(
+        self,
+        frame: Frame,
+    ) -> dict[str, object]:
         return {
             "type": "image",
             "source": {
@@ -113,7 +118,10 @@ class AnthropicCloudModelAdapter(CloudModelAdapter):
 
 
 class OpenAICloudModelAdapter(CloudModelAdapter):
-    def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
+    def convert_to_valid_input(
+        self,
+        frame: Frame,
+    ) -> dict[str, object]:
         image_data = self._frame_to_base64(frame)
         return {
             "type": "input_image",
@@ -173,7 +181,10 @@ class OpenAICloudModelAdapter(CloudModelAdapter):
 
 
 class GoogleCloudModelAdapter(CloudModelAdapter):
-    def convert_to_valid_input(self, frame: Frame) -> dict[str, object]:
+    def convert_to_valid_input(
+        self,
+        frame: Frame,
+    ) -> dict[str, object]:
         return {
             "type": "image",
             "data": self._frame_to_base64(frame),

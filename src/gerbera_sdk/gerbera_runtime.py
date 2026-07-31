@@ -11,6 +11,10 @@ from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules import OperatorEnum, RuleTriggerModeEnum
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
+from gerbera_sdk.inference import (
+    Inference,
+    VisionLanguageModelFrameEnvironment,
+)
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
@@ -204,6 +208,42 @@ class GerberaRuntime:
                 )
 
         GerberaRuntime._register_camera_tools(server_runtime)
+        GerberaRuntime._register_inference_tools(server_runtime)
+
+    @staticmethod
+    def _register_inference_tools(
+        server_runtime: ServerRuntime,
+    ) -> None:
+        registered_models: dict[str, Inference] = {}
+
+        for camera in server_runtime.hardware_system.cameras:
+            for model in camera.subscribed_models:
+                registered_model = registered_models.get(model.name)
+                if registered_model is model:
+                    continue
+                if registered_model is not None:
+                    raise ValueError(
+                        f"Inference model name must be unique: {model.name}"
+                    )
+                registered_models[model.name] = model
+
+        for model in registered_models.values():
+            def build_predict_tool(model: Inference):
+                def predict_with_model(
+                    frames: list[str],
+                ) -> VisionLanguageModelFrameEnvironment:
+                    return model.predict_with_base64(frames)
+
+                return predict_with_model
+
+            server_runtime._register_tool(
+                name=f"predict_with_{model.name}",
+                description=(
+                    f"{model.description} Provide one or more Base64 "
+                    "image strings."
+                ),
+                tool_function=build_predict_tool(model),
+            )
 
     @staticmethod
     def _register_camera_tools(

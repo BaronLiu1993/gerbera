@@ -30,7 +30,9 @@ def test_database_runtime_does_not_start_worker_without_tables() -> None:
     assert worker.started is False
 
 
-def test_database_runtime_rejects_unsupported_streaming_component() -> None:
+def test_database_runtime_rejects_unsupported_streaming_component(
+    monkeypatch,
+) -> None:
     connection = Connection(
         "led",
         "led",
@@ -43,6 +45,11 @@ def test_database_runtime_rejects_unsupported_streaming_component() -> None:
             microcontrollers=[SimpleNamespace(connections=[connection])]
         ),
         event_worker=EventWorker(),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_create_database_table",
+        lambda database, table_name, schema: None,
     )
 
     with pytest.raises(ValueError, match="does not support database streaming"):

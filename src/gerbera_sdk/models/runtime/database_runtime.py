@@ -3,12 +3,37 @@ from dataclasses import dataclass, field
 import psycopg
 from psycopg import sql
 
-from gerbera_sdk.contracts.firmware_contract import ColumnSpec
+from gerbera_sdk.contracts.firmware_contract import ColumnSpec, ColumnType
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.table import Table
+
+
+FRAMES_TABLE_NAME = "frames"
+FRAMES_TABLE_SCHEMA: dict[str, ColumnSpec] = {
+    "id": ColumnSpec(
+        type=ColumnType.TEXT,
+        primary_key=True,
+        nullable=False,
+    ),
+    "base64_string": ColumnSpec(
+        type=ColumnType.TEXT,
+        nullable=False,
+    ),
+    "camera_name": ColumnSpec(
+        type=ColumnType.TEXT,
+        idx=True,
+        nullable=False,
+    ),
+    "timestamp": ColumnSpec(
+        type=ColumnType.TIMESTAMP,
+        idx=True,
+        nullable=False,
+        default="CURRENT_TIMESTAMP",
+    ),
+}
 
 
 @dataclass
@@ -60,6 +85,24 @@ class DatabaseRuntime:
                 cursor.executemany(query, payload)
 
     def _create_tables(self) -> None:
+        # TODO: Create the runtime memory table here when its schema is defined.
+        frames_database = next(
+            (
+                connection.database
+                for microcontroller in self.hardware_system.microcontrollers
+                for connection in microcontroller.connections
+                if connection.database is not None
+            ),
+            None,
+        )
+        if frames_database is not None:
+            self._create_database_table(
+                frames_database,
+                FRAMES_TABLE_NAME,
+                FRAMES_TABLE_SCHEMA,
+            )
+            self._table_databases[FRAMES_TABLE_NAME] = frames_database
+
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
                 database = connection.database

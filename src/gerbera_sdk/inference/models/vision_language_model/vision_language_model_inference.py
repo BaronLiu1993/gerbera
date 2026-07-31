@@ -13,8 +13,6 @@ VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH = (
 
 
 class VisionLanguageModelBoundingBox(BaseModel):
-    """Normalized box with ordered horizontal and vertical boundaries."""
-
     model_config = ConfigDict(extra="forbid")
     x1: float = Field(
         ge=0.0,
@@ -101,3 +99,12 @@ class VisionLanguageModelInference:
             ),
         )
         return VisionLanguageModelFrameEnvironment.model_validate(output)
+
+    def predict_with_base64(
+        self,
+        frames: list[str],
+    ) -> VisionLanguageModelFrameEnvironment:
+        if not frames:
+            raise ValueError("At least one Base64 frame is required for inference")
+
+        return self.predict(frames)

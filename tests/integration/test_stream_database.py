@@ -79,6 +79,12 @@ def test_stream_payload_is_provisioned_buffered_and_written(
     event.flush()
     runtime.stop()
 
+    assert set(database.table_names["frames"].schema) == {
+        "id",
+        "base64_string",
+        "camera_name",
+        "timestamp",
+    }
     assert table_name in database.table_names
     assert cursor.executed
     assert len(cursor.batches) == 1

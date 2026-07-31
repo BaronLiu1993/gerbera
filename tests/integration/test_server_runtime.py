@@ -119,11 +119,17 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
 
 
 def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
+    model = SimpleNamespace(
+        name="openai-vision-language-model",
+        description="Analyze supplied images.",
+        predict_with_base64=lambda frames: None,
+    )
     camera = Camera(
         id="local-camera",
         name="local_camera",
         description="Built-in camera",
         source=DeviceCameraSource(device_index=0),
+        subscribed_models=[model],
     )
     camera_runtime = SimpleNamespace(
         capture_frames=lambda **kwargs: None,
@@ -147,6 +153,9 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
 
     GerberaRuntime._register_server_runtime_tools(runtime)
     tool = asyncio.run(app.get_tool("capture_frames_from_local_camera"))
+    predict_tool = asyncio.run(
+        app.get_tool("predict_with_openai-vision-language-model")
+    )
     properties = tool.parameters["properties"]
 
     assert asyncio.run(app.get_tool("capture_from_local_camera")) is None
@@ -162,6 +171,60 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         "minimum": 0.0,
         "type": "number",
     }
+    assert predict_tool.parameters["properties"]["frames"] == {
+        "items": {"type": "string"},
+        "type": "array",
+    }
+
+
+def test_server_registers_model_base64_prediction_as_a_tool() -> None:
+    prediction = VisionLanguageModelFrameEnvironment(
+        environment_name="workshop",
+        description="A workbench",
+        objects=[],
+    )
+    received_frames = []
+    model = SimpleNamespace(
+        name="openai-vision-language-model",
+        description="Analyze supplied images.",
+        predict_with_base64=lambda frames: (
+            received_frames.append(frames) or prediction
+        ),
+    )
+    camera = Camera(
+        id="local-camera",
+        name="local_camera",
+        description="Built-in camera",
+        source=DeviceCameraSource(device_index=0),
+        subscribed_models=[model],
+    )
+    camera_runtime = SimpleNamespace(
+        capture_frames=lambda **kwargs: None,
+        get_camera_session=lambda camera_key: SimpleNamespace(
+            camera=SimpleNamespace(latest_output=None)
+        ),
+        turn_on_camera_stream=lambda camera_key, running_models: None,
+        turn_off_camera_stream=lambda camera_key: None,
+    )
+    event_bus = EventBus()
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(cameras=[camera]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+        camera_runtime=camera_runtime,
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+    result = app.tools["predict_with_openai-vision-language-model"](
+        ["first-base64", "second-base64"]
+    )
+
+    assert received_frames == [["first-base64", "second-base64"]]
+    assert result is prediction
 
 
 def test_server_does_not_register_capture_frame_without_cameras() -> None:
