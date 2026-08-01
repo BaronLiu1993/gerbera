@@ -14,9 +14,10 @@ class InitialisationProcess:
         init=False,
     )
 
+
     def generate_agent_context(
         self,
-        user_prompt: str,
+        user_prompt: str, 
         hardware_tools: list[dict],
         sources: dict[str, str],
         event_catalog: dict | None = None,
@@ -68,7 +69,7 @@ class InitialisationProcess:
             {"name": t.name, "description": t.description, "schema": t.inputSchema}
             for t in tools
         ]
-
+    
     async def run(self, user_prompt: str) -> str:
         async with MCPClient(self.mcp_url) as client:
             hardware_tools = await self.inspect_hardware(client)

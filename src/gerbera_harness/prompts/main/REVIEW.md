@@ -15,7 +15,6 @@ Analyze persisted experimental data after collection is complete.
   experimental failure, not as evidence that falsifies the hypothesis.
 - Transition to `execution` only when another predefined collection step is
   required.
-- Transition to `complete` when the evidence supports or falsifies the
-  hypothesis and a final conclusion can be recorded.
-- Transition to `failed` when the workflow cannot safely or meaningfully
-  continue.
+- Remain in `review` when a final conclusion can be recorded or when the
+  workflow cannot safely or meaningfully continue. Clearly report whether the
+  evidence supports, falsifies, or cannot resolve the hypothesis.

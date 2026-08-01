@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 from pydantic import ValidationError
 
@@ -8,6 +10,7 @@ from gerbera_harness.agent.driver.subloop import (
     ExecuteLoop,
     ExecuteLoopDecisionEnum,
     ExecuteLoopStateEnum,
+    ObserveSchema,
     ObserveState,
 )
 
@@ -55,3 +58,83 @@ def test_decide_result_schema_accepts_loop_decisions(decision: str) -> None:
 def test_decide_result_schema_rejects_unknown_decision() -> None:
     with pytest.raises(ValidationError):
         DecideResultSchema.model_validate({"decision": "retry"})
+
+
+def test_observe_schema_collects_read_only_space_information() -> None:
+    observed_at = datetime.now(timezone.utc)
+
+    observation = ObserveSchema.model_validate(
+        {
+            "space_name": "workshop",
+            "observed_from": observed_at,
+            "observed_until": observed_at,
+            "read_only": True,
+            "observations": [
+                {
+                    "type": "sensor",
+                    "event_id": "sensor-event",
+                    "source_name": "distance_sensor",
+                    "microcontroller_id": "board-1",
+                    "event_name": "distance-stream",
+                    "observed_at": observed_at,
+                    "readings": [
+                        {
+                            "name": "distance",
+                            "value": 12.5,
+                            "unit": "cm",
+                        }
+                    ],
+                    "stale": False,
+                },
+                {
+                    "type": "camera",
+                    "event_id": "camera-event",
+                    "source_name": "local_camera",
+                    "observed_at": observed_at,
+                    "frame_id": "frame-1",
+                    "vision": {
+                        "environment_name": "workshop",
+                        "description": "A workbench",
+                        "objects": [],
+                    },
+                    "stale": False,
+                },
+            ],
+            "complete": True,
+            "errors": [],
+        }
+    )
+
+    assert len(observation.observations) == 2
+    assert observation.read_only is True
+
+
+def test_observe_schema_rejects_actions_and_invalid_time_windows() -> None:
+    observed_at = datetime.now(timezone.utc)
+
+    with pytest.raises(ValidationError):
+        ObserveSchema.model_validate(
+            {
+                "space_name": "workshop",
+                "observed_from": observed_at,
+                "observed_until": observed_at,
+                "read_only": True,
+                "observations": [],
+                "complete": True,
+                "errors": [],
+                "actions": ["turn_off_motor"],
+            }
+        )
+
+    with pytest.raises(ValidationError, match="observed_from"):
+        ObserveSchema.model_validate(
+            {
+                "space_name": "workshop",
+                "observed_from": "2026-08-01T00:00:01Z",
+                "observed_until": "2026-08-01T00:00:00Z",
+                "read_only": True,
+                "observations": [],
+                "complete": True,
+                "errors": [],
+            }
+        )

@@ -3,7 +3,7 @@ from typing import Annotated, Collection
 from pydantic import BaseModel, ConfigDict, Field
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
-    DecisionEnum,
+    InitialistationDecisionEnum,
     LoopStateEnum,
 )
 
@@ -44,7 +44,10 @@ def build_valid_schema(
             "response": response_schema,
             "decision": {
                 "type": "string",
-                "enum": [decision.value for decision in DecisionEnum],
+                "enum": [
+                    decision.value
+                    for decision in InitialistationDecisionEnum
+                ],
             },
         },
         "required": ["next_state", "response", "decision"],

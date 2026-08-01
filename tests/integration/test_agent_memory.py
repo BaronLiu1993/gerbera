@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from gerbera_harness.agent.agent import Agent
+from gerbera_harness.agent_runtime.agent_runtime import Agent
 from gerbera_harness.agent.driver.main_loop import (
     LoopStateEnum,
     Session,
@@ -24,12 +24,13 @@ class FakeClient:
             {
                 "decision": "accepted",
                 "next_state": "execution",
-                "response": {
+                "hypothesis": {
                     "hypothesis": "Heating increases temperature.",
                     "dependent_variables": ["temperature"],
                     "independent_variables": ["heater_state"],
                     "controlled_variables": ["room_temperature"],
                     "assumptions": ["The sensor is calibrated."],
+                    "clarifying_questions": [],
                     "method": {
                         "description": "Collect and review temperature readings.",
                         "name": "heating_test",
@@ -91,6 +92,7 @@ class FakeClient:
                         },
                     },
                 },
+                "clarifying_questions": [],
             }
         )
 
@@ -111,7 +113,7 @@ class FakeExecutionProcess:
 
 def test_agent_runs_initialisation_end_to_end(monkeypatch) -> None:
     monkeypatch.setattr(
-        "gerbera_harness.agent.agent.ExecutionProcess",
+        "gerbera_harness.agent_runtime.agent_runtime.ExecutionProcess",
         FakeExecutionProcess,
     )
     session = Session()

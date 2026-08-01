@@ -2,9 +2,16 @@
 
 from gerbera_harness.agent.driver.subloop.schema import (
     ActSchema,
+    CameraObservationSchema,
     DecideResultSchema,
     ExecuteLoopDecisionEnum,
+    ObservationErrorSchema,
+    ObservationSchema,
+    ObservationSourceTypeEnum,
     ObserveSchema,
+    SensorObservationSchema,
+    SensorReadingSchema,
+    VisionObservationSchema,
 )
 from gerbera_harness.agent.driver.subloop.states import (
     ActState,
@@ -18,12 +25,19 @@ from gerbera_harness.agent.driver.subloop.states import (
 __all__ = [
     "ActSchema",
     "ActState",
+    "CameraObservationSchema",
     "DecideResultSchema",
     "DecideState",
     "ExecuteLoop",
     "ExecuteLoopDecisionEnum",
     "ExecuteLoopState",
     "ExecuteLoopStateEnum",
+    "ObservationErrorSchema",
+    "ObservationSchema",
+    "ObservationSourceTypeEnum",
     "ObserveSchema",
     "ObserveState",
+    "SensorObservationSchema",
+    "SensorReadingSchema",
+    "VisionObservationSchema",
 ]

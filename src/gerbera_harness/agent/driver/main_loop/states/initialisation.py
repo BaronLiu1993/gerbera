@@ -2,15 +2,12 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
-    DecisionEnum,
     ExperimentState,
+    InitialistationDecisionEnum,
     LoopStateEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
-    HypothesisSchema,
-)
-from gerbera_harness.agent.driver.main_loop.schema.utils import (
-    build_valid_schema,
+from gerbera_harness.agent.driver.main_loop.schema.initialisation.initialisation_response_schema import (
+    InitialisationResponseSchema
 )
 
 
@@ -18,13 +15,31 @@ from gerbera_harness.agent.driver.main_loop.schema.utils import (
 class Initialisation(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.INITIALISATION
     prompt_file: ClassVar[str] = "INITIALISATION.md"
-    valid_decisions: ClassVar[frozenset[DecisionEnum]] = frozenset(
-        {DecisionEnum.ACCEPTED, DecisionEnum.REJECTED}
+    valid_decisions: ClassVar[
+        frozenset[InitialistationDecisionEnum]
+    ] = frozenset(
+        {
+            InitialistationDecisionEnum.ACCEPTED,
+            InitialistationDecisionEnum.REJECTED,
+            InitialistationDecisionEnum.CLARIFY,
+        }
     )
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.INITIALISATION, LoopStateEnum.EXECUTION}
     )
-    valid_schema: ClassVar[dict] = build_valid_schema(
-        valid_transition_states,
-        HypothesisSchema,
+    valid_schema: ClassVar[dict] = (
+        InitialisationResponseSchema.model_json_schema()
     )
+    valid_schema["properties"]["next_state"] = {
+        "type": "string",
+        "enum": sorted(
+            state.value for state in valid_transition_states
+        ),
+    }
+    valid_schema["properties"]["decision"] = {
+        "type": "string",
+        "enum": [
+            decision.value
+            for decision in InitialistationDecisionEnum
+        ],
+    }

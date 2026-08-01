@@ -185,6 +185,7 @@ def hypothesis_data(action: dict) -> dict:
         "independent_variables": ["heater_state"],
         "controlled_variables": ["room_temperature"],
         "assumptions": ["The sensor is calibrated."],
+        "clarifying_questions": [],
         "method": {
             "name": "heating_test",
             "description": "Compare temperature before and after heating.",
@@ -402,10 +403,12 @@ def test_hypothesis_schema_excludes_application_owned_fields() -> None:
 def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
     from gerbera_harness.agent.driver.main_loop import Initialisation
 
-    response_schema = Initialisation.valid_schema["properties"]["response"][
+    hypothesis_schema = Initialisation.valid_schema["properties"]["hypothesis"][
         "anyOf"
     ][0]
 
+    assert hypothesis_schema == {"$ref": "#/$defs/HypothesisSchema"}
+    response_schema = Initialisation.valid_schema["$defs"]["HypothesisSchema"]
     assert "method" in response_schema["properties"]
     assert "methods" not in response_schema["properties"]
     assert "ContinuousExecuteSchema" in Initialisation.valid_schema["$defs"]

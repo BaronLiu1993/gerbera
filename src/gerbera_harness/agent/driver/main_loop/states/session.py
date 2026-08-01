@@ -5,14 +5,8 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
     LoopStateEnum,
 )
-from gerbera_harness.agent.driver.main_loop.states.complete import (
-    Complete,
-)
 from gerbera_harness.agent.driver.main_loop.states.execution import (
     Execution,
-)
-from gerbera_harness.agent.driver.main_loop.states.failed import (
-    Failed,
 )
 from gerbera_harness.agent.driver.main_loop.states.initialisation import (
     Initialisation,
@@ -52,9 +46,5 @@ class Session:
                 self.state = Execution()
             case LoopStateEnum.REVIEW:
                 self.state = Review()
-            case LoopStateEnum.COMPLETE:
-                self.state = Complete()
-            case LoopStateEnum.FAILED:
-                self.state = Failed()
 
         return self.state

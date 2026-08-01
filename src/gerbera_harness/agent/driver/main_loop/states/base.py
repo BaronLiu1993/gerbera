@@ -15,19 +15,12 @@ class LoopStateEnum(str, Enum):
     EXECUTION = "execution"
     OBSERVATION = "observation"
     REVIEW = "review"
-    COMPLETE = "complete"
-    FAILED = "failed"
 
 
-class DecisionEnum(str, Enum):
+class InitialistationDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
-
-
-class WorkflowEnum(str, Enum):
-    COMPLETED = "completed"
-    PENDING = "pending"
-    FAILED = "failed"
+    CLARIFY = "clarify"
 
 
 class TextResponseSchema(RootModel[str]):

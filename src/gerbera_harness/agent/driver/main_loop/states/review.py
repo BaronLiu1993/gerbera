@@ -3,9 +3,9 @@ from typing import ClassVar
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
+    InitialistationDecisionEnum,
     LoopStateEnum,
     TextResponseSchema,
-    DecisionEnum
 )
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
     build_valid_schema,
@@ -19,12 +19,16 @@ class Review(ExperimentState):
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {
             LoopStateEnum.EXECUTION,
-            LoopStateEnum.COMPLETE,
-            LoopStateEnum.FAILED,
+            LoopStateEnum.REVIEW,
         }
     )
-    valid_decisions: ClassVar[frozenset[DecisionEnum]] = frozenset(
-        {DecisionEnum.ACCEPTED, DecisionEnum.REJECTED}
+    valid_decisions: ClassVar[
+        frozenset[InitialistationDecisionEnum]
+    ] = frozenset(
+        {
+            InitialistationDecisionEnum.ACCEPTED,
+            InitialistationDecisionEnum.REJECTED,
+        }
     )
     valid_schema: ClassVar[dict] = build_valid_schema(
         valid_transition_states,

@@ -1,9 +1,14 @@
 import asyncio
+import copy
 import json
 
 import pytest
+from pydantic import ValidationError
 
-from gerbera_harness.agent.agent import Agent
+from gerbera_harness.agent_runtime.agent_runtime import Agent
+from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
+    Answer,
+)
 from gerbera_harness.agent.driver.main_loop import (
     Initialisation,
     LoopStateEnum,
@@ -24,10 +29,12 @@ class FakeClient:
         responses = response if isinstance(response, list) else [response]
         self.responses = iter(responses)
         self.system_prompt = None
+        self.system_prompts = []
         self.valid_schema = None
 
     def send(self, messages, system_prompt, valid_schema) -> str:
         self.system_prompt = system_prompt
+        self.system_prompts.append(system_prompt)
         self.valid_schema = valid_schema
         return json.dumps(next(self.responses))
 
@@ -61,6 +68,7 @@ def hypothesis_response() -> dict:
         "independent_variables": ["heater_state"],
         "controlled_variables": ["room_temperature"],
         "assumptions": ["The sensor is calibrated."],
+        "clarifying_questions": [],
         "method": {
             "description": "Collect and review temperature readings.",
             "name": "heating_test",
@@ -118,6 +126,15 @@ def hypothesis_response() -> dict:
     }
 
 
+def accepted_response(hypothesis: dict | None = None) -> dict:
+    return {
+        "decision": "accepted",
+        "next_state": "execution",
+        "hypothesis": hypothesis or hypothesis_response(),
+        "clarifying_questions": [],
+    }
+
+
 def test_agent_prepares_initialisation_context_without_transitioning() -> None:
     session = Session()
     initial_state = session.state
@@ -140,17 +157,12 @@ def test_agent_prepares_initialisation_context_without_transitioning() -> None:
 def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     monkeypatch.setattr(
-        "gerbera_harness.agent.agent.ExecutionProcess",
+        "gerbera_harness.agent_runtime.agent_runtime.ExecutionProcess",
         FakeExecutionProcess,
     )
     session = Session()
-    model = FakeModel(
-        {
-            "decision": "accepted",
-            "next_state": "execution",
-            "response": hypothesis_response(),
-        }
-    )
+    response = accepted_response()
+    model = FakeModel([response, response])
     agent = Agent(
         session=session,
         model=model,
@@ -163,6 +175,10 @@ def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     assert result is None
     assert session.state.state is LoopStateEnum.EXECUTION
     assert model.client.system_prompt.startswith("# Initialisation")
+    assert len(model.client.system_prompts) == 2
+    assert model.client.system_prompts[1].startswith(
+        "# Initialisation Hypothesis Review"
+    )
     assert model.client.valid_schema == Initialisation.valid_schema
     assert len(FakeExecutionProcess.instances) == 1
     execution = FakeExecutionProcess.instances[0]
@@ -171,67 +187,17 @@ def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     assert execution.ran
 
 
-def test_agent_retries_plan_without_final_review(monkeypatch) -> None:
-    FakeExecutionProcess.instances = []
-    monkeypatch.setattr(
-        "gerbera_harness.agent.agent.ExecutionProcess",
-        FakeExecutionProcess,
-    )
+def test_agent_rejects_invalid_candidate_without_retry() -> None:
     invalid_hypothesis = hypothesis_response()
     invalid_hypothesis["method"].pop("final_review")
-    model = FakeModel(
-        [
-            {
-                "decision": "accepted",
-                "next_state": "execution",
-                "response": invalid_hypothesis,
-            },
-            {
-                "decision": "accepted",
-                "next_state": "execution",
-                "response": hypothesis_response(),
-            },
-        ]
-    )
+    model = FakeModel(accepted_response(invalid_hypothesis))
     agent = Agent(
         session=Session(),
         model=model,
         initialisation_process=FakeInitialisationProcess(),
     )
 
-    asyncio.run(agent.run_agent("Test the heater."))
-
-    assert agent.session.state.state is LoopStateEnum.EXECUTION
-    assert len(FakeExecutionProcess.instances) == 1
-    assert [message["role"] for message in agent.messages] == [
-        "user",
-        "assistant",
-        "user",
-    ]
-    assert "final_review" in (
-        agent.messages[-1]["content"].lower()
-    )
-
-
-def test_agent_limits_invalid_initialisation_retries() -> None:
-    invalid_hypothesis = hypothesis_response()
-    invalid_hypothesis["method"].pop("final_review")
-    invalid_response = {
-        "decision": "accepted",
-        "next_state": "execution",
-        "response": invalid_hypothesis,
-    }
-    agent = Agent(
-        session=Session(),
-        model=FakeModel([invalid_response, invalid_response]),
-        initialisation_process=FakeInitialisationProcess(),
-        max_initialisation_attempts=2,
-    )
-
-    with pytest.raises(
-        RuntimeError,
-        match="invalid experiment plan after 2 attempts",
-    ):
+    with pytest.raises(ValidationError):
         asyncio.run(agent.run_agent("Test the heater."))
 
     assert agent.session.state.state is LoopStateEnum.INITIALISATION
@@ -246,12 +212,8 @@ def test_agent_stops_after_rejected_initialisation() -> None:
                 {
                     "decision": "rejected",
                     "next_state": "initialisation",
-                    "response": None,
-                },
-                {
-                    "decision": "accepted",
-                    "next_state": "execution",
-                    "response": hypothesis_response(),
+                    "hypothesis": None,
+                    "clarifying_questions": [],
                 },
             ]
         ),
@@ -263,4 +225,76 @@ def test_agent_stops_after_rejected_initialisation() -> None:
 
     assert result is None
     assert session.state.state is LoopStateEnum.INITIALISATION
-    assert len(agent.messages) == 1
+    assert len(agent.messages) == 2
+
+
+def test_reviewer_can_apply_a_small_hypothesis_fix(monkeypatch) -> None:
+    FakeExecutionProcess.instances = []
+    monkeypatch.setattr(
+        "gerbera_harness.agent_runtime.agent_runtime.ExecutionProcess",
+        FakeExecutionProcess,
+    )
+    corrected_hypothesis = copy.deepcopy(hypothesis_response())
+    corrected_hypothesis["hypothesis"] = (
+        "Turning on the heater increases measured temperature."
+    )
+    agent = Agent(
+        session=Session(),
+        model=FakeModel(
+            [
+                accepted_response(),
+                accepted_response(corrected_hypothesis),
+            ]
+        ),
+        initialisation_process=FakeInitialisationProcess(),
+    )
+
+    asyncio.run(agent.run_agent("Test the heater."))
+
+    assert agent.current_hypothesis is not None
+    assert agent.current_hypothesis.hypothesis == (
+        "Turning on the heater increases measured temperature."
+    )
+
+
+def test_clarification_questions_and_answers_are_kept_in_memory() -> None:
+    agent = Agent(
+        session=Session(),
+        model=FakeModel(
+            {
+                "decision": "clarify",
+                "next_state": "initialisation",
+                "hypothesis": None,
+                "clarifying_questions": [
+                    {
+                        "question": "Which room should be tested?",
+                        "options": ["lab", "office"],
+                    }
+                ],
+            }
+        ),
+        initialisation_process=FakeInitialisationProcess(),
+    )
+
+    asyncio.run(agent.run_agent("Test the heater."))
+
+    question_id, question = next(
+        iter(agent.clarification_questions.items())
+    )
+    assert question.question == "Which room should be tested?"
+
+    asyncio.run(
+        agent.submit_answers(
+            [Answer(question_id=question_id, answer="lab")]
+        )
+    )
+
+    submitted = json.loads(agent.messages[-1]["content"])
+    assert submitted["clarification_answers"] == [
+        {
+            "question_id": question_id,
+            "question": "Which room should be tested?",
+            "options": ["lab", "office"],
+            "answer": "lab",
+        }
+    ]

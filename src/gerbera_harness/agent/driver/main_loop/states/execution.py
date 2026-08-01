@@ -2,9 +2,15 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
-    DecisionEnum,
     ExperimentState,
+    InitialistationDecisionEnum,
     LoopStateEnum,
+)
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecutionEventSchema,
+)
+from gerbera_harness.agent.driver.main_loop.schema.utils import (
+    build_valid_schema,
 )
 
 
@@ -12,14 +18,19 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
 class Execution(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.EXECUTION
     prompt_file: ClassVar[str] = "EXECUTION.md"
-    valid_decisions: ClassVar[frozenset[DecisionEnum]] = frozenset(
-        {DecisionEnum.ACCEPTED, DecisionEnum.REJECTED}
+    valid_decisions: ClassVar[
+        frozenset[InitialistationDecisionEnum]
+    ] = frozenset(
+        {
+            InitialistationDecisionEnum.ACCEPTED,
+            InitialistationDecisionEnum.REJECTED,
+        }
     )
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.EXECUTION, LoopStateEnum.REVIEW}
     )
-    # It will be action successful or unsuccessful and that is it
-    # valid_schema: ClassVar[dict] = build_valid_schema(
-    #     valid_transition_states,
-    #     ExecutionSchema,
-    # )
+    # Execute emits events indicating whether each action worked.
+    valid_schema: ClassVar[dict] = build_valid_schema(
+        valid_transition_states,
+        ExecutionEventSchema,
+    )
