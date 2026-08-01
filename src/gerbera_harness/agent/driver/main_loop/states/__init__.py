@@ -1,6 +1,6 @@
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
     TextResponseSchema,
 )
@@ -17,7 +17,7 @@ __all__ = [
     "Execution",
     "ExperimentState",
     "Initialisation",
-    "InitialistationDecisionEnum",
+    "InitialisationDecisionEnum",
     "LoopStateEnum",
     "Review",
     "Session",

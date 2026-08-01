@@ -14,7 +14,7 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema impo
 from gerbera_harness.agent.model.mcp_client import MCPClient
 
 from gerbera_harness.agent.driver.main_loop.states import (
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
 )
 
 # ONLY CONCURRENT FOR NOW, WE NEED TO ACHIEVE PARALLELISM LATER
@@ -23,8 +23,8 @@ from gerbera_harness.agent.driver.main_loop.states import (
 class ExecutionProcess:
     mcp_url: str
     actions_list: list[ExecuteActionGroupSchema]
-    decision: InitialistationDecisionEnum = (
-        InitialistationDecisionEnum.REJECTED
+    decision: InitialisationDecisionEnum = (
+        InitialisationDecisionEnum.REJECTED
     )
 
 

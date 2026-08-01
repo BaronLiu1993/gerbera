@@ -38,13 +38,4 @@ class Session:
                 f"Invalid transition: {self.state.state.value} "
                 f"-> {target_state.value}"
             )
-
-        match target_state:
-            case LoopStateEnum.INITIALISATION:
-                self.state = Initialisation()
-            case LoopStateEnum.EXECUTION:
-                self.state = Execution()
-            case LoopStateEnum.REVIEW:
-                self.state = Review()
-
-        return self.state
+        return target_state

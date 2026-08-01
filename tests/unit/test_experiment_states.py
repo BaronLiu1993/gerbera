@@ -3,7 +3,7 @@ import pytest
 from gerbera_harness.agent.driver.main_loop import (
     Execution,
     Initialisation,
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
     Session,
     Review,
 )
@@ -60,9 +60,9 @@ def test_session_rejects_invalid_transition() -> None:
 def test_initialisation_accepts_only_readiness_decisions() -> None:
     assert Initialisation.valid_decisions == frozenset(
         {
-            InitialistationDecisionEnum.ACCEPTED,
-            InitialistationDecisionEnum.REJECTED,
-            InitialistationDecisionEnum.CLARIFY,
+            InitialisationDecisionEnum.ACCEPTED,
+            InitialisationDecisionEnum.REJECTED,
+            InitialisationDecisionEnum.CLARIFY,
         }
     )
 

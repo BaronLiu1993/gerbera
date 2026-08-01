@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 
 from gerbera_harness.agent.driver.main_loop import (
-    InitialistationDecisionEnum as InitialisationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
 )
 from gerbera_harness.agent.driver.main_loop.processes.initialisation_process import (
@@ -28,6 +28,7 @@ class InitialisationResult:
     requested_next_state: LoopStateEnum
     hypothesis: HypothesisSchema | None
     clarifying_questions: list[Question] = field(default_factory=list)
+    rejection_reasons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -95,6 +96,7 @@ class InitialisationRuntime:
                     decision=decision,
                     requested_next_state=requested_next_state,
                     hypothesis=None,
+                    rejection_reasons=response.rejection_reasons,
                 )
 
             if decision is InitialisationDecisionEnum.CLARIFY:

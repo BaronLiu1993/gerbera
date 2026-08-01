@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.initialisation.initialisation_response_schema import (
@@ -16,12 +16,12 @@ class Initialisation(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.INITIALISATION
     prompt_file: ClassVar[str] = "INITIALISATION.md"
     valid_decisions: ClassVar[
-        frozenset[InitialistationDecisionEnum]
+        frozenset[InitialisationDecisionEnum]
     ] = frozenset(
         {
-            InitialistationDecisionEnum.ACCEPTED,
-            InitialistationDecisionEnum.REJECTED,
-            InitialistationDecisionEnum.CLARIFY,
+            InitialisationDecisionEnum.ACCEPTED,
+            InitialisationDecisionEnum.REJECTED,
+            InitialisationDecisionEnum.CLARIFY,
         }
     )
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
@@ -40,6 +40,6 @@ class Initialisation(ExperimentState):
         "type": "string",
         "enum": [
             decision.value
-            for decision in InitialistationDecisionEnum
+            for decision in InitialisationDecisionEnum
         ],
     }

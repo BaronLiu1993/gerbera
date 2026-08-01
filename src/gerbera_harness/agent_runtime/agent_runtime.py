@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from gerbera_harness.agent.driver.main_loop import (
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
     Session,
 )
@@ -32,54 +32,47 @@ class AgentRuntime:
     context_window_size: int = 20
     current_hypothesis: HypothesisSchema | None = None
 
-    # Runtimes
-    _initialisation_runtime: InitialisationRuntime | None = field(
-        default=None,
-        init=False,
-        repr=False,
-    )
-    
+    @property
+    def initialisation_runtime(self) -> InitialisationRuntime:
+        self._initialisation_runtime = InitialisationRuntime(
+            model=self.model,
+            messages=self.messages,
+        )
+        return self._initialisation_runtime
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
             current_state = self.session.state
-
             if current_state.state is LoopStateEnum.INITIALISATION:
-                result = await self._get_initialisation_runtime().run(
+                result = await self.initialisation_runtime.run_initial(
                     initial_user_prompt,
                     current_state.system_prompt,
-                    current_state.valid_schema,
-                )
-                if result is None:
-                    return
-
-                self.clarification_questions = dict(
-                    result.clarifying_questions
                 )
 
-                if (
-                    result.decision
-                    is not InitialistationDecisionEnum.ACCEPTED
-                ):
-                    return
-
-                self.current_hypothesis = result.hypothesis
-                self.session.perform_transition(result.requested_next_state)
+                if result.decision is InitialisationDecisionEnum.ACCEPTED:
+                    self.current_hypothesis = result.hypothesis
+                    self.session.state.state = self.session.perform_transition(result.requested_next_state)
+                elif result.decision is InitialisationDecisionEnum.CLARIFY:
+                    break
+                elif result.decision is InitialisationDecisionEnum.REJECTED:
+                    return result.rejection_reasons
+                else:
+                    raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.EXECUTION:
-                if self.initialisation_process is None:
-                    raise RuntimeError("InitialisationProcess is required")
-                if self.current_hypothesis is None:
-                    raise RuntimeError(
-                        "A validated hypothesis is required for execution"
-                    )
+                pass
 
-                execution_process = ExecutionProcess(
-                    mcp_url=self.initialisation_process.mcp_url,
-                    actions_list=(
-                        self.current_hypothesis.method.execute_steps
-                    ),
-                )
-                await execution_process.run_workflow()
-                break
-            elif current_state.state is LoopStateEnum.REVIEW:
-                break
+            #     if self.current_hypothesis is None:
+            #         raise RuntimeError(
+            #             "A validated hypothesis is required for execution"
+            #         )
+
+            #     execution_process = ExecutionProcess(
+            #         mcp_url=self.initialisation_process.mcp_url,
+            #         actions_list=(
+            #             self.current_hypothesis.method.execute_steps
+            #         ),
+            #     )
+            #     await execution_process.run_workflow()
+            #     break
+            # elif current_state.state is LoopStateEnum.REVIEW:
+            #     break

@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
     TextResponseSchema,
 )
@@ -23,11 +23,11 @@ class Review(ExperimentState):
         }
     )
     valid_decisions: ClassVar[
-        frozenset[InitialistationDecisionEnum]
+        frozenset[InitialisationDecisionEnum]
     ] = frozenset(
         {
-            InitialistationDecisionEnum.ACCEPTED,
-            InitialistationDecisionEnum.REJECTED,
+            InitialisationDecisionEnum.ACCEPTED,
+            InitialisationDecisionEnum.REJECTED,
         }
     )
     valid_schema: ClassVar[dict] = build_valid_schema(

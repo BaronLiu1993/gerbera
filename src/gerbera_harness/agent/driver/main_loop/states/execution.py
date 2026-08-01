@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
-    InitialistationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -19,11 +19,11 @@ class Execution(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.EXECUTION
     prompt_file: ClassVar[str] = "EXECUTION.md"
     valid_decisions: ClassVar[
-        frozenset[InitialistationDecisionEnum]
+        frozenset[InitialisationDecisionEnum]
     ] = frozenset(
         {
-            InitialistationDecisionEnum.ACCEPTED,
-            InitialistationDecisionEnum.REJECTED,
+            InitialisationDecisionEnum.ACCEPTED,
+            InitialisationDecisionEnum.REJECTED,
         }
     )
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(

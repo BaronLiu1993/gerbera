@@ -8,7 +8,7 @@ from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_
 )
 from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
 from gerbera_harness.agent.driver.main_loop.states.base import (
-    InitialistationDecisionEnum as InitialisationDecisionEnum,
+    InitialisationDecisionEnum,
     LoopStateEnum,
 )
 
@@ -17,6 +17,7 @@ class InitialisationResponseSchema(StrictSchema):
     decision: InitialisationDecisionEnum
     next_state: LoopStateEnum
     issues: list[str]
+    rejection_reasons: list[str]
     clarifying_questions: list[QuestionSchema]
 
     @model_validator(mode="after")

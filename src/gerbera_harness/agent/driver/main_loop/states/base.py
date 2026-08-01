@@ -17,7 +17,7 @@ class LoopStateEnum(str, Enum):
     REVIEW = "review"
 
 
-class InitialistationDecisionEnum(str, Enum):
+class InitialisationDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CLARIFY = "clarify"
