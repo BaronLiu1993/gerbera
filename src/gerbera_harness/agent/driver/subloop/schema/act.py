@@ -17,6 +17,6 @@ class ToolCallTypeEnum(str, Enum):
 class ToolCallEventSchema(StrictSchema):
     tool_name: str
     status: ToolCallStatusEnum
-    result: object | None = None
     call_type: ToolCallTypeEnum
+    result: object | None = None
     error_message: str | None = None

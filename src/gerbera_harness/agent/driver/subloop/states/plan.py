@@ -12,4 +12,9 @@ class PlanState(ExecuteLoopState):
     state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.PLAN
     valid_transition_states: ClassVar[
         frozenset[ExecuteLoopStateEnum]
-    ] = frozenset({ExecuteLoopStateEnum.ACT})
+    ] = frozenset(
+        {
+            ExecuteLoopStateEnum.ACT,
+            ExecuteLoopStateEnum.OBSERVE,
+        }
+    )

@@ -1,6 +1,8 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from gerbera_harness.agent.driver.subloop.schema.plan import (
+    PlanningExecuteActionSchema,
     PlanningStatusEnum,
     planning_adapter,
     planning_review_adapter,
@@ -21,6 +23,7 @@ PLANNING_REVIEW_PROMPT = load_prompt(
 class PlanningRuntime:
     model: Model
     messages: list[dict[str, object]]
+    on_action_planned: Callable[[PlanningExecuteActionSchema], None]
 
     async def run_planning(self) -> PlanningStatusEnum:
         client = self.model.get_agent_client()
@@ -32,6 +35,7 @@ class PlanningRuntime:
                 planning_adapter.json_schema(),
             )
             response = planning_adapter.validate_json(raw_response)
+            self.on_action_planned(response.action)
 
             append_message(
                 self.messages,

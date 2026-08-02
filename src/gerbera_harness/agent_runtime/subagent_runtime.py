@@ -1,5 +1,15 @@
 from dataclasses import dataclass
 
+from gerbera_harness.agent.driver.subloop.schema.act import (
+    ToolCallStatusEnum,
+)
+from gerbera_harness.agent.driver.subloop.schema.observe import (
+    ObservationStatusEnum,
+)
+from gerbera_harness.agent.driver.subloop.schema.plan import (
+    PlanningExecuteActionSchema,
+    PlanningStatusEnum,
+)
 from gerbera_harness.agent.driver.subloop.states.base import (
     ExecuteLoopStateEnum,
 )
@@ -24,6 +34,7 @@ class SubAgentRuntime:
     mcp_url: str
     timeout_seconds: float
     context_window_size: int = 20
+    action_plan: PlanningExecuteActionSchema | None = None
 
     @property
     def observation_runtime(self) -> ObservationRuntime:
@@ -38,6 +49,9 @@ class SubAgentRuntime:
         return PlanningRuntime(
             model=self.model,
             messages=self.messages,
+            on_action_planned=lambda action_plan: setattr(
+                self, "action_plan", action_plan
+            ),
         )
 
     @property
@@ -48,14 +62,44 @@ class SubAgentRuntime:
             timeout_seconds=self.timeout_seconds,
         )
 
-    async def run_agent(self):
+    async def run_agent(self) -> None:
         while True:
             current_state = self.session.state
             if current_state.state is ExecuteLoopStateEnum.OBSERVE:
-                self.observation_runtime.run_observation()
+                decision = await self.observation_runtime.run_observation()
+
+                if decision is ObservationStatusEnum.READY:
+                    self.session.perform_transition(ExecuteLoopStateEnum.PLAN)
+                elif decision in {
+                    ObservationStatusEnum.BLOCKED,
+                    ObservationStatusEnum.COMPLETE,
+                }:
+                    # For Now Return None, and we will think about it later,
+                    # i was thinking probably we should add a decision here
+                    # and also append to messages to show we are done here
+                    # to the main loop
+
+                    return
             elif current_state.state is ExecuteLoopStateEnum.PLAN:
-                pass
+                decision = await self.planning_runtime.run_planning()
+
+                if decision is PlanningStatusEnum.READY:
+                    self.session.perform_transition(ExecuteLoopStateEnum.ACT)
+                elif decision is PlanningStatusEnum.BLOCKED:
+                    return
             elif current_state.state is ExecuteLoopStateEnum.ACT:
-                pass
+                if self.action_plan is None:
+                    raise RuntimeError("An action plan is required to act")
+
+                status = await self.act_runtime.run_action(self.action_plan)
+
+                if status in {
+                    ToolCallStatusEnum.SUCCESS,
+                    ToolCallStatusEnum.FAILED,
+                    ToolCallStatusEnum.TIMED_OUT,
+                }:
+                    self.session.perform_transition(
+                        ExecuteLoopStateEnum.OBSERVE
+                    )
             else:
                 raise ValueError("Unsupported State")

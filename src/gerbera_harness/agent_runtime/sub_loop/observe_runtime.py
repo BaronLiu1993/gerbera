@@ -26,20 +26,11 @@ class ObservationRuntime:
     messages: list[dict[str, object]]
     mcp_url: str
 
-    async def run_observation(
-        self,
-        hypothesis_prompt: str,
-    ) -> ObservationStatusEnum:
+    async def run_observation(self) -> ObservationStatusEnum:
         async with MCPClient(self.mcp_url) as mcp_client:
             client = self.model.get_agent_client()
             tools = await mcp_client.list_tools()
             allowed_tool_names = frozenset(tool.name for tool in tools)
-
-            append_message(
-                self.messages,
-                role="user",
-                content=hypothesis_prompt,
-            )
 
             while True:
                 raw_response = client.send(
