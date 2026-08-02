@@ -7,9 +7,10 @@ from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 
 
 class ObservationStatusEnum(str, Enum):
-    READY = "ready"
-    BLOCKED = "blocked"
-    CONTINUE = "continue"
+    READY = "ready"  # Enough information to plan another action
+    BLOCKED = "blocked"  # Physical limitation prevents progress
+    CONTINUE = "continue"  # Gather more observations
+    COMPLETE = "complete"  # Objective visibly achieved
 
 
 class ObservationToolCallSchema(StrictSchema):

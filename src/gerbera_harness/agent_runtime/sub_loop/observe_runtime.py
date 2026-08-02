@@ -87,6 +87,7 @@ class ObservationRuntime:
                 if review.status in {
                     ObservationStatusEnum.READY,
                     ObservationStatusEnum.BLOCKED,
+                    ObservationStatusEnum.COMPLETE,
                 }:
                     break
 

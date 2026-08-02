@@ -1,4 +1,4 @@
-"""Observe-decide-act execution subloop."""
+"""Observe-plan-act execution subloop."""
 
 from gerbera_harness.agent.driver.subloop.schema import (
     ObservationFinishSchema,
@@ -16,17 +16,15 @@ from gerbera_harness.agent.driver.subloop.schema import (
 )
 from gerbera_harness.agent.driver.subloop.states import (
     ActState,
-    DecideState,
-    ExecuteLoop,
     ExecuteLoopState,
     ExecuteLoopStateEnum,
     ObserveState,
+    PlanState,
+    Session,
 )
 
 __all__ = [
     "ActState",
-    "DecideState",
-    "ExecuteLoop",
     "ExecuteLoopState",
     "ExecuteLoopStateEnum",
     "ObservationFinishSchema",
@@ -35,10 +33,12 @@ __all__ = [
     "ObservationStatusEnum",
     "ObservationToolCallSchema",
     "ObserveState",
+    "PlanState",
     "PlanningExecuteActionSchema",
     "PlanningResponseSchema",
     "PlanningReviewSchema",
     "PlanningStatusEnum",
+    "Session",
     "ToolCallEventSchema",
     "ToolCallStatusEnum",
     "ToolCallTypeEnum",

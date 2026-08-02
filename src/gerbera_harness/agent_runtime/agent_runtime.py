@@ -27,7 +27,7 @@ from gerbera_harness.memory.memory import Memory
 class AgentRuntime:
     session: Session
     model: Model
-    memory: Memory | None = None
+    memory: Memory
     messages: list[dict[str, object]] = field(default_factory=list)
     context_window_size: int = 20
     current_hypothesis: HypothesisSchema | None = None

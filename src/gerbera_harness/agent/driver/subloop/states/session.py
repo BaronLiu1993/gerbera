@@ -11,7 +11,7 @@ from gerbera_harness.agent.driver.subloop.states.observe import (
 
 
 @dataclass
-class ExecuteLoop:
+class Session:
     state: ExecuteLoopState = field(default_factory=ObserveState)
 
     def perform_transition(self, target_state: ExecuteLoopStateEnum) -> ExecuteLoopStateEnum:
@@ -21,7 +21,7 @@ class ExecuteLoop:
 
     def valid_transition(
         self,
-        new_state: ExecuteLoopStateEnum | str,
+        new_state: ExecuteLoopStateEnum,
     ) -> bool:
         target_state = ExecuteLoopStateEnum(new_state)
         return self.state.valid_transition(target_state)

@@ -7,7 +7,7 @@ from typing import ClassVar
 
 class ExecuteLoopStateEnum(str, Enum):
     OBSERVE = "observe"
-    DECIDE = "decide"
+    PLAN = "plan"
     ACT = "act"
 
 

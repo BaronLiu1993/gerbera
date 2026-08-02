@@ -12,4 +12,4 @@ class ObserveState(ExecuteLoopState):
     state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.OBSERVE
     valid_transition_states: ClassVar[
         frozenset[ExecuteLoopStateEnum]
-    ] = frozenset({ExecuteLoopStateEnum.DECIDE})
+    ] = frozenset({ExecuteLoopStateEnum.PLAN})
