@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 
 from gerbera_harness.agent.driver.subloop.schema.plan import (
     PlanningStatusEnum,
@@ -8,13 +7,14 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
 )
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.main_loop.utils import append_message
+from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
 
-PROMPT_DIRECTORY = Path(__file__).resolve().parents[2] / "prompts" / "sub"
-PLANNING_PROMPT = (PROMPT_DIRECTORY / "PLANNING.md").read_text().strip()
-PLANNING_REVIEW_PROMPT = (
-    PROMPT_DIRECTORY / "PLANNING_REVIEW.md"
-).read_text().strip()
+PLANNING_PROMPT = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
+PLANNING_REVIEW_PROMPT = load_prompt(
+    PromptTypeEnum.SUB,
+    "PLANNING_REVIEW.md",
+)
 
 
 @dataclass

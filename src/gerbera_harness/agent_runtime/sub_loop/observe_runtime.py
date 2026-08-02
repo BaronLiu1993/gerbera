@@ -1,6 +1,5 @@
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
 from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationStatusEnum,
@@ -11,12 +10,14 @@ from gerbera_harness.agent.driver.subloop.schema.observe import (
 from gerbera_harness.agent.model.mcp_client import MCPClient
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.main_loop.utils import append_message
+from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
 
-PROMPT_DIRECTORY = Path(__file__).resolve().parents[2] / "prompts" / "sub"
-OBSERVATION_REVIEW_PROMPT = (
-    PROMPT_DIRECTORY / "OBSERVATION_REVIEW.md"
-).read_text().strip()
+OBSERVATION_PROMPT = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
+OBSERVATION_REVIEW_PROMPT = load_prompt(
+    PromptTypeEnum.SUB,
+    "OBSERVATION_REVIEW.md",
+)
 
 # All we do here is feed context into messages
 @dataclass
@@ -27,7 +28,6 @@ class ObservationRuntime:
 
     async def run_observation(
         self,
-        system_prompt: str,
         hypothesis_prompt: str,
     ) -> ObservationStatusEnum:
         async with MCPClient(self.mcp_url) as mcp_client:
@@ -44,7 +44,7 @@ class ObservationRuntime:
             while True:
                 raw_response = client.send(
                     self.messages,
-                    system_prompt,
+                    OBSERVATION_PROMPT,
                     observation_adapter.json_schema(),
                 )
                 response = observation_adapter.validate_json(raw_response)
