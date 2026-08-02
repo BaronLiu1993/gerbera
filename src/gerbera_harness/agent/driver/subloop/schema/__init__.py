@@ -1,4 +1,8 @@
-from gerbera_harness.agent.driver.subloop.schema.act import ActSchema
+from gerbera_harness.agent.driver.subloop.schema.act import (
+    ToolCallEventSchema,
+    ToolCallStatusEnum,
+    ToolCallTypeEnum,
+)
 from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationFinishSchema,
@@ -15,7 +19,6 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
 )
 
 __all__ = [
-    "ActSchema",
     "ObservationFinishSchema",
     "ObservationResponseSchema",
     "ObservationReviewSchema",
@@ -26,4 +29,7 @@ __all__ = [
     "PlanningReviewSchema",
     "PlanningStatusEnum",
     "StrictSchema",
+    "ToolCallEventSchema",
+    "ToolCallStatusEnum",
+    "ToolCallTypeEnum",
 ]
