@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from gerbera_harness.agent.driver.subloop.schema.observe import (
-    ObservationFinishSchema,
+    ObservationStatusEnum,
     ObservationToolCallSchema,
     observation_adapter,
     observation_review_adapter,
@@ -18,7 +18,7 @@ OBSERVATION_REVIEW_PROMPT = (
     PROMPT_DIRECTORY / "OBSERVATION_REVIEW.md"
 ).read_text().strip()
 
-
+# All we do here is feed context into messages
 @dataclass
 class ObservationRuntime:
     model: Model
@@ -29,7 +29,7 @@ class ObservationRuntime:
         self,
         system_prompt: str,
         hypothesis_prompt: str,
-    ) -> ObservationFinishSchema:
+    ) -> ObservationStatusEnum:
         async with MCPClient(self.mcp_url) as mcp_client:
             client = self.model.get_agent_client()
             tools = await mcp_client.list_tools()
@@ -79,12 +79,16 @@ class ObservationRuntime:
                     OBSERVATION_REVIEW_PROMPT,
                     observation_review_adapter.json_schema(),
                 )
+
                 review = observation_review_adapter.validate_json(
                     review_response
                 )
 
-                if review.approved:
-                    return
+                if review.status in {
+                    ObservationStatusEnum.READY,
+                    ObservationStatusEnum.BLOCKED,
+                }:
+                    break
 
                 append_message(
                     self.messages,
@@ -93,3 +97,5 @@ class ObservationRuntime:
                         {"observation_review_feedback": review.feedback}
                     ),
                 )
+
+            return review.status

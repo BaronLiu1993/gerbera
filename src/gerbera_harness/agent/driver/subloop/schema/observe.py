@@ -6,9 +6,10 @@ from pydantic import Field, TypeAdapter
 from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 
 
-class ObservationOutcomeEnum(str, Enum):
-    COMPLETE = "complete"
+class ObservationStatusEnum(str, Enum):
+    READY = "ready"
     BLOCKED = "blocked"
+    CONTINUE = "continue"
 
 
 class ObservationToolCallSchema(StrictSchema):
@@ -19,7 +20,6 @@ class ObservationToolCallSchema(StrictSchema):
 
 class ObservationFinishSchema(StrictSchema):
     content_type: Literal["finish"]
-    outcome: ObservationOutcomeEnum
     reason: str
 
 
@@ -34,7 +34,7 @@ class ObservationResponseSchema(StrictSchema):
 
 
 class ObservationReviewSchema(StrictSchema):
-    approved: bool
+    status: ObservationStatusEnum
     feedback: str
 
 

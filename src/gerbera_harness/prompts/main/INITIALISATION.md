@@ -308,3 +308,29 @@ to `null` only when the experiment is infeasible because:
 
 Do not reject merely because tools have not been executed, physical state has
 not been observed, or research sources were not provided.
+
+## TODO: Physical Constraint Contract
+
+Extend the initialisation schemas with an explicit physical constraint
+contract. Initialisation should define the stable constraint envelope for
+execution, including:
+
+- hardware capabilities and operating limits;
+- allowed and prohibited tools and argument ranges;
+- hard safety invariants and softer execution preferences;
+- action preconditions, abort conditions, reversal behavior, and escalation;
+- time, iteration, and resource limits; and
+- observations required before particular actions, including freshness
+  requirements.
+
+Keep declared constraints separate from dynamic physical state. Initialisation
+may require that a path be observed as clear before movement, but it must not
+claim that the path is currently clear. Current world state belongs to the
+observation loop.
+
+Represent safety-relevant constraints with typed, machine-enforceable fields
+rather than only prose in `assumptions`. System-owned limits from tool schemas
+or the hardware registry must remain authoritative and must not be weakened by
+model-generated plans. Planning must respect the resulting constraint envelope,
+and the action runtime must enforce hard constraints deterministically before
+and during physical execution.
