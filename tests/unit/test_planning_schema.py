@@ -27,46 +27,46 @@ def action_parameter(
     [
         (
             {
-                    "description": "Move the motor to 90 degrees.",
-                    "action_type": "execute",
-                    "execution_type": "discrete",
-                    "start_offset_seconds": 0,
-                    "dependent_variables": ["acknowledged_angle"],
-                    "independent_variables": ["commanded_angle"],
-                    "forward_tool_call": "write_motor",
-                    "params": [
-                        action_parameter(
-                            "commanded_angle",
-                            90,
-                            "int",
-                            "degrees",
-                        )
-                    ],
+                "description": "Move the motor to 90 degrees.",
+                "action_type": "execute",
+                "execution_type": "discrete",
+                "start_offset_seconds": 0,
+                "dependent_variables": ["acknowledged_angle"],
+                "independent_variables": ["commanded_angle"],
+                "forward_tool_call": "write_motor",
+                "params": [
+                    action_parameter(
+                        "commanded_angle",
+                        90,
+                        "int",
+                        "degrees",
+                    )
+                ],
             },
             "discrete",
         ),
         (
             {
-                    "description": "Run the heater for 30 seconds.",
-                    "action_type": "execute",
-                    "execution_type": "continuous",
-                    "start_offset_seconds": 0,
-                    "duration_seconds": 30,
-                    "dependent_variables": ["temperature"],
-                    "independent_variables": ["heater_state"],
-                    "forward_tool_call": "start_heater",
-                    "reverse_tool_call": "stop_heater",
-                    "forward_tool_call_params": [
-                        action_parameter("heater_state", True, "bool")
-                    ],
-                    "reverse_tool_call_params": [],
-                    "emitted_event_keys": [
-                        {
-                            "event_type": "STREAM",
-                            "microcontroller_id": "board-1",
-                            "event_name": "temperature",
-                        }
-                    ],
+                "description": "Run the heater for 30 seconds.",
+                "action_type": "execute",
+                "execution_type": "continuous",
+                "start_offset_seconds": 0,
+                "duration_seconds": 30,
+                "dependent_variables": ["temperature"],
+                "independent_variables": ["heater_state"],
+                "forward_tool_call": "start_heater",
+                "reverse_tool_call": "stop_heater",
+                "forward_tool_call_params": [
+                    action_parameter("heater_state", True, "bool")
+                ],
+                "reverse_tool_call_params": [],
+                "emitted_event_keys": [
+                    {
+                        "event_type": "STREAM",
+                        "microcontroller_id": "board-1",
+                        "event_name": "temperature",
+                    }
+                ],
             },
             "continuous",
         ),
@@ -81,21 +81,21 @@ def test_planning_response_accepts_one_execute_action(
     assert response.action.execution_type == execution_type
 
 
-def test_planning_response_rejects_agent_steps() -> None:
+def test_planning_response_rejects_agent_actions() -> None:
     with pytest.raises(ValidationError):
         PlanningResponseSchema.model_validate(
             {
                 "action": {
-                        "description": "Approach the block.",
-                        "action_type": "execute",
-                        "execution_type": "agent",
-                        "start_offset_seconds": 0,
-                        "goal": "Move within reach.",
-                        "completion_criteria": "The block is within reach.",
-                        "input_event_keys": [],
-                        "allowed_tool_calls": ["move"],
-                        "max_iterations": 3,
-                        "timeout_seconds": 30,
+                    "description": "Approach the block.",
+                    "action_type": "execute",
+                    "execution_type": "agent",
+                    "start_offset_seconds": 0,
+                    "goal": "Move within reach.",
+                    "completion_criteria": "The block is within reach.",
+                    "input_event_keys": [],
+                    "allowed_tool_calls": ["move"],
+                    "max_iterations": 3,
+                    "timeout_seconds": 30,
                 }
             }
         )
