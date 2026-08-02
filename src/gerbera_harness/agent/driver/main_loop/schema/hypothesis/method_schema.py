@@ -11,6 +11,7 @@ from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
 
 
 class ExecuteActionGroupSchema(StrictSchema):
+    goal: str
     action_type: Literal["execute"]
     actions: list[ExecuteSchema] = Field(min_length=1)
 
@@ -19,6 +20,9 @@ class ReviewActionGroupSchema(StrictSchema):
     action_type: Literal["review"]
     actions: list[ReviewSchema] = Field(min_length=1, max_length=1)
 
+class TaskSchema(StrictSchema):
+    status: Literal["in_progress", "completed", "failed"]
+    task: ExecuteActionGroupSchema
 
 class MethodSchema(StrictSchema):
     description: str

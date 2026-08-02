@@ -30,6 +30,7 @@ class AgentRuntime:
     memory: Memory
     messages: list[dict[str, object]] = field(default_factory=list)
     context_window_size: int = 20
+    # Stores the current objective + goal and what we want to do to get there
     current_hypothesis: HypothesisSchema | None = None
 
     @property
