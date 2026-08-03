@@ -9,25 +9,17 @@ class PlanningContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
         hypothesis = self.memory.current_hypothesis
         current_task = self.memory.current_task
+        current_world_state = self.memory.world_state_ledger[-1]
 
         return {
-            "phase": "observation",
+            "phase": "planning",
             "goal": self.memory.goal,
-            "hypothesis": (
-                hypothesis.model_dump(mode="json") if hypothesis else None
-            ),
-            "current_step": (
-                current_task.model_dump(mode="json")
-                if current_task
-                else None
-            ),
-            "current_step_goal": (
-                current_task.task.goal if current_task else None
-            ),
-            "current_step_number": (
-                len(self.memory.completed_tasks) + 1
-                if current_task
-                else None
+            "hypothesis": hypothesis.model_dump(mode="json"),
+            "current_step": current_task.model_dump(mode="json"),
+            "current_step_goal": current_task.task.goal,
+            "current_step_number": len(self.memory.completed_tasks) + 1,
+            "current_world_state": current_world_state.model_dump(
+                mode="json"
             ),
             "completed_steps": [
                 task.model_dump(mode="json")
@@ -37,16 +29,12 @@ class PlanningContextBuilder(ContextBuilder):
                 self._serialize_event(event)
                 for event in self._recent(self.memory.event_ledger)
             ],
-            "previous_world_states": [
-                state.model_dump(mode="json")
-                for state in self._recent(self.memory.world_state_ledger)
-            ],
         }
 
-    def _recent(self, values: list[str]) -> list[str]:
+    def _recent(self, values: list) -> list:
         if self.context_window_size == 0:
             return []
-        return values[-self.context_window_size :]
+        return values[-self.context_window_size:]
 
     @staticmethod
     def _serialize_event(event: EventSchema) -> dict[str, object]:

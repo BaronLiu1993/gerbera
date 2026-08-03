@@ -31,15 +31,18 @@ class Memory:
     )
 
     @property
-    def current_task(self) -> TaskSchema | None:
-        return next(
-            (
-                task
-                for task in self.remaining_tasks
-                if task.status == "in_progress"
-            ),
-            None,
-        )
+    def current_task(self) -> TaskSchema:
+        current_tasks = [
+            task
+            for task in self.remaining_tasks
+            if task.status == "in_progress"
+        ]
+        if len(current_tasks) != 1:
+            raise RuntimeError(
+                "Memory requires exactly one in-progress task; "
+                f"found {len(current_tasks)}"
+            )
+        return current_tasks[0]
 
     def append_message(self, role: str, content: object) -> None:
         self.messages.append({"role": role, "content": content})

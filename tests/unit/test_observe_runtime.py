@@ -12,7 +12,36 @@ from gerbera_harness.agent_runtime.context_builder import (
 from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
     ObservationRuntime,
 )
-from gerbera_harness.memory import EventTypeEnum, Memory
+from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
+
+
+class FakeHypothesis:
+    def model_dump(self, *, mode: str) -> dict[str, object]:
+        return {"hypothesis": "Temperature can be measured"}
+
+
+def current_task() -> TaskSchema:
+    return TaskSchema.model_validate(
+        {
+            "status": "in_progress",
+            "task": {
+                "goal": "Read the current temperature",
+                "action_type": "execute",
+                "actions": [
+                    {
+                        "description": "Read the temperature sensor",
+                        "action_type": "execute",
+                        "execution_type": "discrete",
+                        "start_offset_seconds": 0,
+                        "dependent_variables": ["temperature"],
+                        "independent_variables": ["sensor_state"],
+                        "forward_tool_call": "read_temperature",
+                        "params": [],
+                    }
+                ],
+            },
+        }
+    )
 
 
 class FakeMCPClient:
@@ -84,6 +113,8 @@ class FakeModel:
 def test_observation_updates_shared_memory(monkeypatch) -> None:
     monkeypatch.setattr(observe_runtime, "MCPClient", FakeMCPClient)
     memory = Memory(goal="Read the temperature")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(current_task())
     runtime = ObservationRuntime(
         model=FakeModel(),
         memory=memory,

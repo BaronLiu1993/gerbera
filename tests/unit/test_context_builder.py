@@ -8,6 +8,7 @@ from gerbera_harness.agent_runtime.context_builder import (
     ExecutionContextBuilder,
     InitialisationContextBuilder,
     ObservationContextBuilder,
+    PlanningContextBuilder,
 )
 from gerbera_harness.memory import (
     EventTypeEnum,
@@ -19,6 +20,11 @@ from gerbera_harness.memory import (
 
 def context_from(messages: list[dict[str, object]]) -> dict[str, object]:
     return json.loads(messages[0]["content"])["runtime_context"]
+
+
+class FakeHypothesis:
+    def model_dump(self, *, mode: str) -> dict[str, object]:
+        return {"hypothesis": "Heating raises temperature"}
 
 
 def task(status: str, goal: str, tool_name: str) -> TaskSchema:
@@ -78,6 +84,10 @@ def test_initialisation_context_contains_goal_and_bounded_history() -> None:
 def test_execution_context_uses_latest_world_state(
 ) -> None:
     memory = Memory(goal="Set the motor speed")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(
+        task("in_progress", "Set motor speed to 10", "set_motor")
+    )
     memory.append_world_state({"motor_speed": 0})
     memory.append_world_state({"motor_speed": 10})
 
@@ -86,14 +96,18 @@ def test_execution_context_uses_latest_world_state(
     assert context["phase"] == "execution"
     assert context["goal"] == "Set the motor speed"
     assert context["latest_world_state"]["state"] == {"motor_speed": 10}
-    assert context["hypothesis"] is None
-    assert context["remaining_tasks"] == []
+    assert context["hypothesis"]["hypothesis"] == (
+        "Heating raises temperature"
+    )
+    assert context["current_step_goal"] == "Set motor speed to 10"
+    assert len(context["remaining_tasks"]) == 1
     assert context["completed_tasks"] == []
 
 
 def test_observation_context_describes_current_step_and_prior_progress(
 ) -> None:
     memory = Memory(goal="Determine whether heating raises temperature")
+    memory.current_hypothesis = FakeHypothesis()
     memory.completed_tasks.append(
         task("completed", "Record the baseline temperature", "read_sensor")
     )
@@ -127,8 +141,53 @@ def test_observation_context_describes_current_step_and_prior_progress(
     }
 
 
+def test_observation_context_requires_initialized_task_state() -> None:
+    memory = Memory(goal="Observe the heater")
+
+    with pytest.raises(RuntimeError, match="current hypothesis"):
+        ObservationContextBuilder(memory, 20).build()
+
+    memory.current_hypothesis = FakeHypothesis()
+
+    with pytest.raises(RuntimeError, match="exactly one in-progress task"):
+        ObservationContextBuilder(memory, 20).build()
+
+
+def test_planning_context_uses_current_step_and_observed_world_state(
+) -> None:
+    memory = Memory(goal="Determine whether heating raises temperature")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(
+        task("in_progress", "Heat the sample to 30 C", "start_heater")
+    )
+    memory.append_world_state({"temperature": 21.5})
+
+    context = context_from(PlanningContextBuilder(memory, 20).build())
+
+    assert context["phase"] == "planning"
+    assert context["current_step_goal"] == "Heat the sample to 30 C"
+    assert context["current_world_state"]["state"] == {
+        "temperature": 21.5
+    }
+
+
+def test_planning_context_requires_an_observed_world_state() -> None:
+    memory = Memory(goal="Plan heater action")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(
+        task("in_progress", "Heat the sample", "start_heater")
+    )
+
+    with pytest.raises(RuntimeError, match="observed world state"):
+        PlanningContextBuilder(memory, 20).build()
+
+
 def test_context_build_does_not_mutate_memory() -> None:
     memory = Memory(goal="Observe the motor")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(
+        task("in_progress", "Observe the motor", "read_motor")
+    )
     memory.append_message("user", "observe")
 
     built_context = ExecutionContextBuilder(memory, 20).build()
@@ -139,6 +198,10 @@ def test_context_build_does_not_mutate_memory() -> None:
 
 def test_zero_context_window_excludes_message_history() -> None:
     memory = Memory(goal="Observe the motor")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(
+        task("in_progress", "Observe the motor", "read_motor")
+    )
     memory.append_message("user", "observe")
 
     context = ExecutionContextBuilder(memory, 0).build()

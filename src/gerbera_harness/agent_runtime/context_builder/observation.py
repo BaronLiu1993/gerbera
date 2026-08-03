@@ -13,22 +13,10 @@ class ObservationContextBuilder(ContextBuilder):
         return {
             "phase": "observation",
             "goal": self.memory.goal,
-            "hypothesis": (
-                hypothesis.model_dump(mode="json") if hypothesis else None
-            ),
-            "current_step": (
-                current_task.model_dump(mode="json")
-                if current_task
-                else None
-            ),
-            "current_step_goal": (
-                current_task.task.goal if current_task else None
-            ),
-            "current_step_number": (
-                len(self.memory.completed_tasks) + 1
-                if current_task
-                else None
-            ),
+            "hypothesis": hypothesis.model_dump(mode="json"),
+            "current_step": current_task.model_dump(mode="json"),
+            "current_step_goal": current_task.task.goal,
+            "current_step_number": len(self.memory.completed_tasks) + 1,
             "completed_steps": [
                 task.model_dump(mode="json")
                 for task in self._recent(self.memory.completed_tasks)
@@ -43,7 +31,7 @@ class ObservationContextBuilder(ContextBuilder):
             ],
         }
 
-    def _recent(self, values: list[str]) -> list[str]:
+    def _recent(self, values: list) -> list:
         if self.context_window_size == 0:
             return []
         return values[-self.context_window_size :]

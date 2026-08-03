@@ -16,8 +16,8 @@ from gerbera_harness.agent.driver.subloop.states.base import (
 from gerbera_harness.agent.driver.subloop.states.session import Session
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.context_builder import (
-    ExecutionContextBuilder,
     ObservationContextBuilder,
+    PlanningContextBuilder,
 )
 from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
 from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
@@ -56,7 +56,7 @@ class SubAgentRuntime:
         return PlanningRuntime(
             model=self.model,
             memory=self.memory,
-            context_builder=ExecutionContextBuilder(
+            context_builder=PlanningContextBuilder(
                 memory=self.memory,
                 context_window_size=self.context_window_size,
             ),

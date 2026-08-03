@@ -10,10 +10,14 @@ from gerbera_harness.agent_runtime.context_builder.initialisation import (
 from gerbera_harness.agent_runtime.context_builder.observation import (
     ObservationContextBuilder,
 )
+from gerbera_harness.agent_runtime.context_builder.planning import (
+    PlanningContextBuilder,
+)
 
 __all__ = [
     "ContextBuilder",
     "ExecutionContextBuilder",
     "InitialisationContextBuilder",
     "ObservationContextBuilder",
+    "PlanningContextBuilder",
 ]

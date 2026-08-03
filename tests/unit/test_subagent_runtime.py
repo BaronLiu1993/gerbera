@@ -19,7 +19,42 @@ from gerbera_harness.agent.driver.subloop.states import (
     Session,
 )
 from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
-from gerbera_harness.memory import EventTypeEnum, Memory
+from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
+
+
+class FakeHypothesis:
+    def model_dump(self, *, mode: str) -> dict[str, object]:
+        return {"hypothesis": "Motor speed follows the command"}
+
+
+def planning_memory() -> Memory:
+    memory = Memory(goal="Set the motor speed")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.remaining_tasks.append(
+        TaskSchema.model_validate(
+            {
+                "status": "in_progress",
+                "task": {
+                    "goal": "Set the motor speed to 10",
+                    "action_type": "execute",
+                    "actions": [
+                        {
+                            "description": "Set the motor speed",
+                            "action_type": "execute",
+                            "execution_type": "discrete",
+                            "start_offset_seconds": 0,
+                            "dependent_variables": ["motor_speed"],
+                            "independent_variables": ["requested_speed"],
+                            "forward_tool_call": "set_motor",
+                            "params": [],
+                        }
+                    ],
+                },
+            }
+        )
+    )
+    memory.append_world_state({"motor_speed": 0})
+    return memory
 
 
 def planned_action():
@@ -128,7 +163,7 @@ def test_planning_runtime_updates_action_plan() -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=FakePlanningModel(),
-        memory=Memory(goal="Set the motor speed"),
+        memory=planning_memory(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
     )

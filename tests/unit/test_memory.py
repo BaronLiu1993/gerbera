@@ -1,3 +1,5 @@
+import pytest
+
 from gerbera_harness.memory import (
     EventTypeEnum,
     Memory,
@@ -15,6 +17,13 @@ def test_memory_has_independent_default_collections() -> None:
     assert first.current_hypothesis is None
     assert first.remaining_tasks == []
     assert first.completed_tasks == []
+
+
+def test_memory_fails_without_exactly_one_current_task() -> None:
+    memory = Memory(goal="Test the motor")
+
+    with pytest.raises(RuntimeError, match="found 0"):
+        _ = memory.current_task
 
 
 def test_memory_stores_events_and_world_states() -> None:
