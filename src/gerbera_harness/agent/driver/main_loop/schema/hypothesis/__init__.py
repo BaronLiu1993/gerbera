@@ -19,6 +19,7 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema impo
     ExecuteActionGroupSchema,
     MethodSchema,
     ReviewActionGroupSchema,
+    TaskSchema,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "ReviewActionGroupSchema",
     "ReviewVariableSchema",
     "RuleCreationSchema",
+    "TaskSchema",
 ]
