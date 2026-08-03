@@ -8,30 +8,43 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     DiscreteExecuteSchema,
     RuleCreationSchema,
 )
+from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+    ExecuteDecisionEnum,
+)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
-from gerbera_harness.agent.model.mcp_client import MCPClient
-
-from gerbera_harness.agent.driver.main_loop.states import (
-    InitialisationDecisionEnum,
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+    ExecutionTypeEnum,
 )
 
-# ONLY CONCURRENT FOR NOW, WE NEED TO ACHIEVE PARALLELISM LATER
+from gerbera_harness.agent.driver.subloop.schema.act import ToolCallStatusEnum
+from gerbera_harness.agent.model.mcp_client import MCPClient
+
+
+@dataclass(frozen=True)
+class ExecutionProcessResult:
+    decision: ExecuteDecisionEnum
+    errors: list[ExecuteErrorSchema]
+
 
 @dataclass
 class ExecutionProcess:
     mcp_url: str
     actions_list: list[ExecuteActionGroupSchema]
-    decision: InitialisationDecisionEnum = (
-        InitialisationDecisionEnum.REJECTED
-    )
 
-
-    async def run_workflow(self) -> None:
+    async def run_workflow(self) -> ExecutionProcessResult:
         if not self._verify_valid_execute_actions():
             raise ValueError("ExecutionProcess requires execute action groups")
         self._validate_rule_placement()
+
+        try:
+            return await self._run_validated_workflow()
+        except Exception as exc:
+            return self._build_error_result(0, str(exc))
+
+    async def _run_validated_workflow(self) -> ExecutionProcessResult:
 
         async with MCPClient(self.mcp_url) as client:
 
@@ -41,19 +54,23 @@ class ExecutionProcess:
                 tool.name for tool in available_tools
             )
             active_rules: list[RuleCreationSchema] = []
+            action_statuses: list[ToolCallStatusEnum] = []
 
             try:
                 for group_index, group in enumerate(self.actions_list):
-                    await self._execute_group(
-                        client,
-                        allowed_tool_names,
-                        group,
-                        active_rules,
+                    action_statuses.extend(
+                        await self._execute_group(
+                            client,
+                            allowed_tool_names,
+                            group,
+                            active_rules,
+                        )
                     )
             except Exception as exc:
-                raise RuntimeError(
-                    f"Execution group {group_index} failed"
-                ) from exc
+                return self._build_error_result(
+                    group_index,
+                    f"Execution group {group_index} failed",
+                )
             finally:
                 await self._delete_active_rules(
                     client,
@@ -61,13 +78,59 @@ class ExecutionProcess:
                     active_rules,
                 )
 
+            return self._build_result(action_statuses)
+
+    @staticmethod
+    def _build_result(
+        action_statuses: list[ToolCallStatusEnum],
+    ) -> ExecutionProcessResult:
+        if action_statuses and all(
+            status is ToolCallStatusEnum.SUCCESS
+            for status in action_statuses
+        ):
+            return ExecutionProcessResult(
+                decision=ExecuteDecisionEnum.ACCEPTED,
+                errors=[],
+            )
+
+        return ExecutionProcessResult(
+            decision=ExecuteDecisionEnum.FAILED,
+            errors=[
+                ExecuteErrorSchema(
+                    event_name="deterministic_actions",
+                    event_type=ExecutionTypeEnum.DISCRETE,
+                    position=0,
+                    error="Not all deterministic actions completed",
+                )
+            ],
+        )
+
+    def _build_error_result(
+        self,
+        position: int,
+        error: str,
+    ) -> ExecutionProcessResult:
+        group = self.actions_list[position]
+        action = group.actions[0]
+        return ExecutionProcessResult(
+            decision=ExecuteDecisionEnum.FAILED,
+            errors=[
+                ExecuteErrorSchema(
+                    event_name=group.goal,
+                    event_type=ExecutionTypeEnum(action.execution_type),
+                    position=position,
+                    error=error,
+                )
+            ],
+        )
+
     async def _execute_group(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
         group: ExecuteActionGroupSchema,
         active_rules: list[RuleCreationSchema],
-    ) -> None:
+    ) -> list[ToolCallStatusEnum]:
         rule_actions = [
             action
             for action in group.actions
@@ -79,26 +142,34 @@ class ExecutionProcess:
             if not isinstance(action, RuleCreationSchema)
         ]
 
-        for action in rule_actions:
+        action_statuses = [
             await self._create_rule(
                 client,
                 allowed_tool_names,
                 action,
                 active_rules,
             )
+            for action in rule_actions
+        ]
 
         group_start = asyncio.get_running_loop().time()
 
+        action_tasks: list[asyncio.Task[ToolCallStatusEnum]] = []
         async with asyncio.TaskGroup() as task_group:
             for action in ordinary_actions:
-                task_group.create_task(
-                    self._execute_task(
-                        client,
-                        allowed_tool_names,
-                        action,
-                        group_start,
+                action_tasks.append(
+                    task_group.create_task(
+                        self._execute_task(
+                            client,
+                            allowed_tool_names,
+                            action,
+                            group_start,
+                        )
                     )
                 )
+
+        action_statuses.extend(task.result() for task in action_tasks)
+        return action_statuses
 
     async def _create_rule(
         self,
@@ -106,13 +177,14 @@ class ExecutionProcess:
         allowed_tool_names: frozenset[str],
         action: RuleCreationSchema,
         active_rules: list[RuleCreationSchema],
-    ) -> None:
+    ) -> ToolCallStatusEnum:
         await client.call_tool(
             action.create_tool_call,
             self._build_rule_create_arguments(action),
             allowed_tool_names,
         )
         active_rules.append(action)
+        return ToolCallStatusEnum.SUCCESS
 
     async def _execute_task(
         self,
@@ -124,7 +196,7 @@ class ExecutionProcess:
             | DiscreteExecuteSchema
         ),
         group_start: float,
-    ) -> None:
+    ) -> ToolCallStatusEnum:
         start_at = group_start + action.start_offset_seconds
         delay = max(0.0, start_at - asyncio.get_running_loop().time())
 
@@ -136,11 +208,12 @@ class ExecutionProcess:
             )
 
         if isinstance(action, DiscreteExecuteSchema):
-            return await client.call_tool(
+            await client.call_tool(
                 action.forward_tool_call,
                 client.build_arguments(action.params),
                 allowed_tool_names,
             )
+            return ToolCallStatusEnum.SUCCESS
         else:
             await client.call_tool(
                 action.forward_tool_call,
@@ -157,6 +230,8 @@ class ExecutionProcess:
                 action.reverse_tool_call,
                 client.build_arguments(action.reverse_tool_call_params),
             )
+
+        return ToolCallStatusEnum.SUCCESS
 
     async def _call_reverse_tool(
         self,

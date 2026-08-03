@@ -6,8 +6,8 @@ from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
 from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
     ExecuteDecisionEnum,
 )
-from gerbera_harness.agent.driver.subloop.states.base import (
-    ExecuteLoopStateEnum,
+from gerbera_harness.agent.driver.main_loop.states.base import (
+    LoopStateEnum,
 )
 from gerbera_harness.memory import EventSchema, Memory
 
@@ -15,7 +15,7 @@ from gerbera_harness.memory import EventSchema, Memory
 @dataclass(frozen=True)
 class ExecutionResult:
     decision: ExecuteDecisionEnum
-    requested_next_state: ExecuteLoopStateEnum
+    requested_next_state: LoopStateEnum
     event: EventSchema
 
 
@@ -31,21 +31,20 @@ class ExecutionRuntime:
             actions_list=[current_task.task],
         )
 
-        try:
-            await process.run_workflow()
-        except Exception as exc:
-            decision = ExecuteDecisionEnum.FAILED
-            error = str(exc)
-        else:
-            decision = ExecuteDecisionEnum.ACCEPTED
-            error = None
+        process_result = await process.run_workflow()
+        decision = process_result.decision
+        errors = process_result.errors
+
+        if decision is ExecuteDecisionEnum.FAILED:
+            self.memory.append_errors(errors)
 
         event = self.memory.append_execution_result(
             decision=decision,
-            error=error,
+            errors=errors,
         )
+
         return ExecutionResult(
             decision=decision,
-            requested_next_state=ExecuteLoopStateEnum.OBSERVE,
+            requested_next_state=LoopStateEnum.REVIEW,
             event=event,
         )

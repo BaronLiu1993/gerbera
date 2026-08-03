@@ -23,6 +23,10 @@ class ReviewContextBuilder(ContextBuilder):
                 task.model_dump(mode="json")
                 for task in self._recent(completed_tasks)
             ],
+            "errors": [
+                error.model_dump(mode="json")
+                for error in self._recent(self.memory.errors)
+            ],
             "recent_events": [
                 self._serialize_event(event)
                 for event in self._recent(self.memory.event_ledger)

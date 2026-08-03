@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 from gerbera_harness.agent.driver.subloop.schema.act import (
@@ -37,7 +38,15 @@ class SubAgentRuntime:
     mcp_url: str
     timeout_seconds: float
     context_window_size: int = 20
+    max_turns: int = 20
+    turns_completed: int = 0
     action_plan: PlanningExecuteActionSchema | None = None
+
+    def __post_init__(self) -> None:
+        if self.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be greater than 0")
+        if self.max_turns < 1:
+            raise ValueError("max_turns must be at least 1")
 
     @property
     def observation_runtime(self) -> ObservationRuntime:
@@ -74,10 +83,23 @@ class SubAgentRuntime:
         )
 
     async def run_agent(self) -> None:
-        while True:
+        try:
+            await asyncio.wait_for(
+                self._run_agent_loop(),
+                timeout=self.timeout_seconds,
+            )
+        except TimeoutError as exc:
+            raise TimeoutError(
+                "Subagent task timed out after "
+                f"{self.timeout_seconds} seconds"
+            ) from exc
+
+    async def _run_agent_loop(self) -> None:
+        while self.turns_completed < self.max_turns:
             current_state = self.session.state
             if current_state.state is ExecuteLoopStateEnum.OBSERVE:
                 decision = await self.observation_runtime.run_observation()
+                self.turns_completed += 1
 
                 if decision is ObservationStatusEnum.READY:
                     self.session.perform_transition(ExecuteLoopStateEnum.PLAN)
@@ -93,16 +115,20 @@ class SubAgentRuntime:
                     return
             elif current_state.state is ExecuteLoopStateEnum.PLAN:
                 decision = await self.planning_runtime.run_planning()
+                self.turns_completed += 1
 
                 if decision is PlanningStatusEnum.READY:
                     self.session.perform_transition(ExecuteLoopStateEnum.ACT)
                 elif decision is PlanningStatusEnum.BLOCKED:
+                    return
+                elif decision is PlanningStatusEnum.COMPLETE:
                     return
             elif current_state.state is ExecuteLoopStateEnum.ACT:
                 if self.action_plan is None:
                     raise RuntimeError("An action plan is required to act")
 
                 status = await self.act_runtime.run_action(self.action_plan)
+                self.turns_completed += 1
 
                 if status in {
                     ToolCallStatusEnum.SUCCESS,
@@ -114,3 +140,7 @@ class SubAgentRuntime:
                     )
             else:
                 raise ValueError("Unsupported State")
+
+        raise RuntimeError(
+            f"Subagent exceeded its maximum of {self.max_turns} turns"
+        )

@@ -106,8 +106,11 @@ class FakeClient:
 
 
 class FakeModel:
+    def __init__(self) -> None:
+        self.client = FakeClient()
+
     def get_agent_client(self) -> FakeClient:
-        return FakeClient()
+        return self.client
 
 
 def test_observation_updates_shared_memory(monkeypatch) -> None:
@@ -125,8 +128,10 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
         ),
     )
 
+    first_status = asyncio.run(runtime.run_observation())
     status = asyncio.run(runtime.run_observation())
 
+    assert first_status is ObservationStatusEnum.CONTINUE
     assert status is ObservationStatusEnum.COMPLETE
     assert memory.world_state_ledger[-1].state == {
         "temperature": {"value": 22.5, "unit": "celsius"}

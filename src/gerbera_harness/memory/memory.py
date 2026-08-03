@@ -8,6 +8,9 @@ from pydantic import JsonValue
 from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
     ExecuteDecisionEnum,
 )
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
     HypothesisSchema,
 )
@@ -27,6 +30,7 @@ class Memory:
     messages: list[dict[str, object]] = field(default_factory=list)
     current_hypothesis: HypothesisSchema | None = None
     tasks: list[TaskSchema] = field(default_factory=list)
+    errors: list[ExecuteErrorSchema] = field(default_factory=list)
     event_ledger: list[EventSchema] = field(default_factory=list)
     world_state_ledger: list[WorldStateSchema] = field(
         default_factory=list
@@ -56,6 +60,9 @@ class Memory:
     def append_message(self, role: str, content: object) -> None:
         self.messages.append({"role": role, "content": content})
 
+    def append_errors(self, errors: list[ExecuteErrorSchema]) -> None:
+        self.errors.extend(errors)
+
     def append_event(
         self,
         *,
@@ -76,7 +83,7 @@ class Memory:
         self,
         *,
         decision: ExecuteDecisionEnum,
-        error: str | None = None,
+        errors: list[ExecuteErrorSchema],
     ) -> EventSchema:
         current_task = self.get_current_task()
         return self.append_event(
@@ -87,7 +94,7 @@ class Memory:
                 "step_number": self.tasks.index(current_task),
                 "step_goal": current_task.task.goal,
                 "task": current_task.task.model_dump(mode="json"),
-                "error": error,
+                "errors": [error.error for error in errors],
             },
         )
 

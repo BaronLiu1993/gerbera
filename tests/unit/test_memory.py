@@ -1,4 +1,5 @@
 from gerbera_harness.memory import (
+    ExecuteErrorSchema,
     EventTypeEnum,
     Memory,
     SourceTypeEnum,
@@ -39,6 +40,7 @@ def test_memory_has_independent_default_collections() -> None:
     assert second.messages == []
     assert first.current_hypothesis is None
     assert first.tasks == []
+    assert second.errors == []
 
 
 def test_memory_returns_none_without_current_task() -> None:
@@ -88,3 +90,19 @@ def test_memory_stores_events_and_world_states() -> None:
         "value": 22.5,
         "unit": "celsius",
     }
+
+
+def test_memory_appends_error_for_current_task() -> None:
+    memory = Memory(goal="Set the motor speed")
+    error = ExecuteErrorSchema(
+        event_name="Set the motor speed",
+        event_type="discrete",
+        position=0,
+        error="motor rejected command",
+    )
+
+    result = memory.append_errors([error])
+
+    assert result is None
+    assert memory.errors == [error]
+    assert error.error == "motor rejected command"

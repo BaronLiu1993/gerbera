@@ -2,11 +2,13 @@ from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision impo
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
     ExecutionEventSchema,
     ExecutionTypeEnum,
 )
 
 __all__ = [
+    "ExecuteErrorSchema",
     "ExecuteDecisionEnum",
     "ExecutionEventSchema",
     "ExecutionTypeEnum",

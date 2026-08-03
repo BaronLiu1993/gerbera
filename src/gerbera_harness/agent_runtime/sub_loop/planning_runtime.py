@@ -33,48 +33,47 @@ class PlanningRuntime:
     async def run_planning(self) -> PlanningStatusEnum:
         client = self.model.get_agent_client()
 
-        while True:
-            raw_response = client.send(
-                self.context_builder.build(),
-                PLANNING_PROMPT,
-                planning_adapter.json_schema(),
-            )
-            response = planning_adapter.validate_json(raw_response)
-            self.on_action_planned(response.action)
+        raw_response = client.send(
+            self.context_builder.build(),
+            PLANNING_PROMPT,
+            planning_adapter.json_schema(),
+        )
+        response = planning_adapter.validate_json(raw_response)
+        self.on_action_planned(response.action)
 
-            self.memory.append_message(
-                "assistant",
-                response.model_dump_json(),
-            )
+        self.memory.append_message(
+            "assistant",
+            response.model_dump_json(),
+        )
 
-            raw_review = client.send(
-                self.context_builder.build(),
-                PLANNING_REVIEW_PROMPT,
-                planning_review_adapter.json_schema(),
-            )
-            review = planning_review_adapter.validate_json(raw_review)
+        raw_review = client.send(
+            self.context_builder.build(),
+            PLANNING_REVIEW_PROMPT,
+            planning_review_adapter.json_schema(),
+        )
+        review = planning_review_adapter.validate_json(raw_review)
 
-            if review.status is PlanningStatusEnum.COMPLETE:
-                self.memory.complete_task()
-                break
+        if review.status is PlanningStatusEnum.COMPLETE:
+            self.memory.complete_task()
+            return review.status
 
-            if review.status in {
-                PlanningStatusEnum.READY,
-                PlanningStatusEnum.BLOCKED,
-            }:
-                if review.status is PlanningStatusEnum.READY:
-                    self.memory.append_event(
-                        event_type=EventTypeEnum.ACTION_SELECTED,
-                        source_type=SourceTypeEnum.MODEL,
-                        payload={
-                            "action": response.action.model_dump(mode="json")
-                        },
-                    )
-                break
+        if review.status in {
+            PlanningStatusEnum.READY,
+            PlanningStatusEnum.BLOCKED,
+        }:
+            if review.status is PlanningStatusEnum.READY:
+                self.memory.append_event(
+                    event_type=EventTypeEnum.ACTION_SELECTED,
+                    source_type=SourceTypeEnum.MODEL,
+                    payload={
+                        "action": response.action.model_dump(mode="json")
+                    },
+                )
+            return review.status
 
-            self.memory.append_message(
-                "user",
-                review.model_dump_json(),
-            )
+        self.memory.append_message(
+            "user",
+            review.model_dump_json(),
+        )
 
-        return review.status
+        return PlanningStatusEnum.CONTINUE

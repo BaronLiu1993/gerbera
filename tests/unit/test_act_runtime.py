@@ -187,3 +187,26 @@ def test_act_runtime_records_tool_call_timeout() -> None:
     assert status is ToolCallStatusEnum.TIMED_OUT
     assert events[0]["status"] == "timed_out"
     assert events[0]["tool_name"] == "set_motor"
+
+
+def test_act_runtime_stops_continuous_action_when_cancelled() -> None:
+    memory = Memory(goal="Test the motor")
+    runtime = ActRuntime(
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=1,
+    )
+
+    async def cancel_action() -> None:
+        task = asyncio.create_task(runtime.run_action(continuous_action()))
+        await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(cancel_action())
+
+    assert FakeMCPClient.calls == [
+        ("start_motor", {"enabled": True}),
+        ("stop_motor", {"enabled": False}),
+    ]

@@ -39,55 +39,54 @@ class ObservationRuntime:
             tools = await mcp_client.list_tools()
             allowed_tool_names = frozenset(tool.name for tool in tools)
 
-            while True:
-                raw_response = client.send(
-                    self.context_builder.build(),
-                    OBSERVATION_PROMPT,
-                    observation_adapter.json_schema(),
+            raw_response = client.send(
+                self.context_builder.build(),
+                OBSERVATION_PROMPT,
+                observation_adapter.json_schema(),
+            )
+            response = observation_adapter.validate_json(raw_response)
+            observation = response.observation
+
+            self.memory.append_message(
+                "assistant",
+                response.model_dump_json(),
+            )
+
+            if isinstance(observation, ObservationToolCallSchema):
+                result = await mcp_client.call_tool(
+                    name=observation.tool_name,
+                    arguments=observation.arguments,
+                    allowed_tool_names=allowed_tool_names,
                 )
-                response = observation_adapter.validate_json(raw_response)
-                observation = response.observation
+                self._record_tool_result(observation, result)
+                return ObservationStatusEnum.CONTINUE
 
-                self.memory.append_message(
-                    "assistant",
-                    response.model_dump_json(),
-                )
+            review_response = client.send(
+                self.context_builder.build(),
+                OBSERVATION_REVIEW_PROMPT,
+                observation_review_adapter.json_schema(),
+            )
 
-                if isinstance(observation, ObservationToolCallSchema):
-                    result = await mcp_client.call_tool(
-                        name=observation.tool_name,
-                        arguments=observation.arguments,
-                        allowed_tool_names=allowed_tool_names,
-                    )
-                    self._record_tool_result(observation, result)
-                    continue
+            review = observation_review_adapter.validate_json(review_response)
 
-                review_response = client.send(
-                    self.context_builder.build(),
-                    OBSERVATION_REVIEW_PROMPT,
-                    observation_review_adapter.json_schema(),
-                )
-
-                review = observation_review_adapter.validate_json(review_response)
-
-                if review.status in {
-                    ObservationStatusEnum.READY,
-                    ObservationStatusEnum.BLOCKED,
-                    ObservationStatusEnum.COMPLETE,
-                }:
-                    self.memory.append_message(
-                        "user",
-                        json.dumps({"observation_status": review.status}),
-                    )
-                    self._record_world_state(observation, review.status)
-                    break
-
+            if review.status in {
+                ObservationStatusEnum.READY,
+                ObservationStatusEnum.BLOCKED,
+                ObservationStatusEnum.COMPLETE,
+            }:
                 self.memory.append_message(
                     "user",
-                    json.dumps({"observation_review_feedback": review.feedback}),
+                    json.dumps({"observation_status": review.status}),
                 )
+                self._record_world_state(observation, review.status)
+                return review.status
 
-            return review.status
+            self.memory.append_message(
+                "user",
+                json.dumps({"observation_review_feedback": review.feedback}),
+            )
+
+            return ObservationStatusEnum.CONTINUE
 
     def _record_tool_result(
         self,

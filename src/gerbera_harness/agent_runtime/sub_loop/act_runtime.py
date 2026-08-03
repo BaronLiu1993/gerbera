@@ -105,7 +105,24 @@ class ActRuntime:
         if status is not ToolCallStatusEnum.SUCCESS:
             return status
 
-        await asyncio.sleep(action.duration_seconds)
+        try:
+            await asyncio.sleep(action.duration_seconds)
+        except asyncio.CancelledError:
+            reverse_task = asyncio.create_task(
+                self._call_tool(
+                    client,
+                    allowed_tool_names,
+                    ToolCallTypeEnum.REVERSE,
+                    action.reverse_tool_call,
+                    client.build_arguments(action.reverse_tool_call_params),
+                )
+            )
+            try:
+                await asyncio.shield(reverse_task)
+            except asyncio.CancelledError:
+                await reverse_task
+            raise
+
         return await self._call_tool(
             client,
             allowed_tool_names,

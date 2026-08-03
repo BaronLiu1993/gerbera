@@ -20,3 +20,10 @@ class ExecutionEventSchema(StrictSchema):
     status: ExecuteDecisionEnum
     position: int  # Position in the linear steps.
     error_msg: str
+
+
+class ExecuteErrorSchema(StrictSchema):
+    event_name: str
+    event_type: ExecutionTypeEnum
+    position: int
+    error: str
