@@ -7,6 +7,7 @@ from typing import Any
 
 class EventTypeEnum(str, Enum):
     ACTION_SELECTED = "action_selected"
+    EXECUTION_RESULT = "execution_result"
     TOOL_CALL = "tool_call"
     WORLD_STATE_UPDATED = "world_state_updated"
     TASK_STATUS_CHANGED = "task_status_changed"

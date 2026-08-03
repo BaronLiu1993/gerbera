@@ -30,7 +30,7 @@ class FakeHypothesis:
 def planning_memory() -> Memory:
     memory = Memory(goal="Set the motor speed")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         TaskSchema.model_validate(
             {
                 "status": "in_progress",
@@ -116,7 +116,7 @@ def test_act_status_returns_control_to_observation(
     runtime = SubAgentRuntime(
         session=Session(state=ActState()),
         model=SimpleNamespace(),
-        memory=Memory(goal="Set the motor speed"),
+        memory=planning_memory(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         action_plan=planned_action(),
@@ -126,6 +126,7 @@ def test_act_status_returns_control_to_observation(
 
     assert act_runtime.action.forward_tool_call == "set_motor"
     assert isinstance(runtime.session.state, ObserveState)
+    assert runtime.memory.tasks[0].status == "completed"
 
 
 class FakePlanningClient:

@@ -18,12 +18,12 @@ from gerbera_harness.memory import (
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
-
 OBSERVATION_PROMPT = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
 OBSERVATION_REVIEW_PROMPT = load_prompt(
     PromptTypeEnum.SUB,
     "OBSERVATION_REVIEW.md",
 )
+
 
 # All we do here is feed context into messages
 @dataclass
@@ -62,32 +62,29 @@ class ObservationRuntime:
                     self._record_tool_result(observation, result)
                     continue
 
-                if not isinstance(observation, ObservationFinishSchema):
-                    raise ValueError("Unsupported observation response")
-
                 review_response = client.send(
                     self.context_builder.build(),
                     OBSERVATION_REVIEW_PROMPT,
                     observation_review_adapter.json_schema(),
                 )
 
-                review = observation_review_adapter.validate_json(
-                    review_response
-                )
+                review = observation_review_adapter.validate_json(review_response)
 
                 if review.status in {
                     ObservationStatusEnum.READY,
                     ObservationStatusEnum.BLOCKED,
                     ObservationStatusEnum.COMPLETE,
                 }:
+                    self.memory.append_message(
+                        "user",
+                        json.dumps({"observation_status": review.status}),
+                    )
                     self._record_world_state(observation, review.status)
                     break
 
                 self.memory.append_message(
                     "user",
-                    json.dumps(
-                        {"observation_review_feedback": review.feedback}
-                    ),
+                    json.dumps({"observation_review_feedback": review.feedback}),
                 )
 
             return review.status

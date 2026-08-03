@@ -1,10 +1,33 @@
-import pytest
-
 from gerbera_harness.memory import (
     EventTypeEnum,
     Memory,
     SourceTypeEnum,
+    TaskSchema,
 )
+
+
+def current_task() -> TaskSchema:
+    return TaskSchema.model_validate(
+        {
+            "status": "in_progress",
+            "task": {
+                "goal": "Set the motor speed to 10",
+                "action_type": "execute",
+                "actions": [
+                    {
+                        "description": "Set the motor speed",
+                        "action_type": "execute",
+                        "execution_type": "discrete",
+                        "start_offset_seconds": 0,
+                        "dependent_variables": ["motor_speed"],
+                        "independent_variables": ["requested_speed"],
+                        "forward_tool_call": "set_motor",
+                        "params": [],
+                    }
+                ],
+            },
+        }
+    )
 
 
 def test_memory_has_independent_default_collections() -> None:
@@ -15,15 +38,31 @@ def test_memory_has_independent_default_collections() -> None:
 
     assert second.messages == []
     assert first.current_hypothesis is None
-    assert first.remaining_tasks == []
-    assert first.completed_tasks == []
+    assert first.tasks == []
 
 
-def test_memory_fails_without_exactly_one_current_task() -> None:
+def test_memory_returns_none_without_current_task() -> None:
     memory = Memory(goal="Test the motor")
 
-    with pytest.raises(RuntimeError, match="found 0"):
-        _ = memory.current_task
+    assert memory.get_current_task() is None
+
+
+def test_complete_task_moves_the_current_task_and_records_event() -> None:
+    memory = Memory(goal="Set the motor speed")
+    task = current_task()
+    memory.tasks.append(task)
+
+    result = memory.complete_task()
+
+    assert result is None
+    assert memory.tasks == [task]
+    assert memory.tasks[0].status == "completed"
+    assert memory.event_ledger[-1].event_type is (
+        EventTypeEnum.TASK_STATUS_CHANGED
+    )
+    assert memory.event_ledger[-1].payload["step_goal"] == (
+        "Set the motor speed to 10"
+    )
 
 
 def test_memory_stores_events_and_world_states() -> None:

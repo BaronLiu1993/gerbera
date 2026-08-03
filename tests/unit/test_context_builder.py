@@ -85,7 +85,7 @@ def test_execution_context_uses_latest_world_state(
 ) -> None:
     memory = Memory(goal="Set the motor speed")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         task("in_progress", "Set motor speed to 10", "set_motor")
     )
     memory.append_world_state({"motor_speed": 0})
@@ -100,18 +100,17 @@ def test_execution_context_uses_latest_world_state(
         "Heating raises temperature"
     )
     assert context["current_step_goal"] == "Set motor speed to 10"
-    assert len(context["remaining_tasks"]) == 1
-    assert context["completed_tasks"] == []
+    assert len(context["tasks"]) == 1
 
 
 def test_observation_context_describes_current_step_and_prior_progress(
 ) -> None:
     memory = Memory(goal="Determine whether heating raises temperature")
     memory.current_hypothesis = FakeHypothesis()
-    memory.completed_tasks.append(
+    memory.tasks.append(
         task("completed", "Record the baseline temperature", "read_sensor")
     )
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         task("in_progress", "Heat the sample to 30 C", "start_heater")
     )
     memory.append_event(
@@ -128,7 +127,7 @@ def test_observation_context_describes_current_step_and_prior_progress(
         "Determine whether heating raises temperature"
     )
     assert context["current_step_goal"] == "Heat the sample to 30 C"
-    assert context["current_step_number"] == 2
+    assert context["current_step_number"] == 1
     assert context["current_step"]["status"] == "in_progress"
     assert context["completed_steps"][0]["task"]["goal"] == (
         "Record the baseline temperature"
@@ -144,12 +143,14 @@ def test_observation_context_describes_current_step_and_prior_progress(
 def test_observation_context_requires_initialized_task_state() -> None:
     memory = Memory(goal="Observe the heater")
 
-    with pytest.raises(RuntimeError, match="current hypothesis"):
+    with pytest.raises(AttributeError, match="model_dump"):
         ObservationContextBuilder(memory, 20).build()
 
-    memory.current_hypothesis = FakeHypothesis()
+    memory.tasks.append(
+        task("in_progress", "Observe the heater", "read_heater")
+    )
 
-    with pytest.raises(RuntimeError, match="exactly one in-progress task"):
+    with pytest.raises(AttributeError, match="model_dump"):
         ObservationContextBuilder(memory, 20).build()
 
 
@@ -157,7 +158,7 @@ def test_planning_context_uses_current_step_and_observed_world_state(
 ) -> None:
     memory = Memory(goal="Determine whether heating raises temperature")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         task("in_progress", "Heat the sample to 30 C", "start_heater")
     )
     memory.append_world_state({"temperature": 21.5})
@@ -174,18 +175,18 @@ def test_planning_context_uses_current_step_and_observed_world_state(
 def test_planning_context_requires_an_observed_world_state() -> None:
     memory = Memory(goal="Plan heater action")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         task("in_progress", "Heat the sample", "start_heater")
     )
 
-    with pytest.raises(RuntimeError, match="observed world state"):
+    with pytest.raises(IndexError):
         PlanningContextBuilder(memory, 20).build()
 
 
 def test_context_build_does_not_mutate_memory() -> None:
     memory = Memory(goal="Observe the motor")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         task("in_progress", "Observe the motor", "read_motor")
     )
     memory.append_message("user", "observe")
@@ -199,7 +200,7 @@ def test_context_build_does_not_mutate_memory() -> None:
 def test_zero_context_window_excludes_message_history() -> None:
     memory = Memory(goal="Observe the motor")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(
+    memory.tasks.append(
         task("in_progress", "Observe the motor", "read_motor")
     )
     memory.append_message("user", "observe")

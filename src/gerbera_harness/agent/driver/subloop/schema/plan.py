@@ -20,6 +20,7 @@ class PlanningStatusEnum(str, Enum):
     READY = "ready"
     BLOCKED = "blocked"
     CONTINUE = "continue"
+    COMPLETE = "complete"
 
 
 class PlanningResponseSchema(StrictSchema):

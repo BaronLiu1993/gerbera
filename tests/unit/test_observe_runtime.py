@@ -114,7 +114,7 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
     monkeypatch.setattr(observe_runtime, "MCPClient", FakeMCPClient)
     memory = Memory(goal="Read the temperature")
     memory.current_hypothesis = FakeHypothesis()
-    memory.remaining_tasks.append(current_task())
+    memory.tasks.append(current_task())
     runtime = ObservationRuntime(
         model=FakeModel(),
         memory=memory,
@@ -135,4 +135,7 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
         EventTypeEnum.TOOL_CALL,
         EventTypeEnum.WORLD_STATE_UPDATED,
     ]
-    assert len(memory.messages) == 3
+    assert len(memory.messages) == 4
+    assert json.loads(memory.messages[-1]["content"]) == {
+        "observation_status": "complete"
+    }

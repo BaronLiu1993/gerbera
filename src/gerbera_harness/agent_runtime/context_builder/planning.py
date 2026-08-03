@@ -8,7 +8,10 @@ from gerbera_harness.memory import EventSchema
 class PlanningContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
         hypothesis = self.memory.current_hypothesis
-        current_task = self.memory.current_task
+        current_task = self.memory.get_current_task()
+        completed_tasks = [
+            task for task in self.memory.tasks if task.status == "completed"
+        ]
         current_world_state = self.memory.world_state_ledger[-1]
 
         return {
@@ -17,13 +20,13 @@ class PlanningContextBuilder(ContextBuilder):
             "hypothesis": hypothesis.model_dump(mode="json"),
             "current_step": current_task.model_dump(mode="json"),
             "current_step_goal": current_task.task.goal,
-            "current_step_number": len(self.memory.completed_tasks) + 1,
+            "current_step_number": self.memory.tasks.index(current_task),
             "current_world_state": current_world_state.model_dump(
                 mode="json"
             ),
             "completed_steps": [
                 task.model_dump(mode="json")
-                for task in self._recent(self.memory.completed_tasks)
+                for task in self._recent(completed_tasks)
             ],
             "recent_events": [
                 self._serialize_event(event)

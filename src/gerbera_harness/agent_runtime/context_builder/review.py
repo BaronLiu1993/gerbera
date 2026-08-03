@@ -8,21 +8,20 @@ from gerbera_harness.memory import EventSchema
 class ReviewContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
         hypothesis = self.memory.current_hypothesis
-        current_task = self.memory.current_task
+        current_task = self.memory.get_current_task()
+        completed_tasks = [
+            task for task in self.memory.tasks if task.status == "completed"
+        ]
         return {
             "phase": "observation",
             "goal": self.memory.goal,
             "hypothesis": (
                 hypothesis.model_dump(mode="json")
             ),
-            "current_step": (
-                current_task.model_dump(mode="json")
-                if current_task
-                else None
-            ),
+            "current_step": current_task.model_dump(mode="json"),
             "completed_steps": [
                 task.model_dump(mode="json")
-                for task in self._recent(self.memory.completed_tasks)
+                for task in self._recent(completed_tasks)
             ],
             "recent_events": [
                 self._serialize_event(event)

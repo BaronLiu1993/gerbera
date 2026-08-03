@@ -81,10 +81,10 @@ class SubAgentRuntime:
 
                 if decision is ObservationStatusEnum.READY:
                     self.session.perform_transition(ExecuteLoopStateEnum.PLAN)
-                elif decision in {
-                    ObservationStatusEnum.BLOCKED,
-                    ObservationStatusEnum.COMPLETE,
-                }:
+                elif decision is ObservationStatusEnum.COMPLETE:
+                    self.memory.complete_task()
+                    return
+                elif decision is ObservationStatusEnum.BLOCKED:
                     # For Now Return None, and we will think about it later,
                     # i was thinking probably we should add a decision here
                     # and also append to messages to show we are done here

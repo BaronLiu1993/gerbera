@@ -16,7 +16,6 @@ from gerbera_harness.memory import (
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
-
 PLANNING_PROMPT = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
 PLANNING_REVIEW_PROMPT = load_prompt(
     PromptTypeEnum.SUB,
@@ -55,12 +54,22 @@ class PlanningRuntime:
             )
             review = planning_review_adapter.validate_json(raw_review)
 
+            if review.status is PlanningStatusEnum.COMPLETE:
+                self.memory.complete_task()
+                break
+
             if review.status in {
                 PlanningStatusEnum.READY,
                 PlanningStatusEnum.BLOCKED,
             }:
                 if review.status is PlanningStatusEnum.READY:
-                    self._record_selected_action(response.action)
+                    self.memory.append_event(
+                        event_type=EventTypeEnum.ACTION_SELECTED,
+                        source_type=SourceTypeEnum.MODEL,
+                        payload={
+                            "action": response.action.model_dump(mode="json")
+                        },
+                    )
                 break
 
             self.memory.append_message(
@@ -69,13 +78,3 @@ class PlanningRuntime:
             )
 
         return review.status
-
-    def _record_selected_action(
-        self,
-        action: PlanningExecuteActionSchema,
-    ) -> None:
-        self.memory.append_event(
-            event_type=EventTypeEnum.ACTION_SELECTED,
-            source_type=SourceTypeEnum.MODEL,
-            payload={"action": action.model_dump(mode="json")},
-        )

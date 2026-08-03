@@ -5,6 +5,9 @@ from typing import Any
 
 from pydantic import JsonValue
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+    ExecuteDecisionEnum,
+)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
     HypothesisSchema,
 )
@@ -23,26 +26,32 @@ class Memory:
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     messages: list[dict[str, object]] = field(default_factory=list)
     current_hypothesis: HypothesisSchema | None = None
-    remaining_tasks: list[TaskSchema] = field(default_factory=list)
-    completed_tasks: list[TaskSchema] = field(default_factory=list)
+    tasks: list[TaskSchema] = field(default_factory=list)
     event_ledger: list[EventSchema] = field(default_factory=list)
     world_state_ledger: list[WorldStateSchema] = field(
         default_factory=list
     )
 
-    @property
-    def current_task(self) -> TaskSchema:
-        current_tasks = [
-            task
-            for task in self.remaining_tasks
-            if task.status == "in_progress"
-        ]
-        if len(current_tasks) != 1:
-            raise RuntimeError(
-                "Memory requires exactly one in-progress task; "
-                f"found {len(current_tasks)}"
-            )
-        return current_tasks[0]
+    def get_current_task(self) -> TaskSchema | None:
+        for task in self.tasks:
+            if task.status == "in_progress":
+                return task
+
+    def complete_task(self) -> None:
+        for idx, task in enumerate(self.tasks):
+            if task.status == "in_progress":
+                task.status = "completed"
+                self.append_event(
+                    event_type=EventTypeEnum.TASK_STATUS_CHANGED,
+                    source_type=SourceTypeEnum.RUNTIME,
+                    payload={
+                        "status": "completed",
+                        "step_number": idx,
+                        "step_goal": task.task.goal,
+                        "content": task.model_dump(mode="json"),
+                    },
+                )
+                return
 
     def append_message(self, role: str, content: object) -> None:
         self.messages.append({"role": role, "content": content})
@@ -62,6 +71,25 @@ class Memory:
         )
         self.event_ledger.append(event)
         return event
+
+    def append_execution_result(
+        self,
+        *,
+        decision: ExecuteDecisionEnum,
+        error: str | None = None,
+    ) -> EventSchema:
+        current_task = self.get_current_task()
+        return self.append_event(
+            event_type=EventTypeEnum.EXECUTION_RESULT,
+            source_type=SourceTypeEnum.RUNTIME,
+            payload={
+                "decision": decision.value,
+                "step_number": self.tasks.index(current_task),
+                "step_goal": current_task.task.goal,
+                "task": current_task.task.model_dump(mode="json"),
+                "error": error,
+            },
+        )
 
     def append_world_state(
         self,
