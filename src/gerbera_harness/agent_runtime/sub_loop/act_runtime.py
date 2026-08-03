@@ -27,6 +27,7 @@ class ActRuntime:
     memory: Memory
     mcp_url: str
     timeout_seconds: float
+    last_event: ToolCallEventSchema | None = None
 
     async def run_action(
         self,
@@ -188,6 +189,7 @@ class ActRuntime:
             result=result,
             error_message=error_message,
         )
+        self.last_event = event
         event_payload = event.model_dump(mode="json")
         self.memory.append_message(
             "user",

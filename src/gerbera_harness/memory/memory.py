@@ -30,7 +30,6 @@ class Memory:
     messages: list[dict[str, object]] = field(default_factory=list)
     current_hypothesis: HypothesisSchema | None = None
     tasks: list[TaskSchema] = field(default_factory=list)
-    errors: list[ExecuteErrorSchema] = field(default_factory=list)
     event_ledger: list[EventSchema] = field(default_factory=list)
     world_state_ledger: list[WorldStateSchema] = field(
         default_factory=list
@@ -59,9 +58,6 @@ class Memory:
 
     def append_message(self, role: str, content: object) -> None:
         self.messages.append({"role": role, "content": content})
-
-    def append_errors(self, errors: list[ExecuteErrorSchema]) -> None:
-        self.errors.extend(errors)
 
     def append_event(
         self,

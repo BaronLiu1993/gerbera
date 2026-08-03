@@ -8,7 +8,6 @@ from gerbera_harness.agent.driver.main_loop.processes import (
 )
 from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
     ExecutionProcess,
-    ExecutionProcessResult,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
     ExecuteDecisionEnum,
@@ -194,10 +193,8 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
     result = asyncio.run(process.run_workflow())
 
     assert FakeMCPClient.calls == [("set_motor", {"speed": 10})]
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.ACCEPTED,
-        errors=[],
-    )
+    assert result is ExecuteDecisionEnum.ACCEPTED
+    assert process.errors == []
 
 
 def test_execution_process_stops_continuous_action() -> None:
@@ -217,10 +214,8 @@ def test_execution_process_stops_continuous_action() -> None:
         ("start_sensor", {"enabled": True}),
         ("stop_sensor", {"enabled": False}),
     ]
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.ACCEPTED,
-        errors=[],
-    )
+    assert result is ExecuteDecisionEnum.ACCEPTED
+    assert process.errors == []
 
 
 def test_execution_process_reports_unimplemented_agent_loop() -> None:
@@ -236,17 +231,15 @@ def test_execution_process_reports_unimplemented_agent_loop() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name="Approach the detected block.",
-                event_type=ExecutionTypeEnum.AGENT,
-                position=0,
-                error="Execution group 0 failed",
-            )
-        ],
-    )
+    assert result is ExecuteDecisionEnum.FAILED
+    assert process.errors == [
+        ExecuteErrorSchema(
+            event_name="Approach the detected block.",
+            event_type=ExecutionTypeEnum.AGENT,
+            position=0,
+            error="Execution group 0 failed",
+        )
+    ]
 
 
 def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
@@ -281,28 +274,28 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
         ("set_motor", {"speed": 10}),
         ("delete_rule", event_key),
     ]
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.ACCEPTED,
-        errors=[],
-    )
+    assert result is ExecuteDecisionEnum.ACCEPTED
+    assert process.errors == []
 
 
 def test_execution_process_rejects_incomplete_action_statuses() -> None:
-    result = ExecutionProcess._build_result(
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[],
+    )
+    decision = process._build_decision(
         [ToolCallStatusEnum.SUCCESS, ToolCallStatusEnum.FAILED]
     )
 
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name="deterministic_actions",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=0,
-                error="Not all deterministic actions completed",
-            )
-        ],
-    )
+    assert decision is ExecuteDecisionEnum.FAILED
+    assert process.errors == [
+        ExecuteErrorSchema(
+            event_name="deterministic_actions",
+            event_type=ExecutionTypeEnum.DISCRETE,
+            position=0,
+            error="Not all deterministic actions completed",
+        )
+    ]
 
 
 def test_execution_process_deletes_rule_when_later_group_fails() -> None:
@@ -325,17 +318,15 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name="Set the motor speed.",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=1,
-                error="Execution group 1 failed",
-            )
-        ],
-    )
+    assert result is ExecuteDecisionEnum.FAILED
+    assert process.errors == [
+        ExecuteErrorSchema(
+            event_name="Set the motor speed.",
+            event_type=ExecutionTypeEnum.DISCRETE,
+            position=1,
+            error="Execution group 1 failed",
+        )
+    ]
 
     assert FakeMCPClient.calls[-1] == (
         "delete_rule",
@@ -381,17 +372,15 @@ def test_execution_process_rejects_unknown_tool() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name="Call an unavailable tool.",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=0,
-                error="Execution group 0 failed",
-            )
-        ],
-    )
+    assert result is ExecuteDecisionEnum.FAILED
+    assert process.errors == [
+        ExecuteErrorSchema(
+            event_name="Call an unavailable tool.",
+            event_type=ExecutionTypeEnum.DISCRETE,
+            position=0,
+            error="Execution group 0 failed",
+        )
+    ]
     assert FakeMCPClient.calls == []
 
 
@@ -409,19 +398,17 @@ def test_execution_process_stops_continuous_action_on_group_failure() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result == ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name=(
-                    "Collect readings while setting the motor speed."
-                ),
-                event_type=ExecutionTypeEnum.CONTINUOUS,
-                position=0,
-                error="Execution group 0 failed",
-            )
-        ],
-    )
+    assert result is ExecuteDecisionEnum.FAILED
+    assert process.errors == [
+        ExecuteErrorSchema(
+            event_name=(
+                "Collect readings while setting the motor speed."
+            ),
+            event_type=ExecutionTypeEnum.CONTINUOUS,
+            position=0,
+            error="Execution group 0 failed",
+        )
+    ]
     assert ("start_sensor", {"enabled": True}) in FakeMCPClient.calls
     assert ("set_motor", {"speed": 10}) in FakeMCPClient.calls
     assert ("stop_sensor", {"enabled": False}) in FakeMCPClient.calls

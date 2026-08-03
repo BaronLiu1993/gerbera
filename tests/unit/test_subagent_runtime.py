@@ -87,6 +87,10 @@ class FakeActRuntime:
     def __init__(self, status: ToolCallStatusEnum) -> None:
         self.status = status
         self.action = None
+        self.last_event = SimpleNamespace(
+            error_message=f"Action {status.value}",
+            tool_name="set_motor",
+        )
 
     async def run_action(self, action) -> ToolCallStatusEnum:
         self.action = action
@@ -101,6 +105,11 @@ class FakeObservationRuntime:
 class ReadyObservationRuntime:
     async def run_observation(self) -> ObservationStatusEnum:
         return ObservationStatusEnum.READY
+
+
+class BlockedObservationRuntime:
+    async def run_observation(self) -> ObservationStatusEnum:
+        return ObservationStatusEnum.BLOCKED
 
 
 class ReadyPlanningRuntime:
@@ -165,6 +174,11 @@ def test_act_status_returns_control_to_observation(
     assert isinstance(runtime.session.state, ObserveState)
     assert runtime.memory.tasks[0].status == "completed"
     assert runtime.turns_completed == 2
+    if status is ToolCallStatusEnum.SUCCESS:
+        assert runtime.errors == []
+    else:
+        assert runtime.errors[0].event_name == "set_motor"
+        assert runtime.errors[0].error == f"Action {status.value}"
 
 
 def test_subagent_stops_after_maximum_completed_turns(monkeypatch) -> None:
@@ -238,15 +252,21 @@ def test_subagent_runs_observe_plan_act_observe_end_to_end(
 
 
 def test_subagent_rejects_invalid_maximum_turns() -> None:
-    with pytest.raises(ValueError, match="max_turns must be at least 1"):
-        SubAgentRuntime(
-            session=Session(),
-            model=SimpleNamespace(),
-            memory=planning_memory(),
-            mcp_url="https://hardware.example.com/mcp",
-            timeout_seconds=1,
-            max_turns=0,
-        )
+    runtime = SubAgentRuntime(
+        session=Session(),
+        model=SimpleNamespace(),
+        memory=planning_memory(),
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=1,
+        max_turns=0,
+    )
+
+    with pytest.raises(RuntimeError, match="maximum of 0 turns"):
+        asyncio.run(runtime.run_agent())
+
+    assert runtime.errors[0].error == (
+        "Subagent exceeded its maximum of 0 turns"
+    )
 
 
 def test_subagent_times_out_an_unfinished_task(monkeypatch) -> None:
@@ -270,17 +290,20 @@ def test_subagent_times_out_an_unfinished_task(monkeypatch) -> None:
 
 
 def test_subagent_rejects_invalid_timeout() -> None:
-    with pytest.raises(
-        ValueError,
-        match="timeout_seconds must be greater than 0",
-    ):
-        SubAgentRuntime(
-            session=Session(),
-            model=SimpleNamespace(),
-            memory=planning_memory(),
-            mcp_url="https://hardware.example.com/mcp",
-            timeout_seconds=0,
-        )
+    runtime = SubAgentRuntime(
+        session=Session(),
+        model=SimpleNamespace(),
+        memory=planning_memory(),
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=0,
+    )
+
+    with pytest.raises(TimeoutError, match="timed out after 0 seconds"):
+        asyncio.run(runtime.run_agent())
+
+    assert runtime.errors[0].error == (
+        "Subagent task timed out after 0 seconds"
+    )
 
 
 def test_subagent_stops_when_planning_completes(monkeypatch) -> None:
@@ -303,6 +326,26 @@ def test_subagent_stops_when_planning_completes(monkeypatch) -> None:
 
     assert runtime.turns_completed == 1
     assert memory.tasks[0].status == "completed"
+
+
+def test_subagent_propagates_blocked_observation(monkeypatch) -> None:
+    monkeypatch.setattr(
+        SubAgentRuntime,
+        "observation_runtime",
+        property(lambda self: BlockedObservationRuntime()),
+    )
+    runtime = SubAgentRuntime(
+        session=Session(),
+        model=SimpleNamespace(),
+        memory=planning_memory(),
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=1,
+    )
+
+    asyncio.run(runtime.run_agent())
+
+    assert runtime.errors[0].event_name == "observe"
+    assert runtime.errors[0].error == "Observation blocked"
 
 
 class FakePlanningClient:

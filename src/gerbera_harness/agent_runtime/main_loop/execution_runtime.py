@@ -1,10 +1,14 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
     ExecutionProcess,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
     ExecuteDecisionEnum,
+)
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+    ExecutionTypeEnum,
 )
 from gerbera_harness.agent.driver.main_loop.states.base import (
     LoopStateEnum,
@@ -23,6 +27,7 @@ class ExecutionResult:
 class ExecutionRuntime:
     memory: Memory
     mcp_url: str
+    errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     async def run_execution(self) -> ExecutionResult:
         current_task = self.memory.get_current_task()
@@ -31,16 +36,27 @@ class ExecutionRuntime:
             actions_list=[current_task.task],
         )
 
-        process_result = await process.run_workflow()
-        decision = process_result.decision
-        errors = process_result.errors
+        try:
+            decision = await process.run_workflow()
+        except Exception as exc:
+            action = current_task.task.actions[0]
+            execution_errors = [
+                ExecuteErrorSchema(
+                    event_name=current_task.task.goal,
+                    event_type=ExecutionTypeEnum(action.execution_type),
+                    position=self.memory.tasks.index(current_task),
+                    error=str(exc),
+                )
+            ]
+            decision = ExecuteDecisionEnum.FAILED
+        else:
+            execution_errors = process.errors
 
-        if decision is ExecuteDecisionEnum.FAILED:
-            self.memory.append_errors(errors)
+        self.errors.extend(execution_errors)
 
         event = self.memory.append_execution_result(
             decision=decision,
-            errors=errors,
+            errors=execution_errors,
         )
 
         return ExecutionResult(

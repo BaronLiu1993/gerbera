@@ -9,9 +9,6 @@ from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schem
     ExecuteErrorSchema,
     ExecutionTypeEnum,
 )
-from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
-    ExecutionProcessResult,
-)
 from gerbera_harness.agent.driver.main_loop.states.base import (
     LoopStateEnum,
 )
@@ -48,27 +45,32 @@ def current_task() -> TaskSchema:
 
 class FakeExecutionProcess:
     instances: list["FakeExecutionProcess"] = []
-    result = ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.ACCEPTED,
-        errors=[],
-    )
+    result = ExecuteDecisionEnum.ACCEPTED
+    errors: list[ExecuteErrorSchema] = []
+    failure: Exception | None = None
 
-    def __init__(self, mcp_url: str, actions_list: list) -> None:
+    def __init__(
+        self,
+        mcp_url: str,
+        actions_list: list,
+    ) -> None:
         self.mcp_url = mcp_url
         self.actions_list = actions_list
+        self.errors = list(type(self).errors)
         type(self).instances.append(self)
 
-    async def run_workflow(self) -> ExecutionProcessResult:
+    async def run_workflow(self) -> ExecuteDecisionEnum:
+        if type(self).failure is not None:
+            raise type(self).failure
         return type(self).result
 
 
 @pytest.fixture(autouse=True)
 def fake_execution_process(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
-    FakeExecutionProcess.result = ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.ACCEPTED,
-        errors=[],
-    )
+    FakeExecutionProcess.result = ExecuteDecisionEnum.ACCEPTED
+    FakeExecutionProcess.errors = []
+    FakeExecutionProcess.failure = None
     monkeypatch.setattr(
         execution_runtime,
         "ExecutionProcess",
@@ -102,21 +104,19 @@ def test_execution_runtime_runs_one_task_and_requests_review() -> None:
     assert result.event.payload["step_goal"] == (
         "Set the motor speed to 10"
     )
-    assert memory.errors == []
+    assert runtime.errors == []
 
 
 def test_execution_runtime_records_failure_and_requests_review() -> None:
-    FakeExecutionProcess.result = ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name="Set the motor speed to 10",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=0,
-                error="motor rejected command",
-            )
-        ],
-    )
+    FakeExecutionProcess.result = ExecuteDecisionEnum.FAILED
+    FakeExecutionProcess.errors = [
+        ExecuteErrorSchema(
+            event_name="Set the motor speed to 10",
+            event_type=ExecutionTypeEnum.DISCRETE,
+            position=0,
+            error="motor rejected command",
+        )
+    ]
     memory = runtime_memory()
     runtime = ExecutionRuntime(
         memory=memory,
@@ -130,21 +130,19 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
     assert result.event.payload["decision"] == "failed"
     assert result.event.payload["errors"] == ["motor rejected command"]
     assert memory.event_ledger == [result.event]
-    assert memory.errors[0].error == "motor rejected command"
+    assert runtime.errors[0].error == "motor rejected command"
 
 
 def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
-    FakeExecutionProcess.result = ExecutionProcessResult(
-        decision=ExecuteDecisionEnum.FAILED,
-        errors=[
-            ExecuteErrorSchema(
-                event_name="deterministic_actions",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=0,
-                error="Not all deterministic actions completed",
-            )
-        ],
-    )
+    FakeExecutionProcess.result = ExecuteDecisionEnum.FAILED
+    FakeExecutionProcess.errors = [
+        ExecuteErrorSchema(
+            event_name="deterministic_actions",
+            event_type=ExecutionTypeEnum.DISCRETE,
+            position=0,
+            error="Not all deterministic actions completed",
+        )
+    ]
     memory = runtime_memory()
     runtime = ExecutionRuntime(
         memory=memory,
@@ -157,6 +155,21 @@ def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
     assert result.event.payload["errors"] == [
         "Not all deterministic actions completed"
     ]
-    assert memory.errors[0].error == (
+    assert runtime.errors[0].error == (
         "Not all deterministic actions completed"
     )
+
+
+def test_execution_runtime_captures_process_exceptions() -> None:
+    FakeExecutionProcess.failure = RuntimeError("invalid execution wiring")
+    memory = runtime_memory()
+    runtime = ExecutionRuntime(
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+    )
+
+    result = asyncio.run(runtime.run_execution())
+
+    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert runtime.errors[0].error == "invalid execution wiring"
+    assert result.event.payload["errors"] == ["invalid execution wiring"]

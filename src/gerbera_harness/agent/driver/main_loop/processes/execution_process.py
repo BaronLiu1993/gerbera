@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
@@ -22,29 +22,29 @@ from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schem
 from gerbera_harness.agent.driver.subloop.schema.act import ToolCallStatusEnum
 from gerbera_harness.agent.model.mcp_client import MCPClient
 
-
-@dataclass(frozen=True)
-class ExecutionProcessResult:
-    decision: ExecuteDecisionEnum
-    errors: list[ExecuteErrorSchema]
-
-
 @dataclass
 class ExecutionProcess:
     mcp_url: str
     actions_list: list[ExecuteActionGroupSchema]
+    errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
-    async def run_workflow(self) -> ExecutionProcessResult:
+    async def run_workflow(self) -> ExecuteDecisionEnum:
         if not self._verify_valid_execute_actions():
             raise ValueError("ExecutionProcess requires execute action groups")
         self._validate_rule_placement()
 
         try:
-            return await self._run_validated_workflow()
+            decision = await self._run_validated_workflow()
         except Exception as exc:
-            return self._build_error_result(0, str(exc))
+            self._append_error(0, str(exc))
+            decision = ExecuteDecisionEnum.FAILED
 
-    async def _run_validated_workflow(self) -> ExecutionProcessResult:
+        if self.errors:
+            decision = ExecuteDecisionEnum.FAILED
+
+        return decision
+
+    async def _run_validated_workflow(self) -> ExecuteDecisionEnum:
 
         async with MCPClient(self.mcp_url) as client:
 
@@ -67,10 +67,11 @@ class ExecutionProcess:
                         )
                     )
             except Exception as exc:
-                return self._build_error_result(
+                self._append_error(
                     group_index,
                     f"Execution group {group_index} failed",
                 )
+                return ExecuteDecisionEnum.FAILED
             finally:
                 await self._delete_active_rules(
                     client,
@@ -78,50 +79,43 @@ class ExecutionProcess:
                     active_rules,
                 )
 
-            return self._build_result(action_statuses)
+            return self._build_decision(action_statuses)
 
-    @staticmethod
-    def _build_result(
+    def _build_decision(
+        self,
         action_statuses: list[ToolCallStatusEnum],
-    ) -> ExecutionProcessResult:
+    ) -> ExecuteDecisionEnum:
         if action_statuses and all(
             status is ToolCallStatusEnum.SUCCESS
             for status in action_statuses
         ):
-            return ExecutionProcessResult(
-                decision=ExecuteDecisionEnum.ACCEPTED,
-                errors=[],
-            )
+            return ExecuteDecisionEnum.ACCEPTED
 
-        return ExecutionProcessResult(
-            decision=ExecuteDecisionEnum.FAILED,
-            errors=[
+        if not self.errors:
+            self.errors.append(
                 ExecuteErrorSchema(
                     event_name="deterministic_actions",
                     event_type=ExecutionTypeEnum.DISCRETE,
                     position=0,
                     error="Not all deterministic actions completed",
                 )
-            ],
-        )
+            )
+        return ExecuteDecisionEnum.FAILED
 
-    def _build_error_result(
+    def _append_error(
         self,
         position: int,
         error: str,
-    ) -> ExecutionProcessResult:
+    ) -> None:
         group = self.actions_list[position]
         action = group.actions[0]
-        return ExecutionProcessResult(
-            decision=ExecuteDecisionEnum.FAILED,
-            errors=[
-                ExecuteErrorSchema(
-                    event_name=group.goal,
-                    event_type=ExecutionTypeEnum(action.execution_type),
-                    position=position,
-                    error=error,
-                )
-            ],
+        self.errors.append(
+            ExecuteErrorSchema(
+                event_name=group.goal,
+                event_type=ExecutionTypeEnum(action.execution_type),
+                position=position,
+                error=error,
+            )
         )
 
     async def _execute_group(

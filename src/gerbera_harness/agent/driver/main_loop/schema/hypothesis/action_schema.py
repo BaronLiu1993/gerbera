@@ -73,15 +73,11 @@ class RuleCreationSchema(StrictSchema):
 
 
 class AgentExecuteSchema(StrictSchema):
-    description: str
     action_type: Literal["execute"]
     execution_type: Literal["agent"]
-    start_offset_seconds: float = Field(ge=0)
     goal: str = Field(min_length=1)
     completion_criteria: str = Field(min_length=1)
-    input_event_keys: list[EventKey] = Field(min_length=1)
-    allowed_tool_calls: list[str] = Field(min_length=1)
-    max_iterations: int = Field(ge=1)
+    max_turns: int = Field(ge=1)
     timeout_seconds: float = Field(gt=0)
 
 
