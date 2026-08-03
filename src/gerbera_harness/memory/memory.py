@@ -30,6 +30,17 @@ class Memory:
         default_factory=list
     )
 
+    @property
+    def current_task(self) -> TaskSchema | None:
+        return next(
+            (
+                task
+                for task in self.remaining_tasks
+                if task.status == "in_progress"
+            ),
+            None,
+        )
+
     def append_message(self, role: str, content: object) -> None:
         self.messages.append({"role": role, "content": content})
 

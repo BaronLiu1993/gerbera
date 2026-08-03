@@ -15,6 +15,7 @@ from gerbera_harness.agent.driver.main_loop.schema.initialisation.initialisation
     InitialisationResponseSchema,
 )
 from gerbera_harness.agent.model.model import Model
+from gerbera_harness.agent_runtime.context_builder import ContextBuilder
 from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
     Answer,
     Question,
@@ -35,6 +36,7 @@ class InitialisationResult:
 class InitialisationRuntime:
     model: Model
     memory: Memory
+    context_builder: ContextBuilder
     max_attempts: int = 3
     clarifying_questions: dict[str, Question] = field(default_factory=list)
 
@@ -49,7 +51,7 @@ class InitialisationRuntime:
             res = InitialisationProcess.run(user_prompt=user_prompt)
             self.memory.append_message("user", res)
             raw_hypothesis = client.send(
-                self.memory.messages,
+                self.context_builder.build(),
                 system_prompt,
                 HypothesisSchema.model_json_schema(),
             )
@@ -60,7 +62,7 @@ class InitialisationRuntime:
             hypothesis = HypothesisSchema.model_validate(message)
 
             raw_evaluation = client.send(
-                self.memory.messages,
+                self.context_builder.build(),
                 system_prompt,
                 InitialisationResponseSchema.model_json_schema(),
             )

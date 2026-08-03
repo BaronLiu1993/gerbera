@@ -8,6 +8,7 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
     planning_review_adapter,
 )
 from gerbera_harness.agent.model.model import Model
+from gerbera_harness.agent_runtime.context_builder import ContextBuilder
 from gerbera_harness.memory import (
     EventTypeEnum,
     Memory,
@@ -27,6 +28,7 @@ PLANNING_REVIEW_PROMPT = load_prompt(
 class PlanningRuntime:
     model: Model
     memory: Memory
+    context_builder: ContextBuilder
     on_action_planned: Callable[[PlanningExecuteActionSchema], None]
 
     async def run_planning(self) -> PlanningStatusEnum:
@@ -34,7 +36,7 @@ class PlanningRuntime:
 
         while True:
             raw_response = client.send(
-                self.memory.messages,
+                self.context_builder.build(),
                 PLANNING_PROMPT,
                 planning_adapter.json_schema(),
             )
@@ -47,7 +49,7 @@ class PlanningRuntime:
             )
 
             raw_review = client.send(
-                self.memory.messages,
+                self.context_builder.build(),
                 PLANNING_REVIEW_PROMPT,
                 planning_review_adapter.json_schema(),
             )

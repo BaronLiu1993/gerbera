@@ -6,6 +6,9 @@ from gerbera_harness.agent.driver.main_loop import (
     Session,
 )
 from gerbera_harness.agent.model.model import Model
+from gerbera_harness.agent_runtime.context_builder import (
+    InitialisationContextBuilder,
+)
 from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
     InitialisationRuntime,
 )
@@ -24,6 +27,10 @@ class AgentRuntime:
         self._initialisation_runtime = InitialisationRuntime(
             model=self.model,
             memory=self.memory,
+            context_builder=InitialisationContextBuilder(
+                memory=self.memory,
+                context_window_size=self.context_window_size,
+            ),
         )
         return self._initialisation_runtime
 

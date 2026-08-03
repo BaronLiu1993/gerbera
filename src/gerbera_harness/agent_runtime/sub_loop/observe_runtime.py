@@ -10,6 +10,7 @@ from gerbera_harness.agent.driver.subloop.schema.observe import (
 )
 from gerbera_harness.agent.model.mcp_client import MCPClient
 from gerbera_harness.agent.model.model import Model
+from gerbera_harness.agent_runtime.context_builder import ContextBuilder
 from gerbera_harness.memory import (
     EventTypeEnum,
     Memory,
@@ -30,6 +31,7 @@ class ObservationRuntime:
     model: Model
     memory: Memory
     mcp_url: str
+    context_builder: ContextBuilder
 
     async def run_observation(self) -> ObservationStatusEnum:
         async with MCPClient(self.mcp_url) as mcp_client:
@@ -39,7 +41,7 @@ class ObservationRuntime:
 
             while True:
                 raw_response = client.send(
-                    self.memory.messages,
+                    self.context_builder.build(),
                     OBSERVATION_PROMPT,
                     observation_adapter.json_schema(),
                 )
@@ -64,7 +66,7 @@ class ObservationRuntime:
                     raise ValueError("Unsupported observation response")
 
                 review_response = client.send(
-                    self.memory.messages,
+                    self.context_builder.build(),
                     OBSERVATION_REVIEW_PROMPT,
                     observation_review_adapter.json_schema(),
                 )

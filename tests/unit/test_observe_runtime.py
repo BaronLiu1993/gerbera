@@ -6,6 +6,9 @@ from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationStatusEnum,
 )
 from gerbera_harness.agent_runtime.sub_loop import observe_runtime
+from gerbera_harness.agent_runtime.context_builder import (
+    ObservationContextBuilder,
+)
 from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
     ObservationRuntime,
 )
@@ -85,6 +88,10 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
         model=FakeModel(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        context_builder=ObservationContextBuilder(
+            memory=memory,
+            context_window_size=20,
+        ),
     )
 
     status = asyncio.run(runtime.run_observation())
