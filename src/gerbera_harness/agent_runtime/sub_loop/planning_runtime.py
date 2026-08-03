@@ -8,7 +8,11 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
     planning_review_adapter,
 )
 from gerbera_harness.agent.model.model import Model
-from gerbera_harness.agent_runtime.main_loop.utils import append_message
+from gerbera_harness.memory import (
+    EventTypeEnum,
+    Memory,
+    SourceTypeEnum,
+)
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
 
@@ -22,7 +26,7 @@ PLANNING_REVIEW_PROMPT = load_prompt(
 @dataclass
 class PlanningRuntime:
     model: Model
-    messages: list[dict[str, object]]
+    memory: Memory
     on_action_planned: Callable[[PlanningExecuteActionSchema], None]
 
     async def run_planning(self) -> PlanningStatusEnum:
@@ -30,21 +34,20 @@ class PlanningRuntime:
 
         while True:
             raw_response = client.send(
-                self.messages,
+                self.memory.messages,
                 PLANNING_PROMPT,
                 planning_adapter.json_schema(),
             )
             response = planning_adapter.validate_json(raw_response)
             self.on_action_planned(response.action)
 
-            append_message(
-                self.messages,
-                role="assistant",
-                content=response.model_dump_json(),
+            self.memory.append_message(
+                "assistant",
+                response.model_dump_json(),
             )
 
             raw_review = client.send(
-                self.messages,
+                self.memory.messages,
                 PLANNING_REVIEW_PROMPT,
                 planning_review_adapter.json_schema(),
             )
@@ -54,12 +57,23 @@ class PlanningRuntime:
                 PlanningStatusEnum.READY,
                 PlanningStatusEnum.BLOCKED,
             }:
+                if review.status is PlanningStatusEnum.READY:
+                    self._record_selected_action(response.action)
                 break
 
-            append_message(
-                self.messages,
-                role="user",
-                content=review.model_dump_json(),
+            self.memory.append_message(
+                "user",
+                review.model_dump_json(),
             )
 
         return review.status
+
+    def _record_selected_action(
+        self,
+        action: PlanningExecuteActionSchema,
+    ) -> None:
+        self.memory.append_event(
+            event_type=EventTypeEnum.ACTION_SELECTED,
+            source_type=SourceTypeEnum.MODEL,
+            payload={"action": action.model_dump(mode="json")},
+        )

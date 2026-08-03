@@ -30,8 +30,8 @@ class SubAgentRuntime:
     session: Session
     model: Model
     memory: Memory
-    messages: list[dict[str, object]]
     mcp_url: str
+    timeout_seconds: float
     context_window_size: int = 20
     action_plan: PlanningExecuteActionSchema | None = None
 
@@ -39,7 +39,7 @@ class SubAgentRuntime:
     def observation_runtime(self) -> ObservationRuntime:
         return ObservationRuntime(
             model=self.model,
-            messages=self.messages,
+            memory=self.memory,
             mcp_url=self.mcp_url,
         )
 
@@ -47,7 +47,7 @@ class SubAgentRuntime:
     def planning_runtime(self) -> PlanningRuntime:
         return PlanningRuntime(
             model=self.model,
-            messages=self.messages,
+            memory=self.memory,
             on_action_planned=lambda action_plan: setattr(
                 self, "action_plan", action_plan
             ),
@@ -56,7 +56,7 @@ class SubAgentRuntime:
     @property
     def act_runtime(self) -> ActRuntime:
         return ActRuntime(
-            messages=self.messages,
+            memory=self.memory,
             mcp_url=self.mcp_url,
             timeout_seconds=self.timeout_seconds,
         )

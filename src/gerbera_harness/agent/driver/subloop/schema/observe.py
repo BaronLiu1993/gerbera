@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, JsonValue, TypeAdapter
 
 from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 
@@ -22,6 +22,7 @@ class ObservationToolCallSchema(StrictSchema):
 class ObservationFinishSchema(StrictSchema):
     content_type: Literal["finish"]
     reason: str
+    world_state: dict[str, JsonValue]
 
 
 Observation = Annotated[

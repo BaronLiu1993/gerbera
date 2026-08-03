@@ -19,6 +19,7 @@ from gerbera_harness.agent.driver.subloop.states import (
     Session,
 )
 from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
+from gerbera_harness.memory import EventTypeEnum, Memory
 
 
 def planned_action():
@@ -80,8 +81,7 @@ def test_act_status_returns_control_to_observation(
     runtime = SubAgentRuntime(
         session=Session(state=ActState()),
         model=SimpleNamespace(),
-        memory=SimpleNamespace(),
-        messages=[],
+        memory=Memory(goal="Set the motor speed"),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         action_plan=planned_action(),
@@ -109,12 +109,26 @@ class FakePlanningModel:
         return FakePlanningClient()
 
 
+def test_subagent_runtimes_share_memory() -> None:
+    memory = Memory(goal="Set the motor speed")
+    runtime = SubAgentRuntime(
+        session=Session(),
+        model=FakePlanningModel(),
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=1,
+    )
+
+    assert runtime.observation_runtime.memory is memory
+    assert runtime.planning_runtime.memory is memory
+    assert runtime.act_runtime.memory is memory
+
+
 def test_planning_runtime_updates_action_plan() -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=FakePlanningModel(),
-        memory=SimpleNamespace(),
-        messages=[],
+        memory=Memory(goal="Set the motor speed"),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
     )
@@ -124,3 +138,6 @@ def test_planning_runtime_updates_action_plan() -> None:
     assert status is PlanningStatusEnum.READY
     assert runtime.action_plan is not None
     assert runtime.action_plan.forward_tool_call == "set_motor"
+    assert runtime.memory.event_ledger[-1].event_type is (
+        EventTypeEnum.ACTION_SELECTED
+    )

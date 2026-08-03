@@ -15,12 +15,16 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
     PlanningExecuteActionSchema,
 )
 from gerbera_harness.agent.model.mcp_client import MCPClient
-from gerbera_harness.agent_runtime.main_loop.utils import append_message
+from gerbera_harness.memory import (
+    EventTypeEnum,
+    Memory,
+    SourceTypeEnum,
+)
 
 
 @dataclass
 class ActRuntime:
-    messages: list[dict[str, object]]
+    memory: Memory
     mcp_url: str
     timeout_seconds: float
 
@@ -32,7 +36,7 @@ class ActRuntime:
             async with MCPClient(self.mcp_url) as client:
                 tools = await client.list_tools()
                 allowed_tool_names = frozenset(tool.name for tool in tools)
-                return await self._execute_discrete_action(
+                return await self._execute_action(
                     client,
                     allowed_tool_names,
                     action,
@@ -52,7 +56,7 @@ class ActRuntime:
                 error_message=str(exc),
             )
 
-    async def _execute_discrete_action(
+    async def _execute_action(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
@@ -61,18 +65,28 @@ class ActRuntime:
         await asyncio.sleep(action.start_offset_seconds)
 
         if isinstance(action, DiscreteExecuteSchema):
-            return await self._call_tool(
-                client,
-                allowed_tool_names,
-                ToolCallTypeEnum.FORWARD,
-                action.forward_tool_call,
-                client.build_arguments(action.params),
+            return await self._execute_discrete_action(
+                client, allowed_tool_names, action
             )
 
         return await self._execute_continuous_action(
             client,
             allowed_tool_names,
             action,
+        )
+
+    async def _execute_discrete_action(
+        self,
+        client: MCPClient,
+        allowed_tool_names: frozenset[str],
+        action: DiscreteExecuteSchema,
+    ) -> ToolCallStatusEnum:
+        return await self._call_tool(
+            client,
+            allowed_tool_names,
+            ToolCallTypeEnum.FORWARD,
+            action.forward_tool_call,
+            client.build_arguments(action.params),
         )
 
     async def _execute_continuous_action(
@@ -157,9 +171,14 @@ class ActRuntime:
             result=result,
             error_message=error_message,
         )
-        append_message(
-            self.messages,
-            role="user",
-            content=event.model_dump_json(),
+        event_payload = event.model_dump(mode="json")
+        self.memory.append_message(
+            "user",
+            event.model_dump_json(),
+        )
+        self.memory.append_event(
+            event_type=EventTypeEnum.TOOL_CALL,
+            source_type=SourceTypeEnum.MCP_TOOL,
+            payload=event_payload,
         )
         return status

@@ -1,25 +1,14 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from gerbera_harness.agent.driver.main_loop import (
     InitialisationDecisionEnum,
     LoopStateEnum,
     Session,
 )
-from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
-    ExecutionProcess,
-)
-from gerbera_harness.agent.driver.main_loop.processes.initialisation_process import (
-    InitialisationProcess,
-)
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
-    HypothesisSchema,
-)
-
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
     InitialisationRuntime,
 )
-from gerbera_harness.agent_runtime.main_loop.utils import append_message
 from gerbera_harness.memory import Memory
 
 
@@ -28,16 +17,13 @@ class AgentRuntime:
     session: Session
     model: Model
     memory: Memory
-    messages: list[dict[str, object]] = field(default_factory=list)
     context_window_size: int = 20
-    # Stores the current objective + goal and what we want to do to get there
-    current_hypothesis: HypothesisSchema | None = None
 
     @property
     def initialisation_runtime(self) -> InitialisationRuntime:
         self._initialisation_runtime = InitialisationRuntime(
             model=self.model,
-            messages=self.messages,
+            memory=self.memory,
         )
         return self._initialisation_runtime
 
@@ -51,7 +37,11 @@ class AgentRuntime:
                 )
 
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
-                    self.current_hypothesis = result.hypothesis
+                    if result.hypothesis is None:
+                        raise RuntimeError(
+                            "Accepted initialisation requires a hypothesis"
+                        )
+                    self.memory.set_hypothesis(result.hypothesis)
                     self.session.state.state = self.session.perform_transition(result.requested_next_state)
                 elif result.decision is InitialisationDecisionEnum.CLARIFY:
                     break
@@ -62,7 +52,7 @@ class AgentRuntime:
             elif current_state.state is LoopStateEnum.EXECUTION:
                 pass
 
-            #     if self.current_hypothesis is None:
+            #     if self.memory.current_hypothesis is None:
             #         raise RuntimeError(
             #             "A validated hypothesis is required for execution"
             #         )
@@ -70,7 +60,7 @@ class AgentRuntime:
             #     execution_process = ExecutionProcess(
             #         mcp_url=self.initialisation_process.mcp_url,
             #         actions_list=(
-            #             self.current_hypothesis.method.execute_steps
+            #             self.memory.current_hypothesis.method.execute_steps
             #         ),
             #     )
             #     await execution_process.run_workflow()

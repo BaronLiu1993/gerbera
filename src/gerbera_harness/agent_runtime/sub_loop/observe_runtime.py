@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 
 from gerbera_harness.agent.driver.subloop.schema.observe import (
+    ObservationFinishSchema,
     ObservationStatusEnum,
     ObservationToolCallSchema,
     observation_adapter,
@@ -9,7 +10,11 @@ from gerbera_harness.agent.driver.subloop.schema.observe import (
 )
 from gerbera_harness.agent.model.mcp_client import MCPClient
 from gerbera_harness.agent.model.model import Model
-from gerbera_harness.agent_runtime.main_loop.utils import append_message
+from gerbera_harness.memory import (
+    EventTypeEnum,
+    Memory,
+    SourceTypeEnum,
+)
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
 
@@ -23,7 +28,7 @@ OBSERVATION_REVIEW_PROMPT = load_prompt(
 @dataclass
 class ObservationRuntime:
     model: Model
-    messages: list[dict[str, object]]
+    memory: Memory
     mcp_url: str
 
     async def run_observation(self) -> ObservationStatusEnum:
@@ -34,17 +39,16 @@ class ObservationRuntime:
 
             while True:
                 raw_response = client.send(
-                    self.messages,
+                    self.memory.messages,
                     OBSERVATION_PROMPT,
                     observation_adapter.json_schema(),
                 )
                 response = observation_adapter.validate_json(raw_response)
                 observation = response.observation
 
-                append_message(
-                    self.messages,
-                    role="assistant",
-                    content=response.model_dump_json(),
+                self.memory.append_message(
+                    "assistant",
+                    response.model_dump_json(),
                 )
 
                 if isinstance(observation, ObservationToolCallSchema):
@@ -53,20 +57,14 @@ class ObservationRuntime:
                         arguments=observation.arguments,
                         allowed_tool_names=allowed_tool_names,
                     )
-                    append_message(
-                        self.messages,
-                        role="user",
-                        content=json.dumps(
-                            {
-                                "tool_name": observation.tool_name,
-                                "result": result,
-                            }
-                        ),
-                    )
+                    self._record_tool_result(observation, result)
                     continue
 
+                if not isinstance(observation, ObservationFinishSchema):
+                    raise ValueError("Unsupported observation response")
+
                 review_response = client.send(
-                    self.messages,
+                    self.memory.messages,
                     OBSERVATION_REVIEW_PROMPT,
                     observation_review_adapter.json_schema(),
                 )
@@ -80,14 +78,54 @@ class ObservationRuntime:
                     ObservationStatusEnum.BLOCKED,
                     ObservationStatusEnum.COMPLETE,
                 }:
+                    self._record_world_state(observation, review.status)
                     break
 
-                append_message(
-                    self.messages,
-                    role="user",
-                    content=json.dumps(
+                self.memory.append_message(
+                    "user",
+                    json.dumps(
                         {"observation_review_feedback": review.feedback}
                     ),
                 )
 
             return review.status
+
+    def _record_tool_result(
+        self,
+        observation: ObservationToolCallSchema,
+        result: object,
+    ) -> None:
+        self.memory.append_event(
+            event_type=EventTypeEnum.TOOL_CALL,
+            source_type=SourceTypeEnum.MCP_TOOL,
+            payload={
+                "tool_name": observation.tool_name,
+                "arguments": observation.arguments,
+                "status": "success",
+                "result": result,
+            },
+        )
+        self.memory.append_message(
+            "user",
+            json.dumps(
+                {
+                    "tool_name": observation.tool_name,
+                    "result": result,
+                }
+            ),
+        )
+
+    def _record_world_state(
+        self,
+        observation: ObservationFinishSchema,
+        status: ObservationStatusEnum,
+    ) -> None:
+        world_state = self.memory.append_world_state(observation.world_state)
+        self.memory.append_event(
+            event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+            source_type=SourceTypeEnum.MODEL,
+            payload={
+                "review_status": status.value,
+                "world_state": world_state.model_dump(mode="json"),
+            },
+        )

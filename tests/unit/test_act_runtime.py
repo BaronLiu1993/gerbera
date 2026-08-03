@@ -13,6 +13,7 @@ from gerbera_harness.agent.driver.subloop.schema.act import (
 )
 from gerbera_harness.agent_runtime.sub_loop import act_runtime
 from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
+from gerbera_harness.memory import EventTypeEnum, Memory
 
 
 def parameter(variable: str, value: object, parameter_type: str) -> dict:
@@ -117,20 +118,23 @@ def fake_mcp_client(monkeypatch) -> None:
 
 
 def run_action(action, timeout_seconds: float = 1) -> tuple:
-    messages: list[dict[str, object]] = []
+    memory = Memory(goal="Test the motor")
     runtime = ActRuntime(
-        messages=messages,
+        memory=memory,
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=timeout_seconds,
     )
 
     status = asyncio.run(runtime.run_action(action))
-    events = [json.loads(message["content"]) for message in messages]
-    return status, events, messages
+    events = [
+        json.loads(message["content"])
+        for message in memory.messages
+    ]
+    return status, events, memory
 
 
 def test_act_runtime_records_success() -> None:
-    status, events, messages = run_action(discrete_action())
+    status, events, memory = run_action(discrete_action())
 
     assert status is ToolCallStatusEnum.SUCCESS
     assert events == [
@@ -142,7 +146,8 @@ def test_act_runtime_records_success() -> None:
             "error_message": None,
         }
     ]
-    assert messages[-1]["role"] == "user"
+    assert memory.messages[-1]["role"] == "user"
+    assert memory.event_ledger[-1].event_type is EventTypeEnum.TOOL_CALL
 
 
 def test_act_runtime_records_failure_without_raising() -> None:

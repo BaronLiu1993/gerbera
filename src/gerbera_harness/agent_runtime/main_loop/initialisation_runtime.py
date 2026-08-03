@@ -15,11 +15,11 @@ from gerbera_harness.agent.driver.main_loop.schema.initialisation.initialisation
     InitialisationResponseSchema,
 )
 from gerbera_harness.agent.model.model import Model
-from gerbera_harness.agent_runtime.main_loop.utils import append_message
 from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
     Answer,
     Question,
 )
+from gerbera_harness.memory import Memory
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class InitialisationResult:
 @dataclass
 class InitialisationRuntime:
     model: Model
-    messages: list[dict[str, object]]
+    memory: Memory
     max_attempts: int = 3
     clarifying_questions: dict[str, Question] = field(default_factory=list)
 
@@ -47,38 +47,31 @@ class InitialisationRuntime:
 
         for _ in range(self.max_attempts):
             res = InitialisationProcess.run(user_prompt=user_prompt)
-            append_message(
-                self.messages,
-                role="user",
-                content=res,
-            )
+            self.memory.append_message("user", res)
             raw_hypothesis = client.send(
-                self.messages,
+                self.memory.messages,
                 system_prompt,
                 HypothesisSchema.model_json_schema(),
             )
             message = json.loads(raw_hypothesis)
 
-            append_message(
-                self.messages,
-                role="assistant",
-                content=message,
-            )
+            self.memory.append_message("assistant", message)
 
-            hypothesis = HypothesisSchema.model_validate(raw_hypothesis.hypothesis)
+            hypothesis = HypothesisSchema.model_validate(message)
 
             raw_evaluation = client.send(
-                self.messages,
+                self.memory.messages,
                 system_prompt,
                 InitialisationResponseSchema.model_json_schema(),
             )
 
-            response = InitialisationResponseSchema.model_validate(raw_evaluation)
+            response = InitialisationResponseSchema.model_validate_json(
+                raw_evaluation
+            )
 
-            append_message(
-                self.messages,
-                role="assistant",
-                content=json.dumps(response),
+            self.memory.append_message(
+                "assistant",
+                response.model_dump_json(),
             )
 
             decision = response.decision
@@ -132,8 +125,7 @@ class InitialisationRuntime:
                 }
             )
 
-        append_message(
-            self.messages,
-            role="assistant",
-            content=json.dumps({"clarification_answers": responses}),
+        self.memory.append_message(
+            "assistant",
+            json.dumps({"clarification_answers": responses}),
         )
