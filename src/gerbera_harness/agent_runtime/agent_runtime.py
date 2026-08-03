@@ -20,7 +20,7 @@ from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
     InitialisationRuntime,
 )
 from gerbera_harness.agent_runtime.main_loop.utils import append_message
-from gerbera_harness.memory.memory import Memory
+from gerbera_harness.memory import Memory
 
 
 @dataclass

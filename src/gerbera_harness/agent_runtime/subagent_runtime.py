@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import field
 
 from gerbera_harness.agent.driver.subloop.schema.act import (
     ToolCallStatusEnum,
@@ -23,21 +22,7 @@ from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
 from gerbera_harness.agent_runtime.sub_loop.planning_runtime import (
     PlanningRuntime,
 )
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
-    HypothesisSchema,
-)
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.world_state_schema import (
-    WorldStateSchema
-)
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.event_schema import (
-    EventSchema
-)
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
-    TaskSchema
-)
-
-
-from gerbera_harness.memory.memory import Memory
+from gerbera_harness.memory import Memory
 
 
 @dataclass
@@ -47,28 +32,6 @@ class SubAgentRuntime:
     memory: Memory
     messages: list[dict[str, object]]
     mcp_url: str
-
-    # Goal completed_tasks and reminaing_tasks are orchestrated from the main agent runtime
-
-    # The goal of this step
-    goal: str
-
-    # So far what have we been able to do
-    completed_tasks: list[TaskSchema]
-
-    # So far what is remaining in the AI defined work flow and what work is remaining
-    remaining_tasks: list[TaskSchema]
-
-    # Stores every possible event that can occur
-    event_ledger: list[EventSchema] = field(default_factory=list)
-
-    # Stores the current world state
-    world_state_ledger: list[WorldStateSchema] = field(default_factory=list) 
-    # World states of what the agent has been seeing, we keep historical record, but for prompt contruction we only see the top one
-
-    # Stores the objective goal and what we want to do to get there
-    current_hypothesis: HypothesisSchema
-
     context_window_size: int = 20
     action_plan: PlanningExecuteActionSchema | None = None
 

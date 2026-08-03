@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.event_schema import (
+from gerbera_harness.memory import (
     EventSchema,
-)
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.world_state_schema import (
+    EventTypeEnum,
+    Memory,
+    SourceTypeEnum,
     WorldStateSchema,
 )
-from gerbera_harness.memory import Memory
 
 
 def test_memory_has_independent_default_collections() -> None:
@@ -27,12 +27,13 @@ def test_memory_stores_events_and_world_states() -> None:
 
     memory.event_ledger.append(
         EventSchema(
-            event_type="tool_call",
-            event_name="read_temperature",
-            event_description="Read the current temperature.",
-            event_status="success",
-            occurred_at=observed_at,
-            result={"value": 22.5, "unit": "celsius"},
+            event_type=EventTypeEnum.TOOL_CALL,
+            source_type=SourceTypeEnum.MCP_TOOL,
+            payload={
+                "tool_name": "read_temperature",
+                "result": {"value": 22.5, "unit": "celsius"},
+            },
+            session_id="session-1",
         )
     )
     memory.world_state_ledger.append(
@@ -42,7 +43,9 @@ def test_memory_stores_events_and_world_states() -> None:
         )
     )
 
-    assert memory.event_ledger[-1].event_name == "read_temperature"
+    assert memory.event_ledger[-1].payload["tool_name"] == (
+        "read_temperature"
+    )
     assert memory.world_state_ledger[-1].state["temperature"] == {
         "value": 22.5,
         "unit": "celsius",
