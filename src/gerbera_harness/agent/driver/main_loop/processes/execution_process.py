@@ -31,8 +31,6 @@ ActiveRule = tuple[int, RuleCreationSchema]
 
 @dataclass
 class ExecutionProcess:
-    """Validate and execute deterministic action groups."""
-
     mcp_url: str
     actions_list: list[ExecuteActionGroupSchema]
     errors: list[ExecuteErrorSchema] = field(default_factory=list)

@@ -1,42 +1,48 @@
-from gerbera_sdk.inference.frame import Frame
-from gerbera_sdk.inference.cloud_model_adapter import (
-    AnthropicCloudModelAdapter,
-    CloudModelAdapter,
-    CloudModelAdapterRegistry,
-    GoogleCloudModelAdapter,
+from gerbera_sdk.inference.frame import (
+    BoundingBox,
+    Frame,
+    VisionLanguageModelFrameEnvironment,
+    VisionLanguageModelFrameObject,
+)
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
+    AnthropicVisionLanguageModelAdapter,
+    GoogleVisionLanguageModelAdapter,
     ModelProviderEnum,
-    OpenAICloudModelAdapter,
+    OpenAIVisionLanguageModelAdapter,
+    VisionLanguageModelAdapter,
+    VisionLanguageModelAdapterRegistry,
+    VisionLanguageModelAdapters,
 )
 from gerbera_sdk.inference.inference import (
     Inference,
-    ModelAdapters,
     ModelTypes,
 )
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
-    VisionLanguageModelBoundingBox,
-    VisionLanguageModelFrameEnvironment,
-    VisionLanguageModelFrameObject,
     VisionLanguageModelInference,
 )
-from gerbera_sdk.inference.local_model_adapter import LocalModelAdapter
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
+    ObjectDetectionAdapter,
+    Yolov5ModelAdapter,
+)
 from gerbera_sdk.inference.model_registry import ModelRegistry, ModelTypeEnum
 
 __all__ = [
-    "AnthropicCloudModelAdapter",
-    "CloudModelAdapter",
-    "CloudModelAdapterRegistry",
+    "AnthropicVisionLanguageModelAdapter",
+    "BoundingBox",
     "Frame",
-    "GoogleCloudModelAdapter",
+    "GoogleVisionLanguageModelAdapter",
     "Inference",
-    "LocalModelAdapter",
-    "ModelAdapters",
     "ModelProviderEnum",
     "ModelRegistry",
     "ModelTypeEnum",
     "ModelTypes",
-    "OpenAICloudModelAdapter",
-    "VisionLanguageModelBoundingBox",
+    "ObjectDetectionAdapter",
+    "OpenAIVisionLanguageModelAdapter",
+    "VisionLanguageModelAdapter",
+    "VisionLanguageModelAdapterRegistry",
+    "VisionLanguageModelAdapters",
     "VisionLanguageModelFrameEnvironment",
     "VisionLanguageModelFrameObject",
     "VisionLanguageModelInference",
+    "Yolov5ModelAdapter",
 ]

@@ -9,18 +9,15 @@ import pytest
 import requests
 
 from gerbera_sdk.inference import (
-    CloudModelAdapter,
+    BoundingBox,
     Frame,
-    OpenAICloudModelAdapter,
+    OpenAIVisionLanguageModelAdapter,
+    VisionLanguageModelAdapter,
     VisionLanguageModelFrameEnvironment,
     VisionLanguageModelInference,
+    Yolov5ModelAdapter,
 )
-from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
-    VisionLanguageModelBoundingBox,
-)
-
-
-class RecordingCloudModelAdapter(CloudModelAdapter):
+class RecordingVisionLanguageModelAdapter(VisionLanguageModelAdapter):
     def __init__(self) -> None:
         super().__init__(api_key="key", model="test-model")
         self.frames = []
@@ -53,9 +50,27 @@ class RecordingCloudModelAdapter(CloudModelAdapter):
         }
 
 
-def test_cloud_model_adapter_is_abstract() -> None:
+def test_yolov5_adapter_loads_weights_from_project_models(
+    monkeypatch,
+) -> None:
+    loaded_paths = []
+    model = object()
+    monkeypatch.setattr(
+        cv2.dnn,
+        "readNetFromONNX",
+        lambda path: loaded_paths.append(path) or model,
+    )
+
+    adapter = Yolov5ModelAdapter(weights_path="yolov5s.onnx")
+
+    assert adapter.model is model
+    assert adapter.model is model
+    assert loaded_paths == [".gerbera/models/yolov5s.onnx"]
+
+
+def test_vision_language_model_adapter_is_abstract() -> None:
     with pytest.raises(TypeError):
-        CloudModelAdapter(api_key="key", model="test-model")
+        VisionLanguageModelAdapter(api_key="key", model="test-model")
 
 
 def test_vision_language_model_converts_then_predicts() -> None:
@@ -69,7 +84,7 @@ def test_vision_language_model_converts_then_predicts() -> None:
             image=np.ones((4, 6, 3), dtype=np.uint8),
         ),
     ]
-    adapter = RecordingCloudModelAdapter()
+    adapter = RecordingVisionLanguageModelAdapter()
     inference = VisionLanguageModelInference(
         model=adapter,
         name="vision",
@@ -113,7 +128,7 @@ def test_vision_language_model_schema_is_strict_for_every_object() -> None:
 
 def test_vision_language_model_requires_at_least_one_frame() -> None:
     inference = VisionLanguageModelInference(
-        model=RecordingCloudModelAdapter(),
+        model=RecordingVisionLanguageModelAdapter(),
         name="vision",
         description="Test vision model",
         user_prompt="Describe the frames",
@@ -124,7 +139,7 @@ def test_vision_language_model_requires_at_least_one_frame() -> None:
 
 
 def test_vision_language_model_predicts_with_base64_strings() -> None:
-    adapter = RecordingCloudModelAdapter()
+    adapter = RecordingVisionLanguageModelAdapter()
     inference = VisionLanguageModelInference(
         model=adapter,
         name="vision",
@@ -153,8 +168,14 @@ def test_vision_language_model_predicts_with_base64_strings() -> None:
 @pytest.mark.parametrize(
     ("coordinates", "message"),
     [
-        ({"x1": 0.5, "x2": 0.5, "y1": 0.1, "y2": 0.9}, "x1"),
-        ({"x1": 0.1, "x2": 0.9, "y1": 0.5, "y2": 0.5}, "y1"),
+        (
+            {"xmin": 0.5, "xmax": 0.5, "ymin": 0.1, "ymax": 0.9},
+            "xmin",
+        ),
+        (
+            {"xmin": 0.1, "xmax": 0.9, "ymin": 0.5, "ymax": 0.5},
+            "ymin",
+        ),
     ],
 )
 def test_vision_language_model_rejects_zero_area_bounding_boxes(
@@ -162,11 +183,11 @@ def test_vision_language_model_rejects_zero_area_bounding_boxes(
     message: str,
 ) -> None:
     with pytest.raises(ValidationError, match=message):
-        VisionLanguageModelBoundingBox.model_validate(coordinates)
+        BoundingBox.model_validate(coordinates)
 
 
 def test_vision_language_model_prompt_defines_normalized_coordinates() -> None:
-    adapter = RecordingCloudModelAdapter()
+    adapter = RecordingVisionLanguageModelAdapter()
     inference = VisionLanguageModelInference(
         model=adapter,
         name="vision",
@@ -178,15 +199,15 @@ def test_vision_language_model_prompt_defines_normalized_coordinates() -> None:
     assert "one or more camera frames" in inference.system_prompt
     assert "frame_index" in inference.system_prompt
     assert "normalized coordinates" in inference.system_prompt
-    assert "0.0 <= x1 < x2 <= 1.0" in inference.system_prompt
-    assert "0.0 <= y1 < y2 <= 1.0" in inference.system_prompt
+    assert "0.0 <= xmin < xmax <= 1.0" in inference.system_prompt
+    assert "0.0 <= ymin < ymax <= 1.0" in inference.system_prompt
 
 
-def test_cloud_model_adapter_raises_when_frame_encoding_fails(
+def test_vision_language_model_adapter_raises_when_frame_encoding_fails(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(cv2, "imencode", lambda *args: (False, None))
-    adapter = OpenAICloudModelAdapter(
+    adapter = OpenAIVisionLanguageModelAdapter(
         api_key="key",
         model="test-model",
     )
@@ -215,10 +236,11 @@ def test_openai_adapter_includes_response_body_in_http_errors(
         b'additionalProperties is required"}}'
     )
     monkeypatch.setattr(
-        "gerbera_sdk.inference.cloud_model_adapter.requests.post",
+        "gerbera_sdk.inference.models.vision_language_model."
+        "vision_language_model_adapter.requests.post",
         lambda *args, **kwargs: response,
     )
-    adapter = OpenAICloudModelAdapter(
+    adapter = OpenAIVisionLanguageModelAdapter(
         api_key="key",
         model="gpt-5.6",
     )
@@ -274,10 +296,11 @@ def test_openai_adapter_expands_multiple_images_into_content(
         return response
 
     monkeypatch.setattr(
-        "gerbera_sdk.inference.cloud_model_adapter.requests.post",
+        "gerbera_sdk.inference.models.vision_language_model."
+        "vision_language_model_adapter.requests.post",
         fake_post,
     )
-    adapter = OpenAICloudModelAdapter(
+    adapter = OpenAIVisionLanguageModelAdapter(
         api_key="key",
         model="gpt-5.6",
     )

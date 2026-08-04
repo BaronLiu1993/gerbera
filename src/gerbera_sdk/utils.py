@@ -3,9 +3,15 @@ import json
 import re
 from urllib.parse import urlsplit
 
+from pydantic import BaseModel, ConfigDict
+
 
 MAX_EVENT_NAME_LENGTH = 63
 EventKey = tuple[str, str, str]
+
+
+class StrictSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 def build_event_key(
