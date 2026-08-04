@@ -163,10 +163,12 @@ class VisionLanguageModelInference:
                 if camera.latest_frame is not None
             ]
             if frames:
-                self.predict(frames)
+                detection = self.predict(frames)
+                print(detection)
 
             stop_event.wait(self.interval_seconds)
 
+    # Single predict function
     def predict(
         self,
         frames: list[Frame],
