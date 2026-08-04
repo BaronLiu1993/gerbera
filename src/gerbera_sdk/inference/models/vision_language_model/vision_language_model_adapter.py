@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeAlias
 
-import requests
+import httpx
 
 from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
 
@@ -63,7 +63,7 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        response = requests.post(
+        response = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={
                 "x-api-key": self.api_key,
@@ -114,7 +114,7 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        response = requests.post(
+        response = httpx.post(
             "https://api.openai.com/v1/responses",
             headers={
                 "Authorization": f"Bearer {self.api_key}",
@@ -145,8 +145,8 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         )
         try:
             response.raise_for_status()
-        except requests.HTTPError as exc:
-            raise requests.HTTPError(
+        except httpx.HTTPStatusError as exc:
+            raise httpx.HTTPStatusError(
                 f"{exc}\nOpenAI response: {response.text}",
                 request=exc.request,
                 response=exc.response,
@@ -177,7 +177,7 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        response = requests.post(
+        response = httpx.post(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={
                 "x-goog-api-key": self.api_key,

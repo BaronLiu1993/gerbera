@@ -24,6 +24,5 @@ class Camera:
     description: str
     source: CameraSource
     latest_frame: Frame | None = None
-    latest_output: object | None = None
     subscribed_models: list[Inference] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

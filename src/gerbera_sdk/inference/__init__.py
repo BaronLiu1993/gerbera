@@ -14,13 +14,18 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_ad
     VisionLanguageModelAdapter,
     VisionLanguageModelAdapters,
 )
-from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
+from gerbera_sdk.inference.model_types import (
+    ObjectDetectionModelProviderEnum,
+    VisionLanguageModelProviderEnum,
+)
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModel,
     VisionLanguageModelInference,
 )
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
+    OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionAdapter,
+    ObjectDetectionModelAdapters,
     Yolov5ModelAdapter,
 )
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
@@ -42,7 +47,10 @@ __all__ = [
     "Inference",
     "Model",
     "VisionLanguageModelProviderEnum",
+    "ObjectDetectionModelProviderEnum",
+    "OBJECT_DETECTION_MODEL_REGISTRY",
     "ObjectDetectionAdapter",
+    "ObjectDetectionModelAdapters",
     "ObjectDetectionModel",
     "ObjectDetectionModelInference",
     "OpenAIVisionLanguageModelAdapter",

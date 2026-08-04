@@ -1,14 +1,19 @@
 import json
+from datetime import datetime
 
 import cv2
+import httpx
+import numpy as np
 from pydantic import TypeAdapter, ValidationError
 import pytest
-import requests
 
 from gerbera_sdk.inference import (
     BoundingBox,
+    Frame,
     Model,
     ObjectDetectionModel,
+    OBJECT_DETECTION_MODEL_REGISTRY,
+    ObjectDetectionModelProviderEnum,
     OpenAIVisionLanguageModelAdapter,
     VisionLanguageModelAdapter,
     VisionLanguageModel,
@@ -60,11 +65,20 @@ def test_yolov5_adapter_loads_weights_from_project_models(
         lambda path: loaded_paths.append(path) or model,
     )
 
-    adapter = Yolov5ModelAdapter(weights_path="yolov5s.onnx")
+    adapter = Yolov5ModelAdapter(model_source="yolov5s.onnx")
 
     assert adapter.model is model
     assert adapter.model is model
     assert loaded_paths == [".gerbera/models/yolov5s.onnx"]
+
+
+def test_object_detection_registry_contains_yolov5_adapter() -> None:
+    assert (
+        OBJECT_DETECTION_MODEL_REGISTRY[
+            ObjectDetectionModelProviderEnum.YOLOV5
+        ]
+        is Yolov5ModelAdapter
+    )
 
 
 @pytest.mark.parametrize(
@@ -109,7 +123,16 @@ def test_vision_language_model_adapter_is_abstract() -> None:
 
 
 def test_vision_language_model_converts_then_predicts() -> None:
-    frames = ["first-base64-frame", "second-base64-frame"]
+    frames = [
+        Frame(
+            timestamp=datetime.now(),
+            image=np.zeros((4, 6, 3), dtype=np.uint8),
+        ),
+        Frame(
+            timestamp=datetime.now(),
+            image=np.ones((4, 6, 3), dtype=np.uint8),
+        ),
+    ]
     adapter = RecordingVisionLanguageModelAdapter()
     inference = VisionLanguageModelInference(
         model=adapter,
@@ -120,7 +143,10 @@ def test_vision_language_model_converts_then_predicts() -> None:
 
     result = inference.predict(frames)
 
-    assert adapter.frames == frames
+    assert adapter.frames == [
+        frame.to_base64_string()
+        for frame in frames
+    ]
     assert adapter.prediction_args == {
         "model_input": [{"frame_index": 0}, {"frame_index": 1}],
         "system_prompt": inference.system_prompt,
@@ -164,7 +190,7 @@ def test_vision_language_model_requires_at_least_one_frame() -> None:
         inference.predict([])
 
 
-def test_vision_language_model_predicts_with_base64_strings() -> None:
+def test_vision_language_model_converts_each_frame_to_base64() -> None:
     adapter = RecordingVisionLanguageModelAdapter()
     inference = VisionLanguageModelInference(
         model=adapter,
@@ -173,14 +199,26 @@ def test_vision_language_model_predicts_with_base64_strings() -> None:
         user_prompt="Describe the frames",
     )
 
-    frames = ["first-base64-frame", "second-base64-frame"]
+    frames = [
+        Frame(
+            timestamp=datetime.now(),
+            image=np.zeros((2, 2, 3), dtype=np.uint8),
+        ),
+        Frame(
+            timestamp=datetime.now(),
+            image=np.ones((2, 2, 3), dtype=np.uint8),
+        ),
+    ]
     result = inference.predict(frames)
 
     assert adapter.prediction_args["model_input"] == [
         {"frame_index": 0},
         {"frame_index": 1},
     ]
-    assert adapter.frames == frames
+    assert adapter.frames == [
+        frame.to_base64_string()
+        for frame in frames
+    ]
     assert result.environment_name == "workshop"
 
 
@@ -238,21 +276,21 @@ def test_openai_adapter_formats_base64_input(
 def test_openai_adapter_includes_response_body_in_http_errors(
     monkeypatch,
 ) -> None:
-    request = requests.Request(
+    request = httpx.Request(
         "POST",
         "https://api.openai.com/v1/responses",
-    ).prepare()
-    response = requests.Response()
-    response.status_code = 400
-    response.url = request.url
-    response.request = request
-    response._content = (
-        b'{"error":{"message":"Invalid schema: '
-        b'additionalProperties is required"}}'
+    )
+    response = httpx.Response(
+        400,
+        request=request,
+        text=(
+            '{"error":{"message":"Invalid schema: '
+            'additionalProperties is required"}}'
+        ),
     )
     monkeypatch.setattr(
         "gerbera_sdk.inference.models.vision_language_model."
-        "vision_language_model_adapter.requests.post",
+        "vision_language_model_adapter.httpx.post",
         lambda *args, **kwargs: response,
     )
     adapter = OpenAIVisionLanguageModelAdapter(
@@ -261,7 +299,7 @@ def test_openai_adapter_includes_response_body_in_http_errors(
     )
 
     with pytest.raises(
-        requests.HTTPError,
+        httpx.HTTPStatusError,
         match="OpenAI response.*additionalProperties is required",
     ):
         adapter.predict(
@@ -283,10 +321,13 @@ def test_openai_adapter_expands_multiple_images_into_content(
     monkeypatch,
 ) -> None:
     captured_request = {}
-    response = requests.Response()
-    response.status_code = 200
-    response._content = json.dumps(
-        {
+    response = httpx.Response(
+        200,
+        request=httpx.Request(
+            "POST",
+            "https://api.openai.com/v1/responses",
+        ),
+        json={
             "output": [
                 {
                     "content": [
@@ -303,8 +344,8 @@ def test_openai_adapter_expands_multiple_images_into_content(
                     ]
                 }
             ]
-        }
-    ).encode()
+        },
+    )
 
     def fake_post(url, **kwargs):
         captured_request.update(kwargs["json"])
@@ -312,7 +353,7 @@ def test_openai_adapter_expands_multiple_images_into_content(
 
     monkeypatch.setattr(
         "gerbera_sdk.inference.models.vision_language_model."
-        "vision_language_model_adapter.requests.post",
+        "vision_language_model_adapter.httpx.post",
         fake_post,
     )
     adapter = OpenAIVisionLanguageModelAdapter(

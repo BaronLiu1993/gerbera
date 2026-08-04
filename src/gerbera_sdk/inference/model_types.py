@@ -7,4 +7,5 @@ class VisionLanguageModelProviderEnum(Enum):
     GOOGLE = "google"
 
 class ObjectDetectionModelProviderEnum(Enum):
-    pass
+    YOLOV5 = "yolov5"
+    YOLOV8 = "yolov8"
