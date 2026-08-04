@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+)
 from gerbera_harness.agent_runtime.context_builder.base import ContextBuilder
 from gerbera_harness.memory import EventSchema
 
 
 @dataclass(frozen=True)
 class PlanningContextBuilder(ContextBuilder):
+    previous_act_error: ExecuteErrorSchema | None = None
+
     def build_runtime_context(self) -> dict[str, object]:
         hypothesis = self.memory.current_hypothesis
         current_task = self.memory.get_current_task()
@@ -23,6 +28,11 @@ class PlanningContextBuilder(ContextBuilder):
             "current_step_number": self.memory.tasks.index(current_task),
             "current_world_state": current_world_state.model_dump(
                 mode="json"
+            ),
+            "previous_act_error": (
+                self.previous_act_error.model_dump(mode="json")
+                if self.previous_act_error is not None
+                else None
             ),
             "completed_steps": [
                 task.model_dump(mode="json")

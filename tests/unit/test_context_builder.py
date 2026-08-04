@@ -3,6 +3,10 @@ from dataclasses import dataclass
 
 import pytest
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+    ExecutionTypeEnum,
+)
 from gerbera_harness.agent_runtime.context_builder import (
     ContextBuilder,
     ExecutionContextBuilder,
@@ -170,6 +174,34 @@ def test_planning_context_uses_current_step_and_observed_world_state(
     assert context["current_world_state"]["state"] == {
         "temperature": 21.5
     }
+    assert context["previous_act_error"] is None
+
+
+def test_planning_context_includes_previous_act_error() -> None:
+    memory = Memory(goal="Set the motor speed")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.tasks.append(
+        task("in_progress", "Set motor speed to 10", "set_motor")
+    )
+    memory.append_world_state({"motor_speed": 0})
+    previous_error = ExecuteErrorSchema(
+        event_name="set_motor",
+        event_type=ExecutionTypeEnum.AGENT,
+        position=2,
+        error="motor rejected command",
+    )
+
+    context = context_from(
+        PlanningContextBuilder(
+            memory,
+            20,
+            previous_act_error=previous_error,
+        ).build()
+    )
+
+    assert context["previous_act_error"] == previous_error.model_dump(
+        mode="json"
+    )
 
 
 def test_planning_context_requires_an_observed_world_state() -> None:

@@ -3,6 +3,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+    ExecutionTypeEnum,
+)
 from gerbera_harness.agent.driver.subloop.schema.act import (
     ToolCallStatusEnum,
 )
@@ -176,9 +180,48 @@ def test_act_status_returns_control_to_observation(
     assert runtime.turns_completed == 2
     if status is ToolCallStatusEnum.SUCCESS:
         assert runtime.errors == []
+        assert runtime.previous_act_error is None
     else:
         assert runtime.errors[0].event_name == "set_motor"
         assert runtime.errors[0].error == f"Action {status.value}"
+        assert runtime.previous_act_error is runtime.errors[0]
+
+
+def test_successful_adjustment_clears_previous_act_error(
+    monkeypatch,
+) -> None:
+    act_runtime = FakeActRuntime(ToolCallStatusEnum.SUCCESS)
+    monkeypatch.setattr(
+        SubAgentRuntime,
+        "act_runtime",
+        property(lambda self: act_runtime),
+    )
+    monkeypatch.setattr(
+        SubAgentRuntime,
+        "observation_runtime",
+        property(lambda self: FakeObservationRuntime()),
+    )
+    previous_error = ExecuteErrorSchema(
+        event_name="set_motor",
+        event_type=ExecutionTypeEnum.AGENT,
+        position=1,
+        error="motor rejected command",
+    )
+    runtime = SubAgentRuntime(
+        session=Session(state=ActState()),
+        model=SimpleNamespace(),
+        memory=planning_memory(),
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=1,
+        action_plan=planned_action(),
+        errors=[previous_error],
+        previous_act_error=previous_error,
+    )
+
+    asyncio.run(runtime.run_agent())
+
+    assert runtime.previous_act_error is None
+    assert runtime.errors == [previous_error]
 
 
 def test_subagent_stops_after_maximum_completed_turns(monkeypatch) -> None:

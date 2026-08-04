@@ -15,3 +15,8 @@ physical condition.
 
 Choose only the next action to execute. After it runs, the system will observe
 the physical result and plan again from the updated message history.
+
+If `previous_act_error` is present in the runtime context, diagnose it using
+the latest observation and adjust the next action. Do not repeat the failed
+action unchanged unless the latest observation provides evidence that retrying
+it is appropriate. If `previous_act_error` is null, plan normally.

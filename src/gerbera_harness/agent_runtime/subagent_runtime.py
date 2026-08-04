@@ -47,6 +47,7 @@ class SubAgentRuntime:
     turns_completed: int = 0
     action_plan: PlanningExecuteActionSchema | None = None
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
+    previous_act_error: ExecuteErrorSchema | None = None
 
     @property
     def observation_runtime(self) -> ObservationRuntime:
@@ -68,6 +69,7 @@ class SubAgentRuntime:
             context_builder=PlanningContextBuilder(
                 memory=self.memory,
                 context_window_size=self.context_window_size,
+                previous_act_error=self.previous_act_error,
             ),
             on_action_planned=lambda action_plan: setattr(
                 self, "action_plan", action_plan
@@ -133,11 +135,13 @@ class SubAgentRuntime:
                 status = await act_runtime.run_action(self.action_plan)
                 self.turns_completed += 1
 
-                if status in {
+                if status is ToolCallStatusEnum.SUCCESS:
+                    self.previous_act_error = None
+                elif status in {
                     ToolCallStatusEnum.FAILED,
                     ToolCallStatusEnum.TIMED_OUT,
                 }:
-                    self._append_error(
+                    self.previous_act_error = self._append_error(
                         act_runtime.last_event.error_message,
                         event_name=act_runtime.last_event.tool_name,
                     )
@@ -162,14 +166,12 @@ class SubAgentRuntime:
         error: str,
         *,
         event_name: str | None = None,
-    ) -> None:
-        self.errors.append(
-            ExecuteErrorSchema(
-                event_name=(
-                    event_name or self.session.state.state.value
-                ),
-                event_type=ExecutionTypeEnum.AGENT,
-                position=self.turns_completed,
-                error=error,
-            )
+    ) -> ExecuteErrorSchema:
+        execute_error = ExecuteErrorSchema(
+            event_name=(event_name or self.session.state.state.value),
+            event_type=ExecutionTypeEnum.AGENT,
+            position=self.turns_completed,
+            error=error,
         )
+        self.errors.append(execute_error)
+        return execute_error
