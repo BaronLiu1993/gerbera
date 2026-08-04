@@ -1,9 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gerbera_harness.agent.driver.main_loop import (
     InitialisationDecisionEnum,
     LoopStateEnum,
     Session,
+)
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
 )
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.context_builder import (
@@ -11,6 +14,9 @@ from gerbera_harness.agent_runtime.context_builder import (
 )
 from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
     InitialisationRuntime,
+)
+from gerbera_harness.agent_runtime.main_loop.execution_runtime import (
+    ExecutionRuntime,
 )
 from gerbera_harness.memory import Memory
 
@@ -20,7 +26,9 @@ class AgentRuntime:
     session: Session
     model: Model
     memory: Memory
+    mcp_url: str
     context_window_size: int = 20
+    errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     @property
     def initialisation_runtime(self) -> InitialisationRuntime:
@@ -33,6 +41,13 @@ class AgentRuntime:
             ),
         )
         return self._initialisation_runtime
+
+    @property
+    def execution_runtime(self) -> ExecutionRuntime:
+        return ExecutionRuntime(
+            memory=self.memory,
+            mcp_url=self.mcp_url,
+        )
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
@@ -49,7 +64,9 @@ class AgentRuntime:
                             "Accepted initialisation requires a hypothesis"
                         )
                     self.memory.set_hypothesis(result.hypothesis)
-                    self.session.state.state = self.session.perform_transition(result.requested_next_state)
+                    self.session.perform_transition(
+                        result.requested_next_state
+                    )
                 elif result.decision is InitialisationDecisionEnum.CLARIFY:
                     break
                 elif result.decision is InitialisationDecisionEnum.REJECTED:
@@ -57,7 +74,13 @@ class AgentRuntime:
                 else:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.EXECUTION:
-                pass
+                result = await self.execution_runtime.run_execution()
+                self.errors.extend(result.errors)
+                self.session.perform_transition(
+                    result.requested_next_state
+                )
+            elif current_state.state is LoopStateEnum.REVIEW:
+                break
 
             #     if self.memory.current_hypothesis is None:
             #         raise RuntimeError(

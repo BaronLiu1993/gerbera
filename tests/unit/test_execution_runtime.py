@@ -104,6 +104,7 @@ def test_execution_runtime_runs_one_task_and_requests_review() -> None:
     assert result.event.payload["step_goal"] == (
         "Set the motor speed to 10"
     )
+    assert result.errors == []
     assert runtime.errors == []
 
 
@@ -130,6 +131,7 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
     assert result.event.payload["decision"] == "failed"
     assert result.event.payload["errors"] == ["motor rejected command"]
     assert memory.event_ledger == [result.event]
+    assert result.errors[0].error == "motor rejected command"
     assert runtime.errors[0].error == "motor rejected command"
 
 
@@ -172,4 +174,28 @@ def test_execution_runtime_captures_process_exceptions() -> None:
 
     assert result.decision is ExecuteDecisionEnum.FAILED
     assert runtime.errors[0].error == "invalid execution wiring"
+    assert result.errors[0].error == "invalid execution wiring"
     assert result.event.payload["errors"] == ["invalid execution wiring"]
+
+
+def test_execution_result_only_contains_errors_from_current_run() -> None:
+    memory = runtime_memory()
+    runtime = ExecutionRuntime(
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+        errors=[
+            ExecuteErrorSchema(
+                event_name="previous task",
+                event_type=ExecutionTypeEnum.DISCRETE,
+                position=0,
+                error="previous error",
+            )
+        ],
+    )
+
+    result = asyncio.run(runtime.run_execution())
+
+    assert result.errors == []
+    assert [error.error for error in runtime.errors] == [
+        "previous error"
+    ]

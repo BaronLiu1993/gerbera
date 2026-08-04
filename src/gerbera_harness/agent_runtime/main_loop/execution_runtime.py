@@ -21,6 +21,7 @@ class ExecutionResult:
     decision: ExecuteDecisionEnum
     requested_next_state: LoopStateEnum
     event: EventSchema
+    errors: list[ExecuteErrorSchema]
 
 
 @dataclass
@@ -63,4 +64,5 @@ class ExecutionRuntime:
             decision=decision,
             requested_next_state=LoopStateEnum.REVIEW,
             event=event,
+            errors=list(execution_errors),
         )

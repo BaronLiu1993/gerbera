@@ -16,6 +16,13 @@ from gerbera_harness.agent.driver.main_loop.states.review import (
 )
 
 
+STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
+    LoopStateEnum.INITIALISATION: Initialisation,
+    LoopStateEnum.EXECUTION: Execution,
+    LoopStateEnum.REVIEW: Review,
+}
+
+
 @dataclass
 class Session:
     state: ExperimentState = field(default_factory=Initialisation)
@@ -38,4 +45,5 @@ class Session:
                 f"Invalid transition: {self.state.state.value} "
                 f"-> {target_state.value}"
             )
-        return target_state
+        self.state = STATE_TYPES[target_state]()
+        return self.state
