@@ -122,7 +122,7 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
     model = SimpleNamespace(
         name="openai-vision-language-model",
         description="Analyze supplied images.",
-        predict_with_base64=lambda frames: None,
+        predict=lambda frames: None,
     )
     camera = Camera(
         id="local-camera",
@@ -187,7 +187,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     model = SimpleNamespace(
         name="openai-vision-language-model",
         description="Analyze supplied images.",
-        predict_with_base64=lambda frames: (
+        predict=lambda frames: (
             received_frames.append(frames) or prediction
         ),
     )

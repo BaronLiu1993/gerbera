@@ -232,7 +232,7 @@ class GerberaRuntime:
                 def predict_with_model(
                     frames: list[str],
                 ) -> VisionLanguageModelFrameEnvironment:
-                    return model.predict_with_base64(frames)
+                    return model.predict(frames)
 
                 return predict_with_model
 

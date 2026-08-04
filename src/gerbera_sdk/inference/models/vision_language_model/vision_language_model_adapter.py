@@ -1,20 +1,11 @@
-import base64
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from typing import TypeAlias
 
-import cv2
 import requests
 
-from gerbera_sdk.inference.frame import Frame
-
-
-class ModelProviderEnum(Enum):
-    ANTHROPIC = "anthropic"
-    OPENAI = "openai"
-    GOOGLE = "google"
+from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
 
 
 @dataclass
@@ -23,18 +14,6 @@ class VisionLanguageModelAdapter(ABC):
     model: str
     max_tokens: int = 1024
     timeout_seconds: float = 120.0
-
-    @staticmethod
-    def _frame_to_base64(frame: Frame) -> str:
-        success, encoded = cv2.imencode(
-            ".jpg",
-            frame.image,
-            [cv2.IMWRITE_JPEG_QUALITY, 90],
-        )
-        if not success:
-            raise RuntimeError("Could not encode camera frame")
-
-        return base64.b64encode(encoded.tobytes()).decode("ascii")
 
     @staticmethod
     def _parse_json_output(output_text: str) -> dict[str, object]:
@@ -48,7 +27,7 @@ class VisionLanguageModelAdapter(ABC):
     @abstractmethod
     def convert_to_valid_input(
         self,
-        frame: Frame,
+        frame: str,
     ) -> dict[str, object]:
         pass
 
@@ -66,14 +45,14 @@ class VisionLanguageModelAdapter(ABC):
 class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
     def convert_to_valid_input(
         self,
-        frame: Frame,
+        frame: str,
     ) -> dict[str, object]:
         return {
             "type": "image",
             "source": {
                 "type": "base64",
                 "media_type": "image/jpeg",
-                "data": self._frame_to_base64(frame),
+                "data": frame,
             },
         }
 
@@ -121,12 +100,11 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
 class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
     def convert_to_valid_input(
         self,
-        frame: Frame,
+        frame: str,
     ) -> dict[str, object]:
-        image_data = self._frame_to_base64(frame)
         return {
             "type": "input_image",
-            "image_url": f"data:image/jpeg;base64,{image_data}",
+            "image_url": f"data:image/jpeg;base64,{frame}",
         }
 
     def predict(
@@ -184,11 +162,11 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
 class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
     def convert_to_valid_input(
         self,
-        frame: Frame,
+        frame: str,
     ) -> dict[str, object]:
         return {
             "type": "image",
-            "data": self._frame_to_base64(frame),
+            "data": frame,
             "mime_type": "image/jpeg",
         }
 
@@ -237,8 +215,8 @@ VisionLanguageModelAdapters: TypeAlias = (
     | GoogleVisionLanguageModelAdapter
 )
 
-VisionLanguageModelAdapterRegistry = {
-    ModelProviderEnum.ANTHROPIC: AnthropicVisionLanguageModelAdapter,
-    ModelProviderEnum.OPENAI: OpenAIVisionLanguageModelAdapter,
-    ModelProviderEnum.GOOGLE: GoogleVisionLanguageModelAdapter,
+VISION_LANGUAGE_MODEL_REGISTRY = {
+    VisionLanguageModelProviderEnum.ANTHROPIC: AnthropicVisionLanguageModelAdapter,
+    VisionLanguageModelProviderEnum.OPENAI: OpenAIVisionLanguageModelAdapter,
+    VisionLanguageModelProviderEnum.GOOGLE: GoogleVisionLanguageModelAdapter,
 }

@@ -1,26 +1,25 @@
 from dataclasses import dataclass
-from pathlib import Path
+from typing import Literal
 
-from gerbera_sdk.inference.frame import (
-    Frame,
-    VisionLanguageModelFrameEnvironment,
+from pydantic import Field
+
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
+    ObjectDetectionAdapter,
 )
-from gerbera_sdk.inference.inference import ModelTypes
-from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
-    VisionLanguageModelAdapters,
-)
+from gerbera_sdk.utils import StrictSchema
 
 
-VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH = (
-    Path(__file__).resolve().parent / "vision_language_model.md"
-)
+class ObjectDetectionModel(StrictSchema):
+    name: str = Field(min_length=1)
+    model_type: Literal["object_detection"] = "object_detection"
+    model_class: Literal["yolov5", "yolov8"] # Expand this to a config file later
+    
+    description: str
 
 
 @dataclass
 class ObjectDetectionModelInference:
-    model: VisionLanguageModelAdapters
+    model: ObjectDetectionAdapter
     name: str
     description: str
-    model_type: ModelTypes = ModelTypes.OBJECT_DETECTION
-    interval_seconds: float = 5.0
-
+    interval_seconds: float = 1.0

@@ -1,18 +1,17 @@
-import base64
 import json
-from datetime import datetime
 
 import cv2
-import numpy as np
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 import pytest
 import requests
 
 from gerbera_sdk.inference import (
     BoundingBox,
-    Frame,
+    Model,
+    ObjectDetectionModel,
     OpenAIVisionLanguageModelAdapter,
     VisionLanguageModelAdapter,
+    VisionLanguageModel,
     VisionLanguageModelFrameEnvironment,
     VisionLanguageModelInference,
     Yolov5ModelAdapter,
@@ -25,7 +24,7 @@ class RecordingVisionLanguageModelAdapter(VisionLanguageModelAdapter):
 
     def convert_to_valid_input(
         self,
-        frame: Frame,
+        frame: str,
     ) -> dict[str, object]:
         self.frames.append(frame)
         return {"frame_index": len(self.frames) - 1}
@@ -68,22 +67,49 @@ def test_yolov5_adapter_loads_weights_from_project_models(
     assert loaded_paths == [".gerbera/models/yolov5s.onnx"]
 
 
+@pytest.mark.parametrize(
+    ("definition", "model_class"),
+    [
+        (
+            {
+                "name": "detector",
+                "model_type": "object_detection",
+                "model_class": "yolov5",
+                "weights": "detector.onnx",
+                "class_names": ["part"],
+                "description": "Detect parts",
+            },
+            ObjectDetectionModel,
+        ),
+        (
+            {
+                "name": "observer",
+                "model_type": "vision_language_model",
+                "model_class": "openai",
+                "model_name": "vision-model",
+                "description": "Observe the workspace",
+                "user_prompt": "Describe the workspace",
+            },
+            VisionLanguageModel,
+        ),
+    ],
+)
+def test_model_type_selects_model_schema(
+    definition: dict[str, object],
+    model_class: type[ObjectDetectionModel] | type[VisionLanguageModel],
+) -> None:
+    model = TypeAdapter(Model).validate_python(definition)
+
+    assert isinstance(model, model_class)
+
+
 def test_vision_language_model_adapter_is_abstract() -> None:
     with pytest.raises(TypeError):
         VisionLanguageModelAdapter(api_key="key", model="test-model")
 
 
 def test_vision_language_model_converts_then_predicts() -> None:
-    frames = [
-        Frame(
-            timestamp=datetime.now(),
-            image=np.zeros((4, 6, 3), dtype=np.uint8),
-        ),
-        Frame(
-            timestamp=datetime.now(),
-            image=np.ones((4, 6, 3), dtype=np.uint8),
-        ),
-    ]
+    frames = ["first-base64-frame", "second-base64-frame"]
     adapter = RecordingVisionLanguageModelAdapter()
     inference = VisionLanguageModelInference(
         model=adapter,
@@ -147,21 +173,14 @@ def test_vision_language_model_predicts_with_base64_strings() -> None:
         user_prompt="Describe the frames",
     )
 
-    image = np.zeros((2, 2, 3), dtype=np.uint8)
-    success, encoded = cv2.imencode(".jpg", image)
-    assert success
-    base64_string = base64.b64encode(encoded.tobytes()).decode("ascii")
-
-    result = inference.predict_with_base64(
-        [base64_string, f"data:image/jpeg;base64,{base64_string}"]
-    )
+    frames = ["first-base64-frame", "second-base64-frame"]
+    result = inference.predict(frames)
 
     assert adapter.prediction_args["model_input"] == [
         {"frame_index": 0},
         {"frame_index": 1},
     ]
-    assert len(adapter.frames) == 2
-    assert all(frame.image.shape == image.shape for frame in adapter.frames)
+    assert adapter.frames == frames
     assert result.environment_name == "workshop"
 
 
@@ -203,21 +222,17 @@ def test_vision_language_model_prompt_defines_normalized_coordinates() -> None:
     assert "0.0 <= ymin < ymax <= 1.0" in inference.system_prompt
 
 
-def test_vision_language_model_adapter_raises_when_frame_encoding_fails(
-    monkeypatch,
+def test_openai_adapter_formats_base64_input(
 ) -> None:
-    monkeypatch.setattr(cv2, "imencode", lambda *args: (False, None))
     adapter = OpenAIVisionLanguageModelAdapter(
         api_key="key",
         model="test-model",
     )
-    frame = Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((1, 1, 3), dtype=np.uint8),
-    )
 
-    with pytest.raises(RuntimeError, match="Could not encode camera frame"):
-        adapter.convert_to_valid_input(frame)
+    assert adapter.convert_to_valid_input("AA==") == {
+        "type": "input_image",
+        "image_url": "data:image/jpeg;base64,AA==",
+    }
 
 
 def test_openai_adapter_includes_response_body_in_http_errors(
