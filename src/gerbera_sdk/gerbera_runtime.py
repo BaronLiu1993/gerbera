@@ -275,7 +275,7 @@ class GerberaRuntime:
                         name: True
                         for name in (running_models or [])
                     }
-                    camera_runtime.capture_frames(
+                    camera_runtime._capture_frames(
                         camera_key=camera_key,
                         running_models=selected_models,
                         image_count=image_count,

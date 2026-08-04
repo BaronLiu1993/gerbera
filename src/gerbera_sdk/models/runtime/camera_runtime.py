@@ -118,32 +118,16 @@ class CameraRuntime:
                 ):
                     time.sleep(interval_seconds)
 
-            with self._lock:
-                camera.latest_frame = frames[-1]
-                subscribed_models = camera.subscribed_models
-
-                for inference in subscribed_models:
-                    if inference.name in running_models:
-                        inference.predict(frames)
+            # Leave out for now
+            # with self._lock:
+            #     for inference in possible_models:
+            #         if inference.name in running_models:
+            #             inference.predict(frames)
 
         finally:
             capture.release()
 
-    def capture_frames(
-        self,
-        camera_key: str,
-        running_models: dict[str],
-        image_count: int = 1,
-        interval_seconds: float = 0.0,
-    ) -> None:
-        self._capture_frames(
-            camera_key=camera_key,
-            running_models=running_models,
-            image_count=image_count,
-            interval_seconds=interval_seconds,
-        )
-
-    def _capture_loop(self, camera_key: str, running_models: dict[str]) -> None:
+    def _capture_loop(self, camera_key: str) -> None:
         camera_session = self.get_camera_session(camera_key)
         camera = camera_session.camera
         stop_event = camera_session._stop_event
@@ -170,11 +154,6 @@ class CameraRuntime:
 
                 with self._lock:
                     camera.latest_frame = latest_frame
-                    subscribed_models = camera.subscribed_models
-
-                    for inference in subscribed_models:
-                        if inference.name in running_models:
-                            inference.predict([latest_frame])
 
         finally:
             capture.release()

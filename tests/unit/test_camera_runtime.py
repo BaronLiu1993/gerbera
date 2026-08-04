@@ -107,7 +107,7 @@ def test_capture_frames_defaults_to_one_image_and_releases_capture(
         lambda address: captured_addresses.append(address) or capture,
     )
 
-    runtime.capture_frames(camera.id, {})
+    runtime._capture_frames(camera.id, {})
     frame = camera.latest_frame
 
     assert captured_addresses == [2]
@@ -135,7 +135,7 @@ def test_capture_frames_runs_subscribed_model(
         lambda _: FakeCapture(),
     )
 
-    runtime.capture_frames(camera.id, {"test-model": True})
+    runtime._capture_frames(camera.id, {"test-model": True})
 
     assert predicted_batches == [[camera.latest_frame]]
 
@@ -168,7 +168,7 @@ def test_capture_frames_batches_images_into_one_model_call(
         lambda seconds: sleep_calls.append(seconds),
     )
 
-    runtime.capture_frames(
+    runtime._capture_frames(
         camera_key=camera.id,
         running_models={"test-model": True},
         image_count=3,
@@ -201,7 +201,7 @@ def test_capture_frames_rejects_invalid_batch_settings(
     runtime = CameraRuntime(hardware_system=HardwareSystem())
 
     with pytest.raises(ValueError, match=message):
-        runtime.capture_frames(
+        runtime._capture_frames(
             camera_key="missing",
             running_models={},
             image_count=image_count,
@@ -232,21 +232,16 @@ def test_capture_frames_releases_capture_on_failure(
     )
 
     with pytest.raises(RuntimeError, match=message):
-        runtime.capture_frames(camera.id, {})
+        runtime._capture_frames(camera.id, {})
 
     assert camera.latest_frame is None
     assert capture.released
 
 
-def test_capture_loop_updates_frame_and_runs_subscribed_models(
+def test_capture_loop_updates_latest_frame(
     monkeypatch,
 ) -> None:
-    predictions = []
-    model = SimpleNamespace(
-        name="test-model",
-        predict=lambda frames: predictions.append(frames)
-    )
-    camera = _camera(subscribed_models=[model])
+    camera = _camera()
     runtime = CameraRuntime(
         hardware_system=HardwareSystem(cameras=[camera])
     )
@@ -259,9 +254,9 @@ def test_capture_loop_updates_frame_and_runs_subscribed_models(
         lambda _: capture,
     )
 
-    runtime._capture_loop(camera.id, {"test-model": True})
+    runtime._capture_loop(camera.id, {})
 
-    assert camera.latest_frame is predictions[0][0]
+    assert camera.latest_frame is not None
     assert capture.released
 
 

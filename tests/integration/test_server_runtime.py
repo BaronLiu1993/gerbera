@@ -54,7 +54,7 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
     started_streams = []
     stopped_streams = []
     camera_runtime = SimpleNamespace(
-        capture_frames=lambda **kwargs: (
+        _capture_frames=lambda **kwargs: (
             captured_batches.append(kwargs)
         ),
         turn_on_camera_stream=lambda camera_key, running_models: (
@@ -123,7 +123,7 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         subscribed_models=[model],
     )
     camera_runtime = SimpleNamespace(
-        capture_frames=lambda **kwargs: None,
+        _capture_frames=lambda **kwargs: None,
         turn_on_camera_stream=lambda camera_key, running_models: None,
         turn_off_camera_stream=lambda camera_key: None,
     )
@@ -187,7 +187,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         subscribed_models=[model],
     )
     camera_runtime = SimpleNamespace(
-        capture_frames=lambda **kwargs: None,
+        _capture_frames=lambda **kwargs: None,
         turn_on_camera_stream=lambda camera_key, running_models: None,
         turn_off_camera_stream=lambda camera_key: None,
     )

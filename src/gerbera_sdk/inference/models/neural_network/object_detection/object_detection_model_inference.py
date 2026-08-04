@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     ObjectDetectionAdapter,
 )
@@ -18,11 +19,15 @@ class ObjectDetectionModel:
     description: str = ""
 
 
+
 @dataclass
 class ObjectDetectionModelInference:
     model: ObjectDetectionAdapter
+
+
     name: str
     description: str
-    interval_seconds: float = 1.0
+    interval_seconds: float = 0.2
 
-    
+    def predict(self, frame: Frame):
+        pass
