@@ -120,12 +120,11 @@ class CameraRuntime:
 
             with self._lock:
                 camera.latest_frame = frames[-1]
-                camera.latest_output = None
                 subscribed_models = camera.subscribed_models
 
                 for inference in subscribed_models:
                     if inference.name in running_models:
-                        camera.latest_output = inference.predict(frames)
+                        inference.predict(frames)
 
         finally:
             capture.release()
@@ -171,14 +170,11 @@ class CameraRuntime:
 
                 with self._lock:
                     camera.latest_frame = latest_frame
-                    camera.latest_output = None
                     subscribed_models = camera.subscribed_models
 
                     for inference in subscribed_models:
                         if inference.name in running_models:
-                            camera.latest_output = inference.predict(
-                                [latest_frame]
-                            )
+                            inference.predict([latest_frame])
 
         finally:
             capture.release()

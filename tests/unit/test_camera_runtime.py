@@ -117,16 +117,13 @@ def test_capture_frames_defaults_to_one_image_and_releases_capture(
     assert capture.released
 
 
-def test_capture_frames_stores_subscribed_model_output(
+def test_capture_frames_runs_subscribed_model(
     monkeypatch,
 ) -> None:
-    expected_output = {"environment_name": "workshop"}
     predicted_batches = []
     model = SimpleNamespace(
         name="test-model",
-        predict=lambda frames: (
-            predicted_batches.append(frames) or expected_output
-        ),
+        predict=lambda frames: predicted_batches.append(frames),
     )
     camera = _camera(subscribed_models=[model])
     runtime = CameraRuntime(
@@ -140,7 +137,6 @@ def test_capture_frames_stores_subscribed_model_output(
 
     runtime.capture_frames(camera.id, {"test-model": True})
 
-    assert camera.latest_output is expected_output
     assert predicted_batches == [[camera.latest_frame]]
 
 
@@ -266,7 +262,6 @@ def test_capture_loop_updates_frame_and_runs_subscribed_models(
     runtime._capture_loop(camera.id, {"test-model": True})
 
     assert camera.latest_frame is predictions[0][0]
-    assert camera.latest_output is None
     assert capture.released
 
 

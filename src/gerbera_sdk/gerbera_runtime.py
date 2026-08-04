@@ -1,9 +1,8 @@
-import json
 import subprocess
 from typing import Annotated
 
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field, StrictFloat
+from pydantic import Field, StrictFloat
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.events.event_bus import EventBus
@@ -260,14 +259,6 @@ class GerberaRuntime:
         for camera in cameras:
             camera_key = camera.id
 
-            def serialize_camera_output(camera_key: str) -> str:
-                output = camera_runtime.get_camera_session(
-                    camera_key
-                ).camera.latest_output
-                if isinstance(output, BaseModel):
-                    return output.model_dump_json()
-                return json.dumps(output)
-
             def build_capture_frames_tool(camera_key: str):
                 def capture_frames_from_camera(
                     running_models: list[str] | None = None,
@@ -279,7 +270,7 @@ class GerberaRuntime:
                         float,
                         Field(ge=0.0, le=60.0),
                     ] = 0.0,
-                ) -> str:
+                ) -> None:
                     selected_models = {
                         name: True
                         for name in (running_models or [])
@@ -290,7 +281,6 @@ class GerberaRuntime:
                         image_count=image_count,
                         interval_seconds=interval_seconds,
                     )
-                    return serialize_camera_output(camera_key)
 
                 return capture_frames_from_camera
 
@@ -301,8 +291,7 @@ class GerberaRuntime:
                     "image_count controls the batch size and interval_seconds "
                     "controls the delay between images. "
                     "Optionally provide running_models using subscribed "
-                    "inference names. Returns the camera's latest inference "
-                    "output as a JSON string."
+                    "inference names."
                 ),
                 tool_function=build_capture_frames_tool(camera_key),
             )

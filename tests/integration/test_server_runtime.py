@@ -1,5 +1,4 @@
 import asyncio
-import json
 from types import SimpleNamespace
 
 from fastmcp import FastMCP
@@ -54,17 +53,9 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
     captured_batches = []
     started_streams = []
     stopped_streams = []
-    camera_output = VisionLanguageModelFrameEnvironment(
-        environment_name="workshop",
-        description="A workbench",
-        objects=[],
-    )
     camera_runtime = SimpleNamespace(
         capture_frames=lambda **kwargs: (
             captured_batches.append(kwargs)
-        ),
-        get_camera_session=lambda camera_key: SimpleNamespace(
-            camera=SimpleNamespace(latest_output=camera_output)
         ),
         turn_on_camera_stream=lambda camera_key, running_models: (
             started_streams.append((camera_key, running_models))
@@ -102,7 +93,7 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
             "interval_seconds": 0.25,
         }
     ]
-    assert json.loads(result) == camera_output.model_dump()
+    assert result is None
 
     assert app.tools["turn_on_local_camera_stream"](
         ["openai-vision-language-model"],
@@ -133,9 +124,6 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
     )
     camera_runtime = SimpleNamespace(
         capture_frames=lambda **kwargs: None,
-        get_camera_session=lambda camera_key: SimpleNamespace(
-            camera=SimpleNamespace(latest_output=None)
-        ),
         turn_on_camera_stream=lambda camera_key, running_models: None,
         turn_off_camera_stream=lambda camera_key: None,
     )
@@ -200,9 +188,6 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     )
     camera_runtime = SimpleNamespace(
         capture_frames=lambda **kwargs: None,
-        get_camera_session=lambda camera_key: SimpleNamespace(
-            camera=SimpleNamespace(latest_output=None)
-        ),
         turn_on_camera_stream=lambda camera_key, running_models: None,
         turn_off_camera_stream=lambda camera_key: None,
     )
