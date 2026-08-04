@@ -12,8 +12,8 @@ from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
 class VisionLanguageModelAdapter(ABC):
     api_key: str
     model: str
-    max_tokens: int = 1024
-    timeout_seconds: float = 120.0
+    max_tokens: int
+    timeout_seconds: float
 
     @staticmethod
     def _parse_json_output(output_text: str) -> dict[str, object]:

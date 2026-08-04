@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 import uuid
 
-from gerbera_sdk.inference import Frame, Inference
 
+if TYPE_CHECKING:
+    from gerbera_sdk.inference import Frame, Inference
 
 # Camera Sources
 @dataclass(frozen=True)
