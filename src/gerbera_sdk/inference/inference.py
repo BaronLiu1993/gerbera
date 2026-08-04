@@ -1,26 +1,19 @@
-from typing import TypeAlias
 from enum import Enum
+from typing import TypeAlias
 
-from gerbera_sdk.inference.cloud_model_adapter import (
-    AnthropicCloudModelAdapter,
-    GoogleCloudModelAdapter,
-    OpenAICloudModelAdapter,
-)
-
-ModelAdapters: TypeAlias = (
-    AnthropicCloudModelAdapter
-    | OpenAICloudModelAdapter
-    | GoogleCloudModelAdapter
-)
 
 class ModelTypes(Enum):
     VISION_LANGUAGE_MODEL = "vision_language_model"
-    NEURAL_NETWORK = "neural_network"
+    OBJECT_DETECTION = "object_detection"
 
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
-    VisionLanguageModelInference,
+    VisionLanguageModelInference
+)
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
+    ObjectDetectionModelInference
 )
 
 Inference: TypeAlias = (
-    VisionLanguageModelInference
+    VisionLanguageModelInference,
+    ObjectDetectionModelInference
 )

@@ -1,11 +1,13 @@
 from enum import Enum
 
-from gerbera_sdk.inference.cloud_model_adapter import (
-    CloudModelAdapter,
-    CloudModelAdapterRegistry,
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
     ModelProviderEnum,
+    VisionLanguageModelAdapter,
+    VisionLanguageModelAdapterRegistry,
 )
-from gerbera_sdk.inference.local_model_adapter import LocalModelAdapter
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
+    ObjectDetectionAdapter,
+)
 
 
 class ModelTypeEnum(Enum):
@@ -14,8 +16,8 @@ class ModelTypeEnum(Enum):
 
 
 _MODEL_REGISTRY = {
-    ModelTypeEnum.LOCAL: LocalModelAdapter,
-    ModelTypeEnum.CLOUD: CloudModelAdapterRegistry,
+    ModelTypeEnum.LOCAL: ObjectDetectionAdapter,
+    ModelTypeEnum.CLOUD: VisionLanguageModelAdapterRegistry,
 }
 
 
@@ -24,9 +26,9 @@ class ModelRegistry:
     def get_model_from_registry(
         model_type: ModelTypeEnum,
         model_provider: str,
-    ) -> type[LocalModelAdapter] | type[CloudModelAdapter]:
+    ) -> type[ObjectDetectionAdapter] | type[VisionLanguageModelAdapter]:
         registered_model = _MODEL_REGISTRY[model_type]
-        if registered_model is LocalModelAdapter:
+        if registered_model is ObjectDetectionAdapter:
             return registered_model
 
         provider = ModelProviderEnum(model_provider)
