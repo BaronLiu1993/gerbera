@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import uuid
 
+from gerbera_sdk.inference import Model
 from gerbera_sdk.models.hardware.camera import Camera
 from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
@@ -10,6 +11,7 @@ class HardwareSystem:
     description: str = ""
     microcontrollers: list[Microcontroller] = field(default_factory=list)
     cameras: list[Camera] = field(default_factory=list)
+    models: list[Model] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def _get_required_microcontroller_libraries(self) -> list[str]:

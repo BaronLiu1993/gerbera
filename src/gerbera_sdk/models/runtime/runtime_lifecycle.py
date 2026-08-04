@@ -47,7 +47,7 @@ class RuntimeLifecycle:
             self.board_runtime.start()
             cleanup.callback(self.board_runtime.close)
 
-            self.camera_runtime.register_cameras()
+            self.camera_runtime.start_cameras()
             cleanup.callback(self.camera_runtime.clean_up_cameras)
 
             self.database_runtime.start()

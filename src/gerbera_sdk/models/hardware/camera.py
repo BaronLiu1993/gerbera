@@ -6,7 +6,7 @@ import uuid
 
 
 if TYPE_CHECKING:
-    from gerbera_sdk.inference import Frame, Inference
+    from gerbera_sdk.inference import Frame
 
 # Camera Sources
 @dataclass(frozen=True)
@@ -28,5 +28,4 @@ class Camera:
     description: str
     source: CameraSource
     latest_frame: Frame | None = None
-    subscribed_models: list[Inference] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

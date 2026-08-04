@@ -41,9 +41,9 @@ class Yolov5ModelAdapter(ObjectDetectionAdapter):
     def decode(self):
         pass
 
-    def detect(self, frame: list[Frame]):
+    def detect(self, frame: Frame):
         blob = cv2.dnn.blobFromImage(
-            frame,
+            frame.image,
             scalefactor=1 / 255.0,
             size=(640, 640),
             swapRB=True,
@@ -51,7 +51,7 @@ class Yolov5ModelAdapter(ObjectDetectionAdapter):
         )
         self.model.setInput(blob)
         predictions = self.model.forward()
-        print(predictions)
+        return predictions
 
 
 class Yolov8ModelAdapter(ObjectDetectionAdapter):
@@ -61,9 +61,9 @@ class Yolov8ModelAdapter(ObjectDetectionAdapter):
     def decode(self):
         pass
 
-    def detect(self, frame: list[Frame]):
+    def detect(self, frame: Frame):
         blob = cv2.dnn.blobFromImage(
-            frame,
+            frame.image,
             scalefactor=1 / 255.0,
             size=(640, 640),
             swapRB=True,
@@ -71,7 +71,7 @@ class Yolov8ModelAdapter(ObjectDetectionAdapter):
         )
         self.model.setInput(blob)
         predictions = self.model.forward()
-        print(predictions)
+        return predictions
 
 ObjectDetectionModelAdapters: TypeAlias = Yolov5ModelAdapter 
 

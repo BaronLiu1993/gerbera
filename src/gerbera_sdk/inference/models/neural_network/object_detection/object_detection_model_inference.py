@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
 
-from pydantic import Field
+from pydantic import Field, InstanceOf
 import threading
 
-from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionModelAdapters,
@@ -12,54 +11,114 @@ from gerbera_sdk.inference.model_types import (
     ObjectDetectionModelProviderEnum,
 )
 from gerbera_sdk.models.hardware.camera import Camera
+from gerbera_sdk.utils import StrictSchema
 
 
-@dataclass
-class ObjectDetectionModel:
+class ObjectDetectionModel(StrictSchema):
+    model_name: ObjectDetectionModelProviderEnum
     name: str = Field(min_length=1)
-    model_name: ObjectDetectionModelProviderEnum # Yolov5 or whatever
     model_source: str = Field(min_length=1)
-    subscribed_cameras: list[Camera] = field(default_factory=list)
+    subscribed_cameras: list[InstanceOf[Camera]] = Field(min_length=1)
     description: str = ""
 
     @property
     def model(self) -> "ObjectDetectionModelInference":
-        if self.model_name not in OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]:
-            raise RuntimeError(
-                f"Model Does Not Exist For Provider {self.model_name}"
-            )
-        adapter = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
-        object_detection_model = adapter(model_source=self.model_source)
+        adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
+        object_detection_model = adapter_class(
+            model_source=self.model_source
+        )
 
         return ObjectDetectionModelInference(
-            model=object_detection_model,
+            model_session=ObjectDetectionSession(
+                model=object_detection_model
+            ),
             name=self.name,
             description=self.description,
+            subscribed_cameras=self.subscribed_cameras,
         )
 
 
 @dataclass
-class VLMSession:
-    model: ObjectDetectionModel
+class ObjectDetectionSession:
+    model: ObjectDetectionModelAdapters
     _thread: threading.Thread | None = None
     _stop_event: threading.Event | None = None
 
 
 @dataclass
 class ObjectDetectionModelInference:
-    model: ObjectDetectionModelAdapters
+    model_session: ObjectDetectionSession
     name: str
     description: str
+    subscribed_cameras: list[Camera] = field(default_factory=list)
     interval_seconds: float = 0.2
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+    )
 
-    def turn_on_prediction_loop(self):
-        pass
+    def turn_on_prediction_loop(self) -> None:
+        if self.model_session._thread is not None:
+            raise RuntimeError(
+                f"Object detection is already running: {self.name}"
+            )
 
-    def turn_off_prediction_loop(self):
-        pass
+        stop_event = threading.Event()
+        thread = threading.Thread(
+            target=self.prediction_loop,
+            name=f"object-detection-{self.name}",
+            daemon=False,
+        )
 
-    def prediction_loop(self):
-        pass
+        self.model_session._stop_event, self.model_session._thread = (
+            stop_event,
+            thread,
+        )
 
-    def predict(self, frame: Frame):
-        pass
+        try:
+            thread.start()
+        except RuntimeError as exc:
+            with self._lock:
+                self.model_session._stop_event = None
+                self.model_session._thread = None
+            raise RuntimeError(
+                f"Could Not Start Object Detection Thread {self.name}"
+            ) from exc
+
+    def turn_off_prediction_loop(self) -> None:
+        stop_event = self.model_session._stop_event
+        thread = self.model_session._thread
+
+        if stop_event is None or thread is None:
+            raise RuntimeError(
+                f"Object detection is not running: {self.name}"
+            )
+
+        stop_event.set()
+        thread.join(timeout=5.0)
+
+        if thread.is_alive():
+            raise RuntimeError(
+                f"Object detection thread did not stop: {self.name}"
+            )
+
+        with self._lock:
+            self.model_session._stop_event = None
+            self.model_session._thread = None
+
+    def prediction_loop(self) -> None:
+        stop_event = self.model_session._stop_event
+        if stop_event is None:
+            raise RuntimeError(
+                "Object detection prediction loop has no stop event"
+            )
+
+        while not stop_event.is_set():
+            for camera in self.subscribed_cameras:
+                frame = camera.latest_frame
+                if frame is not None:
+                    detection = self.model_session.model.detect(frame)
+                    print(detection)
+
+            stop_event.wait(self.interval_seconds)

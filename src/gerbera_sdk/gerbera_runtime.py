@@ -210,41 +210,6 @@ class GerberaRuntime:
         GerberaRuntime._register_inference_tools(server_runtime)
 
     @staticmethod
-    def _register_inference_tools(
-        server_runtime: ServerRuntime,
-    ) -> None:
-        registered_models: dict[str, Inference] = {}
-
-        for camera in server_runtime.hardware_system.cameras:
-            for model in camera.subscribed_models:
-                registered_model = registered_models.get(model.name)
-                if registered_model is model:
-                    continue
-                if registered_model is not None:
-                    raise ValueError(
-                        f"Inference model name must be unique: {model.name}"
-                    )
-                registered_models[model.name] = model
-
-        for model in registered_models.values():
-            def build_predict_tool(model: Inference):
-                def predict_with_model(
-                    frames: list[str],
-                ) -> VisionLanguageModelFrameEnvironment:
-                    return model.predict(frames)
-
-                return predict_with_model
-
-            server_runtime._register_tool(
-                name=f"predict_with_{model.name}",
-                description=(
-                    f"{model.description} Provide one or more Base64 "
-                    "image strings."
-                ),
-                tool_function=build_predict_tool(model),
-            )
-
-    @staticmethod
     def _register_camera_tools(
         server_runtime: ServerRuntime,
     ) -> None:
@@ -261,7 +226,6 @@ class GerberaRuntime:
 
             def build_capture_frames_tool(camera_key: str):
                 def capture_frames_from_camera(
-                    running_models: list[str] | None = None,
                     image_count: Annotated[
                         int,
                         Field(ge=1, le=20),
@@ -270,67 +234,82 @@ class GerberaRuntime:
                         float,
                         Field(ge=0.0, le=60.0),
                     ] = 0.0,
-                ) -> None:
-                    selected_models = {
-                        name: True
-                        for name in (running_models or [])
-                    }
-                    camera_runtime._capture_frames(
+                ) -> list[str]:
+                    frames = camera_runtime.capture_frames(
                         camera_key=camera_key,
-                        running_models=selected_models,
                         image_count=image_count,
                         interval_seconds=interval_seconds,
                     )
+                    return [frame.to_base64_string() for frame in frames]
 
                 return capture_frames_from_camera
 
             server_runtime._register_tool(
                 name=f"capture_frames_from_{camera.name}",
                 description=(
-                    f"Capture and batch one or more images from {camera.name}. "
+                    f"Capture one or more current images from {camera.name}. "
                     "image_count controls the batch size and interval_seconds "
-                    "controls the delay between images. "
-                    "Optionally provide running_models using subscribed "
-                    "inference names."
+                    "controls the delay between images. Returns the images as "
+                    "Base64 strings for precise vision inference."
                 ),
                 tool_function=build_capture_frames_tool(camera_key),
             )
 
-            def build_start_stream_tool(camera_key: str):
-                def turn_on_stream(
-                    running_models: list[str] | None = None,
-                ) -> None:
-                    selected_models = {
-                        name: True
-                        for name in (running_models or [])
-                    }
-                    camera_runtime.turn_on_camera_stream(
-                        camera_key,
-                        selected_models,
-                    )
+    @staticmethod
+    def _register_inference_tools(
+        server_runtime: ServerRuntime,
+    ) -> None:
+        registered_models: dict[str, Inference] = {}
 
-                return turn_on_stream
+        for configured_model in server_runtime.hardware_system.models:
+            inference = configured_model.model
+            registered_model = registered_models.get(inference.name)
+            if registered_model is not None:
+                raise ValueError(
+                    f"Inference model name must be unique: {inference.name}"
+                )
+            registered_models[inference.name] = inference
+
+        for model in registered_models.values():
+            def build_turn_on_inference_tool(model: Inference):
+                def turn_on_inference() -> None:
+                    model.turn_on_prediction_loop()
+
+                return turn_on_inference
 
             server_runtime._register_tool(
-                name=f"turn_on_{camera.name}_stream",
-                description=(
-                    f"Start continuous capture from {camera.name}. "
-                    "Optionally provide running_models using subscribed "
-                    "inference names."
-                ),
-                tool_function=build_start_stream_tool(camera_key),
+                name=f"turn_on_{model.name}_inference",
+                description=f"Start continuous inference for {model.name}.",
+                tool_function=build_turn_on_inference_tool(model),
             )
 
-            def build_stop_stream_tool(camera_key: str):
-                def turn_off_stream() -> None:
-                    camera_runtime.turn_off_camera_stream(camera_key)
+            def build_turn_off_inference_tool(model: Inference):
+                def turn_off_inference() -> None:
+                    model.turn_off_prediction_loop()
 
-                return turn_off_stream
+                return turn_off_inference
 
             server_runtime._register_tool(
-                name=f"turn_off_{camera.name}_stream",
-                description=f"Stop continuous capture from {camera.name}.",
-                tool_function=build_stop_stream_tool(camera_key),
+                name=f"turn_off_{model.name}_inference",
+                description=f"Stop continuous inference for {model.name}.",
+                tool_function=build_turn_off_inference_tool(model),
+            )
+
+            def build_predict_tool(model: Inference):
+                def predict_with_model(
+                    frames: list[str],
+                ) -> VisionLanguageModelFrameEnvironment:
+                    return model.predict(frames)
+
+                return predict_with_model
+
+            server_runtime._register_tool(
+                name=f"predict_with_{model.name}",
+                description=(
+                    f"{model.description} Provide one or more Base64 "
+                    "image strings."
+                ),
+                tool_function=build_predict_tool(model),
             )
 
     @staticmethod

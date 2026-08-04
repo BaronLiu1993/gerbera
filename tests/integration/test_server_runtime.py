@@ -43,7 +43,7 @@ class FakeSerialConnection:
         self.on_write()
 
 
-def test_server_registers_named_camera_tools_when_camera_exists() -> None:
+def test_server_registers_camera_capture_tool() -> None:
     camera = Camera(
         id="local-camera",
         name="local_camera",
@@ -51,102 +51,61 @@ def test_server_registers_named_camera_tools_when_camera_exists() -> None:
         source=DeviceCameraSource(device_index=0),
     )
     captured_batches = []
-    started_streams = []
-    stopped_streams = []
+    frames = [
+        SimpleNamespace(to_base64_string=lambda: "first-base64"),
+        SimpleNamespace(to_base64_string=lambda: "second-base64"),
+    ]
     camera_runtime = SimpleNamespace(
-        _capture_frames=lambda **kwargs: (
-            captured_batches.append(kwargs)
-        ),
-        turn_on_camera_stream=lambda camera_key, running_models: (
-            started_streams.append((camera_key, running_models))
-        ),
-        turn_off_camera_stream=lambda camera_key: (
-            stopped_streams.append(camera_key)
+        capture_frames=lambda **kwargs: (
+            captured_batches.append(kwargs) or frames
         ),
     )
-    event_bus = EventBus()
     app = FakeApp()
     runtime = ServerRuntime(
         hardware_system=HardwareSystem(cameras=[camera]),
         board_runtime=object(),
-        event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
+        event_bus=EventBus(),
+        stream_controller=StreamController(EventBus()),
         event_worker=EventWorker(),
         app=app,
         camera_runtime=camera_runtime,
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
-    result = app.tools["capture_frames_from_local_camera"](
-        ["openai-vision-language-model"],
-        3,
-        0.25,
-    )
+    result = app.tools["capture_frames_from_local_camera"](3, 0.25)
 
     assert captured_batches == [
         {
             "camera_key": "local-camera",
-            "running_models": {
-                "openai-vision-language-model": True,
-            },
             "image_count": 3,
             "interval_seconds": 0.25,
         }
     ]
-    assert result is None
-
-    assert app.tools["turn_on_local_camera_stream"](
-        ["openai-vision-language-model"],
-    ) is None
-    assert started_streams == [
-        (
-            "local-camera",
-            {"openai-vision-language-model": True},
-        )
-    ]
-
-    assert app.tools["turn_off_local_camera_stream"]() is None
-    assert stopped_streams == ["local-camera"]
+    assert result == ["first-base64", "second-base64"]
 
 
 def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
-    model = SimpleNamespace(
-        name="openai-vision-language-model",
-        description="Analyze supplied images.",
-        predict=lambda frames: None,
-    )
     camera = Camera(
         id="local-camera",
         name="local_camera",
         description="Built-in camera",
         source=DeviceCameraSource(device_index=0),
-        subscribed_models=[model],
     )
-    camera_runtime = SimpleNamespace(
-        _capture_frames=lambda **kwargs: None,
-        turn_on_camera_stream=lambda camera_key, running_models: None,
-        turn_off_camera_stream=lambda camera_key: None,
-    )
-    event_bus = EventBus()
     app = FastMCP("test")
     runtime = ServerRuntime(
         hardware_system=HardwareSystem(cameras=[camera]),
         board_runtime=object(),
-        event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
+        event_bus=EventBus(),
+        stream_controller=StreamController(EventBus()),
         event_worker=EventWorker(),
         app=app,
-        camera_runtime=camera_runtime,
+        camera_runtime=SimpleNamespace(capture_frames=lambda **kwargs: []),
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
     tool = asyncio.run(app.get_tool("capture_frames_from_local_camera"))
-    predict_tool = asyncio.run(
-        app.get_tool("predict_with_openai-vision-language-model")
-    )
     properties = tool.parameters["properties"]
 
-    assert asyncio.run(app.get_tool("capture_from_local_camera")) is None
     assert properties["image_count"] == {
         "default": 1,
         "maximum": 20,
@@ -159,10 +118,8 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         "minimum": 0.0,
         "type": "number",
     }
-    assert predict_tool.parameters["properties"]["frames"] == {
-        "items": {"type": "string"},
-        "type": "array",
-    }
+    assert asyncio.run(app.get_tool("turn_on_local_camera_stream")) is None
+    assert asyncio.run(app.get_tool("turn_off_local_camera_stream")) is None
 
 
 def test_server_registers_model_base64_prediction_as_a_tool() -> None:
@@ -179,28 +136,17 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
             received_frames.append(frames) or prediction
         ),
     )
-    camera = Camera(
-        id="local-camera",
-        name="local_camera",
-        description="Built-in camera",
-        source=DeviceCameraSource(device_index=0),
-        subscribed_models=[model],
-    )
-    camera_runtime = SimpleNamespace(
-        _capture_frames=lambda **kwargs: None,
-        turn_on_camera_stream=lambda camera_key, running_models: None,
-        turn_off_camera_stream=lambda camera_key: None,
-    )
     event_bus = EventBus()
     app = FakeApp()
     runtime = ServerRuntime(
-        hardware_system=HardwareSystem(cameras=[camera]),
+        hardware_system=HardwareSystem(
+            models=[SimpleNamespace(model=model)]
+        ),
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
-        camera_runtime=camera_runtime,
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
@@ -212,7 +158,54 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     assert result is prediction
 
 
-def test_server_does_not_register_capture_frame_without_cameras() -> None:
+def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
+    calls = []
+    vision_inference = SimpleNamespace(
+        name="workspace-vlm",
+        description="Observe the workspace.",
+        predict=lambda frames: None,
+        turn_on_prediction_loop=lambda: calls.append("vlm.on"),
+        turn_off_prediction_loop=lambda: calls.append("vlm.off"),
+    )
+    object_detection_inference = SimpleNamespace(
+        name="part-detector",
+        description="Detect parts.",
+        predict=lambda frames: None,
+        turn_on_prediction_loop=lambda: calls.append("detector.on"),
+        turn_off_prediction_loop=lambda: calls.append("detector.off"),
+    )
+    hardware_system = HardwareSystem(
+        models=[
+            SimpleNamespace(model=vision_inference),
+            SimpleNamespace(model=object_detection_inference),
+        ]
+    )
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=hardware_system,
+        board_runtime=object(),
+        event_bus=EventBus(),
+        stream_controller=StreamController(EventBus()),
+        event_worker=EventWorker(),
+        app=app,
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+
+    app.tools["turn_on_workspace-vlm_inference"]()
+    app.tools["turn_on_part-detector_inference"]()
+    app.tools["turn_off_workspace-vlm_inference"]()
+    app.tools["turn_off_part-detector_inference"]()
+
+    assert calls == [
+        "vlm.on",
+        "detector.on",
+        "vlm.off",
+        "detector.off",
+    ]
+
+
+def test_server_does_not_register_camera_lifecycle_tools() -> None:
     event_bus = EventBus()
     app = FakeApp()
     runtime = ServerRuntime(
