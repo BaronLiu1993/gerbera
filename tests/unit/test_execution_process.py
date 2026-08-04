@@ -22,7 +22,6 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     DiscreteExecuteSchema,
     RuleCreationSchema,
 )
-from gerbera_harness.agent.driver.subloop.schema.act import ToolCallStatusEnum
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
@@ -86,21 +85,11 @@ def continuous_action() -> ContinuousExecuteSchema:
 def agent_action() -> AgentExecuteSchema:
     return AgentExecuteSchema.model_validate(
         {
-            "description": "Approach the detected block.",
             "action_type": "execute",
             "execution_type": "agent",
-            "start_offset_seconds": 0,
             "goal": "Move within grasping range of the block.",
             "completion_criteria": "The block is centered and within reach.",
-            "input_event_keys": [
-                {
-                    "event_type": "VISION",
-                    "microcontroller_id": "camera-1",
-                    "event_name": "block_detected",
-                }
-            ],
-            "allowed_tool_calls": ["set_motor"],
-            "max_iterations": 10,
+            "max_turns": 10,
             "timeout_seconds": 30,
         }
     )
@@ -218,7 +207,7 @@ def test_execution_process_stops_continuous_action() -> None:
     assert process.errors == []
 
 
-def test_execution_process_reports_unimplemented_agent_loop() -> None:
+def test_execution_process_rejects_agent_actions() -> None:
     group = ExecuteActionGroupSchema(
         goal="Approach the detected block.",
         action_type="execute",
@@ -229,17 +218,28 @@ def test_execution_process_reports_unimplemented_agent_loop() -> None:
         actions_list=[group],
     )
 
-    result = asyncio.run(process.run_workflow())
+    with pytest.raises(
+        ValueError,
+        match="only accepts deterministic actions",
+    ):
+        asyncio.run(process.run_workflow())
 
-    assert result is ExecuteDecisionEnum.FAILED
-    assert process.errors == [
-        ExecuteErrorSchema(
-            event_name="Approach the detected block.",
-            event_type=ExecutionTypeEnum.AGENT,
-            position=0,
-            error="Execution group 0 failed",
-        )
-    ]
+    assert process.errors == []
+
+
+def test_execution_process_rejects_empty_workflow() -> None:
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="requires deterministic action groups",
+    ):
+        asyncio.run(process.run_workflow())
+
+    assert process.errors == []
 
 
 def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
@@ -284,7 +284,7 @@ def test_execution_process_rejects_incomplete_action_statuses() -> None:
         actions_list=[],
     )
     decision = process._build_decision(
-        [ToolCallStatusEnum.SUCCESS, ToolCallStatusEnum.FAILED]
+        [ExecuteDecisionEnum.ACCEPTED, ExecuteDecisionEnum.FAILED]
     )
 
     assert decision is ExecuteDecisionEnum.FAILED
@@ -324,7 +324,7 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
             event_name="Set the motor speed.",
             event_type=ExecutionTypeEnum.DISCRETE,
             position=1,
-            error="Execution group 1 failed",
+            error="MCP tool 'set_motor' failed: tool failed",
         )
     ]
 
@@ -336,6 +336,34 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
             "event_name": "temperature",
         },
     )
+
+
+def test_execution_process_fails_when_rule_cleanup_fails() -> None:
+    FakeMCPClient.failing_tools = {"delete_rule"}
+    group = ExecuteActionGroupSchema(
+        goal="Set the motor speed safely.",
+        action_type="execute",
+        actions=[rule_creation_action(), discrete_action()],
+    )
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[group],
+    )
+
+    result = asyncio.run(process.run_workflow())
+
+    assert result is ExecuteDecisionEnum.FAILED
+    assert process.errors == [
+        ExecuteErrorSchema(
+            event_name="Set the motor speed safely.",
+            event_type=ExecutionTypeEnum.RULE,
+            position=0,
+            error=(
+                "Rule cleanup failed: MCP tool 'delete_rule' failed: "
+                "tool failed"
+            ),
+        )
+    ]
 
 
 def test_execution_process_rejects_rule_after_first_group() -> None:
@@ -378,7 +406,7 @@ def test_execution_process_rejects_unknown_tool() -> None:
             event_name="Call an unavailable tool.",
             event_type=ExecutionTypeEnum.DISCRETE,
             position=0,
-            error="Execution group 0 failed",
+            error="MCP tool is not allowed: unknown_tool",
         )
     ]
     assert FakeMCPClient.calls == []
@@ -404,9 +432,9 @@ def test_execution_process_stops_continuous_action_on_group_failure() -> None:
             event_name=(
                 "Collect readings while setting the motor speed."
             ),
-            event_type=ExecutionTypeEnum.CONTINUOUS,
+            event_type=ExecutionTypeEnum.DISCRETE,
             position=0,
-            error="Execution group 0 failed",
+            error="MCP tool 'set_motor' failed: tool failed",
         )
     ]
     assert ("start_sensor", {"enabled": True}) in FakeMCPClient.calls
