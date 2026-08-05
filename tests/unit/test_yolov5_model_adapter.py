@@ -34,7 +34,12 @@ def adapter(tmp_path, monkeypatch) -> Yolov5ModelAdapter:
         tmp_path,
     )
 
-    return Yolov5ModelAdapter(model_source="yolov5n.onnx")
+    return Yolov5ModelAdapter(
+        model_source="yolov5n.onnx",
+        confidence_threshold=0.25,
+        iou_threshold=0.45,
+        max_detections=300,
+    )
 
 
 def test_manifest_is_loaded_from_model_source_yaml(

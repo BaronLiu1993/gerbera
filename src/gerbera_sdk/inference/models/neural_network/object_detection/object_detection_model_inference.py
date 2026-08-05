@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from pydantic import Field, InstanceOf
 import threading
+import uuid
 
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
@@ -18,6 +19,10 @@ from gerbera_sdk.models.hardware.camera import Camera
 
 @dataclass
 class ObjectDetectionModel:
+    model_id: str = field(
+        default_factory=lambda: str(uuid.uuid4()),
+        init=False,
+    )
     model_name: ObjectDetectionModelProviderEnum
     name: str = Field(min_length=1)
     model_source: str = Field(min_length=1)
@@ -54,6 +59,10 @@ class ObjectDetectionSession:
 
 @dataclass
 class ObjectDetectionModelInference:
+    model_id: str = field(
+        default_factory=lambda: str(uuid.uuid4()),
+        init=False,
+    )
     model_session: ObjectDetectionSession
     name: str
     description: str
@@ -111,11 +120,11 @@ class ObjectDetectionModelInference:
     def predict(self, camera: Camera) -> PerceptionStateModel:
         frame = camera.latest_frame
         if frame is None:
-            raise RuntimeError(f"Camera has no frame: {camera.id}")
+            raise RuntimeError(f"Camera has no frame: {camera.camera_id}")
 
         perception_objects = self.model_session.model.detect(frame)
         return PerceptionStateModel(
-            camera_id=camera.id,
+            camera_id=camera.camera_id,
             frame=frame,
             model_name=self.name,
             perception_objects=perception_objects,
@@ -129,7 +138,12 @@ class ObjectDetectionModelInference:
         while not stop_event.is_set():
             for camera in self.subscribed_cameras:
                 if camera.latest_frame is not None:
-                    perception_state = self.predict(camera)
-                    print(perception_state)
+                    perception_objects = self.predict(camera)
+                    PerceptionStateModel(
+                        camera_id=camera.camera_id,
+                        frame=camera.latest_frame,
+                        model_name=self.name,
+                        perception_objects=perception_objects,
+                    )
 
             stop_event.wait(self.interval_seconds)

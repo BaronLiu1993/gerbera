@@ -3,6 +3,7 @@ from pathlib import Path
 
 from pydantic import Field, InstanceOf
 import threading
+import uuid
 
 from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_schema import (
@@ -31,6 +32,7 @@ VISION_LANGUAGE_MODEL_VALID_NAME = {
 
 class VisionLanguageModel(StrictSchema):
     # We need these
+    model_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = Field(min_length=1)
     model_provider: VisionLanguageModelProviderEnum
 
