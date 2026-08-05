@@ -1,3 +1,5 @@
+from mcp.types import ToolAnnotations
+
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
@@ -49,6 +51,21 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
                 },
             )
         ]
+
+    def annotations(
+        self,
+        connection: Connection,
+        command: CommandSpec,
+    ) -> ToolAnnotations:
+        if command.method.strip().upper() != "WRITE":
+            raise ValueError(f"Unsupported DC motor command: {command.method}")
+        return ToolAnnotations(
+            title=f"Set {connection.name} motor motion",
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=False,
+        )
 
     def build_handler(self, connection: Connection) -> str:
         in1_pin = connection.pins["in1"]

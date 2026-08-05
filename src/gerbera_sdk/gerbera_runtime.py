@@ -2,6 +2,7 @@ import subprocess
 from typing import Annotated, Literal
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field, StrictFloat
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
@@ -284,6 +285,13 @@ class GerberaRuntime:
                     "Base64 strings for precise vision inference."
                 ),
                 tool_function=build_capture_frames_tool(camera_key),
+                annotations=ToolAnnotations(
+                    title=f"Capture frames from {camera.name}",
+                    readOnlyHint=True,
+                    destructiveHint=False,
+                    idempotentHint=True,
+                    openWorldHint=False,
+                ),
             )
 
     @staticmethod
@@ -322,6 +330,16 @@ class GerberaRuntime:
                 name=turn_on_tool_name,
                 description=f"Start continuous inference for {model.name}.",
                 tool_function=build_turn_on_inference_tool(model_id),
+                annotations=ToolAnnotations(
+                    title=f"Start continuous inference for {model.name}",
+                    readOnlyHint=False,
+                    destructiveHint=False,
+                    idempotentHint=True,
+                    openWorldHint=not isinstance(
+                        model,
+                        ObjectDetectionModelInference,
+                    ),
+                ),
             )
 
             def build_turn_off_inference_tool(model_id: str):
@@ -334,6 +352,13 @@ class GerberaRuntime:
                 name=turn_off_tool_name,
                 description=f"Stop continuous inference for {model.name}.",
                 tool_function=build_turn_off_inference_tool(model_id),
+                annotations=ToolAnnotations(
+                    title=f"Stop continuous inference for {model.name}",
+                    readOnlyHint=False,
+                    destructiveHint=False,
+                    idempotentHint=True,
+                    openWorldHint=False,
+                ),
             )
 
             if isinstance(model, ObjectDetectionModelInference):
@@ -438,12 +463,29 @@ class GerberaRuntime:
                     f"{model.name} for a subscribed camera ID."
                 ),
                 tool_function=read_tool,
+                annotations=ToolAnnotations(
+                    title=f"Read latest inference from {model.name}",
+                    readOnlyHint=True,
+                    destructiveHint=False,
+                    idempotentHint=True,
+                    openWorldHint=False,
+                ),
             )
 
             server_runtime._register_tool(
                 name=single_inference_tool_name,
                 description=predict_description,
                 tool_function=predict_tool,
+                annotations=ToolAnnotations(
+                    title=f"Perform one-shot inference with {model.name}",
+                    readOnlyHint=True,
+                    destructiveHint=False,
+                    idempotentHint=True,
+                    openWorldHint=not isinstance(
+                        model,
+                        ObjectDetectionModelInference,
+                    ),
+                ),
             )
 
         def list_configured_models() -> list[ModelCatalogEntry]:
@@ -486,6 +528,13 @@ class GerberaRuntime:
                 "lifecycle, read, and single-inference tool names."
             ),
             tool_function=list_configured_models,
+            annotations=ToolAnnotations(
+                title="List configured inference models",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
         )
 
     @staticmethod
@@ -530,6 +579,13 @@ class GerberaRuntime:
                 "or hardcode an endpoint."
             ),
             tool_function=insert_rule,
+            annotations=ToolAnnotations(
+                title="Create an event rule",
+                readOnlyHint=False,
+                destructiveHint=False,
+                idempotentHint=False,
+                openWorldHint=False,
+            ),
         )
 
         def delete_rule(
@@ -550,6 +606,13 @@ class GerberaRuntime:
                 "its local callback script."
             ),
             tool_function=delete_rule,
+            annotations=ToolAnnotations(
+                title="Delete an event rule",
+                readOnlyHint=False,
+                destructiveHint=True,
+                idempotentHint=False,
+                openWorldHint=False,
+            ),
         )
 
     @staticmethod
@@ -566,6 +629,13 @@ class GerberaRuntime:
                 "when creating rules."
             ),
             tool_function=list_rule_events,
+            annotations=ToolAnnotations(
+                title="List events available for rules",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
         )
 
     @staticmethod
@@ -577,7 +647,12 @@ class GerberaRuntime:
         supports_stream_toggle = (
             GerberaRuntime._connection_supports_stream_toggle(connection)
         )
+        toggle_annotations: ToolAnnotations | None = None
         for command in CommandCompiler.command_specs(connection):
+            annotations = CommandCompiler.command_annotations(
+                connection,
+                command,
+            )
             server_runtime._register_connection_action(
                 microcontroller,
                 connection,
@@ -587,15 +662,29 @@ class GerberaRuntime:
                 supports_stream_toggle
                 and GerberaRuntime._command_is_state_toggle(command)
             ):
-                server_runtime._register_connection_tool(connection, command)
+                server_runtime._register_connection_tool(
+                    connection,
+                    command,
+                    annotations,
+                )
+            if GerberaRuntime._command_is_state_toggle(command):
+                toggle_annotations = annotations
 
         if supports_stream_toggle:
+            if toggle_annotations is None:
+                raise RuntimeError("Stream toggle annotations are not configured")
             server_runtime._register_stream_toggle_tools(
                 microcontroller,
                 connection,
+                toggle_annotations,
             )
         elif GerberaRuntime._connection_supports_state_toggle(connection):
-            server_runtime._register_state_toggle_tools(connection)
+            if toggle_annotations is None:
+                raise RuntimeError("State toggle annotations are not configured")
+            server_runtime._register_state_toggle_tools(
+                connection,
+                toggle_annotations,
+            )
 
     @staticmethod
     def _install_dependencies(hardware_system: HardwareSystem) -> None:

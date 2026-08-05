@@ -1,5 +1,19 @@
+from mcp.types import ToolAnnotations
+
+from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.firmware.devices.sg90 import SG90FirmwareBuilder
+from gerbera_sdk.models.hardware.connection import Connection
 
 
 class MG996RFirmwareBuilder(SG90FirmwareBuilder):
     template_name = "mg996r_write"
+
+    def annotations(
+        self,
+        connection: Connection,
+        command: CommandSpec,
+    ) -> ToolAnnotations:
+        annotations = super().annotations(connection, command)
+        return annotations.model_copy(
+            update={"title": f"Set {connection.name} MG996R servo angle"}
+        )

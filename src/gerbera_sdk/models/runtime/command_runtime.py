@@ -1,5 +1,7 @@
 from typing import Callable
 
+from mcp.types import ToolAnnotations
+
 from gerbera_sdk.contracts.command_contract import (
     CommandSpec,
     ParameterSpec,
@@ -25,6 +27,14 @@ class CommandCompiler:
     def command_specs(connection: Connection) -> list[CommandSpec]:
         builder = CommandCompiler._get_builder(connection)
         return list(builder.required_commands(connection))
+
+    @staticmethod
+    def command_annotations(
+        connection: Connection,
+        command: CommandSpec,
+    ) -> ToolAnnotations:
+        builder = CommandCompiler._get_builder(connection)
+        return builder.annotations(connection, command)
 
     @staticmethod
     def _command_spec_for_action(

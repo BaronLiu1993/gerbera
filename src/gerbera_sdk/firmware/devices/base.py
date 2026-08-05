@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from mcp.types import ToolAnnotations
+
 from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.contracts.firmware_contract import (
     ColumnSpec,
@@ -49,6 +51,14 @@ class BaseFirmwareBuilder(ABC):
 
     @abstractmethod
     def required_commands(self, connection: Connection) -> list[CommandSpec]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def annotations(
+        self,
+        connection: Connection,
+        command: CommandSpec,
+    ) -> ToolAnnotations:
         raise NotImplementedError
 
     @abstractmethod

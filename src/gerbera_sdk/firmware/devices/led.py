@@ -1,3 +1,5 @@
+from mcp.types import ToolAnnotations
+
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
@@ -33,6 +35,21 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
                 },
             )
         ]
+
+    def annotations(
+        self,
+        connection: Connection,
+        command: CommandSpec,
+    ) -> ToolAnnotations:
+        if command.method.strip().upper() != "WRITE":
+            raise ValueError(f"Unsupported LED command: {command.method}")
+        return ToolAnnotations(
+            title=f"Set {connection.name} LED state",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        )
 
     def build_handler(self, connection: Connection) -> str:
         out_pin = connection.pins["out"]

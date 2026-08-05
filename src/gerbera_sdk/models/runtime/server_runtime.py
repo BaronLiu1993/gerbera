@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from gerbera_sdk.contracts.command_contract import (
@@ -310,6 +311,7 @@ class ServerRuntime:
         self,
         connection: Connection,
         command: CommandSpec,
+        annotations: ToolAnnotations,
     ) -> None:
         description = command.description.strip()
         if not description:
@@ -333,6 +335,7 @@ class ServerRuntime:
             name=tool_name,
             description=description,
             tool_function=tool_function,
+            annotations=annotations,
         )
 
     def _register_tool(
@@ -340,10 +343,15 @@ class ServerRuntime:
         name: str,
         description: str,
         tool_function: Callable[..., Any],
+        annotations: ToolAnnotations,
     ) -> None:
         tool_function.__name__ = name
         tool_function.__doc__ = description
-        self.app.tool(name=name, description=description)(tool_function)
+        self.app.tool(
+            name=name,
+            description=description,
+            annotations=annotations,
+        )(tool_function)
 
     def _register_state_toggle_tool(
         self,
@@ -351,26 +359,36 @@ class ServerRuntime:
         state: str,
         tool_name: str,
         description: str,
+        annotations: ToolAnnotations,
     ) -> None:
         tool_function = self._build_state_toggle_tool_function(connection, state)
         self._register_tool(
             name=tool_name,
             description=description,
             tool_function=tool_function,
+            annotations=annotations.model_copy(
+                update={"title": description.rstrip(".")}
+            ),
         )
 
-    def _register_state_toggle_tools(self, connection: Connection) -> None:
+    def _register_state_toggle_tools(
+        self,
+        connection: Connection,
+        annotations: ToolAnnotations,
+    ) -> None:
         self._register_state_toggle_tool(
             connection=connection,
             state="on",
             tool_name=f"turn_on_{connection.name}",
             description=f"Turn on {connection.name}.",
+            annotations=annotations,
         )
         self._register_state_toggle_tool(
             connection=connection,
             state="off",
             tool_name=f"turn_off_{connection.name}",
             description=f"Turn off {connection.name}.",
+            annotations=annotations,
         )
 
     def _register_stream_toggle_tool(
@@ -380,6 +398,7 @@ class ServerRuntime:
         state: str,
         tool_name: str,
         description: str,
+        annotations: ToolAnnotations,
     ) -> None:
         tool_function = self._build_stream_toggle_tool_function(
             microcontroller=microcontroller,
@@ -390,12 +409,16 @@ class ServerRuntime:
             name=tool_name,
             description=description,
             tool_function=tool_function,
+            annotations=annotations.model_copy(
+                update={"title": description.rstrip(".")}
+            ),
         )
 
     def _register_stream_toggle_tools(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
+        annotations: ToolAnnotations,
     ) -> None:
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
@@ -403,6 +426,7 @@ class ServerRuntime:
             state="on",
             tool_name=f"turn_on_{connection.name}_stream",
             description=f"Turn on continuous streaming for {connection.name}.",
+            annotations=annotations,
         )
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
@@ -410,4 +434,5 @@ class ServerRuntime:
             state="off",
             tool_name=f"turn_off_{connection.name}_stream",
             description=f"Turn off continuous streaming for {connection.name}.",
+            annotations=annotations,
         )

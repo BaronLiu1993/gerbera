@@ -3,6 +3,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 import numpy as np
 import pytest
 
@@ -31,10 +32,12 @@ from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 class FakeApp:
     def __init__(self) -> None:
         self.tools = {}
+        self.annotations = {}
 
-    def tool(self, name: str, description: str):
+    def tool(self, name: str, description: str, annotations=None):
         def register(function):
             self.tools[name] = function
+            self.annotations[name] = annotations
             return function
 
         return register
@@ -126,6 +129,13 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         "minimum": 0.0,
         "type": "number",
     }
+    assert tool.annotations == ToolAnnotations(
+        title="Capture frames from local_camera",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
     assert asyncio.run(app.get_tool("turn_on_local_camera_stream")) is None
     assert asyncio.run(app.get_tool("turn_off_local_camera_stream")) is None
 
@@ -186,6 +196,12 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     assert result is prediction
     assert read_calls == [("vision-id", "camera-id")]
     assert latest_result is prediction
+    assert app.annotations[
+        "perform_single_openai-vision-language-model"
+    ].openWorldHint is True
+    assert app.annotations[
+        "read_openai-vision-language-model"
+    ].readOnlyHint is True
 
 
 def test_server_registers_single_object_detection_as_a_tool() -> None:
@@ -307,6 +323,13 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
             "type": "array",
         }
     }
+    assert tool.annotations == ToolAnnotations(
+        title="Perform one-shot inference with part-detector",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
 
 
 def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
@@ -430,6 +453,13 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         "turn_on_status_led",
         "turn_off_status_led",
     }
+    assert app.annotations["write_status_led"] == ToolAnnotations(
+        title="Set status_led LED state",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
 
 
 def test_streaming_sensor_exposes_only_read_and_stream_controls(
@@ -472,6 +502,8 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
         "turn_on_ir_sensor_stream",
         "turn_off_ir_sensor_stream",
     }
+    assert app.annotations["read_ir_sensor"].readOnlyHint is True
+    assert app.annotations["turn_on_ir_sensor_stream"].idempotentHint is True
 
 
 def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
@@ -493,11 +525,22 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         event_worker=EventWorker(),
         app=app,
     )
-    runtime._register_connection_tool(connection, command)
+    runtime._register_connection_tool(
+        connection,
+        command,
+        CommandCompiler.command_annotations(connection, command),
+    )
 
     tool = asyncio.run(app.get_tool("write_motor"))
     params_schema = tool.parameters["$defs"]["MotorWriteParams"]
     assert tool.description == "Set servo angle."
+    assert tool.annotations == ToolAnnotations(
+        title="Set motor servo angle",
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
     assert params_schema == {
         "additionalProperties": False,
         "properties": {
@@ -540,6 +583,13 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     GerberaRuntime._register_agent_runtime_tool(runtime)
 
     tool = asyncio.run(app.get_tool("insert_rule"))
+    assert tool.annotations == ToolAnnotations(
+        title="Create an event rule",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    )
     asyncio.run(
         tool.run(
             {
@@ -563,6 +613,7 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     assert len(list(runtime.agent_runtime.rules_path.glob("*.py"))) == 1
 
     delete_tool = asyncio.run(app.get_tool("delete_rule"))
+    assert delete_tool.annotations.destructiveHint is True
     asyncio.run(
         delete_tool.run(
             {
@@ -610,6 +661,7 @@ def test_server_exposes_registered_events_as_nested_catalog(
     GerberaRuntime._register_event_catalog_tool(runtime)
 
     tool = asyncio.run(app.get_tool("list_rule_events"))
+    assert tool.annotations.readOnlyHint is True
     result = asyncio.run(tool.run({}))
     catalog = result.structured_content
     expected_metadata = {
@@ -651,7 +703,11 @@ def test_database_backed_tool_description_includes_table_name() -> None:
         app=app,
     )
 
-    runtime._register_connection_tool(connection, command)
+    runtime._register_connection_tool(
+        connection,
+        command,
+        CommandCompiler.command_annotations(connection, command),
+    )
 
     tool = asyncio.run(app.get_tool("write_motor"))
     assert (

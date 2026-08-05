@@ -1,3 +1,5 @@
+from mcp.types import ToolAnnotations
+
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
 from gerbera_sdk.contracts.firmware_contract import ColumnSpec, ColumnType
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
@@ -45,6 +47,30 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
             )
         )
         return commands
+
+    def annotations(
+        self,
+        connection: Connection,
+        command: CommandSpec,
+    ) -> ToolAnnotations:
+        method = command.method.strip().upper()
+        if method == "READ":
+            return ToolAnnotations(
+                title=f"Read current line state from {connection.name}",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            )
+        if method == "WRITE":
+            return ToolAnnotations(
+                title=f"Set {connection.name} stream state",
+                readOnlyHint=False,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            )
+        raise ValueError(f"Unsupported KY-033 command: {command.method}")
 
     def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
         return {
