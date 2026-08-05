@@ -275,39 +275,39 @@ class GerberaRuntime:
                 raise RuntimeError("Model runtime is not configured")
             return
 
-        registered_models: dict[str, Inference] = {}
+        registered_models: dict[str, tuple[str, Inference]] = {}
 
-        for inference in model_runtime.model_inferences:
+        for model_id, inference in model_runtime.model_inferences.items():
             registered_model = registered_models.get(inference.name)
             if registered_model is not None:
                 raise ValueError(
                     f"Inference model name must be unique: {inference.name}"
                 )
-            registered_models[inference.name] = inference
+            registered_models[inference.name] = (model_id, inference)
 
-        for model in registered_models.values():
-            def build_turn_on_inference_tool(model: Inference):
+        for model_id, model in registered_models.values():
+            def build_turn_on_inference_tool(model_id: str):
                 def turn_on_inference() -> None:
-                    model_runtime.turn_on_inference(model)
+                    model_runtime.turn_on_model(model_id)
 
                 return turn_on_inference
 
             server_runtime._register_tool(
                 name=f"turn_on_{model.name}_inference",
                 description=f"Start continuous inference for {model.name}.",
-                tool_function=build_turn_on_inference_tool(model),
+                tool_function=build_turn_on_inference_tool(model_id),
             )
 
-            def build_turn_off_inference_tool(model: Inference):
+            def build_turn_off_inference_tool(model_id: str):
                 def turn_off_inference() -> None:
-                    model_runtime.turn_off_inference(model)
+                    model_runtime.turn_off_model(model_id)
 
                 return turn_off_inference
 
             server_runtime._register_tool(
                 name=f"turn_off_{model.name}_inference",
                 description=f"Stop continuous inference for {model.name}.",
-                tool_function=build_turn_off_inference_tool(model),
+                tool_function=build_turn_off_inference_tool(model_id),
             )
 
             def build_predict_tool(model: Inference):

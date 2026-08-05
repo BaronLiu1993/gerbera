@@ -4,7 +4,6 @@ from gerbera_sdk.inference.frame import (
     BoundingBox,
     Frame,
 )
-from gerbera_sdk.inference.model import Model
 from gerbera_sdk.inference.model_output_store import (
     ModelOutput,
     ModelOutputStore,
@@ -49,6 +48,9 @@ from gerbera_sdk.inference.models.neural_network.object_detection.object_detecti
 Inference: TypeAlias = (
     ObjectDetectionModelInference | VisionLanguageModelInference
 )
+Model: TypeAlias = ObjectDetectionModel | VisionLanguageModel
+
+
 __all__ = [
     "AnthropicVisionLanguageModelAdapter",
     "BoundingBox",

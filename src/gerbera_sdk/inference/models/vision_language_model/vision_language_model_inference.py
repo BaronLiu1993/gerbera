@@ -196,14 +196,14 @@ class VisionLanguageModelInference:
     # Single predict function
     def predict(
         self,
-        frames: list[Frame],
+        base64_frames: list[str],
     ) -> VisionLanguageModelFrameEnvironment:
-        if not frames:
+        if not base64_frames:
             raise ValueError("At least one frame is required for inference")
 
         valid_frame_input = [
-            self.model_session.model.convert_to_valid_input(frame.to_base64_string())
-            for frame in frames
+            self.model_session.model.convert_to_valid_input(frame)
+            for frame in base64_frames
         ]
 
         output = self.model_session.model.predict(

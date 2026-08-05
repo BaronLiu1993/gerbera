@@ -135,7 +135,14 @@ class ObjectDetectionModelInference:
             self.model_session._stop_event = None
             self.model_session._thread = None
 
-    def predict(self, camera: Camera) -> PerceptionStateModel:
+    def predict(self, camera_id: str) -> PerceptionStateModel:
+        camera = None
+        for subscribed_camera in self.subscribed_cameras:
+            if self.subscribed_cameras.camera_id == camera_id:
+                camera = subscribed_camera
+
+        if camera is None:
+            raise RuntimeError(f"Camera is not subscribed.")
         frame = camera.latest_frame
         if frame is None:
             raise RuntimeError(f"Camera has no frame: {camera.camera_id}")

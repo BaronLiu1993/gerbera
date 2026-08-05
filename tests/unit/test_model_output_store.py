@@ -237,7 +237,7 @@ def test_model_runtime_builds_all_model_inferences() -> None:
     runtime = ModelRuntime(hardware_system)
 
     assert len(runtime.model_inferences) == 2
-    for inference in runtime.model_inferences:
+    for inference in runtime.model_inferences.values():
         assert (
             inference.model_session.model_output_store
             is runtime.model_output_store
@@ -250,10 +250,26 @@ def test_model_runtime_starts_and_stops_all_inference_threads() -> None:
         HardwareSystem(models=[make_model([camera])])
     )
 
-    runtime.start()
-    assert all(inference.is_running for inference in runtime.model_inferences)
-
-    runtime.stop()
+    runtime.turn_on_all_models()
     assert all(
-        not inference.is_running for inference in runtime.model_inferences
+        inference.is_running
+        for inference in runtime.model_inferences.values()
     )
+
+    runtime.turn_off_all_models()
+    assert all(
+        not inference.is_running
+        for inference in runtime.model_inferences.values()
+    )
+
+
+def test_model_runtime_turns_one_model_on_and_off_by_id() -> None:
+    camera = make_camera("camera")
+    model = make_model([camera])
+    runtime = ModelRuntime(HardwareSystem(models=[model]))
+
+    runtime.turn_on_model(model.model_id)
+    assert runtime.model_inferences[model.model_id].is_running
+
+    runtime.turn_off_model(model.model_id)
+    assert not runtime.model_inferences[model.model_id].is_running

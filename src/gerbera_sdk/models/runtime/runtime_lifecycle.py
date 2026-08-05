@@ -60,8 +60,8 @@ class RuntimeLifecycle:
             server_runtime._start_event_listener()
             cleanup.callback(server_runtime._stop_event_listener)
 
-            self.model_runtime.start()
-            cleanup.callback(self.model_runtime.stop)
+            self.model_runtime.turn_on_all_models()
+            cleanup.callback(self.model_runtime.turn_off_all_models)
         except Exception:
             cleanup.close()
             raise

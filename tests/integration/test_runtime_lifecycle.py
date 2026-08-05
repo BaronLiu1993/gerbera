@@ -28,8 +28,8 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         stop=lambda: calls.append("database.stop"),
     )
     model_runtime = SimpleNamespace(
-        start=lambda: calls.append("models.start"),
-        stop=lambda: calls.append("models.stop"),
+        turn_on_all_models=lambda: calls.append("models.start"),
+        turn_off_all_models=lambda: calls.append("models.stop"),
     )
 
     monkeypatch.setattr(GerberaRuntime, "_build_board_runtime", lambda _: board_runtime)

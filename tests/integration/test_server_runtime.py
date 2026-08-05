@@ -146,12 +146,12 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         event_worker=EventWorker(),
         app=app,
         model_runtime=SimpleNamespace(
-            model_inferences=[model],
-            turn_on_inference=lambda inference: (
-                inference.turn_on_prediction_loop()
+            model_inferences={"vision-id": model},
+            turn_on_model=lambda model_id: (
+                model.turn_on_prediction_loop()
             ),
-            turn_off_inference=lambda inference: (
-                inference.turn_off_prediction_loop()
+            turn_off_model=lambda model_id: (
+                model.turn_off_prediction_loop()
             ),
         ),
     )
@@ -193,15 +193,21 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         event_worker=EventWorker(),
         app=app,
         model_runtime=SimpleNamespace(
-            model_inferences=[
-                vision_inference,
-                object_detection_inference,
-            ],
-            turn_on_inference=lambda inference: (
-                inference.turn_on_prediction_loop()
+            model_inferences={
+                "vision-id": vision_inference,
+                "detector-id": object_detection_inference,
+            },
+            turn_on_model=lambda model_id: (
+                {
+                    "vision-id": vision_inference,
+                    "detector-id": object_detection_inference,
+                }[model_id].turn_on_prediction_loop()
             ),
-            turn_off_inference=lambda inference: (
-                inference.turn_off_prediction_loop()
+            turn_off_model=lambda model_id: (
+                {
+                    "vision-id": vision_inference,
+                    "detector-id": object_detection_inference,
+                }[model_id].turn_off_prediction_loop()
             ),
         ),
     )
