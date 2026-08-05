@@ -49,15 +49,29 @@ class ModelRuntime:
         self,
         model_id: str,
         inference_input: str | list[str],
-    ) -> PerceptionStateModel | VisionLanguageModelFrameEnvironment:
+    ) -> (
+        PerceptionStateModel
+        | list[PerceptionStateModel]
+        | VisionLanguageModelFrameEnvironment
+    ):
         inference = self.model_inferences[model_id]
 
         if isinstance(inference, ObjectDetectionModelInference):
-            if not isinstance(inference_input, str):
+            if isinstance(inference_input, str):
+                return inference.predict(inference_input)
+            if not isinstance(inference_input, list) or not all(
+                isinstance(camera_id, str)
+                for camera_id in inference_input
+            ):
                 raise TypeError(
-                    "Object detection inference requires a camera ID"
+                    "Object detection inference requires one camera ID or "
+                    "a list of camera IDs"
                 )
-            return inference.predict(inference_input)
+            if not inference_input:
+                raise ValueError(
+                    "At least one camera ID is required for inference"
+                )
+            return inference.predict_many(inference_input)
 
         if isinstance(inference, VisionLanguageModelInference):
             if not isinstance(inference_input, list) or not all(

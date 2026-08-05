@@ -277,26 +277,33 @@ def test_model_runtime_turns_one_model_on_and_off_by_id() -> None:
     assert not runtime.model_inferences[model.model_id].is_running
 
 
-def test_model_runtime_runs_single_object_detection_inference() -> None:
+def test_model_runtime_runs_single_object_detection_inference_for_multiple_cameras(
+) -> None:
     class FakeObjectDetectionAdapter:
         def detect(self, frame: Frame) -> list:
             return []
 
-    camera = make_camera("camera")
-    camera.latest_frame = Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((2, 2, 3), dtype=np.uint8),
-    )
-    model = make_model([camera])
+    cameras = [make_camera("first"), make_camera("second")]
+    for camera in cameras:
+        camera.latest_frame = Frame(
+            timestamp=datetime.now(),
+            image=np.zeros((2, 2, 3), dtype=np.uint8),
+        )
+    model = make_model(cameras)
     runtime = ModelRuntime(HardwareSystem(models=[model]))
     runtime.model_inferences[model.model_id].model_session.model = (
         FakeObjectDetectionAdapter()
     )
 
-    output = runtime.single_inference(model.model_id, camera.camera_id)
+    output = runtime.single_inference(
+        model.model_id,
+        [camera.camera_id for camera in cameras],
+    )
 
-    assert isinstance(output, PerceptionStateModel)
-    assert output.camera_id == camera.camera_id
+    assert isinstance(output, list)
+    assert [result.camera_id for result in output] == [
+        camera.camera_id for camera in cameras
+    ]
 
 
 def test_model_runtime_runs_single_vlm_inference() -> None:
@@ -337,10 +344,10 @@ def test_model_runtime_runs_single_vlm_inference() -> None:
     assert adapter.frames == ["first-base64", "second-base64"]
 
 
-def test_model_runtime_validates_single_inference_input_type() -> None:
+def test_model_runtime_requires_at_least_one_object_detection_input() -> None:
     camera = make_camera("camera")
     model = make_model([camera])
     runtime = ModelRuntime(HardwareSystem(models=[model]))
 
-    with pytest.raises(TypeError, match="requires a camera ID"):
-        runtime.single_inference(model.model_id, ["base64-frame"])
+    with pytest.raises(ValueError, match="At least one camera ID"):
+        runtime.single_inference(model.model_id, [])

@@ -47,6 +47,7 @@ class ModelCatalogEntry(StrictSchema):
     is_running: bool
     turn_on_tool: str
     turn_off_tool: str
+    read_tool: str
     single_inference_tool: str
 
 
@@ -314,6 +315,7 @@ class GerberaRuntime:
 
             turn_on_tool_name = f"turn_on_{model.name}"
             turn_off_tool_name = f"turn_off_{model.name}"
+            read_tool_name = f"read_{model.name}"
             single_inference_tool_name = f"perform_single_{model.name}"
 
             server_runtime._register_tool(
@@ -335,34 +337,85 @@ class GerberaRuntime:
             )
 
             if isinstance(model, ObjectDetectionModelInference):
-                def build_predict_tool(model_id: str):
-                    def predict_with_model(
+                def build_read_tool(model_id: str):
+                    def read_model_output(
                         camera_id: str,
                     ) -> dict[str, object]:
-                        result = model_runtime.single_inference(
+                        result = model_runtime.read_model_output(
                             model_id,
                             camera_id,
                         )
                         if not isinstance(result, PerceptionStateModel):
                             raise TypeError(
-                                "Object detection returned an invalid result"
+                                "Object detection stored an invalid result"
                             )
                         return result.model_dump(
                             mode="json",
                             exclude={"frame"},
                         )
 
-                    return predict_with_model
+                    return read_model_output
 
-                predict_tool = build_predict_tool(model_id)
-                predict_description = (
-                    f"{model.description} Provide the ID of a subscribed "
-                    "camera with a current frame."
-                )
-            else:
                 def build_predict_tool(model_id: str):
                     def predict_with_model(
-                        frames: list[str],
+                        camera_ids: Annotated[
+                            list[str],
+                            Field(min_length=1),
+                        ],
+                    ) -> list[dict[str, object]]:
+                        results = model_runtime.single_inference(
+                            model_id,
+                            camera_ids,
+                        )
+                        if not isinstance(results, list) or not all(
+                            isinstance(result, PerceptionStateModel)
+                            for result in results
+                        ):
+                            raise TypeError(
+                                "Object detection returned an invalid result"
+                            )
+                        return [
+                            result.model_dump(
+                                mode="json",
+                                exclude={"frame"},
+                            )
+                            for result in results
+                        ]
+
+                    return predict_with_model
+
+                read_tool = build_read_tool(model_id)
+                predict_tool = build_predict_tool(model_id)
+                predict_description = (
+                    f"{model.description} Provide one or more IDs of "
+                    "subscribed cameras with current frames."
+                )
+            else:
+                def build_read_tool(model_id: str):
+                    def read_model_output(
+                        camera_id: str,
+                    ) -> VisionLanguageModelFrameEnvironment:
+                        result = model_runtime.read_model_output(
+                            model_id,
+                            camera_id,
+                        )
+                        if not isinstance(
+                            result,
+                            VisionLanguageModelFrameEnvironment,
+                        ):
+                            raise TypeError(
+                                "Vision language model stored an invalid result"
+                            )
+                        return result
+
+                    return read_model_output
+
+                def build_predict_tool(model_id: str):
+                    def predict_with_model(
+                        frames: Annotated[
+                            list[str],
+                            Field(min_length=1),
+                        ],
                     ) -> VisionLanguageModelFrameEnvironment:
                         return model_runtime.single_inference(
                             model_id,
@@ -371,11 +424,21 @@ class GerberaRuntime:
 
                     return predict_with_model
 
+                read_tool = build_read_tool(model_id)
                 predict_tool = build_predict_tool(model_id)
                 predict_description = (
                     f"{model.description} Provide one or more Base64 "
                     "image strings."
                 )
+
+            server_runtime._register_tool(
+                name=read_tool_name,
+                description=(
+                    f"Read the latest continuous inference output from "
+                    f"{model.name} for a subscribed camera ID."
+                ),
+                tool_function=read_tool,
+            )
 
             server_runtime._register_tool(
                 name=single_inference_tool_name,
@@ -407,6 +470,7 @@ class GerberaRuntime:
                         is_running=model.is_running,
                         turn_on_tool=f"turn_on_{model.name}",
                         turn_off_tool=f"turn_off_{model.name}",
+                        read_tool=f"read_{model.name}",
                         single_inference_tool=(
                             f"perform_single_{model.name}"
                         ),
@@ -419,7 +483,7 @@ class GerberaRuntime:
             description=(
                 "List configured inference models, their model IDs, "
                 "subscribed camera IDs, current running state, and exact "
-                "lifecycle and single-inference tool names."
+                "lifecycle, read, and single-inference tool names."
             ),
             tool_function=list_configured_models,
         )

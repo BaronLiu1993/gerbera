@@ -140,27 +140,44 @@ class ObjectDetectionModelInference:
             self.model_session._stop_event = None
             self.model_session._thread = None
 
-    def predict(self, camera_id: str) -> PerceptionStateModel:
-        camera = None
+    def _get_subscribed_camera(self, camera_id: str) -> Camera:
         for subscribed_camera in self.subscribed_cameras:
             if subscribed_camera.camera_id == camera_id:
-                camera = subscribed_camera
-                break
+                return subscribed_camera
 
-        if camera is None:
-            raise RuntimeError(f"Camera is not subscribed: {camera_id}")
+        raise RuntimeError(f"Camera is not subscribed: {camera_id}")
+
+    def _predict_for_camera(self, camera: Camera) -> PerceptionStateModel:
         frame = camera.latest_frame
         if frame is None:
             raise RuntimeError(f"Camera has no frame: {camera.camera_id}")
 
+        perception_objects = self.model_session.model.detect(frame)
+        return PerceptionStateModel(
+            camera_id=camera.camera_id,
+            frame=frame,
+            model_name=self.name,
+            perception_objects=perception_objects,
+        )
+
+    def predict(self, camera_id: str) -> PerceptionStateModel:
+        camera = self._get_subscribed_camera(camera_id)
         with self._prediction_lock:
-            perception_objects = self.model_session.model.detect(frame)
-            return PerceptionStateModel(
-                camera_id=camera.camera_id,
-                frame=frame,
-                model_name=self.name,
-                perception_objects=perception_objects,
-            )
+            return self._predict_for_camera(camera)
+
+    def predict_many(
+        self,
+        camera_ids: list[str],
+    ) -> list[PerceptionStateModel]:
+        if not camera_ids:
+            raise ValueError("At least one camera ID is required for inference")
+
+        cameras = [
+            self._get_subscribed_camera(camera_id)
+            for camera_id in camera_ids
+        ]
+        with self._prediction_lock:
+            return [self._predict_for_camera(camera) for camera in cameras]
 
     def prediction_loop(self) -> None:
         stop_event = self.model_session._stop_event

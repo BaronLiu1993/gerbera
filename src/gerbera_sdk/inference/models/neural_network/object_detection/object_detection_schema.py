@@ -1,9 +1,6 @@
-from typing import Literal
-
 from pydantic import Field, InstanceOf
 
 from gerbera_sdk.inference.frame import BoundingBox, Frame
-from gerbera_sdk.inference.model_types import ObjectDetectionModelProviderEnum
 from gerbera_sdk.utils import StrictSchema
 
 

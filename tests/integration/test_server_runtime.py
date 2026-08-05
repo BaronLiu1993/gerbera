@@ -138,6 +138,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     )
     received_frames = []
     received_model_ids = []
+    read_calls = []
     model = SimpleNamespace(
         name="openai-vision-language-model",
         description="Analyze supplied images.",
@@ -160,6 +161,9 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
                 received_model_ids.append(model_id)
                 or model.predict(frames)
             ),
+            read_model_output=lambda model_id, camera_id: (
+                read_calls.append((model_id, camera_id)) or prediction
+            ),
             turn_on_model=lambda model_id: (
                 model.turn_on_prediction_loop()
             ),
@@ -173,10 +177,15 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     result = app.tools["perform_single_openai-vision-language-model"](
         ["first-base64", "second-base64"]
     )
+    latest_result = app.tools["read_openai-vision-language-model"](
+        "camera-id"
+    )
 
     assert received_frames == [["first-base64", "second-base64"]]
     assert received_model_ids == ["vision-id"]
     assert result is prediction
+    assert read_calls == [("vision-id", "camera-id")]
+    assert latest_result is prediction
 
 
 def test_server_registers_single_object_detection_as_a_tool() -> None:
@@ -214,9 +223,11 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
         app=app,
         model_runtime=SimpleNamespace(
             model_inferences={"detector-id": inference},
-            single_inference=lambda model_id, camera_id: (
-                received_calls.append((model_id, camera_id)) or prediction
+            single_inference=lambda model_id, camera_ids: (
+                received_calls.append((model_id, camera_ids))
+                or [prediction]
             ),
+            read_model_output=lambda model_id, camera_id: prediction,
             turn_on_model=lambda model_id: None,
             turn_off_model=lambda model_id: None,
         ),
@@ -224,16 +235,21 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
 
     GerberaRuntime._register_server_runtime_tools(runtime)
     result = app.tools["perform_single_local_object_detection_model"](
+        ["camera-id"]
+    )
+    latest_result = app.tools["read_local_object_detection_model"](
         "camera-id"
     )
     catalog = app.tools["list_configured_models"]()
 
-    assert received_calls == [("detector-id", "camera-id")]
-    assert result == {
+    assert received_calls == [("detector-id", ["camera-id"])]
+    expected_result = {
         "camera_id": "camera-id",
         "model_name": "local_object_detection_model",
         "perception_objects": [],
     }
+    assert result == [expected_result]
+    assert latest_result == expected_result
     assert [entry.model_dump() for entry in catalog] == [
         {
             "model_id": "detector-id",
@@ -249,6 +265,7 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
             "is_running": False,
             "turn_on_tool": "turn_on_local_object_detection_model",
             "turn_off_tool": "turn_off_local_object_detection_model",
+            "read_tool": "read_local_object_detection_model",
             "single_inference_tool": (
                 "perform_single_local_object_detection_model"
             ),
@@ -274,6 +291,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         model_runtime=SimpleNamespace(
             model_inferences={"detector-id": inference},
             single_inference=lambda model_id, camera_id: None,
+            read_model_output=lambda model_id, camera_id: None,
             turn_on_model=lambda model_id: None,
             turn_off_model=lambda model_id: None,
         ),
@@ -283,7 +301,11 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
     tool = asyncio.run(app.get_tool("perform_single_part-detector"))
 
     assert tool.parameters["properties"] == {
-        "camera_id": {"type": "string"}
+        "camera_ids": {
+            "items": {"type": "string"},
+            "minItems": 1,
+            "type": "array",
+        }
     }
 
 
