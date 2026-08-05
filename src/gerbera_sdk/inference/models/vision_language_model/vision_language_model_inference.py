@@ -104,6 +104,11 @@ class VisionLanguageModelInference:
         init=False,
         repr=False,
     )
+    _prediction_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+    )
 
     @property
     def is_running(self) -> bool:
@@ -182,7 +187,9 @@ class VisionLanguageModelInference:
                     frames.append(frame)
 
             if cameras:
-                model_output = self.predict(frames)
+                model_output = self.predict(
+                    [frame.to_base64_string() for frame in frames]
+                )
 
                 for camera in cameras:
                     self.model_session.model_output_store.write_model_output(
@@ -201,15 +208,18 @@ class VisionLanguageModelInference:
         if not base64_frames:
             raise ValueError("At least one frame is required for inference")
 
-        valid_frame_input = [
-            self.model_session.model.convert_to_valid_input(frame)
-            for frame in base64_frames
-        ]
+        with self._prediction_lock:
+            valid_frame_input = [
+                self.model_session.model.convert_to_valid_input(frame)
+                for frame in base64_frames
+            ]
 
-        output = self.model_session.model.predict(
-            model_input=valid_frame_input,
-            system_prompt=self.system_prompt,
-            user_prompt=self.user_prompt,
-            output_schema=(VisionLanguageModelFrameEnvironment.model_json_schema()),
-        )
-        return VisionLanguageModelFrameEnvironment.model_validate(output)
+            output = self.model_session.model.predict(
+                model_input=valid_frame_input,
+                system_prompt=self.system_prompt,
+                user_prompt=self.user_prompt,
+                output_schema=(
+                    VisionLanguageModelFrameEnvironment.model_json_schema()
+                ),
+            )
+            return VisionLanguageModelFrameEnvironment.model_validate(output)

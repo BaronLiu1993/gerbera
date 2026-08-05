@@ -78,6 +78,11 @@ class ObjectDetectionModelInference:
         init=False,
         repr=False,
     )
+    _prediction_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+    )
 
     @property
     def is_running(self) -> bool:
@@ -138,22 +143,24 @@ class ObjectDetectionModelInference:
     def predict(self, camera_id: str) -> PerceptionStateModel:
         camera = None
         for subscribed_camera in self.subscribed_cameras:
-            if self.subscribed_cameras.camera_id == camera_id:
+            if subscribed_camera.camera_id == camera_id:
                 camera = subscribed_camera
+                break
 
         if camera is None:
-            raise RuntimeError(f"Camera is not subscribed.")
+            raise RuntimeError(f"Camera is not subscribed: {camera_id}")
         frame = camera.latest_frame
         if frame is None:
             raise RuntimeError(f"Camera has no frame: {camera.camera_id}")
 
-        perception_objects = self.model_session.model.detect(frame)
-        return PerceptionStateModel(
-            camera_id=camera.camera_id,
-            frame=frame,
-            model_name=self.name,
-            perception_objects=perception_objects,
-        )
+        with self._prediction_lock:
+            perception_objects = self.model_session.model.detect(frame)
+            return PerceptionStateModel(
+                camera_id=camera.camera_id,
+                frame=frame,
+                model_name=self.name,
+                perception_objects=perception_objects,
+            )
 
     def prediction_loop(self) -> None:
         stop_event = self.model_session._stop_event
@@ -163,7 +170,7 @@ class ObjectDetectionModelInference:
         while not stop_event.is_set():
             for camera in self.subscribed_cameras:
                 if camera.latest_frame is not None:
-                    perception_state = self.predict(camera)
+                    perception_state = self.predict(camera.camera_id)
                     self.model_session.model_output_store.write_model_output(
                         camera_id=camera.camera_id,
                         model_id=self.model_id,

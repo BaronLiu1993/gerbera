@@ -92,7 +92,7 @@ def agent_execute_action() -> dict:
         ],
         "allowed_tool_calls": [
             "move_arm",
-            "turn_on_part-detector_inference",
+            "turn_on_part-detector",
         ],
         "max_iterations": 10,
         "timeout_seconds": 30,

@@ -49,8 +49,8 @@ class CameraRuntime:
         with self._lifecycle_lock:
             with self._lock:
                 for camera in self.hardware_system.cameras:
-                    if camera.id not in self.camera_registry:
-                        self.camera_registry[camera.id] = CameraSession(
+                    if camera.camera_id not in self.camera_registry:
+                        self.camera_registry[camera.camera_id] = CameraSession(
                             camera=camera
                         )
 

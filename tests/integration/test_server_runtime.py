@@ -1,7 +1,9 @@
 import asyncio
+from datetime import datetime
 from types import SimpleNamespace
 
 from fastmcp import FastMCP
+import numpy as np
 import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
@@ -10,6 +12,11 @@ from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModelFrameEnvironment,
+)
+from gerbera_sdk.inference import (
+    Frame,
+    ObjectDetectionModelInference,
+    PerceptionStateModel,
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
@@ -45,7 +52,7 @@ class FakeSerialConnection:
 
 def test_server_registers_camera_capture_tool() -> None:
     camera = Camera(
-        id="local-camera",
+        camera_id="local-camera",
         name="local_camera",
         description="Built-in camera",
         source=DeviceCameraSource(device_index=0),
@@ -82,11 +89,12 @@ def test_server_registers_camera_capture_tool() -> None:
         }
     ]
     assert result == ["first-base64", "second-base64"]
+    assert set(app.tools) == {"capture_frames_from_local_camera"}
 
 
 def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
     camera = Camera(
-        id="local-camera",
+        camera_id="local-camera",
         name="local_camera",
         description="Built-in camera",
         source=DeviceCameraSource(device_index=0),
@@ -129,6 +137,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         objects=[],
     )
     received_frames = []
+    received_model_ids = []
     model = SimpleNamespace(
         name="openai-vision-language-model",
         description="Analyze supplied images.",
@@ -147,6 +156,10 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         app=app,
         model_runtime=SimpleNamespace(
             model_inferences={"vision-id": model},
+            single_inference=lambda model_id, frames: (
+                received_model_ids.append(model_id)
+                or model.predict(frames)
+            ),
             turn_on_model=lambda model_id: (
                 model.turn_on_prediction_loop()
             ),
@@ -157,12 +170,121 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
-    result = app.tools["predict_with_openai-vision-language-model"](
+    result = app.tools["perform_single_openai-vision-language-model"](
         ["first-base64", "second-base64"]
     )
 
     assert received_frames == [["first-base64", "second-base64"]]
+    assert received_model_ids == ["vision-id"]
     assert result is prediction
+
+
+def test_server_registers_single_object_detection_as_a_tool() -> None:
+    camera = Camera(
+        camera_id="camera-id",
+        name="local_camera",
+        description="Local camera",
+        source=DeviceCameraSource(device_index=0),
+    )
+    frame = Frame(
+        timestamp=datetime.now(),
+        image=np.zeros((2, 2, 3), dtype=np.uint8),
+    )
+    prediction = PerceptionStateModel(
+        camera_id="camera-id",
+        frame=frame,
+        model_name="local_object_detection_model",
+        perception_objects=[],
+    )
+    inference = ObjectDetectionModelInference(
+        model_session=SimpleNamespace(_thread=None, _stop_event=None),
+        name="local_object_detection_model",
+        description="Detect parts.",
+        subscribed_cameras=[camera],
+    )
+    received_calls = []
+    event_bus = EventBus()
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(models=[SimpleNamespace()]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+        model_runtime=SimpleNamespace(
+            model_inferences={"detector-id": inference},
+            single_inference=lambda model_id, camera_id: (
+                received_calls.append((model_id, camera_id)) or prediction
+            ),
+            turn_on_model=lambda model_id: None,
+            turn_off_model=lambda model_id: None,
+        ),
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+    result = app.tools["perform_single_local_object_detection_model"](
+        "camera-id"
+    )
+    catalog = app.tools["list_configured_models"]()
+
+    assert received_calls == [("detector-id", "camera-id")]
+    assert result == {
+        "camera_id": "camera-id",
+        "model_name": "local_object_detection_model",
+        "perception_objects": [],
+    }
+    assert [entry.model_dump() for entry in catalog] == [
+        {
+            "model_id": "detector-id",
+            "name": "local_object_detection_model",
+            "description": "Detect parts.",
+            "model_type": "object_detection",
+            "subscribed_cameras": [
+                {
+                    "camera_id": "camera-id",
+                    "name": "local_camera",
+                }
+            ],
+            "is_running": False,
+            "turn_on_tool": "turn_on_local_object_detection_model",
+            "turn_off_tool": "turn_off_local_object_detection_model",
+            "single_inference_tool": (
+                "perform_single_local_object_detection_model"
+            ),
+        }
+    ]
+
+
+def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
+    inference = ObjectDetectionModelInference(
+        model_session=SimpleNamespace(_thread=None, _stop_event=None),
+        name="part-detector",
+        description="Detect parts.",
+    )
+    event_bus = EventBus()
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(models=[SimpleNamespace()]),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+        model_runtime=SimpleNamespace(
+            model_inferences={"detector-id": inference},
+            single_inference=lambda model_id, camera_id: None,
+            turn_on_model=lambda model_id: None,
+            turn_off_model=lambda model_id: None,
+        ),
+    )
+
+    GerberaRuntime._register_server_runtime_tools(runtime)
+    tool = asyncio.run(app.get_tool("perform_single_part-detector"))
+
+    assert tool.parameters["properties"] == {
+        "camera_id": {"type": "string"}
+    }
 
 
 def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
@@ -214,10 +336,10 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
 
     GerberaRuntime._register_server_runtime_tools(runtime)
 
-    app.tools["turn_on_workspace-vlm_inference"]()
-    app.tools["turn_on_part-detector_inference"]()
-    app.tools["turn_off_workspace-vlm_inference"]()
-    app.tools["turn_off_part-detector_inference"]()
+    app.tools["turn_on_workspace-vlm"]()
+    app.tools["turn_on_part-detector"]()
+    app.tools["turn_off_workspace-vlm"]()
+    app.tools["turn_off_part-detector"]()
 
     assert calls == [
         "vlm.on",

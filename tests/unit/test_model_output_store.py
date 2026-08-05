@@ -269,7 +269,78 @@ def test_model_runtime_turns_one_model_on_and_off_by_id() -> None:
     runtime = ModelRuntime(HardwareSystem(models=[model]))
 
     runtime.turn_on_model(model.model_id)
+    runtime.turn_on_model(model.model_id)
     assert runtime.model_inferences[model.model_id].is_running
 
     runtime.turn_off_model(model.model_id)
+    runtime.turn_off_model(model.model_id)
     assert not runtime.model_inferences[model.model_id].is_running
+
+
+def test_model_runtime_runs_single_object_detection_inference() -> None:
+    class FakeObjectDetectionAdapter:
+        def detect(self, frame: Frame) -> list:
+            return []
+
+    camera = make_camera("camera")
+    camera.latest_frame = Frame(
+        timestamp=datetime.now(),
+        image=np.zeros((2, 2, 3), dtype=np.uint8),
+    )
+    model = make_model([camera])
+    runtime = ModelRuntime(HardwareSystem(models=[model]))
+    runtime.model_inferences[model.model_id].model_session.model = (
+        FakeObjectDetectionAdapter()
+    )
+
+    output = runtime.single_inference(model.model_id, camera.camera_id)
+
+    assert isinstance(output, PerceptionStateModel)
+    assert output.camera_id == camera.camera_id
+
+
+def test_model_runtime_runs_single_vlm_inference() -> None:
+    class FakeVisionLanguageModelAdapter:
+        def __init__(self) -> None:
+            self.frames = []
+
+        def convert_to_valid_input(self, frame: str) -> dict[str, str]:
+            self.frames.append(frame)
+            return {"frame": frame}
+
+        def predict(self, **kwargs) -> dict[str, object]:
+            return {
+                "environment_name": "workshop",
+                "description": "A workshop",
+                "objects": [],
+            }
+
+    camera = make_camera("camera")
+    model = VisionLanguageModel(
+        name="vision",
+        model_provider=VisionLanguageModelProviderEnum.ANTHROPIC,
+        user_prompt="Observe the frame",
+        api_key="test-key",
+        model_name="opus-4.6",
+        subscribed_cameras=[camera],
+    )
+    runtime = ModelRuntime(HardwareSystem(models=[model]))
+    adapter = FakeVisionLanguageModelAdapter()
+    runtime.model_inferences[model.model_id].model_session.model = adapter
+
+    output = runtime.single_inference(
+        model.model_id,
+        ["first-base64", "second-base64"],
+    )
+
+    assert output.environment_name == "workshop"
+    assert adapter.frames == ["first-base64", "second-base64"]
+
+
+def test_model_runtime_validates_single_inference_input_type() -> None:
+    camera = make_camera("camera")
+    model = make_model([camera])
+    runtime = ModelRuntime(HardwareSystem(models=[model]))
+
+    with pytest.raises(TypeError, match="requires a camera ID"):
+        runtime.single_inference(model.model_id, ["base64-frame"])

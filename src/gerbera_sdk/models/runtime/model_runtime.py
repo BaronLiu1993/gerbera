@@ -2,7 +2,14 @@ from dataclasses import dataclass, field
 from functools import cached_property
 import threading
 
-from gerbera_sdk.inference import Inference, ModelOutputStore
+from gerbera_sdk.inference import (
+    Inference,
+    ModelOutputStore,
+    ObjectDetectionModelInference,
+    PerceptionStateModel,
+    VisionLanguageModelFrameEnvironment,
+    VisionLanguageModelInference,
+)
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 
@@ -38,13 +45,45 @@ class ModelRuntime:
             model_id=model_id, camera_id=camera_id
         )
 
+    def single_inference(
+        self,
+        model_id: str,
+        inference_input: str | list[str],
+    ) -> PerceptionStateModel | VisionLanguageModelFrameEnvironment:
+        inference = self.model_inferences[model_id]
+
+        if isinstance(inference, ObjectDetectionModelInference):
+            if not isinstance(inference_input, str):
+                raise TypeError(
+                    "Object detection inference requires a camera ID"
+                )
+            return inference.predict(inference_input)
+
+        if isinstance(inference, VisionLanguageModelInference):
+            if not isinstance(inference_input, list) or not all(
+                isinstance(frame, str) for frame in inference_input
+            ):
+                raise TypeError(
+                    "Vision language model inference requires a list of "
+                    "Base64 image strings"
+                )
+            return inference.predict(inference_input)
+
+        raise TypeError(f"Unsupported inference type: {type(inference).__name__}")
+
     def turn_on_model(self, model_id: str) -> None:
         with self._lock:
-            self.model_inferences[model_id].turn_on_prediction_loop()
+            inference = self.model_inferences[model_id]
+            if inference.is_running:
+                return
+            inference.turn_on_prediction_loop()
 
     def turn_off_model(self, model_id: str) -> None:
         with self._lock:
-            self.model_inferences[model_id].turn_off_prediction_loop()
+            inference = self.model_inferences[model_id]
+            if not inference.is_running:
+                return
+            inference.turn_off_prediction_loop()
 
     def turn_on_all_models(self) -> None:
         with self._lock:

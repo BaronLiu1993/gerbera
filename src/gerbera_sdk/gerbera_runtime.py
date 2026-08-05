@@ -1,5 +1,5 @@
 import subprocess
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastmcp import FastMCP
 from pydantic import Field, StrictFloat
@@ -12,6 +12,8 @@ from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.inference import (
     Inference,
+    ObjectDetectionModelInference,
+    PerceptionStateModel,
     VisionLanguageModelFrameEnvironment,
 )
 from gerbera_sdk.models.hardware.connection import Connection
@@ -28,6 +30,24 @@ from gerbera_sdk.models.runtime.server_runtime import (
     EventCatalog,
     ServerRuntime,
 )
+from gerbera_sdk.utils import StrictSchema
+
+
+class SubscribedCameraCatalogEntry(StrictSchema):
+    camera_id: str
+    name: str
+
+
+class ModelCatalogEntry(StrictSchema):
+    model_id: str
+    name: str
+    description: str
+    model_type: Literal["object_detection", "vision_language_model"]
+    subscribed_cameras: list[SubscribedCameraCatalogEntry]
+    is_running: bool
+    turn_on_tool: str
+    turn_off_tool: str
+    single_inference_tool: str
 
 
 class GerberaRuntime:
@@ -232,7 +252,7 @@ class GerberaRuntime:
             raise RuntimeError("Camera runtime is not configured")
 
         for camera in cameras:
-            camera_key = camera.id
+            camera_key = camera.camera_id
 
             def build_capture_frames_tool(camera_key: str):
                 def capture_frames_from_camera(
@@ -292,8 +312,12 @@ class GerberaRuntime:
 
                 return turn_on_inference
 
+            turn_on_tool_name = f"turn_on_{model.name}"
+            turn_off_tool_name = f"turn_off_{model.name}"
+            single_inference_tool_name = f"perform_single_{model.name}"
+
             server_runtime._register_tool(
-                name=f"turn_on_{model.name}_inference",
+                name=turn_on_tool_name,
                 description=f"Start continuous inference for {model.name}.",
                 tool_function=build_turn_on_inference_tool(model_id),
             )
@@ -305,27 +329,100 @@ class GerberaRuntime:
                 return turn_off_inference
 
             server_runtime._register_tool(
-                name=f"turn_off_{model.name}_inference",
+                name=turn_off_tool_name,
                 description=f"Stop continuous inference for {model.name}.",
                 tool_function=build_turn_off_inference_tool(model_id),
             )
 
-            def build_predict_tool(model: Inference):
-                def predict_with_model(
-                    frames: list[str],
-                ) -> VisionLanguageModelFrameEnvironment:
-                    return model.predict(frames)
+            if isinstance(model, ObjectDetectionModelInference):
+                def build_predict_tool(model_id: str):
+                    def predict_with_model(
+                        camera_id: str,
+                    ) -> dict[str, object]:
+                        result = model_runtime.single_inference(
+                            model_id,
+                            camera_id,
+                        )
+                        if not isinstance(result, PerceptionStateModel):
+                            raise TypeError(
+                                "Object detection returned an invalid result"
+                            )
+                        return result.model_dump(
+                            mode="json",
+                            exclude={"frame"},
+                        )
 
-                return predict_with_model
+                    return predict_with_model
 
-            server_runtime._register_tool(
-                name=f"predict_with_{model.name}",
-                description=(
+                predict_tool = build_predict_tool(model_id)
+                predict_description = (
+                    f"{model.description} Provide the ID of a subscribed "
+                    "camera with a current frame."
+                )
+            else:
+                def build_predict_tool(model_id: str):
+                    def predict_with_model(
+                        frames: list[str],
+                    ) -> VisionLanguageModelFrameEnvironment:
+                        return model_runtime.single_inference(
+                            model_id,
+                            frames,
+                        )
+
+                    return predict_with_model
+
+                predict_tool = build_predict_tool(model_id)
+                predict_description = (
                     f"{model.description} Provide one or more Base64 "
                     "image strings."
-                ),
-                tool_function=build_predict_tool(model),
+                )
+
+            server_runtime._register_tool(
+                name=single_inference_tool_name,
+                description=predict_description,
+                tool_function=predict_tool,
             )
+
+        def list_configured_models() -> list[ModelCatalogEntry]:
+            catalog: list[ModelCatalogEntry] = []
+            for model_id, model in registered_models.values():
+                model_type = (
+                    "object_detection"
+                    if isinstance(model, ObjectDetectionModelInference)
+                    else "vision_language_model"
+                )
+                catalog.append(
+                    ModelCatalogEntry(
+                        model_id=model_id,
+                        name=model.name,
+                        description=model.description,
+                        model_type=model_type,
+                        subscribed_cameras=[
+                            SubscribedCameraCatalogEntry(
+                                camera_id=camera.camera_id,
+                                name=camera.name,
+                            )
+                            for camera in model.subscribed_cameras
+                        ],
+                        is_running=model.is_running,
+                        turn_on_tool=f"turn_on_{model.name}",
+                        turn_off_tool=f"turn_off_{model.name}",
+                        single_inference_tool=(
+                            f"perform_single_{model.name}"
+                        ),
+                    )
+                )
+            return catalog
+
+        server_runtime._register_tool(
+            name="list_configured_models",
+            description=(
+                "List configured inference models, their model IDs, "
+                "subscribed camera IDs, current running state, and exact "
+                "lifecycle and single-inference tool names."
+            ),
+            tool_function=list_configured_models,
+        )
 
     @staticmethod
     def _register_agent_runtime_tool(

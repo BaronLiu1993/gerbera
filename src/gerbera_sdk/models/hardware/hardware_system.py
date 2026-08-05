@@ -50,18 +50,20 @@ class HardwareSystem:
             self.microcontrollers.append(microcontroller)
 
     def add_cameras(self, cameras: list[Camera]) -> None:
-        existing_ids = {camera.id for camera in self.cameras}
+        existing_ids = {camera.camera_id for camera in self.cameras}
         seen_ids: set[str] = set()
 
         for camera in cameras:
-            if camera.id in seen_ids:
-                raise ValueError(f"Duplicate camera in input: {camera.id}")
-
-            if camera.id in existing_ids:
+            if camera.camera_id in seen_ids:
                 raise ValueError(
-                    f"Camera already exists in hardware system {self.id}: "
-                    f"{camera.id}"
+                    f"Duplicate camera in input: {camera.camera_id}"
                 )
 
-            seen_ids.add(camera.id)
+            if camera.camera_id in existing_ids:
+                raise ValueError(
+                    f"Camera already exists in hardware system {self.id}: "
+                    f"{camera.camera_id}"
+                )
+
+            seen_ids.add(camera.camera_id)
             self.cameras.append(camera)
