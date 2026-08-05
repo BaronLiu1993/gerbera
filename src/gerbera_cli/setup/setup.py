@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 from typing import Any
 
-import requests
+import httpx
 import typer
 
 from gerbera_cli.utils import CONFIG_PATH, _load_config
@@ -101,7 +101,7 @@ def _poll_public_endpoint(timeout_seconds: float = 10.0) -> str:
 
     while time.time() < deadline:
         try:
-            response = requests.get(
+            response = httpx.get(
                 "http://127.0.0.1:4040/api/tunnels",
                 timeout=1,
             )
@@ -113,7 +113,7 @@ def _poll_public_endpoint(timeout_seconds: float = 10.0) -> str:
                 public_url = str(tunnels[0].get("public_url", "")).strip()
                 if public_url:
                     return public_url
-        except requests.RequestException:
+        except httpx.HTTPError:
             pass
 
         time.sleep(0.25)
