@@ -139,14 +139,21 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     event_bus = EventBus()
     app = FakeApp()
     runtime = ServerRuntime(
-        hardware_system=HardwareSystem(
-            models=[SimpleNamespace(model=model)]
-        ),
+        hardware_system=HardwareSystem(models=[SimpleNamespace()]),
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        model_runtime=SimpleNamespace(
+            model_inferences=[model],
+            turn_on_inference=lambda inference: (
+                inference.turn_on_prediction_loop()
+            ),
+            turn_off_inference=lambda inference: (
+                inference.turn_off_prediction_loop()
+            ),
+        ),
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)
@@ -175,10 +182,7 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         turn_off_prediction_loop=lambda: calls.append("detector.off"),
     )
     hardware_system = HardwareSystem(
-        models=[
-            SimpleNamespace(model=vision_inference),
-            SimpleNamespace(model=object_detection_inference),
-        ]
+        models=[SimpleNamespace(), SimpleNamespace()]
     )
     app = FakeApp()
     runtime = ServerRuntime(
@@ -188,6 +192,18 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         stream_controller=StreamController(EventBus()),
         event_worker=EventWorker(),
         app=app,
+        model_runtime=SimpleNamespace(
+            model_inferences=[
+                vision_inference,
+                object_detection_inference,
+            ],
+            turn_on_inference=lambda inference: (
+                inference.turn_on_prediction_loop()
+            ),
+            turn_off_inference=lambda inference: (
+                inference.turn_off_prediction_loop()
+            ),
+        ),
     )
 
     GerberaRuntime._register_server_runtime_tools(runtime)

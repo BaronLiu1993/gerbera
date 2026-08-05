@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 import threading
 from typing import TypeAlias
 
-from gerbera_sdk.inference.model import Model
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
     PerceptionStateModel,
 )
@@ -29,14 +28,20 @@ class ModelOutputStore:
         if key not in self.model_outputs:
             raise KeyError(f"Model output is not registered: {key}")
 
-    def register_models(self, models: list[Model]) -> None:
+    def register(self, keys: list[ModelOutputStoreKey]) -> None:
         with self._lock:
-            for model in models:
-                for camera in model.subscribed_cameras:
-                    key = (camera.camera_id, model.model_id)
-                    if key in self.model_outputs:
-                        raise KeyError(f"Model output is already registered: {key}")
-                    self.model_outputs[key] = None
+            if len(keys) != len(set(keys)):
+                raise KeyError("Model output key is registered more than once")
+
+            duplicate_keys = set(keys) & self.model_outputs.keys()
+            if duplicate_keys:
+                duplicate_key = duplicate_keys.pop()
+                raise KeyError(
+                    f"Model output is already registered: {duplicate_key}"
+                )
+
+            for key in keys:
+                self.model_outputs[key] = None
 
     def write_model_output(
         self,

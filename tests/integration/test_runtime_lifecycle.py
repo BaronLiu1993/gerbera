@@ -27,6 +27,10 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         start=lambda: calls.append("database.start"),
         stop=lambda: calls.append("database.stop"),
     )
+    model_runtime = SimpleNamespace(
+        start=lambda: calls.append("models.start"),
+        stop=lambda: calls.append("models.stop"),
+    )
 
     monkeypatch.setattr(GerberaRuntime, "_build_board_runtime", lambda _: board_runtime)
     monkeypatch.setattr(
@@ -39,6 +43,11 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         GerberaRuntime,
         "_build_database_runtime",
         lambda hardware, worker: database_runtime,
+    )
+    monkeypatch.setattr(
+        GerberaRuntime,
+        "_build_model_runtime",
+        lambda hardware: model_runtime,
     )
     def build_server_runtime(**kwargs):
         runtime_lifecycle = kwargs["runtime_lifecycle"]
@@ -107,7 +116,9 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         "cameras.start",
         "database.start",
         "listener.start",
+        "models.start",
         "server.run",
+        "models.stop",
         "listener.stop",
         "streams.flush",
         "database.stop",

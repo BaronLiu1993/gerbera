@@ -22,6 +22,7 @@ from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import (
     EventCatalog,
@@ -60,10 +61,12 @@ class GerberaRuntime:
             hardware_system,
             event_worker,
         )
+        model_runtime = GerberaRuntime._build_model_runtime(hardware_system)
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,
             camera_runtime=camera_runtime,
             database_runtime=database_runtime,
+            model_runtime=model_runtime,
         )
         server_runtime = GerberaRuntime._build_server_runtime(
             hardware_system=hardware_system,
@@ -120,6 +123,12 @@ class GerberaRuntime:
         return CameraRuntime(hardware_system=hardware_system)
 
     @staticmethod
+    def _build_model_runtime(
+        hardware_system: HardwareSystem,
+    ) -> ModelRuntime:
+        return ModelRuntime(hardware_system=hardware_system)
+
+    @staticmethod
     def _build_server_runtime(
         hardware_system: HardwareSystem,
         board_runtime: BoardRuntime,
@@ -141,6 +150,7 @@ class GerberaRuntime:
             event_worker=event_worker,
             app=app,
             camera_runtime=runtime_lifecycle.camera_runtime,
+            model_runtime=runtime_lifecycle.model_runtime,
         )
         runtime_lifecycle.bind_server_runtime(server_runtime)
         return server_runtime
@@ -259,10 +269,15 @@ class GerberaRuntime:
     def _register_inference_tools(
         server_runtime: ServerRuntime,
     ) -> None:
+        model_runtime = server_runtime.model_runtime
+        if model_runtime is None:
+            if server_runtime.hardware_system.models:
+                raise RuntimeError("Model runtime is not configured")
+            return
+
         registered_models: dict[str, Inference] = {}
 
-        for configured_model in server_runtime.hardware_system.models:
-            inference = configured_model.model
+        for inference in model_runtime.model_inferences:
             registered_model = registered_models.get(inference.name)
             if registered_model is not None:
                 raise ValueError(
@@ -273,7 +288,7 @@ class GerberaRuntime:
         for model in registered_models.values():
             def build_turn_on_inference_tool(model: Inference):
                 def turn_on_inference() -> None:
-                    model.turn_on_prediction_loop()
+                    model_runtime.turn_on_inference(model)
 
                 return turn_on_inference
 
@@ -285,7 +300,7 @@ class GerberaRuntime:
 
             def build_turn_off_inference_tool(model: Inference):
                 def turn_off_inference() -> None:
-                    model.turn_off_prediction_loop()
+                    model_runtime.turn_off_inference(model)
 
                 return turn_off_inference
 

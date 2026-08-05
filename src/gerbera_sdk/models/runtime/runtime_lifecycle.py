@@ -7,6 +7,7 @@ from fastmcp import FastMCP
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 
 
@@ -15,6 +16,7 @@ class RuntimeLifecycle:
     board_runtime: BoardRuntime
     camera_runtime: CameraRuntime
     database_runtime: DatabaseRuntime
+    model_runtime: ModelRuntime
     server_runtime: ServerRuntime | None = None
 
     def bind_server_runtime(self, server_runtime: ServerRuntime) -> None:
@@ -36,6 +38,7 @@ class RuntimeLifecycle:
                 "board_runtime": self.board_runtime,
                 "camera_runtime": self.camera_runtime,
                 "database_runtime": self.database_runtime,
+                "model_runtime": self.model_runtime,
             }
 
     def _start_resources(
@@ -56,6 +59,9 @@ class RuntimeLifecycle:
 
             server_runtime._start_event_listener()
             cleanup.callback(server_runtime._stop_event_listener)
+
+            self.model_runtime.start()
+            cleanup.callback(self.model_runtime.stop)
         except Exception:
             cleanup.close()
             raise
