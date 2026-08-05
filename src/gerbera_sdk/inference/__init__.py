@@ -3,8 +3,6 @@ from typing import TypeAlias
 from gerbera_sdk.inference.frame import (
     BoundingBox,
     Frame,
-    VisionLanguageModelFrameEnvironment,
-    VisionLanguageModelFrameObject,
 )
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
     AnthropicVisionLanguageModelAdapter,
@@ -22,6 +20,10 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_in
     VisionLanguageModel,
     VisionLanguageModelInference,
 )
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_schema import (
+    VisionLanguageModelFrameEnvironment,
+    VisionLanguageModelFrameObject,
+)
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionAdapter,
@@ -31,6 +33,10 @@ from gerbera_sdk.inference.models.neural_network.object_detection.object_detecti
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
     ObjectDetectionModel,
     ObjectDetectionModelInference,
+)
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
+    PerceptionObjectModel,
+    PerceptionStateModel,
 )
 
 
@@ -53,6 +59,8 @@ __all__ = [
     "ObjectDetectionModelAdapters",
     "ObjectDetectionModel",
     "ObjectDetectionModelInference",
+    "PerceptionObjectModel",
+    "PerceptionStateModel",
     "OpenAIVisionLanguageModelAdapter",
     "VisionLanguageModelAdapter",
     "VISION_LANGUAGE_MODEL_REGISTRY",

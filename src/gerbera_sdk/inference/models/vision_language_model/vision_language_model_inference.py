@@ -4,8 +4,8 @@ from pathlib import Path
 from pydantic import Field, InstanceOf
 import threading
 
-from gerbera_sdk.inference.frame import (
-    Frame,
+from gerbera_sdk.inference.frame import Frame
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_schema import (
     VisionLanguageModelFrameEnvironment,
 )
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
