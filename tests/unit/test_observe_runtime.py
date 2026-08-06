@@ -2,6 +2,8 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+from mcp.types import ToolAnnotations
+
 from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationStatusEnum,
 )
@@ -55,7 +57,20 @@ class FakeMCPClient:
         pass
 
     async def list_tools(self) -> list:
-        return [SimpleNamespace(name="read_temperature")]
+        return [
+            SimpleNamespace(
+                name="read_temperature",
+                annotations=ToolAnnotations(readOnlyHint=True),
+            ),
+            SimpleNamespace(
+                name="set_heater",
+                annotations=ToolAnnotations(readOnlyHint=False),
+            ),
+            SimpleNamespace(
+                name="unclassified_tool",
+                annotations=None,
+            ),
+        ]
 
     async def call_tool(
         self,
@@ -63,6 +78,7 @@ class FakeMCPClient:
         arguments: dict,
         allowed_tool_names: frozenset[str],
     ) -> dict[str, object]:
+        assert allowed_tool_names == frozenset({"read_temperature"})
         assert name in allowed_tool_names
         return {"value": 22.5, "unit": "celsius"}
 

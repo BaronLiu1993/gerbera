@@ -37,7 +37,12 @@ class ObservationRuntime:
         async with MCPClient(self.mcp_url) as mcp_client:
             client = self.model.get_agent_client()
             tools = await mcp_client.list_tools()
-            allowed_tool_names = frozenset(tool.name for tool in tools)
+            allowed_tool_names = frozenset(
+                tool.name
+                for tool in tools
+                if tool.annotations is not None
+                and tool.annotations.readOnlyHint is True
+            )
 
             raw_response = client.send(
                 self.context_builder.build(),
