@@ -1,5 +1,7 @@
 from enum import Enum
 
+from pydantic import Field
+
 from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 
 
@@ -16,6 +18,7 @@ class ToolCallTypeEnum(str, Enum):
 
 class ToolCallEventSchema(StrictSchema):
     tool_name: str
+    arguments: dict[str, object] = Field(default_factory=dict)
     status: ToolCallStatusEnum
     call_type: ToolCallTypeEnum
     result: object | None = None

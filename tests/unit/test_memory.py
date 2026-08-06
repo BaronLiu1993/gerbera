@@ -2,6 +2,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+    ExecutionTypeEnum,
+)
+from gerbera_harness.agent.driver.main_loop.states.base import (
+    ExecuteDecisionEnum,
+)
 from gerbera_harness.memory import (
     EventTypeEnum,
     Memory,
@@ -138,3 +145,56 @@ def test_memory_stores_events_and_world_states() -> None:
         "value": 22.5,
         "unit": "celsius",
     }
+
+
+def test_execution_result_commits_evidence_and_errors_together() -> None:
+    memory = Memory(goal="Set the motor speed")
+    task = current_task()
+    memory.tasks.append(task)
+    error = ExecuteErrorSchema(
+        event_name="set_motor",
+        event_type=ExecutionTypeEnum.DISCRETE,
+        position=0,
+        error="Motor rejected command",
+    )
+    tool_event = {
+        "position": 0,
+        "tool_name": "set_motor",
+        "arguments": {"speed": 10},
+        "status": "failed",
+        "result": None,
+    }
+
+    result = memory.commit_execution_result(
+        task=task,
+        position=0,
+        decision=ExecuteDecisionEnum.REJECTED,
+        errors=[error],
+        observations=[],
+        tool_events=[tool_event],
+    )
+
+    assert [event.event_type for event in memory.event_ledger] == [
+        EventTypeEnum.TOOL_CALL,
+        EventTypeEnum.EXECUTION_RESULT,
+    ]
+    assert memory.event_ledger[0].payload == tool_event
+    assert result.payload["errors"] == ["Motor rejected command"]
+
+
+def test_execution_commit_validates_before_writing_evidence() -> None:
+    memory = Memory(goal="Set the motor speed")
+    task = current_task()
+    memory.tasks.append(task)
+
+    with pytest.raises(IndexError):
+        memory.commit_execution_result(
+            task=task,
+            position=1,
+            decision=ExecuteDecisionEnum.REJECTED,
+            errors=[],
+            observations=[],
+            tool_events=[{"tool_name": "set_motor"}],
+        )
+
+    assert memory.event_ledger == []

@@ -122,6 +122,7 @@ class FakeExecutionProcess:
     instances: list["FakeExecutionProcess"] = []
     result = ExecuteDecisionEnum.ACCEPTED
     errors: list[ExecuteErrorSchema] = []
+    recorded_tool_events: list[dict[str, object]] = []
     failure: Exception | None = None
 
     def __init__(
@@ -138,6 +139,9 @@ class FakeExecutionProcess:
         self.on_group_started = on_group_started
         self.on_group_completed = on_group_completed
         self.errors = list(type(self).errors)
+        self.tool_events = [
+            dict(event) for event in type(self).recorded_tool_events
+        ]
         type(self).instances.append(self)
 
     async def run_workflow(self) -> ExecuteDecisionEnum:
@@ -200,6 +204,7 @@ def fake_execution_process(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     FakeExecutionProcess.result = ExecuteDecisionEnum.ACCEPTED
     FakeExecutionProcess.errors = []
+    FakeExecutionProcess.recorded_tool_events = []
     FakeExecutionProcess.failure = None
     FakeSubAgentRuntime.instances = []
     FakeSubAgentRuntime.result = SubAgentResult(
@@ -249,6 +254,34 @@ def test_execution_runtime_runs_one_task_and_requests_review() -> None:
     )
     assert result.errors == []
     assert runtime.errors == []
+
+
+def test_execution_runtime_commits_deterministic_tool_evidence() -> None:
+    FakeExecutionProcess.recorded_tool_events = [
+        {
+            "position": 0,
+            "tool_name": "set_motor",
+            "arguments": {"speed": 10},
+            "status": "success",
+            "result": {"speed": 10},
+        }
+    ]
+    memory = runtime_memory()
+    runtime = ExecutionRuntime(
+        model=object(),
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+    )
+
+    asyncio.run(runtime.run_execution())
+
+    tool_events = [
+        event
+        for event in memory.event_ledger
+        if event.event_type is EventTypeEnum.TOOL_CALL
+    ]
+    assert tool_events[0].payload["arguments"] == {"speed": 10}
+    assert tool_events[0].payload["result"] == {"speed": 10}
 
 
 def test_execution_runtime_records_failure_and_requests_review() -> None:
@@ -379,6 +412,67 @@ def test_execution_runtime_dispatches_agent_action_to_subagent() -> None:
     assert memory.get_current_task() is None
 
 
+def test_execution_runtime_commits_subagent_result_evidence() -> None:
+    FakeSubAgentRuntime.result = SubAgentResult(
+        decision=ExecuteDecisionEnum.ACCEPTED,
+        errors=[],
+        turns_completed=2,
+        tool_events=[
+            {
+                "tool_name": "set_motor",
+                "arguments": {"speed": 10},
+                "status": "success",
+                "result": {"speed": 10},
+            }
+        ],
+    )
+    memory = agent_memory()
+    runtime = ExecutionRuntime(
+        model=object(),
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+    )
+
+    result = asyncio.run(runtime.run_execution())
+
+    assert result.decision is ExecuteDecisionEnum.ACCEPTED
+    tool_events = [
+        event
+        for event in memory.event_ledger
+        if event.event_type is EventTypeEnum.TOOL_CALL
+    ]
+    assert tool_events[0].payload["arguments"] == {"speed": 10}
+
+
+def test_execution_runtime_drops_errors_from_accepted_subagent() -> None:
+    recovered_error = ExecuteErrorSchema(
+        event_name="set_motor",
+        event_type=ExecutionTypeEnum.AGENT,
+        position=3,
+        error="Recovered motor failure",
+    )
+    FakeSubAgentRuntime.result = SimpleNamespace(
+        decision=ExecuteDecisionEnum.ACCEPTED,
+        errors=[recovered_error],
+        turns_completed=4,
+        observations=[],
+        tool_events=[],
+    )
+    memory = agent_memory()
+    runtime = ExecutionRuntime(
+        model=object(),
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+    )
+
+    result = asyncio.run(runtime.run_execution())
+
+    assert result.decision is ExecuteDecisionEnum.ACCEPTED
+    assert result.errors == []
+    assert runtime.errors == []
+    assert memory.completed_tasks == memory.tasks
+
+
 def test_execution_runtime_records_failed_subagent_result() -> None:
     error = ExecuteErrorSchema(
         event_name="observe",
@@ -416,6 +510,7 @@ def test_execution_runtime_runs_all_initialisation_tasks_before_review() -> None
     memory.current_hypothesis = SimpleNamespace(
         method=SimpleNamespace(execute_steps=[first, second])
     )
+    memory.initialize_tasks(memory.current_hypothesis)
     runtime = ExecutionRuntime(
         model=object(),
         memory=memory,

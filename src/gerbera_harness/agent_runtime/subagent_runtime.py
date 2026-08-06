@@ -179,8 +179,14 @@ class SubAgentRuntime:
     def _result(self, decision: ExecuteDecisionEnum) -> SubAgentResult:
         return SubAgentResult(
             decision=decision,
-            errors=list(self.errors),
+            errors=(
+                list(self.errors)
+                if decision is ExecuteDecisionEnum.REJECTED
+                else []
+            ),
             turns_completed=self.turns_completed,
+            observations=list(self.observations),
+            tool_events=[dict(event) for event in self.tool_events],
         )
 
     def _append_error(

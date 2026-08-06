@@ -139,9 +139,10 @@ def test_act_runtime_records_success() -> None:
 
     assert status is ToolCallStatusEnum.SUCCESS
     assert events == [
-        {
-            "tool_name": "set_motor",
-            "status": "success",
+            {
+                "tool_name": "set_motor",
+                "arguments": {"speed": 10},
+                "status": "success",
             "result": {"tool": "set_motor"},
             "call_type": "forward",
             "error_message": None,
@@ -159,6 +160,7 @@ def test_act_runtime_records_failure_without_raising() -> None:
     assert status is ToolCallStatusEnum.FAILED
     assert events[0]["status"] == "failed"
     assert events[0]["call_type"] == "forward"
+    assert events[0]["arguments"] == {"speed": 10}
     assert "set_motor" in events[0]["error_message"]
 
 

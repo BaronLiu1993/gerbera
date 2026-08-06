@@ -184,6 +184,18 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
     assert FakeMCPClient.calls == [("set_motor", {"speed": 10})]
     assert result is ExecuteDecisionEnum.ACCEPTED
     assert process.errors == []
+    assert process.tool_events == [
+        {
+            "position": 0,
+            "execution_type": "discrete",
+            "call_type": "forward",
+            "tool_name": "set_motor",
+            "arguments": {"speed": 10},
+            "status": "success",
+            "result": {"tool": "set_motor"},
+            "error": None,
+        }
+    ]
 
 
 @pytest.mark.parametrize("position", [-1, 1])
@@ -517,6 +529,16 @@ def test_execution_process_rejects_unknown_tool() -> None:
             error="MCP tool is not allowed: unknown_tool",
         )
     ]
+    assert process.tool_events[0] == {
+        "position": 0,
+        "execution_type": "discrete",
+        "call_type": "forward",
+        "tool_name": "unknown_tool",
+        "arguments": {"speed": 10},
+        "status": "failed",
+        "result": None,
+        "error": "MCP tool is not allowed: unknown_tool",
+    }
     assert FakeMCPClient.calls == []
 
 

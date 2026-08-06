@@ -46,6 +46,7 @@ class ExecutionProcess:
     on_group_started: GroupStartedHandler | None = None
     on_group_completed: GroupCompletedHandler | None = None
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
+    tool_events: list[dict[str, object]] = field(default_factory=list)
 
     async def run_workflow(self) -> ExecuteDecisionEnum:
         self._validate_workflow()
@@ -264,10 +265,14 @@ class ExecutionProcess:
         }
 
         try:
-            await client.call_tool(
-                rule.create_tool_call,
-                arguments,
-                allowed_tool_names,
+            await self._call_tool(
+                client=client,
+                allowed_tool_names=allowed_tool_names,
+                group_index=group_index,
+                action=rule,
+                call_type="create_rule",
+                tool_name=rule.create_tool_call,
+                arguments=arguments,
             )
         except Exception as exc:
             self._append_error(group_index, rule, str(exc))
@@ -291,16 +296,21 @@ class ExecutionProcess:
 
             if isinstance(action, DiscreteExecuteSchema):
                 arguments = client.build_arguments(action.params)
-                await client.call_tool(
-                    action.forward_tool_call,
-                    arguments,
-                    allowed_tool_names,
+                await self._call_tool(
+                    client=client,
+                    allowed_tool_names=allowed_tool_names,
+                    group_index=group_index,
+                    action=action,
+                    call_type="forward",
+                    tool_name=action.forward_tool_call,
+                    arguments=arguments,
                 )
                 return ExecuteDecisionEnum.ACCEPTED
 
             return await self._execute_continuous_action(
                 client,
                 allowed_tool_names,
+                group_index,
                 action,
             )
         except Exception as exc:
@@ -311,15 +321,20 @@ class ExecutionProcess:
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
+        group_index: int,
         action: ContinuousExecuteSchema,
     ) -> ExecuteDecisionEnum:
         forward_arguments = client.build_arguments(
             action.forward_tool_call_params
         )
-        await client.call_tool(
-            action.forward_tool_call,
-            forward_arguments,
-            allowed_tool_names,
+        await self._call_tool(
+            client=client,
+            allowed_tool_names=allowed_tool_names,
+            group_index=group_index,
+            action=action,
+            call_type="forward",
+            tool_name=action.forward_tool_call,
+            arguments=forward_arguments,
         )
 
         try:
@@ -331,6 +346,9 @@ class ExecutionProcess:
             await self._call_cleanup_tool(
                 client,
                 allowed_tool_names,
+                group_index,
+                action,
+                "reverse",
                 action.reverse_tool_call,
                 reverse_arguments,
             )
@@ -348,6 +366,9 @@ class ExecutionProcess:
                 await self._call_cleanup_tool(
                     client,
                     allowed_tool_names,
+                    group_index,
+                    rule,
+                    "delete_rule",
                     rule.delete_tool_call,
                     rule.event_key.model_dump(),
                 )
@@ -358,18 +379,25 @@ class ExecutionProcess:
                     f"Rule cleanup failed: {exc}",
                 )
 
-    @staticmethod
     async def _call_cleanup_tool(
+        self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
+        group_index: int,
+        action: ExecutableActionSchema,
+        call_type: str,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> Any:
         cleanup_task = asyncio.create_task(
-            client.call_tool(
-                tool_name,
-                arguments,
-                allowed_tool_names,
+            self._call_tool(
+                client=client,
+                allowed_tool_names=allowed_tool_names,
+                group_index=group_index,
+                action=action,
+                call_type=call_type,
+                tool_name=tool_name,
+                arguments=arguments,
             )
         )
 
@@ -378,6 +406,51 @@ class ExecutionProcess:
         except asyncio.CancelledError:
             await cleanup_task
             raise
+
+    async def _call_tool(
+        self,
+        *,
+        client: MCPClient,
+        allowed_tool_names: frozenset[str],
+        group_index: int,
+        action: ExecutableActionSchema,
+        call_type: str,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> Any:
+        event = {
+            "position": group_index,
+            "execution_type": action.execution_type,
+            "call_type": call_type,
+            "tool_name": tool_name,
+            "arguments": dict(arguments),
+        }
+        try:
+            result = await client.call_tool(
+                tool_name,
+                arguments,
+                allowed_tool_names,
+            )
+        except Exception as exc:
+            self.tool_events.append(
+                {
+                    **event,
+                    "status": "failed",
+                    "result": None,
+                    "error": str(exc),
+                }
+            )
+            raise
+
+        self.tool_events.append(
+            {
+                **event,
+                "status": "success",
+                "result": result,
+                "error": None,
+            }
+        )
+        return result
 
     def _build_decision(
         self,

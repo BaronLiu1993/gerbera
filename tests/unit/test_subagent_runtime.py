@@ -190,6 +190,7 @@ def test_act_status_returns_control_to_observation(
     assert isinstance(runtime.session.state, ObserveState)
     assert runtime.context.current_task.goal == "Set the motor speed to 10"
     assert runtime.turns_completed == 2
+    assert result.errors == []
     if status is ToolCallStatusEnum.SUCCESS:
         assert runtime.errors == []
         assert runtime.previous_act_error is None
@@ -233,6 +234,7 @@ def test_successful_adjustment_clears_previous_act_error(
     result = asyncio.run(runtime.run_agent())
 
     assert result.decision is ExecuteDecisionEnum.ACCEPTED
+    assert result.errors == []
     assert runtime.previous_act_error is None
     assert runtime.errors == [previous_error]
 

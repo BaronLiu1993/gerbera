@@ -149,6 +149,7 @@ class ActRuntime:
             return self._emit_tool_call_event(
                 call_type=call_type,
                 tool_name=tool_name,
+                arguments=arguments,
                 status=ToolCallStatusEnum.TIMED_OUT,
                 error_message=(
                     f"Tool call timed out after {self.timeout_seconds} seconds"
@@ -158,6 +159,7 @@ class ActRuntime:
             return self._emit_tool_call_event(
                 call_type=call_type,
                 tool_name=tool_name,
+                arguments=arguments,
                 status=ToolCallStatusEnum.FAILED,
                 error_message=str(exc),
             )
@@ -165,6 +167,7 @@ class ActRuntime:
         return self._emit_tool_call_event(
             call_type=call_type,
             tool_name=tool_name,
+            arguments=arguments,
             status=ToolCallStatusEnum.SUCCESS,
             result=result,
         )
@@ -174,6 +177,7 @@ class ActRuntime:
         *,
         call_type: ToolCallTypeEnum,
         tool_name: str,
+        arguments: dict[str, Any] | None = None,
         status: ToolCallStatusEnum,
         result: object | None = None,
         error_message: str | None = None,
@@ -181,6 +185,7 @@ class ActRuntime:
         event = ToolCallEventSchema(
             call_type=call_type,
             tool_name=tool_name,
+            arguments=arguments or {},
             status=status,
             result=result,
             error_message=error_message,

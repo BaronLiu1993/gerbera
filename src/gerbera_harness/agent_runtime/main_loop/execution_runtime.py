@@ -30,10 +30,9 @@ from gerbera_harness.agent_runtime.subagent_context import (
 from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
 from gerbera_harness.memory import (
     EventSchema,
-    EventTypeEnum,
     Memory,
-    SourceTypeEnum,
     TaskSchema,
+    WorldStateSchema,
 )
 
 
@@ -41,6 +40,8 @@ from gerbera_harness.memory import (
 class _ExecutionRunState:
     current_group_index: int = 0
     tasks_by_group: dict[int, TaskSchema] = field(default_factory=dict)
+    observations: list[WorldStateSchema] = field(default_factory=list)
+    tool_events: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,7 @@ class ExecutionRuntime:
         process = ExecutionProcess(
             mcp_url=self.mcp_url,
             actions_list=action_groups,
-            agent_executor=self._execute_agent,
+            agent_executor=partial(self._execute_agent, run_state),
             on_group_started=partial(
                 self._on_group_started,
                 run_state,
@@ -117,11 +118,16 @@ class ExecutionRuntime:
             result_position = min(failed_positions)
             current_task = run_state.tasks_by_group[result_position]
 
-        event = self.memory.append_execution_result(
+        event = self.memory.commit_execution_result(
             task=current_task,
             position=result_position,
             decision=decision,
             errors=execution_errors,
+            observations=run_state.observations,
+            tool_events=[
+                *process.tool_events,
+                *run_state.tool_events,
+            ],
         )
 
         return ExecutionResult(
@@ -182,6 +188,7 @@ class ExecutionRuntime:
 
     async def _execute_agent(
         self,
+        run_state: _ExecutionRunState,
         group_index: int,
         action: AgentExecuteSchema,
     ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
@@ -202,26 +209,17 @@ class ExecutionRuntime:
         )
         subagent_result = await subagent.run_agent()
 
-        for observation in subagent.observations:
-            self.memory.world_state_ledger.append(observation)
-            self.memory.append_event(
-                event_type=EventTypeEnum.WORLD_STATE_UPDATED,
-                source_type=SourceTypeEnum.MODEL,
-                payload={
-                    "world_state": observation.model_dump(mode="json")
-                },
-            )
-        for tool_event in subagent.tool_events:
-            self.memory.append_event(
-                event_type=EventTypeEnum.TOOL_CALL,
-                source_type=SourceTypeEnum.MCP_TOOL,
-                payload=dict(tool_event),
-            )
+        run_state.observations.extend(subagent_result.observations)
+        run_state.tool_events.extend(
+            dict(event) for event in subagent_result.tool_events
+        )
 
-        workflow_errors = [
-            error.model_copy(update={"position": group_index})
-            for error in subagent_result.errors
-        ]
+        workflow_errors = []
+        if subagent_result.decision is ExecuteDecisionEnum.REJECTED:
+            workflow_errors = [
+                error.model_copy(update={"position": group_index})
+                for error in subagent_result.errors
+            ]
         return subagent_result.decision, workflow_errors
 
     @staticmethod

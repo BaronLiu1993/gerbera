@@ -120,13 +120,60 @@ class Memory:
         decision: ExecuteDecisionEnum,
         errors: list[ExecuteErrorSchema],
     ) -> EventSchema:
+        return self.commit_execution_result(
+            task=task,
+            position=position,
+            decision=decision,
+            errors=errors,
+            observations=[],
+            tool_events=[],
+        )
+
+    def commit_execution_result(
+        self,
+        *,
+        task: TaskSchema,
+        position: int,
+        decision: ExecuteDecisionEnum,
+        errors: list[ExecuteErrorSchema],
+        observations: list[WorldStateSchema],
+        tool_events: list[dict[str, object]],
+    ) -> EventSchema:
         if task not in self.tasks:
             raise ValueError(
                 "Execution result task is not in main-agent memory"
             )
         if not 0 <= position < len(self.tasks):
             raise IndexError("Execution result position is outside task bounds")
-        return self.append_event(
+
+        committed_errors = (
+            list(errors)
+            if decision is ExecuteDecisionEnum.REJECTED
+            else []
+        )
+        tool_payloads = [dict(event) for event in tool_events]
+        observation_values = list(observations)
+        events = [
+            EventSchema(
+                event_type=EventTypeEnum.TOOL_CALL,
+                source_type=SourceTypeEnum.MCP_TOOL,
+                payload=payload,
+                session_id=self.session_id,
+            )
+            for payload in tool_payloads
+        ]
+        events.extend(
+            EventSchema(
+                event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+                source_type=SourceTypeEnum.MODEL,
+                payload={
+                    "world_state": observation.model_dump(mode="json")
+                },
+                session_id=self.session_id,
+            )
+            for observation in observation_values
+        )
+        result_event = EventSchema(
             event_type=EventTypeEnum.EXECUTION_RESULT,
             source_type=SourceTypeEnum.RUNTIME,
             payload={
@@ -134,9 +181,15 @@ class Memory:
                 "step_number": position,
                 "step_goal": task.task.goal,
                 "task": task.model_dump(mode="json"),
-                "errors": [error.error for error in errors],
+                "errors": [error.error for error in committed_errors],
             },
+            session_id=self.session_id,
         )
+        events.append(result_event)
+
+        self.world_state_ledger.extend(observation_values)
+        self.event_ledger.extend(events)
+        return result_event
 
     def append_world_state(
         self,
