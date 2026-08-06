@@ -49,80 +49,16 @@ class ExecutionProcess:
     tool_events: list[dict[str, object]] = field(default_factory=list)
 
     async def run_workflow(self) -> ExecuteDecisionEnum:
-        self._validate_workflow()
+        async with MCPClient(self.mcp_url) as client:
+            tools = await client.list_tools()
+            tool_names: set[str] = set()
+            for tool in tools:
+                tool_names.add(tool.name)
 
-        try:
-            async with MCPClient(self.mcp_url) as client:
-                tools = await client.list_tools()
-                allowed_tool_names = frozenset(tool.name for tool in tools)
-                return await self._execute_workflow(
-                    client,
-                    allowed_tool_names,
-                )
-        except Exception as exc:
-            first_action = self.actions_list[0].actions[0]
-            self._append_error(0, first_action, str(exc))
-            return ExecuteDecisionEnum.REJECTED
-
-    def _validate_workflow(self) -> None:
-        if not self.actions_list:
-            raise ValueError(
-                "ExecutionProcess requires deterministic action groups"
+            return await self._execute_workflow(
+                client,
+                frozenset(tool_names),
             )
-
-        supported_types = (
-            RuleCreationSchema,
-            AgentExecuteSchema,
-            ContinuousExecuteSchema,
-            DiscreteExecuteSchema,
-        )
-
-        for group_index, group in enumerate(self.actions_list):
-            if not isinstance(group, ExecuteActionGroupSchema):
-                raise ValueError(
-                    "ExecutionProcess requires deterministic action groups"
-                )
-
-            if not group.actions:
-                raise ValueError(
-                    "ExecutionProcess requires non-empty action groups"
-                )
-
-            agent_actions = [
-                action
-                for action in group.actions
-                if isinstance(action, AgentExecuteSchema)
-            ]
-            if agent_actions and (
-                len(agent_actions) != 1 or len(group.actions) != 1
-            ):
-                raise ValueError(
-                    "An agent action must be the only action in its "
-                    "execute group"
-                )
-
-            for action in group.actions:
-                if not isinstance(action, supported_types):
-                    raise ValueError(
-                        "ExecutionProcess received an unsupported action"
-                    )
-
-                if (
-                    isinstance(action, AgentExecuteSchema)
-                    and self.agent_executor is None
-                ):
-                    raise ValueError(
-                        "ExecutionProcess only accepts deterministic actions "
-                        "without an agent executor"
-                    )
-
-                if (
-                    isinstance(action, RuleCreationSchema)
-                    and group_index != 0
-                ):
-                    raise ValueError(
-                        "Rule creation must be in the first execute group"
-                    )
 
     async def _execute_workflow(
         self,
@@ -130,59 +66,42 @@ class ExecutionProcess:
         allowed_tool_names: frozenset[str],
     ) -> ExecuteDecisionEnum:
         active_rules: list[ActiveRule] = []
-        decisions: list[ExecuteDecisionEnum] = []
 
         try:
             for group_index, group in enumerate(self.actions_list):
-                previous_error_count = len(self.errors)
+                if self.on_group_started is not None:
+                    self.on_group_started(group_index, group)
 
-                try:
-                    if self.on_group_started is not None:
-                        self.on_group_started(group_index, group)
+                first_action = group.actions[0]
+                if isinstance(first_action, AgentExecuteSchema):
+                    if self.agent_executor is None:
+                        raise RuntimeError(
+                            "Agent executor is not configured"
+                        )
 
-                    first_action = group.actions[0]
-                    if isinstance(first_action, AgentExecuteSchema):
-                        if self.agent_executor is None:
-                            raise RuntimeError(
-                                "Agent executor is not configured"
+                    agent_decision, agent_errors = await self.agent_executor(
+                        group_index,
+                        first_action,
+                    )
+                    self.errors.extend(agent_errors)
+                    group_decisions = [agent_decision]
+                else:
+                    try:
+                        group_decisions = (
+                            await self._execute_deterministic_group(
+                                client=client,
+                                allowed_tool_names=allowed_tool_names,
+                                group_index=group_index,
+                                group=group,
+                                active_rules=active_rules,
                             )
-                        agent_decision, agent_errors = (
-                            await self.agent_executor(
-                                group_index,
-                                first_action,
-                            )
                         )
-                        self.errors.extend(agent_errors)
-                        group_decisions = [agent_decision]
-                    else:
-                        group_decisions = await self._execute_group(
-                            client,
-                            allowed_tool_names,
-                            group_index,
-                            group,
-                            active_rules,
-                        )
-                except Exception as exc:
-                    if len(self.errors) == previous_error_count:
-                        self._append_error(
-                            group_index,
-                            group.actions[0],
-                            str(exc),
-                        )
-                    return ExecuteDecisionEnum.REJECTED
+                    except Exception:
+                        return ExecuteDecisionEnum.REJECTED
 
-                decisions.extend(group_decisions)
-                if any(
-                    decision is not ExecuteDecisionEnum.ACCEPTED
-                    for decision in group_decisions
-                ):
-                    if len(self.errors) == previous_error_count:
-                        self._append_error(
-                            group_index,
-                            first_action,
-                            "Action group did not complete",
-                        )
-                    return ExecuteDecisionEnum.REJECTED
+                for decision in group_decisions:
+                    if decision is ExecuteDecisionEnum.REJECTED:
+                        return ExecuteDecisionEnum.REJECTED
 
                 if self.on_group_completed is not None:
                     self.on_group_completed(group_index, group)
@@ -193,9 +112,11 @@ class ExecutionProcess:
                 active_rules,
             )
 
-        return self._build_decision(decisions)
+        if self.errors:
+            return ExecuteDecisionEnum.REJECTED
+        return ExecuteDecisionEnum.ACCEPTED
 
-    async def _execute_group(
+    async def _execute_deterministic_group(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
@@ -452,48 +373,12 @@ class ExecutionProcess:
         )
         return result
 
-    def _build_decision(
-        self,
-        decisions: list[ExecuteDecisionEnum],
-    ) -> ExecuteDecisionEnum:
-        if not decisions:
-            self._append_incomplete_actions_error()
-            return ExecuteDecisionEnum.REJECTED
-
-        if self.errors:
-            return ExecuteDecisionEnum.REJECTED
-
-        for decision in decisions:
-            if decision is not ExecuteDecisionEnum.ACCEPTED:
-                self._append_incomplete_actions_error()
-                return ExecuteDecisionEnum.REJECTED
-
-        return ExecuteDecisionEnum.ACCEPTED
-
-    def _append_incomplete_actions_error(self) -> None:
-        if self.errors:
-            return
-
-        self.errors.append(
-            ExecuteErrorSchema(
-                event_name="deterministic_actions",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=0,
-                error="Not all deterministic actions completed",
-            )
-        )
-
     def _append_error(
         self,
         group_index: int,
         action: ExecutableActionSchema,
         error: str,
     ) -> None:
-        if not 0 <= group_index < len(self.actions_list):
-            raise IndexError(
-                f"Execution position {group_index} is outside workflow "
-                f"bounds [0, {len(self.actions_list)})"
-            )
         group = self.actions_list[group_index]
         self.errors.append(
             ExecuteErrorSchema(

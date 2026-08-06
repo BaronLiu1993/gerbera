@@ -226,7 +226,11 @@ def fake_execution_process(monkeypatch) -> None:
 
 def runtime_memory() -> Memory:
     memory = Memory(goal="Test the motor")
-    memory.tasks.append(current_task())
+    task = current_task()
+    memory.tasks.append(task)
+    memory.current_hypothesis = SimpleNamespace(
+        method=SimpleNamespace(execute_steps=[task.task])
+    )
     return memory
 
 
@@ -344,7 +348,7 @@ def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
     )
 
 
-def test_execution_runtime_captures_process_exceptions() -> None:
+def test_execution_runtime_propagates_process_exceptions() -> None:
     FakeExecutionProcess.failure = RuntimeError("invalid execution wiring")
     memory = runtime_memory()
     runtime = ExecutionRuntime(
@@ -353,12 +357,27 @@ def test_execution_runtime_captures_process_exceptions() -> None:
         mcp_url="https://hardware.example.com/mcp",
     )
 
-    result = asyncio.run(runtime.run_execution())
+    with pytest.raises(RuntimeError, match="invalid execution wiring"):
+        asyncio.run(runtime.run_execution())
 
-    assert result.decision is ExecuteDecisionEnum.REJECTED
-    assert runtime.errors[0].error == "invalid execution wiring"
-    assert result.errors[0].error == "invalid execution wiring"
-    assert result.event.payload["errors"] == ["invalid execution wiring"]
+    assert memory.tasks[0].status == "in_progress"
+    assert memory.event_ledger == []
+
+
+def test_execution_runtime_fails_before_mutating_missing_task() -> None:
+    memory = runtime_memory()
+    memory.tasks.clear()
+    runtime = ExecutionRuntime(
+        model=object(),
+        memory=memory,
+        mcp_url="https://hardware.example.com/mcp",
+    )
+
+    with pytest.raises(IndexError):
+        asyncio.run(runtime.run_execution())
+
+    assert memory.tasks == []
+    assert memory.event_ledger == []
 
 
 def test_execution_result_only_contains_errors_from_current_run() -> None:

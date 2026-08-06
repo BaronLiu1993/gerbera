@@ -6,19 +6,16 @@ from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
 )
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
+    LoopStateEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
     ExecuteErrorSchema,
-    ExecutionTypeEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     AgentExecuteSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
-)
-from gerbera_harness.agent.driver.main_loop.states.base import (
-    LoopStateEnum,
 )
 from gerbera_harness.agent.driver.subloop.states import (
     Session as SubAgentSession,
@@ -31,7 +28,6 @@ from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
 from gerbera_harness.memory import (
     EventSchema,
     Memory,
-    TaskSchema,
     WorldStateSchema,
 )
 
@@ -39,7 +35,6 @@ from gerbera_harness.memory import (
 @dataclass
 class _ExecutionRunState:
     current_group_index: int = 0
-    tasks_by_group: dict[int, TaskSchema] = field(default_factory=dict)
     observations: list[WorldStateSchema] = field(default_factory=list)
     tool_events: list[dict[str, object]] = field(default_factory=list)
 
@@ -71,56 +66,23 @@ class ExecutionRuntime:
                 self._on_group_started,
                 run_state,
             ),
-            on_group_completed=partial(
-                self._on_group_completed,
-                run_state,
-            ),
+            on_group_completed=self._on_group_completed,
         )
 
-        try:
-            decision = await process.run_workflow()
-            execution_errors = process.errors
-        except Exception as exc:
-            current_group_index = run_state.current_group_index
-            action = action_groups[current_group_index].actions[0]
-            execution_errors = [
-                ExecuteErrorSchema(
-                    event_name=action_groups[current_group_index].goal,
-                    event_type=ExecutionTypeEnum(action.execution_type),
-                    position=current_group_index,
-                    error=str(exc),
-                )
-            ]
-            decision = ExecuteDecisionEnum.REJECTED
+        decision = await process.run_workflow()
+        execution_errors = process.errors
 
         self.errors.extend(execution_errors)
 
         current_position = run_state.current_group_index
-        current_task = self._task_for_group(
-            run_state,
-            current_position,
-            action_groups[current_position],
-        )
+        current_task = self.memory.tasks[current_position]
 
-        result_position = current_position
         if decision is ExecuteDecisionEnum.REJECTED:
-            failed_positions = {
-                error.position for error in execution_errors
-            } or {current_position}
-            for position in failed_positions:
-                self._validate_position(position, action_groups)
-                failed_task = self._task_for_group(
-                    run_state,
-                    position,
-                    action_groups[position],
-                )
-                self.memory.fail_task(failed_task)
-            result_position = min(failed_positions)
-            current_task = run_state.tasks_by_group[result_position]
+            self.memory.fail_task(current_task)
 
         event = self.memory.commit_execution_result(
             task=current_task,
-            position=result_position,
+            position=current_position,
             decision=decision,
             errors=execution_errors,
             observations=run_state.observations,
@@ -141,50 +103,17 @@ class ExecutionRuntime:
         self,
         run_state: _ExecutionRunState,
         group_index: int,
-        group: ExecuteActionGroupSchema,
+        _group: ExecuteActionGroupSchema,
     ) -> None:
+        self.memory.start_task(self.memory.tasks[group_index])
         run_state.current_group_index = group_index
-        self._task_for_group(run_state, group_index, group)
 
     def _on_group_completed(
         self,
-        run_state: _ExecutionRunState,
         group_index: int,
-        group: ExecuteActionGroupSchema,
+        _group: ExecuteActionGroupSchema,
     ) -> None:
-        task = self._task_for_group(run_state, group_index, group)
-        self.memory.complete_task(task)
-
-    def _task_for_group(
-        self,
-        run_state: _ExecutionRunState,
-        group_index: int,
-        group: ExecuteActionGroupSchema,
-    ) -> TaskSchema:
-        existing = run_state.tasks_by_group.get(group_index)
-        if existing is not None:
-            return existing
-
-        assigned_task_ids = {
-            task.id for task in run_state.tasks_by_group.values()
-        }
-        task = next(
-            (
-                candidate
-                for candidate in self.memory.tasks
-                if candidate.status in {"pending", "in_progress"}
-                and candidate.task == group
-                and candidate.id not in assigned_task_ids
-            ),
-            None,
-        )
-        if task is None:
-            task = TaskSchema(status="pending", task=group)
-            self.memory.tasks.append(task)
-
-        self.memory.start_task(task)
-        run_state.tasks_by_group[group_index] = task
-        return task
+        self.memory.complete_task(self.memory.tasks[group_index])
 
     async def _execute_agent(
         self,
@@ -210,41 +139,19 @@ class ExecutionRuntime:
         subagent_result = await subagent.run_agent()
 
         run_state.observations.extend(subagent_result.observations)
-        run_state.tool_events.extend(
-            dict(event) for event in subagent_result.tool_events
-        )
+        for event in subagent_result.tool_events:
+            run_state.tool_events.append(dict(event))
 
         workflow_errors = []
         if subagent_result.decision is ExecuteDecisionEnum.REJECTED:
-            workflow_errors = [
-                error.model_copy(update={"position": group_index})
-                for error in subagent_result.errors
-            ]
+            for error in subagent_result.errors:
+                workflow_errors.append(
+                    error.model_copy(update={"position": group_index})
+                )
         return subagent_result.decision, workflow_errors
 
-    @staticmethod
-    def _validate_position(
-        position: int,
-        action_groups: list[ExecuteActionGroupSchema],
-    ) -> None:
-        if not 0 <= position < len(action_groups):
-            raise IndexError(
-                f"Execution position {position} is outside workflow "
-                f"bounds [0, {len(action_groups)})"
-            )
-
     def _execution_groups(self) -> list[ExecuteActionGroupSchema]:
-        hypothesis = self.memory.current_hypothesis
-        if hypothesis is not None:
-            return list(hypothesis.method.execute_steps)
-
-        groups = [
-            task.task
-            for task in self.memory.tasks
-            if task.status in {"pending", "in_progress"}
-        ]
-        if not groups:
-            raise RuntimeError(
-                "Initialisation must provide execution tasks"
-            )
+        groups = []
+        for task in self.memory.tasks:
+            groups.append(task.task)
         return groups

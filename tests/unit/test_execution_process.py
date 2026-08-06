@@ -198,24 +198,6 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
     ]
 
 
-@pytest.mark.parametrize("position", [-1, 1])
-def test_execution_process_rejects_out_of_bounds_error_positions(
-    position: int,
-) -> None:
-    group = ExecuteActionGroupSchema(
-        goal="Set the motor speed.",
-        action_type="execute",
-        actions=[discrete_action()],
-    )
-    process = ExecutionProcess(
-        mcp_url="https://hardware.example.com/mcp",
-        actions_list=[group],
-    )
-
-    with pytest.raises(IndexError, match="outside workflow bounds"):
-        process._append_error(position, group.actions[0], "failed")
-
-
 def test_execution_process_stops_continuous_action() -> None:
     group = ExecuteActionGroupSchema(
         goal="Collect sensor readings.",
@@ -249,8 +231,8 @@ def test_execution_process_rejects_agent_actions() -> None:
     )
 
     with pytest.raises(
-        ValueError,
-        match="only accepts deterministic actions",
+        RuntimeError,
+        match="Agent executor is not configured",
     ):
         asyncio.run(process.run_workflow())
 
@@ -347,21 +329,6 @@ def test_execution_process_stops_workflow_after_failed_agent_group() -> None:
     assert FakeMCPClient.calls == []
 
 
-def test_execution_process_rejects_empty_workflow() -> None:
-    process = ExecutionProcess(
-        mcp_url="https://hardware.example.com/mcp",
-        actions_list=[],
-    )
-
-    with pytest.raises(
-        ValueError,
-        match="requires deterministic action groups",
-    ):
-        asyncio.run(process.run_workflow())
-
-    assert process.errors == []
-
-
 def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
     group = ExecuteActionGroupSchema(
         goal="Set the motor speed safely.",
@@ -396,26 +363,6 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
     ]
     assert result is ExecuteDecisionEnum.ACCEPTED
     assert process.errors == []
-
-
-def test_execution_process_rejects_incomplete_action_statuses() -> None:
-    process = ExecutionProcess(
-        mcp_url="https://hardware.example.com/mcp",
-        actions_list=[],
-    )
-    decision = process._build_decision(
-        [ExecuteDecisionEnum.ACCEPTED, ExecuteDecisionEnum.REJECTED]
-    )
-
-    assert decision is ExecuteDecisionEnum.REJECTED
-    assert process.errors == [
-        ExecuteErrorSchema(
-            event_name="deterministic_actions",
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=0,
-            error="Not all deterministic actions completed",
-        )
-    ]
 
 
 def test_execution_process_deletes_rule_when_later_group_fails() -> None:
@@ -484,27 +431,6 @@ def test_execution_process_fails_when_rule_cleanup_fails() -> None:
             ),
         )
     ]
-
-
-def test_execution_process_rejects_rule_after_first_group() -> None:
-    process = ExecutionProcess(
-        mcp_url="https://hardware.example.com/mcp",
-        actions_list=[
-            ExecuteActionGroupSchema(
-                goal="Set the motor speed.",
-                action_type="execute",
-                actions=[discrete_action()],
-            ),
-            ExecuteActionGroupSchema(
-                goal="Install the safety rule.",
-                action_type="execute",
-                actions=[rule_creation_action()],
-            ),
-        ],
-    )
-
-    with pytest.raises(ValueError, match="first execute group"):
-        asyncio.run(process.run_workflow())
 
 
 def test_execution_process_rejects_unknown_tool() -> None:
