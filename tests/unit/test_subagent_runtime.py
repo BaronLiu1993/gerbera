@@ -3,6 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+    ExecuteDecisionEnum,
+)
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
     ExecuteErrorSchema,
     ExecutionTypeEnum,
@@ -122,11 +125,7 @@ class ReadyPlanningRuntime:
 
 
 class CompletePlanningRuntime:
-    def __init__(self, memory: Memory) -> None:
-        self.memory = memory
-
     async def run_planning(self) -> PlanningStatusEnum:
-        self.memory.complete_task()
         return PlanningStatusEnum.COMPLETE
 
 
@@ -172,8 +171,10 @@ def test_act_status_returns_control_to_observation(
         action_plan=planned_action(),
     )
 
-    asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.ACCEPTED
+    assert result.turns_completed == 2
     assert act_runtime.action.forward_tool_call == "set_motor"
     assert isinstance(runtime.session.state, ObserveState)
     assert runtime.memory.tasks[0].status == "completed"
@@ -218,8 +219,9 @@ def test_successful_adjustment_clears_previous_act_error(
         previous_act_error=previous_error,
     )
 
-    asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.ACCEPTED
     assert runtime.previous_act_error is None
     assert runtime.errors == [previous_error]
 
@@ -251,9 +253,11 @@ def test_subagent_stops_after_maximum_completed_turns(monkeypatch) -> None:
         action_plan=planned_action(),
     )
 
-    with pytest.raises(RuntimeError, match="maximum of 3 turns"):
-        asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.errors == runtime.errors
+    assert result.turns_completed == 3
     assert runtime.turns_completed == 3
     assert isinstance(runtime.session.state, ActState)
 
@@ -287,8 +291,9 @@ def test_subagent_runs_observe_plan_act_observe_end_to_end(
         action_plan=planned_action(),
     )
 
-    asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.ACCEPTED
     assert runtime.turns_completed == 4
     assert runtime.memory.tasks[0].status == "completed"
     assert act_runtime.action is runtime.action_plan
@@ -304,9 +309,9 @@ def test_subagent_rejects_invalid_maximum_turns() -> None:
         max_turns=0,
     )
 
-    with pytest.raises(RuntimeError, match="maximum of 0 turns"):
-        asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.FAILED
     assert runtime.errors[0].error == (
         "Subagent exceeded its maximum of 0 turns"
     )
@@ -326,8 +331,34 @@ def test_subagent_times_out_an_unfinished_task(monkeypatch) -> None:
         timeout_seconds=0.001,
     )
 
-    with pytest.raises(TimeoutError, match="timed out after 0.001 seconds"):
-        asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
+
+    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert runtime.turns_completed == 0
+
+
+def test_external_cancellation_propagates(monkeypatch) -> None:
+    monkeypatch.setattr(
+        SubAgentRuntime,
+        "observation_runtime",
+        property(lambda self: HangingObservationRuntime()),
+    )
+    runtime = SubAgentRuntime(
+        session=Session(),
+        model=SimpleNamespace(),
+        memory=planning_memory(),
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=10,
+    )
+
+    async def cancel_runtime() -> None:
+        task = asyncio.create_task(runtime.run_agent())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(cancel_runtime())
 
     assert runtime.turns_completed == 0
 
@@ -341,9 +372,9 @@ def test_subagent_rejects_invalid_timeout() -> None:
         timeout_seconds=0,
     )
 
-    with pytest.raises(TimeoutError, match="timed out after 0 seconds"):
-        asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.FAILED
     assert runtime.errors[0].error == (
         "Subagent task timed out after 0 seconds"
     )
@@ -351,7 +382,7 @@ def test_subagent_rejects_invalid_timeout() -> None:
 
 def test_subagent_stops_when_planning_completes(monkeypatch) -> None:
     memory = planning_memory()
-    planning_runtime = CompletePlanningRuntime(memory)
+    planning_runtime = CompletePlanningRuntime()
     monkeypatch.setattr(
         SubAgentRuntime,
         "planning_runtime",
@@ -365,10 +396,11 @@ def test_subagent_stops_when_planning_completes(monkeypatch) -> None:
         timeout_seconds=1,
     )
 
-    asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.ACCEPTED
     assert runtime.turns_completed == 1
-    assert memory.tasks[0].status == "completed"
+    assert memory.tasks[0].status == "in_progress"
 
 
 def test_subagent_propagates_blocked_observation(monkeypatch) -> None:
@@ -385,8 +417,10 @@ def test_subagent_propagates_blocked_observation(monkeypatch) -> None:
         timeout_seconds=1,
     )
 
-    asyncio.run(runtime.run_agent())
+    result = asyncio.run(runtime.run_agent())
 
+    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.errors == runtime.errors
     assert runtime.errors[0].event_name == "observe"
     assert runtime.errors[0].error == "Observation blocked"
 

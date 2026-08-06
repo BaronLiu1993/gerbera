@@ -47,6 +47,15 @@ def test_memory_returns_none_without_current_task() -> None:
     assert memory.get_current_task() is None
 
 
+def test_tasks_have_independent_application_owned_ids() -> None:
+    first = current_task()
+    second = current_task()
+
+    assert first.id
+    assert second.id
+    assert first.id != second.id
+
+
 def test_complete_task_moves_the_current_task_and_records_event() -> None:
     memory = Memory(goal="Set the motor speed")
     task = current_task()

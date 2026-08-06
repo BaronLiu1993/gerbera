@@ -1,6 +1,9 @@
 import asyncio
 from dataclasses import dataclass, field
 
+from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+    ExecuteDecisionEnum,
+)
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
     ExecuteErrorSchema,
     ExecutionTypeEnum,
@@ -32,6 +35,7 @@ from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
 from gerbera_harness.agent_runtime.sub_loop.planning_runtime import (
     PlanningRuntime,
 )
+from gerbera_harness.agent_runtime.subagent_result import SubAgentResult
 from gerbera_harness.memory import Memory
 
 
@@ -84,24 +88,24 @@ class SubAgentRuntime:
             timeout_seconds=self.timeout_seconds,
         )
 
-    async def run_agent(self) -> None:
+    async def run_agent(self) -> SubAgentResult:
         try:
-            await asyncio.wait_for(
+            return await asyncio.wait_for(
                 self._run_agent_loop(),
                 timeout=self.timeout_seconds,
             )
-        except TimeoutError as exc:
+        except TimeoutError:
             error = TimeoutError(
                 "Subagent task timed out after "
                 f"{self.timeout_seconds} seconds"
             )
             self._append_error(str(error))
-            raise error from exc
+            return self._result(ExecuteDecisionEnum.FAILED)
         except Exception as exc:
             self._append_error(str(exc))
-            raise
+            return self._result(ExecuteDecisionEnum.FAILED)
 
-    async def _run_agent_loop(self) -> None:
+    async def _run_agent_loop(self) -> SubAgentResult:
         while self.turns_completed < self.max_turns:
             current_state = self.session.state
             if current_state.state is ExecuteLoopStateEnum.OBSERVE:
@@ -112,10 +116,10 @@ class SubAgentRuntime:
                     self.session.perform_transition(ExecuteLoopStateEnum.PLAN)
                 elif decision is ObservationStatusEnum.COMPLETE:
                     self.memory.complete_task()
-                    return
+                    return self._result(ExecuteDecisionEnum.ACCEPTED)
                 elif decision is ObservationStatusEnum.BLOCKED:
                     self._append_error("Observation blocked")
-                    return
+                    return self._result(ExecuteDecisionEnum.FAILED)
             elif current_state.state is ExecuteLoopStateEnum.PLAN:
                 decision = await self.planning_runtime.run_planning()
                 self.turns_completed += 1
@@ -124,9 +128,9 @@ class SubAgentRuntime:
                     self.session.perform_transition(ExecuteLoopStateEnum.ACT)
                 elif decision is PlanningStatusEnum.BLOCKED:
                     self._append_error("Planning blocked")
-                    return
+                    return self._result(ExecuteDecisionEnum.FAILED)
                 elif decision is PlanningStatusEnum.COMPLETE:
-                    return
+                    return self._result(ExecuteDecisionEnum.ACCEPTED)
             elif current_state.state is ExecuteLoopStateEnum.ACT:
                 if self.action_plan is None:
                     raise RuntimeError("An action plan is required to act")
@@ -151,14 +155,19 @@ class SubAgentRuntime:
                     ToolCallStatusEnum.FAILED,
                     ToolCallStatusEnum.TIMED_OUT,
                 }:
-                    self.session.perform_transition(
-                        ExecuteLoopStateEnum.OBSERVE
-                    )
+                    self.session.perform_transition(ExecuteLoopStateEnum.OBSERVE)
             else:
                 raise ValueError("Unsupported State")
 
-        raise RuntimeError(
-            f"Subagent exceeded its maximum of {self.max_turns} turns"
+        reason = f"Subagent exceeded its maximum of {self.max_turns} turns"
+        self._append_error(reason)
+        return self._result(ExecuteDecisionEnum.FAILED)
+
+    def _result(self, decision: ExecuteDecisionEnum) -> SubAgentResult:
+        return SubAgentResult(
+            decision=decision,
+            errors=list(self.errors),
+            turns_completed=self.turns_completed,
         )
 
     def _append_error(

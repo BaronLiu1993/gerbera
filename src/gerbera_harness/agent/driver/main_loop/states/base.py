@@ -13,7 +13,6 @@ PROMPT_DIRECTORY = Path(__file__).resolve().parents[4] / "prompts" / "main"
 class LoopStateEnum(str, Enum):
     INITIALISATION = "initialisation"
     EXECUTION = "execution"
-    OBSERVATION = "observation"
     REVIEW = "review"
 
 

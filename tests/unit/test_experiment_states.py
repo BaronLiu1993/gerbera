@@ -44,6 +44,15 @@ def test_session_replaces_state_during_transition() -> None:
     assert session.state is not initial_state
 
 
+def test_main_loop_sessions_have_independent_run_ids() -> None:
+    first = Session()
+    second = Session()
+
+    assert first.run_id
+    assert second.run_id
+    assert first.run_id != second.run_id
+
+
 def test_session_rejects_invalid_transition() -> None:
     session = Session()
     initial_state = session.state

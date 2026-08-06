@@ -26,7 +26,7 @@ STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
 @dataclass
 class Session:
     state: ExperimentState = field(default_factory=Initialisation)
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    run_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def valid_transition(
         self,
