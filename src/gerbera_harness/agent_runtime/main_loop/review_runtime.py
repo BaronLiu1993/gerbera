@@ -24,6 +24,7 @@ class ReviewResult:
     decision: ReviewDecisionEnum
     requested_next_state: LoopStateEnum | None
     hypothesis: HypothesisSchema | None
+    feedback: list[str]
 
 
 @dataclass

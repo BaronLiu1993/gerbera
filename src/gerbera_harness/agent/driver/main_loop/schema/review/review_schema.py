@@ -18,6 +18,7 @@ class ReviewResponseSchema(StrictSchema):
     decision: ReviewDecisionEnum
     next_state: Literal[LoopStateEnum.INITIALISATION] | None
     hypothesis: HypothesisSchema | None
+    feedback: list[str]
 
     @model_validator(mode="after")
     def validate_decision_transition(self) -> "ReviewResponseSchema":

@@ -4,6 +4,7 @@ from gerbera_harness.agent.driver.main_loop import (
     InitialisationDecisionEnum,
     ExecuteDecisionEnum,
     LoopStateEnum,
+    ReviewDecisionEnum,
     Session,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -12,6 +13,7 @@ from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schem
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.context_builder import (
     InitialisationContextBuilder,
+    ReviewContextBuilder,
 )
 from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
     InitialisationRuntime,
@@ -32,6 +34,7 @@ class AgentRuntime:
     memory: Memory
     mcp_url: str
     context_window_size: int = 20
+    feedback: list[str]
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     @property
@@ -64,6 +67,7 @@ class AgentRuntime:
             if current_state.state is LoopStateEnum.INITIALISATION:
                 result = await self.initialisation_runtime.run_initial(
                     initial_user_prompt,
+                    self.feedback
                 )
 
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
@@ -93,16 +97,13 @@ class AgentRuntime:
                 result = await self.review_runtime.run_review()
 
                 if result.decision is ReviewDecisionEnum.REPLAN:
-                    
+                    self.feedback = result.feedback
+                    self.session.perform_transition(result.requested_next_state)
                 elif result.decision is ReviewDecisionEnum.ACCEPTED:
-
-                elif result.decision is ReviewDecisionEnum.REJECT
-
+                    break
+                elif result.decision is ReviewDecisionEnum.REJECTED:
+                    break
                 else:
                     raise ValueError("Unsupported Decision")
-
-
-
-
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
