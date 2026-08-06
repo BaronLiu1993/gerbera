@@ -121,7 +121,6 @@ def agent_memory() -> Memory:
 class FakeExecutionProcess:
     instances: list["FakeExecutionProcess"] = []
     result = ExecuteDecisionEnum.ACCEPTED
-    errors: list[ExecuteErrorSchema] = []
     recorded_tool_events: list[dict[str, object]] = []
     failure: Exception | None = None
 
@@ -138,7 +137,6 @@ class FakeExecutionProcess:
         self.agent_executor = agent_executor
         self.on_group_started = on_group_started
         self.on_group_completed = on_group_completed
-        self.errors = list(type(self).errors)
         self.tool_events = [
             dict(event) for event in type(self).recorded_tool_events
         ]
@@ -148,21 +146,16 @@ class FakeExecutionProcess:
         if type(self).failure is not None:
             raise type(self).failure
         for group_index, group in enumerate(self.actions_list):
-            if self.on_group_started is not None:
-                self.on_group_started(group_index, group)
+            self.on_group_started(group_index, group)
             action = group.actions[0]
             if action.execution_type == "agent":
-                decision, errors = await self.agent_executor(
+                decision = await self.agent_executor(
                     group_index,
                     action,
                 )
-                self.errors.extend(errors)
                 if decision is ExecuteDecisionEnum.REJECTED:
                     return decision
-            if (
-                type(self).result is ExecuteDecisionEnum.ACCEPTED
-                and self.on_group_completed is not None
-            ):
+            if type(self).result is ExecuteDecisionEnum.ACCEPTED:
                 self.on_group_completed(group_index, group)
         return type(self).result
 
@@ -203,7 +196,6 @@ class FakeSubAgentRuntime:
 def fake_execution_process(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     FakeExecutionProcess.result = ExecuteDecisionEnum.ACCEPTED
-    FakeExecutionProcess.errors = []
     FakeExecutionProcess.recorded_tool_events = []
     FakeExecutionProcess.failure = None
     FakeSubAgentRuntime.instances = []
@@ -256,8 +248,6 @@ def test_execution_runtime_runs_one_task_and_requests_review() -> None:
     assert result.event.payload["step_goal"] == (
         "Set the motor speed to 10"
     )
-    assert result.errors == []
-    assert runtime.errors == []
 
 
 def test_execution_runtime_commits_deterministic_tool_evidence() -> None:
@@ -290,14 +280,6 @@ def test_execution_runtime_commits_deterministic_tool_evidence() -> None:
 
 def test_execution_runtime_records_failure_and_requests_review() -> None:
     FakeExecutionProcess.result = ExecuteDecisionEnum.REJECTED
-    FakeExecutionProcess.errors = [
-        ExecuteErrorSchema(
-            event_name="Set the motor speed to 10",
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=0,
-            error="motor rejected command",
-        )
-    ]
     memory = runtime_memory()
     runtime = ExecutionRuntime(
         model=object(),
@@ -310,26 +292,16 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
     assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.requested_next_state is LoopStateEnum.REVIEW
     assert result.event.payload["decision"] == "rejected"
-    assert result.event.payload["errors"] == ["motor rejected command"]
+    assert result.event.payload["errors"] == []
     assert [event.event_type for event in memory.event_ledger] == [
         EventTypeEnum.TASK_STATUS_CHANGED,
         EventTypeEnum.EXECUTION_RESULT,
     ]
     assert memory.tasks[0].status == "failed"
-    assert result.errors[0].error == "motor rejected command"
-    assert runtime.errors[0].error == "motor rejected command"
 
 
 def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
     FakeExecutionProcess.result = ExecuteDecisionEnum.REJECTED
-    FakeExecutionProcess.errors = [
-        ExecuteErrorSchema(
-            event_name="deterministic_actions",
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=0,
-            error="Not all deterministic actions completed",
-        )
-    ]
     memory = runtime_memory()
     runtime = ExecutionRuntime(
         model=object(),
@@ -340,12 +312,7 @@ def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
     result = asyncio.run(runtime.run_execution())
 
     assert result.decision is ExecuteDecisionEnum.REJECTED
-    assert result.event.payload["errors"] == [
-        "Not all deterministic actions completed"
-    ]
-    assert runtime.errors[0].error == (
-        "Not all deterministic actions completed"
-    )
+    assert result.event.payload["errors"] == []
 
 
 def test_execution_runtime_propagates_process_exceptions() -> None:
@@ -380,30 +347,6 @@ def test_execution_runtime_fails_before_mutating_missing_task() -> None:
     assert memory.event_ledger == []
 
 
-def test_execution_result_only_contains_errors_from_current_run() -> None:
-    memory = runtime_memory()
-    runtime = ExecutionRuntime(
-        model=object(),
-        memory=memory,
-        mcp_url="https://hardware.example.com/mcp",
-        errors=[
-            ExecuteErrorSchema(
-                event_name="previous task",
-                event_type=ExecutionTypeEnum.DISCRETE,
-                position=0,
-                error="previous error",
-            )
-        ],
-    )
-
-    result = asyncio.run(runtime.run_execution())
-
-    assert result.errors == []
-    assert [error.error for error in runtime.errors] == [
-        "previous error"
-    ]
-
-
 def test_execution_runtime_dispatches_agent_action_to_subagent() -> None:
     memory = agent_memory()
     model = object()
@@ -416,7 +359,6 @@ def test_execution_runtime_dispatches_agent_action_to_subagent() -> None:
     result = asyncio.run(runtime.run_execution())
 
     assert result.decision is ExecuteDecisionEnum.ACCEPTED
-    assert result.errors == []
     assert result.event.payload["decision"] == "accepted"
     assert len(FakeSubAgentRuntime.instances) == 1
     subagent = FakeSubAgentRuntime.instances[0]
@@ -487,8 +429,6 @@ def test_execution_runtime_drops_errors_from_accepted_subagent() -> None:
     result = asyncio.run(runtime.run_execution())
 
     assert result.decision is ExecuteDecisionEnum.ACCEPTED
-    assert result.errors == []
-    assert runtime.errors == []
     assert memory.completed_tasks == memory.tasks
 
 
@@ -514,9 +454,7 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
     result = asyncio.run(runtime.run_execution())
 
     assert result.decision is ExecuteDecisionEnum.REJECTED
-    assert result.errors[0].position == 0
-    assert runtime.errors[0].position == 0
-    assert result.event.payload["errors"] == ["Target is occluded"]
+    assert result.event.payload["errors"] == []
     assert memory.get_current_task() is None
 
 

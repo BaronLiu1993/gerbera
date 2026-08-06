@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from gerbera_harness.agent.driver.main_loop import (
     InitialisationDecisionEnum,
@@ -6,9 +6,6 @@ from gerbera_harness.agent.driver.main_loop import (
     LoopStateEnum,
     ReviewDecisionEnum,
     Session,
-)
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
-    ExecuteErrorSchema,
 )
 from gerbera_harness.agent.driver.main_loop.processes.initialisation_process import (
     InitialisationProcess,
@@ -38,13 +35,12 @@ class AgentRuntime:
     mcp_url: str
     feedback: list[str]
     context_window_size: int = 20
-    errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     @property
     def initialisation_runtime(self) -> InitialisationRuntime:
         self._initialisation_runtime = InitialisationRuntime(
             model=self.model,
-            memory=self.memory,     
+            memory=self.memory,
             context_builder=InitialisationContextBuilder(
                 memory=self.memory,
                 context_window_size=self.context_window_size,
@@ -111,10 +107,9 @@ class AgentRuntime:
                 result = await self.execution_runtime.run_execution()
 
                 if result.decision is ExecuteDecisionEnum.ACCEPTED:
-                    self.errors.extend(result.errors)
                     self.session.perform_transition(result.requested_next_state)
                 elif result.decision is ExecuteDecisionEnum.REJECTED:
-                    self.session.perform_transition(result.requested_next_state)
+                    break
                 else:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.REVIEW:

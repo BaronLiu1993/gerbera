@@ -19,23 +19,10 @@ def test_generate_agent_context_formats_markdown() -> None:
             }
         ],
         sources={"https://example.com/method": "Methodology details."},
-        event_catalog={
-            "STREAM": {
-                "board-1": {
-                    "temperature": {
-                        "event_type": "STREAM",
-                        "microcontroller_id": "board-1",
-                        "event_name": "temperature",
-                    }
-                }
-            }
-        },
     )
 
     assert context.startswith("# Experiment Context")
     assert "## Objective" in context
-    assert "## Available Rule Events" in context
-    assert '"microcontroller_id": "board-1"' in context
     assert "### read_temperature" in context
     assert '"type": "object"' in context
     assert "### https://example.com/method" in context
@@ -63,37 +50,7 @@ def test_run_inspects_hardware_then_builds_context(monkeypatch) -> None:
                     description="Read the temperature sensor.",
                     inputSchema={"type": "object"},
                 ),
-                SimpleNamespace(
-                    name="list_rule_events",
-                    description="List rule events.",
-                    inputSchema={"type": "object"},
-                ),
             ]
-
-        async def call_tool(
-            self,
-            name,
-            arguments,
-            allowed_tool_names,
-            *,
-            structured=False,
-        ):
-            assert name == "list_rule_events"
-            assert arguments == {}
-            assert name in allowed_tool_names
-            assert structured is True
-            calls.append("list_rule_events")
-            return {
-                "STREAM": {
-                    "board-1": {
-                        "temperature": {
-                            "event_type": "STREAM",
-                            "microcontroller_id": "board-1",
-                            "event_name": "temperature",
-                        }
-                    }
-                }
-            }
 
     monkeypatch.setattr(
         "gerbera_harness.agent.driver.main_loop.processes.initialisation_process.MCPClient",
@@ -111,10 +68,9 @@ def test_run_inspects_hardware_then_builds_context(monkeypatch) -> None:
 
     context = asyncio.run(process.run("Test the heater."))
 
-    assert calls == ["inspect_hardware", "list_rule_events", "fetch_url"]
+    assert calls == ["inspect_hardware", "fetch_url"]
     assert "# Experiment Context" in context
     assert "Test the heater." in context
-    assert '"event_name": "temperature"' in context
 
 
 def test_fetch_url_uses_async_http_client(monkeypatch) -> None:

@@ -12,10 +12,6 @@ from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
-    ExecuteErrorSchema,
-    ExecutionTypeEnum,
-)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     AgentExecuteSchema,
     ContinuousExecuteSchema,
@@ -168,13 +164,24 @@ def fake_mcp_client(monkeypatch):
     monkeypatch.setattr(execution_process, "MCPClient", FakeMCPClient)
 
 
+async def reject_agent(group_index, action) -> ExecuteDecisionEnum:
+    return ExecuteDecisionEnum.REJECTED
+
+
+def make_execution_process(**kwargs) -> ExecutionProcess:
+    kwargs.setdefault("agent_executor", reject_agent)
+    kwargs.setdefault("on_group_started", lambda index, group: None)
+    kwargs.setdefault("on_group_completed", lambda index, group: None)
+    return ExecutionProcess(**kwargs)
+
+
 def test_execution_process_calls_discrete_mcp_tool() -> None:
     group = ExecuteActionGroupSchema(
         goal="Set the motor speed.",
         action_type="execute",
         actions=[discrete_action()],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
@@ -183,7 +190,6 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
 
     assert FakeMCPClient.calls == [("set_motor", {"speed": 10})]
     assert result is ExecuteDecisionEnum.ACCEPTED
-    assert process.errors == []
     assert process.tool_events == [
         {
             "position": 0,
@@ -193,7 +199,6 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
             "arguments": {"speed": 10},
             "status": "success",
             "result": {"tool": "set_motor"},
-            "error": None,
         }
     ]
 
@@ -204,7 +209,7 @@ def test_execution_process_stops_continuous_action() -> None:
         action_type="execute",
         actions=[continuous_action()],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
@@ -216,7 +221,6 @@ def test_execution_process_stops_continuous_action() -> None:
         ("stop_sensor", {"enabled": False}),
     ]
     assert result is ExecuteDecisionEnum.ACCEPTED
-    assert process.errors == []
 
 
 def test_execution_process_rejects_agent_actions() -> None:
@@ -225,18 +229,14 @@ def test_execution_process_rejects_agent_actions() -> None:
         action_type="execute",
         actions=[agent_action()],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
 
-    with pytest.raises(
-        RuntimeError,
-        match="Agent executor is not configured",
-    ):
-        asyncio.run(process.run_workflow())
+    result = asyncio.run(process.run_workflow())
 
-    assert process.errors == []
+    assert result is ExecuteDecisionEnum.REJECTED
 
 
 def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
@@ -247,11 +247,11 @@ def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
     async def execute_agent(
         group_index: int,
         action: AgentExecuteSchema,
-    ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
+    ) -> ExecuteDecisionEnum:
         executed_agents.append((group_index, action))
-        return ExecuteDecisionEnum.ACCEPTED, []
+        return ExecuteDecisionEnum.ACCEPTED
 
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[
             ExecuteActionGroupSchema(
@@ -288,24 +288,20 @@ def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
         "set_motor",
         "delete_rule",
     ]
-    assert process.errors == []
 
 
 def test_execution_process_stops_workflow_after_failed_agent_group() -> None:
-    error = ExecuteErrorSchema(
-        event_name="Approach the block.",
-        event_type=ExecutionTypeEnum.AGENT,
-        position=0,
-        error="Target is blocked",
-    )
+    attempts = 0
 
     async def execute_agent(
         group_index: int,
         action: AgentExecuteSchema,
-    ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
-        return ExecuteDecisionEnum.REJECTED, [error]
+    ) -> ExecuteDecisionEnum:
+        nonlocal attempts
+        attempts += 1
+        return ExecuteDecisionEnum.REJECTED
 
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[
             ExecuteActionGroupSchema(
@@ -325,8 +321,44 @@ def test_execution_process_stops_workflow_after_failed_agent_group() -> None:
     result = asyncio.run(process.run_workflow())
 
     assert result is ExecuteDecisionEnum.REJECTED
-    assert process.errors == [error]
+    assert attempts == 3
     assert FakeMCPClient.calls == []
+
+
+def test_execution_process_completes_task_after_retry() -> None:
+    attempts = 0
+    completed_groups = []
+
+    async def execute_agent(
+        group_index: int,
+        action: AgentExecuteSchema,
+    ) -> ExecuteDecisionEnum:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            return ExecuteDecisionEnum.REJECTED
+        return ExecuteDecisionEnum.ACCEPTED
+
+    process = make_execution_process(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[
+            ExecuteActionGroupSchema(
+                goal="Approach the block.",
+                action_type="execute",
+                actions=[agent_action()],
+            )
+        ],
+        agent_executor=execute_agent,
+        on_group_completed=lambda index, group: completed_groups.append(
+            index
+        ),
+    )
+
+    result = asyncio.run(process.run_workflow())
+
+    assert result is ExecuteDecisionEnum.ACCEPTED
+    assert attempts == 3
+    assert completed_groups == [0]
 
 
 def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
@@ -335,7 +367,7 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
         action_type="execute",
         actions=[discrete_action(), rule_creation_action()],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
@@ -362,12 +394,11 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
         ("delete_rule", event_key),
     ]
     assert result is ExecuteDecisionEnum.ACCEPTED
-    assert process.errors == []
 
 
 def test_execution_process_deletes_rule_when_later_group_fails() -> None:
     FakeMCPClient.failing_tools = {"set_motor"}
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[
             ExecuteActionGroupSchema(
@@ -386,14 +417,7 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
     result = asyncio.run(process.run_workflow())
 
     assert result is ExecuteDecisionEnum.REJECTED
-    assert process.errors == [
-        ExecuteErrorSchema(
-            event_name="Set the motor speed.",
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=1,
-            error="MCP tool 'set_motor' failed: tool failed",
-        )
-    ]
+    assert FakeMCPClient.calls.count(("set_motor", {"speed": 10})) == 3
 
     assert FakeMCPClient.calls[-1] == (
         "delete_rule",
@@ -412,25 +436,13 @@ def test_execution_process_fails_when_rule_cleanup_fails() -> None:
         action_type="execute",
         actions=[rule_creation_action(), discrete_action()],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
 
-    result = asyncio.run(process.run_workflow())
-
-    assert result is ExecuteDecisionEnum.REJECTED
-    assert process.errors == [
-        ExecuteErrorSchema(
-            event_name="Set the motor speed safely.",
-            event_type=ExecutionTypeEnum.RULE,
-            position=0,
-            error=(
-                "Rule cleanup failed: MCP tool 'delete_rule' failed: "
-                "tool failed"
-            ),
-        )
-    ]
+    with pytest.raises(RuntimeError, match="delete_rule"):
+        asyncio.run(process.run_workflow())
 
 
 def test_execution_process_rejects_unknown_tool() -> None:
@@ -439,7 +451,7 @@ def test_execution_process_rejects_unknown_tool() -> None:
         action_type="execute",
         actions=[discrete_action("unknown_tool")],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
@@ -447,24 +459,7 @@ def test_execution_process_rejects_unknown_tool() -> None:
     result = asyncio.run(process.run_workflow())
 
     assert result is ExecuteDecisionEnum.REJECTED
-    assert process.errors == [
-        ExecuteErrorSchema(
-            event_name="Call an unavailable tool.",
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=0,
-            error="MCP tool is not allowed: unknown_tool",
-        )
-    ]
-    assert process.tool_events[0] == {
-        "position": 0,
-        "execution_type": "discrete",
-        "call_type": "forward",
-        "tool_name": "unknown_tool",
-        "arguments": {"speed": 10},
-        "status": "failed",
-        "result": None,
-        "error": "MCP tool is not allowed: unknown_tool",
-    }
+    assert process.tool_events == []
     assert FakeMCPClient.calls == []
 
 
@@ -475,7 +470,7 @@ def test_execution_process_stops_continuous_action_on_group_failure() -> None:
         action_type="execute",
         actions=[continuous_action(), discrete_action()],
     )
-    process = ExecutionProcess(
+    process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
@@ -483,16 +478,6 @@ def test_execution_process_stops_continuous_action_on_group_failure() -> None:
     result = asyncio.run(process.run_workflow())
 
     assert result is ExecuteDecisionEnum.REJECTED
-    assert process.errors == [
-        ExecuteErrorSchema(
-            event_name=(
-                "Collect readings while setting the motor speed."
-            ),
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=0,
-            error="MCP tool 'set_motor' failed: tool failed",
-        )
-    ]
     assert ("start_sensor", {"enabled": True}) in FakeMCPClient.calls
     assert ("set_motor", {"speed": 10}) in FakeMCPClient.calls
     assert ("stop_sensor", {"enabled": False}) in FakeMCPClient.calls

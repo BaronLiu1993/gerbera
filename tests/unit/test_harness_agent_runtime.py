@@ -10,10 +10,6 @@ from gerbera_harness.agent.driver.main_loop import (
     ReviewDecisionEnum,
     Session,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
-    ExecuteErrorSchema,
-    ExecutionTypeEnum,
-)
 from gerbera_harness.agent_runtime import agent_runtime
 from gerbera_harness.agent_runtime.agent_runtime import AgentRuntime
 from gerbera_harness.memory import Memory
@@ -44,17 +40,9 @@ def execution_group():
     ).task
 
 
-def test_agent_runtime_collects_execution_errors_and_moves_to_review(
+def test_agent_runtime_moves_accepted_execution_to_review(
     monkeypatch,
 ) -> None:
-    execution_errors = [
-        ExecuteErrorSchema(
-            event_name="move_motor",
-            event_type=ExecutionTypeEnum.DISCRETE,
-            position=0,
-            error="motor rejected command",
-        )
-    ]
     model = object()
 
     class FakeExecutionRuntime:
@@ -66,7 +54,6 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
         async def run_execution(self) -> SimpleNamespace:
             return SimpleNamespace(
                 decision=ExecuteDecisionEnum.ACCEPTED,
-                errors=execution_errors,
                 requested_next_state=LoopStateEnum.REVIEW,
             )
 
@@ -101,10 +88,55 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
 
     asyncio.run(runtime.run_agent("unused during execution"))
 
-    assert runtime.errors == execution_errors
-    assert runtime.errors is not execution_errors
     assert runtime.execution_runtime.model is model
     assert isinstance(runtime.session.state, Review)
+
+
+def test_agent_runtime_stops_after_rejected_execution(monkeypatch) -> None:
+    review_called = False
+
+    class FakeExecutionRuntime:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        async def run_execution(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                decision=ExecuteDecisionEnum.REJECTED,
+                requested_next_state=LoopStateEnum.REVIEW,
+            )
+
+    class FakeReviewRuntime:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        async def run_review(self) -> SimpleNamespace:
+            nonlocal review_called
+            review_called = True
+            return SimpleNamespace(decision=ReviewDecisionEnum.ACCEPTED)
+
+    monkeypatch.setattr(
+        agent_runtime,
+        "ExecutionRuntime",
+        FakeExecutionRuntime,
+    )
+    monkeypatch.setattr(
+        agent_runtime,
+        "ReviewRuntime",
+        FakeReviewRuntime,
+    )
+    runtime = AgentRuntime(
+        session=Session(state=Execution()),
+        model=object(),
+        memory=Memory(goal="Move the motor"),
+        mcp_url="https://hardware.example.com/mcp",
+        feedback=[],
+    )
+
+    result = asyncio.run(runtime.run_agent("Move the motor"))
+
+    assert result is None
+    assert isinstance(runtime.session.state, Execution)
+    assert review_called is False
 
 
 def test_agent_runtime_pauses_replan_in_review(monkeypatch) -> None:
@@ -164,7 +196,6 @@ def test_accepted_initialisation_creates_pending_tasks(monkeypatch) -> None:
         async def run_execution(self) -> SimpleNamespace:
             return SimpleNamespace(
                 decision=ExecuteDecisionEnum.ACCEPTED,
-                errors=[],
                 requested_next_state=LoopStateEnum.REVIEW,
             )
 

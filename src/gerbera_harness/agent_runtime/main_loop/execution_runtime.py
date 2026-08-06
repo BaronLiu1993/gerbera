@@ -8,9 +8,6 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
     LoopStateEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
-    ExecuteErrorSchema,
-)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     AgentExecuteSchema,
 )
@@ -44,7 +41,6 @@ class ExecutionResult:
     decision: ExecuteDecisionEnum
     requested_next_state: LoopStateEnum
     event: EventSchema
-    errors: list[ExecuteErrorSchema]
 
 
 @dataclass
@@ -52,7 +48,6 @@ class ExecutionRuntime:
     model: Model
     memory: Memory
     mcp_url: str
-    errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     async def run_execution(self) -> ExecutionResult:
         action_groups = self._execution_groups()
@@ -70,9 +65,6 @@ class ExecutionRuntime:
         )
 
         decision = await process.run_workflow()
-        execution_errors = process.errors
-
-        self.errors.extend(execution_errors)
 
         current_position = run_state.current_group_index
         current_task = self.memory.tasks[current_position]
@@ -84,7 +76,7 @@ class ExecutionRuntime:
             task=current_task,
             position=current_position,
             decision=decision,
-            errors=execution_errors,
+            errors=[],
             observations=run_state.observations,
             tool_events=[
                 *process.tool_events,
@@ -96,7 +88,6 @@ class ExecutionRuntime:
             decision=decision,
             requested_next_state=LoopStateEnum.REVIEW,
             event=event,
-            errors=list(execution_errors),
         )
 
     def _on_group_started(
@@ -120,7 +111,7 @@ class ExecutionRuntime:
         run_state: _ExecutionRunState,
         group_index: int,
         action: AgentExecuteSchema,
-    ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
+    ) -> ExecuteDecisionEnum:
         current_task = self.memory.get_current_task()
         if current_task is None:
             raise RuntimeError("Subagent execution requires a current task")
@@ -142,13 +133,7 @@ class ExecutionRuntime:
         for event in subagent_result.tool_events:
             run_state.tool_events.append(dict(event))
 
-        workflow_errors = []
-        if subagent_result.decision is ExecuteDecisionEnum.REJECTED:
-            for error in subagent_result.errors:
-                workflow_errors.append(
-                    error.model_copy(update={"position": group_index})
-                )
-        return subagent_result.decision, workflow_errors
+        return subagent_result.decision
 
     def _execution_groups(self) -> list[ExecuteActionGroupSchema]:
         groups = []
