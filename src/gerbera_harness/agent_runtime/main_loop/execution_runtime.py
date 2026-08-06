@@ -24,8 +24,17 @@ from gerbera_harness.agent.driver.subloop.states import (
     Session as SubAgentSession,
 )
 from gerbera_harness.agent.model.model import Model
+from gerbera_harness.agent_runtime.subagent_context import (
+    SubAgentContextBuilder,
+)
 from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
-from gerbera_harness.memory import EventSchema, Memory, TaskSchema
+from gerbera_harness.memory import (
+    EventSchema,
+    EventTypeEnum,
+    Memory,
+    SourceTypeEnum,
+    TaskSchema,
+)
 
 
 @dataclass
@@ -175,14 +184,39 @@ class ExecutionRuntime:
         group_index: int,
         action: AgentExecuteSchema,
     ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
-        subagent_result = await SubAgentRuntime(
+        current_task = self.memory.get_current_task()
+        if current_task is None:
+            raise RuntimeError("Subagent execution requires a current task")
+
+        subagent = SubAgentRuntime(
             session=SubAgentSession(),
             model=self.model,
-            memory=self.memory,
+            context=SubAgentContextBuilder(memory=self.memory).build(
+                current_task=current_task,
+                workflow_position=group_index,
+            ),
             mcp_url=self.mcp_url,
             timeout_seconds=action.timeout_seconds,
             max_turns=action.max_turns,
-        ).run_agent()
+        )
+        subagent_result = await subagent.run_agent()
+
+        for observation in subagent.observations:
+            self.memory.world_state_ledger.append(observation)
+            self.memory.append_event(
+                event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+                source_type=SourceTypeEnum.MODEL,
+                payload={
+                    "world_state": observation.model_dump(mode="json")
+                },
+            )
+        for tool_event in subagent.tool_events:
+            self.memory.append_event(
+                event_type=EventTypeEnum.TOOL_CALL,
+                source_type=SourceTypeEnum.MCP_TOOL,
+                payload=dict(tool_event),
+            )
+
         workflow_errors = [
             error.model_copy(update={"position": group_index})
             for error in subagent_result.errors

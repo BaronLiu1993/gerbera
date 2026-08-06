@@ -107,6 +107,17 @@ def current_agent_task() -> TaskSchema:
     )
 
 
+def agent_memory() -> Memory:
+    memory = Memory(goal="Test adaptive movement")
+    task = current_agent_task()
+    memory.tasks.append(task)
+    memory.current_hypothesis = SimpleNamespace(
+        method=SimpleNamespace(execute_steps=[task.task]),
+        model_dump=lambda **kwargs: {"goal": "Test adaptive movement"},
+    )
+    return memory
+
+
 class FakeExecutionProcess:
     instances: list["FakeExecutionProcess"] = []
     result = ExecuteDecisionEnum.ACCEPTED
@@ -165,17 +176,19 @@ class FakeSubAgentRuntime:
         *,
         session,
         model,
-        memory,
+        context,
         mcp_url: str,
         timeout_seconds: float,
         max_turns: int,
     ) -> None:
         self.session = session
         self.model = model
-        self.memory = memory
+        self.context = context
         self.mcp_url = mcp_url
         self.timeout_seconds = timeout_seconds
         self.max_turns = max_turns
+        self.observations = []
+        self.tool_events = []
         type(self).instances.append(self)
 
     async def run_agent(self) -> SubAgentResult:
@@ -340,8 +353,7 @@ def test_execution_result_only_contains_errors_from_current_run() -> None:
 
 
 def test_execution_runtime_dispatches_agent_action_to_subagent() -> None:
-    memory = Memory(goal="Test adaptive movement")
-    memory.tasks.append(current_agent_task())
+    memory = agent_memory()
     model = object()
     runtime = ExecutionRuntime(
         model=model,
@@ -357,7 +369,9 @@ def test_execution_runtime_dispatches_agent_action_to_subagent() -> None:
     assert len(FakeSubAgentRuntime.instances) == 1
     subagent = FakeSubAgentRuntime.instances[0]
     assert subagent.model is model
-    assert subagent.memory is memory
+    assert subagent.context.goal == memory.goal
+    assert subagent.context.current_task == memory.tasks[0].task
+    assert subagent.context.workflow_position == 0
     assert subagent.mcp_url == "https://hardware.example.com/mcp"
     assert subagent.max_turns == 7
     assert subagent.timeout_seconds == 12.5
@@ -377,8 +391,7 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
         errors=[error],
         turns_completed=2,
     )
-    memory = Memory(goal="Test adaptive movement")
-    memory.tasks.append(current_agent_task())
+    memory = agent_memory()
     runtime = ExecutionRuntime(
         model=object(),
         memory=memory,

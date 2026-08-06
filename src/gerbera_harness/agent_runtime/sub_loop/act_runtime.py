@@ -15,18 +15,14 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
     PlanningExecuteActionSchema,
 )
 from gerbera_harness.agent.model.mcp_client import MCPClient
-from gerbera_harness.memory import (
-    EventTypeEnum,
-    Memory,
-    SourceTypeEnum,
-)
 
 
 @dataclass
 class ActRuntime:
-    memory: Memory
     mcp_url: str
     timeout_seconds: float
+    messages: list[dict[str, object]]
+    tool_events: list[dict[str, object]]
     last_event: ToolCallEventSchema | None = None
 
     async def run_action(
@@ -191,13 +187,8 @@ class ActRuntime:
         )
         self.last_event = event
         event_payload = event.model_dump(mode="json")
-        self.memory.append_message(
-            "user",
-            event.model_dump_json(),
+        self.messages.append(
+            {"role": "user", "content": event.model_dump_json()}
         )
-        self.memory.append_event(
-            event_type=EventTypeEnum.TOOL_CALL,
-            source_type=SourceTypeEnum.MCP_TOOL,
-            payload=event_payload,
-        )
+        self.tool_events.append(event_payload)
         return status

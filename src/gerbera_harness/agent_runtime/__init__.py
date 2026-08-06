@@ -6,10 +6,16 @@ from gerbera_harness.agent_runtime.main_loop import (
     InitialisationRuntime,
 )
 from gerbera_harness.agent_runtime.subagent_result import SubAgentResult
+from gerbera_harness.agent_runtime.subagent_context import (
+    SubAgentContext,
+    SubAgentContextBuilder,
+)
 
 __all__ = [
     "AgentRuntime",
     "InitialisationResult",
     "InitialisationRuntime",
     "SubAgentResult",
+    "SubAgentContext",
+    "SubAgentContextBuilder",
 ]

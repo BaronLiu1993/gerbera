@@ -10,13 +10,14 @@ from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationStatusEnum,
 )
 from gerbera_harness.agent_runtime.sub_loop import observe_runtime
-from gerbera_harness.agent_runtime.context_builder import (
-    ObservationContextBuilder,
+from gerbera_harness.agent_runtime.subagent_context import (
+    SubAgentContextBuilder,
+    SubAgentPromptContextBuilder,
 )
 from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
     ObservationRuntime,
 )
-from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
+from gerbera_harness.memory import Memory, TaskSchema
 
 
 class FakeHypothesis:
@@ -146,14 +147,26 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
     memory = Memory(goal="Read the temperature")
     memory.current_hypothesis = FakeHypothesis()
     memory.tasks.append(current_task())
+    messages = []
+    observations = []
+    tool_events = []
+    context = SubAgentContextBuilder(memory).build(
+        current_task=memory.tasks[0],
+        workflow_position=0,
+    )
     runtime = ObservationRuntime(
         model=FakeModel(),
-        memory=memory,
         mcp_url="https://hardware.example.com/mcp",
-        context_builder=ObservationContextBuilder(
-            memory=memory,
-            context_window_size=20,
+        context_builder=SubAgentPromptContextBuilder(
+            context=context,
+            phase="observation",
+            messages=messages,
+            observations=observations,
+            tool_events=tool_events,
         ),
+        messages=messages,
+        observations=observations,
+        tool_events=tool_events,
     )
 
     first_status = asyncio.run(runtime.run_observation())
@@ -161,14 +174,12 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
 
     assert first_status is ObservationStatusEnum.CONTINUE
     assert status is ObservationStatusEnum.COMPLETE
-    assert memory.world_state_ledger[-1].state == {
+    assert observations[-1].state == {
         "temperature": {"value": 22.5, "unit": "celsius"}
     }
-    assert [event.event_type for event in memory.event_ledger] == [
-        EventTypeEnum.TOOL_CALL,
-        EventTypeEnum.WORLD_STATE_UPDATED,
-    ]
-    assert len(memory.messages) == 4
-    assert json.loads(memory.messages[-1]["content"]) == {
+    assert len(tool_events) == 1
+    assert tool_events[0]["tool_name"] == "read_temperature"
+    assert len(messages) == 4
+    assert json.loads(messages[-1]["content"]) == {
         "observation_status": "complete"
     }

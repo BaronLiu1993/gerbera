@@ -27,7 +27,10 @@ from gerbera_harness.agent.driver.subloop.states import (
     Session,
 )
 from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
-from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
+from gerbera_harness.agent_runtime.subagent_context import (
+    SubAgentContextBuilder,
+)
+from gerbera_harness.memory import Memory, TaskSchema
 
 
 class FakeHypothesis:
@@ -63,6 +66,14 @@ def planning_memory() -> Memory:
     )
     memory.append_world_state({"motor_speed": 0})
     return memory
+
+
+def subagent_context(memory: Memory | None = None):
+    memory = memory or planning_memory()
+    return SubAgentContextBuilder(memory).build(
+        current_task=memory.tasks[0],
+        workflow_position=0,
+    )
 
 
 def planned_action():
@@ -165,7 +176,7 @@ def test_act_status_returns_control_to_observation(
     runtime = SubAgentRuntime(
         session=Session(state=ActState()),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         action_plan=planned_action(),
@@ -177,7 +188,7 @@ def test_act_status_returns_control_to_observation(
     assert result.turns_completed == 2
     assert act_runtime.action.forward_tool_call == "set_motor"
     assert isinstance(runtime.session.state, ObserveState)
-    assert runtime.memory.tasks[0].status == "in_progress"
+    assert runtime.context.current_task.goal == "Set the motor speed to 10"
     assert runtime.turns_completed == 2
     if status is ToolCallStatusEnum.SUCCESS:
         assert runtime.errors == []
@@ -211,7 +222,7 @@ def test_successful_adjustment_clears_previous_act_error(
     runtime = SubAgentRuntime(
         session=Session(state=ActState()),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         action_plan=planned_action(),
@@ -246,7 +257,7 @@ def test_subagent_stops_after_maximum_completed_turns(monkeypatch) -> None:
     runtime = SubAgentRuntime(
         session=Session(state=ActState()),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         max_turns=3,
@@ -285,7 +296,7 @@ def test_subagent_runs_observe_plan_act_observe_end_to_end(
     runtime = SubAgentRuntime(
         session=Session(),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         action_plan=planned_action(),
@@ -295,7 +306,7 @@ def test_subagent_runs_observe_plan_act_observe_end_to_end(
 
     assert result.decision is ExecuteDecisionEnum.ACCEPTED
     assert runtime.turns_completed == 4
-    assert runtime.memory.tasks[0].status == "in_progress"
+    assert runtime.context.current_task.goal == "Set the motor speed to 10"
     assert act_runtime.action is runtime.action_plan
 
 
@@ -303,7 +314,7 @@ def test_subagent_rejects_invalid_maximum_turns() -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
         max_turns=0,
@@ -326,7 +337,7 @@ def test_subagent_times_out_an_unfinished_task(monkeypatch) -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=0.001,
     )
@@ -346,7 +357,7 @@ def test_external_cancellation_propagates(monkeypatch) -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=10,
     )
@@ -367,7 +378,7 @@ def test_subagent_rejects_invalid_timeout() -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=0,
     )
@@ -391,7 +402,7 @@ def test_subagent_stops_when_planning_completes(monkeypatch) -> None:
     runtime = SubAgentRuntime(
         session=Session(state=PlanState()),
         model=SimpleNamespace(),
-        memory=memory,
+        context=subagent_context(memory),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
     )
@@ -412,7 +423,7 @@ def test_subagent_propagates_blocked_observation(monkeypatch) -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=SimpleNamespace(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
     )
@@ -441,26 +452,42 @@ class FakePlanningModel:
         return FakePlanningClient()
 
 
-def test_subagent_runtimes_share_memory() -> None:
-    memory = Memory(goal="Set the motor speed")
+def test_subagent_runtimes_share_local_runtime_fields() -> None:
+    memory = planning_memory()
     runtime = SubAgentRuntime(
         session=Session(),
         model=FakePlanningModel(),
-        memory=memory,
+        context=subagent_context(memory),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
     )
 
-    assert runtime.observation_runtime.memory is memory
-    assert runtime.planning_runtime.memory is memory
-    assert runtime.act_runtime.memory is memory
+    assert runtime.observation_runtime.messages is runtime.messages
+    assert runtime.planning_runtime.messages is runtime.messages
+    assert runtime.act_runtime.messages is runtime.messages
+
+
+def test_subagent_context_is_a_snapshot_of_main_memory() -> None:
+    memory = planning_memory()
+    memory.append_world_state({"motor_speed": 5})
+
+    context = subagent_context(memory)
+
+    assert context.goal == memory.goal
+    assert context.current_task is memory.tasks[0].task
+    assert context.workflow_position == 0
+    assert context.world_states == tuple(memory.world_state_ledger)
+
+    memory.append_world_state({"motor_speed": 10})
+
+    assert len(context.world_states) == 2
 
 
 def test_planning_runtime_updates_action_plan() -> None:
     runtime = SubAgentRuntime(
         session=Session(),
         model=FakePlanningModel(),
-        memory=planning_memory(),
+        context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
     )
@@ -470,6 +497,4 @@ def test_planning_runtime_updates_action_plan() -> None:
     assert status is PlanningStatusEnum.READY
     assert runtime.action_plan is not None
     assert runtime.action_plan.forward_tool_call == "set_motor"
-    assert runtime.memory.event_ledger[-1].event_type is (
-        EventTypeEnum.ACTION_SELECTED
-    )
+    assert runtime.messages[-1]["role"] == "assistant"

@@ -24,9 +24,9 @@ from gerbera_harness.agent.driver.subloop.states.base import (
 )
 from gerbera_harness.agent.driver.subloop.states.session import Session
 from gerbera_harness.agent.model.model import Model
-from gerbera_harness.agent_runtime.context_builder import (
-    ObservationContextBuilder,
-    PlanningContextBuilder,
+from gerbera_harness.agent_runtime.subagent_context import (
+    SubAgentContext,
+    SubAgentPromptContextBuilder,
 )
 from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
 from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
@@ -36,14 +36,14 @@ from gerbera_harness.agent_runtime.sub_loop.planning_runtime import (
     PlanningRuntime,
 )
 from gerbera_harness.agent_runtime.subagent_result import SubAgentResult
-from gerbera_harness.memory import Memory
+from gerbera_harness.memory import WorldStateSchema
 
 
 @dataclass
 class SubAgentRuntime:
     session: Session
     model: Model
-    memory: Memory
+    context: SubAgentContext
     mcp_url: str
     timeout_seconds: float
     context_window_size: int = 20
@@ -52,29 +52,42 @@ class SubAgentRuntime:
     action_plan: PlanningExecuteActionSchema | None = None
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
     previous_act_error: ExecuteErrorSchema | None = None
+    messages: list[dict[str, object]] = field(default_factory=list)
+    observations: list[WorldStateSchema] = field(default_factory=list)
+    tool_events: list[dict[str, object]] = field(default_factory=list)
 
     @property
     def observation_runtime(self) -> ObservationRuntime:
         return ObservationRuntime(
             model=self.model,
-            memory=self.memory,
             mcp_url=self.mcp_url,
-            context_builder=ObservationContextBuilder(
-                memory=self.memory,
+            context_builder=SubAgentPromptContextBuilder(
+                context=self.context,
+                phase="observation",
+                messages=self.messages,
+                observations=self.observations,
+                tool_events=self.tool_events,
                 context_window_size=self.context_window_size,
             ),
+            messages=self.messages,
+            observations=self.observations,
+            tool_events=self.tool_events,
         )
 
     @property
     def planning_runtime(self) -> PlanningRuntime:
         return PlanningRuntime(
             model=self.model,
-            memory=self.memory,
-            context_builder=PlanningContextBuilder(
-                memory=self.memory,
+            context_builder=SubAgentPromptContextBuilder(
+                context=self.context,
+                phase="planning",
+                messages=self.messages,
+                observations=self.observations,
+                tool_events=self.tool_events,
                 context_window_size=self.context_window_size,
                 previous_act_error=self.previous_act_error,
             ),
+            messages=self.messages,
             on_action_planned=lambda action_plan: setattr(
                 self, "action_plan", action_plan
             ),
@@ -83,9 +96,10 @@ class SubAgentRuntime:
     @property
     def act_runtime(self) -> ActRuntime:
         return ActRuntime(
-            memory=self.memory,
             mcp_url=self.mcp_url,
             timeout_seconds=self.timeout_seconds,
+            messages=self.messages,
+            tool_events=self.tool_events,
         )
 
     async def run_agent(self) -> SubAgentResult:

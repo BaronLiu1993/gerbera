@@ -13,7 +13,6 @@ from gerbera_harness.agent.driver.subloop.schema.act import (
 )
 from gerbera_harness.agent_runtime.sub_loop import act_runtime
 from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
-from gerbera_harness.memory import EventTypeEnum, Memory
 
 
 def parameter(variable: str, value: object, parameter_type: str) -> dict:
@@ -118,23 +117,25 @@ def fake_mcp_client(monkeypatch) -> None:
 
 
 def run_action(action, timeout_seconds: float = 1) -> tuple:
-    memory = Memory(goal="Test the motor")
+    messages = []
+    tool_events = []
     runtime = ActRuntime(
-        memory=memory,
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=timeout_seconds,
+        messages=messages,
+        tool_events=tool_events,
     )
 
     status = asyncio.run(runtime.run_action(action))
     events = [
         json.loads(message["content"])
-        for message in memory.messages
+        for message in messages
     ]
-    return status, events, memory
+    return status, events, messages, tool_events
 
 
 def test_act_runtime_records_success() -> None:
-    status, events, memory = run_action(discrete_action())
+    status, events, messages, tool_events = run_action(discrete_action())
 
     assert status is ToolCallStatusEnum.SUCCESS
     assert events == [
@@ -146,14 +147,14 @@ def test_act_runtime_records_success() -> None:
             "error_message": None,
         }
     ]
-    assert memory.messages[-1]["role"] == "user"
-    assert memory.event_ledger[-1].event_type is EventTypeEnum.TOOL_CALL
+    assert messages[-1]["role"] == "user"
+    assert tool_events[-1]["status"] == "success"
 
 
 def test_act_runtime_records_failure_without_raising() -> None:
     FakeMCPClient.failing_tools = {"set_motor"}
 
-    status, events, _ = run_action(discrete_action())
+    status, events, _, _ = run_action(discrete_action())
 
     assert status is ToolCallStatusEnum.FAILED
     assert events[0]["status"] == "failed"
@@ -166,7 +167,7 @@ def test_act_runtime_records_forward_and_reverse_calls() -> None:
         update={"duration_seconds": 0}
     )
 
-    status, events, _ = run_action(action)
+    status, events, _, _ = run_action(action)
 
     assert status is ToolCallStatusEnum.SUCCESS
     assert FakeMCPClient.calls == [
@@ -182,7 +183,9 @@ def test_act_runtime_records_forward_and_reverse_calls() -> None:
 def test_act_runtime_records_tool_call_timeout() -> None:
     FakeMCPClient.slow_tools = {"set_motor"}
 
-    status, events, _ = run_action(discrete_action(), timeout_seconds=0.01)
+    status, events, _, _ = run_action(
+        discrete_action(), timeout_seconds=0.01
+    )
 
     assert status is ToolCallStatusEnum.TIMED_OUT
     assert events[0]["status"] == "timed_out"
@@ -190,11 +193,13 @@ def test_act_runtime_records_tool_call_timeout() -> None:
 
 
 def test_act_runtime_stops_continuous_action_when_cancelled() -> None:
-    memory = Memory(goal="Test the motor")
+    messages = []
+    tool_events = []
     runtime = ActRuntime(
-        memory=memory,
         mcp_url="https://hardware.example.com/mcp",
         timeout_seconds=1,
+        messages=messages,
+        tool_events=tool_events,
     )
 
     async def cancel_action() -> None:

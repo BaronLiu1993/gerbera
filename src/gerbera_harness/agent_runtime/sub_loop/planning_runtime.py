@@ -8,11 +8,8 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
     planning_review_adapter,
 )
 from gerbera_harness.agent.model.model import Model
-from gerbera_harness.agent_runtime.context_builder import ContextBuilder
-from gerbera_harness.memory import (
-    EventTypeEnum,
-    Memory,
-    SourceTypeEnum,
+from gerbera_harness.agent_runtime.subagent_context import (
+    SubAgentPromptContextBuilder,
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
@@ -26,8 +23,8 @@ PLANNING_REVIEW_PROMPT = load_prompt(
 @dataclass
 class PlanningRuntime:
     model: Model
-    memory: Memory
-    context_builder: ContextBuilder
+    context_builder: SubAgentPromptContextBuilder
+    messages: list[dict[str, object]]
     on_action_planned: Callable[[PlanningExecuteActionSchema], None]
 
     async def run_planning(self) -> PlanningStatusEnum:
@@ -41,9 +38,8 @@ class PlanningRuntime:
         response = planning_adapter.validate_json(raw_response)
         self.on_action_planned(response.action)
 
-        self.memory.append_message(
-            "assistant",
-            response.model_dump_json(),
+        self.messages.append(
+            {"role": "assistant", "content": response.model_dump_json()}
         )
 
         raw_review = await client.send(
@@ -60,19 +56,10 @@ class PlanningRuntime:
             PlanningStatusEnum.READY,
             PlanningStatusEnum.BLOCKED,
         }:
-            if review.status is PlanningStatusEnum.READY:
-                self.memory.append_event(
-                    event_type=EventTypeEnum.ACTION_SELECTED,
-                    source_type=SourceTypeEnum.MODEL,
-                    payload={
-                        "action": response.action.model_dump(mode="json")
-                    },
-                )
             return review.status
 
-        self.memory.append_message(
-            "user",
-            review.model_dump_json(),
+        self.messages.append(
+            {"role": "user", "content": review.model_dump_json()}
         )
 
         return PlanningStatusEnum.CONTINUE
