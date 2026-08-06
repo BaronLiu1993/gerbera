@@ -14,9 +14,7 @@ class PlanningContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
         hypothesis = self.memory.current_hypothesis
         current_task = self.memory.get_current_task()
-        completed_tasks = [
-            task for task in self.memory.tasks if task.status == "completed"
-        ]
+        completed_tasks = self.memory.completed_tasks
         current_world_state = self.memory.world_state_ledger[-1]
 
         return {

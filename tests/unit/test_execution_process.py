@@ -186,6 +186,24 @@ def test_execution_process_calls_discrete_mcp_tool() -> None:
     assert process.errors == []
 
 
+@pytest.mark.parametrize("position", [-1, 1])
+def test_execution_process_rejects_out_of_bounds_error_positions(
+    position: int,
+) -> None:
+    group = ExecuteActionGroupSchema(
+        goal="Set the motor speed.",
+        action_type="execute",
+        actions=[discrete_action()],
+    )
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[group],
+    )
+
+    with pytest.raises(IndexError, match="outside workflow bounds"):
+        process._append_error(position, group.actions[0], "failed")
+
+
 def test_execution_process_stops_continuous_action() -> None:
     group = ExecuteActionGroupSchema(
         goal="Collect sensor readings.",
@@ -229,6 +247,7 @@ def test_execution_process_rejects_agent_actions() -> None:
 
 def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
     started_groups: list[int] = []
+    completed_groups: list[int] = []
     executed_agents: list[tuple[int, AgentExecuteSchema]] = []
 
     async def execute_agent(
@@ -259,12 +278,16 @@ def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
         ],
         agent_executor=execute_agent,
         on_group_started=lambda index, group: started_groups.append(index),
+        on_group_completed=lambda index, group: completed_groups.append(
+            index
+        ),
     )
 
     result = asyncio.run(process.run_workflow())
 
     assert result is ExecuteDecisionEnum.ACCEPTED
     assert started_groups == [0, 1, 2]
+    assert completed_groups == [0, 1, 2]
     assert executed_agents == [(1, process.actions_list[1].actions[0])]
     assert [call[0] for call in FakeMCPClient.calls] == [
         "insert_rule",

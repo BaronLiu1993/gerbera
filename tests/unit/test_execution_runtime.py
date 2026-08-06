@@ -2,12 +2,14 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
     ExecuteErrorSchema,
+    ExecutionEventSchema,
     ExecutionTypeEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
@@ -53,6 +55,36 @@ def test_execution_type_uses_one_enum_with_rule_support() -> None:
     assert ExecutionTypeEnum.RULE.value == "rule"
 
 
+@pytest.mark.parametrize(
+    "schema, values",
+    [
+        (
+            ExecutionEventSchema,
+            {
+                "event_name": "set_motor",
+                "event_description": "Set motor speed",
+                "event_type": ExecutionTypeEnum.DISCRETE,
+                "status": ExecuteDecisionEnum.ACCEPTED,
+                "position": -1,
+                "error_msg": None,
+            },
+        ),
+        (
+            ExecuteErrorSchema,
+            {
+                "event_name": "set_motor",
+                "event_type": ExecutionTypeEnum.DISCRETE,
+                "position": -1,
+                "error": "failed",
+            },
+        ),
+    ],
+)
+def test_execution_positions_must_be_non_negative(schema, values) -> None:
+    with pytest.raises(ValidationError):
+        schema.model_validate(values)
+
+
 def current_agent_task() -> TaskSchema:
     return TaskSchema.model_validate(
         {
@@ -87,11 +119,13 @@ class FakeExecutionProcess:
         actions_list: list,
         agent_executor=None,
         on_group_started=None,
+        on_group_completed=None,
     ) -> None:
         self.mcp_url = mcp_url
         self.actions_list = actions_list
         self.agent_executor = agent_executor
         self.on_group_started = on_group_started
+        self.on_group_completed = on_group_completed
         self.errors = list(type(self).errors)
         type(self).instances.append(self)
 
@@ -110,6 +144,11 @@ class FakeExecutionProcess:
                 self.errors.extend(errors)
                 if decision is ExecuteDecisionEnum.REJECTED:
                     return decision
+            if (
+                type(self).result is ExecuteDecisionEnum.ACCEPTED
+                and self.on_group_completed is not None
+            ):
+                self.on_group_completed(group_index, group)
         return type(self).result
 
 
@@ -222,7 +261,11 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
     assert result.requested_next_state is LoopStateEnum.REVIEW
     assert result.event.payload["decision"] == "rejected"
     assert result.event.payload["errors"] == ["motor rejected command"]
-    assert memory.event_ledger == [result.event]
+    assert [event.event_type for event in memory.event_ledger] == [
+        EventTypeEnum.TASK_STATUS_CHANGED,
+        EventTypeEnum.EXECUTION_RESULT,
+    ]
+    assert memory.tasks[0].status == "failed"
     assert result.errors[0].error == "motor rejected command"
     assert runtime.errors[0].error == "motor rejected command"
 
@@ -345,8 +388,8 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
     result = asyncio.run(runtime.run_execution())
 
     assert result.decision is ExecuteDecisionEnum.REJECTED
-    assert result.errors == [error]
-    assert runtime.errors == [error]
+    assert result.errors[0].position == 0
+    assert runtime.errors[0].position == 0
     assert result.event.payload["errors"] == ["Target is occluded"]
     assert memory.get_current_task() is None
 
@@ -376,3 +419,4 @@ def test_execution_runtime_runs_all_initialisation_tasks_before_review() -> None
         "completed",
         "completed",
     ]
+    assert memory.completed_tasks == memory.tasks

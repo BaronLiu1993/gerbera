@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import JsonValue
 
@@ -31,6 +31,9 @@ class Memory:
     messages: list[dict[str, object]] = field(default_factory=list)
     current_hypothesis: HypothesisSchema | None = None
     tasks: list[TaskSchema] = field(default_factory=list)
+    # Owned by the main-agent execution lifecycle. Subagents may read this
+    # context, but only the main execution runtime marks workflow completion.
+    completed_tasks: list[TaskSchema] = field(default_factory=list)
     event_ledger: list[EventSchema] = field(default_factory=list)
     world_state_ledger: list[WorldStateSchema] = field(
         default_factory=list
@@ -41,21 +44,39 @@ class Memory:
             if task.status == "in_progress":
                 return task
 
-    def complete_task(self) -> None:
-        for idx, task in enumerate(self.tasks):
-            if task.status == "in_progress":
-                task.status = "completed"
-                self.append_event(
-                    event_type=EventTypeEnum.TASK_STATUS_CHANGED,
-                    source_type=SourceTypeEnum.RUNTIME,
-                    payload={
-                        "status": "completed",
-                        "step_number": idx,
-                        "step_goal": task.task.goal,
-                        "content": task.model_dump(mode="json"),
-                    },
-                )
-                return
+    def complete_task(self, task: TaskSchema) -> None:
+        self._set_task_status(task, "completed")
+        if task not in self.completed_tasks:
+            self.completed_tasks.append(task)
+
+    def fail_task(self, task: TaskSchema) -> None:
+        self._set_task_status(task, "failed")
+        if task in self.completed_tasks:
+            self.completed_tasks.remove(task)
+
+    def _set_task_status(
+        self,
+        task: TaskSchema,
+        status: Literal["completed", "failed"],
+    ) -> None:
+        if task not in self.tasks:
+            raise ValueError("Cannot update a task outside main-agent memory")
+
+        if task.status == status:
+            return
+
+        task.status = status
+        idx = self.tasks.index(task)
+        self.append_event(
+            event_type=EventTypeEnum.TASK_STATUS_CHANGED,
+            source_type=SourceTypeEnum.RUNTIME,
+            payload={
+                "status": status,
+                "step_number": idx,
+                "step_goal": task.task.goal,
+                "content": task.model_dump(mode="json"),
+            },
+        )
 
     def append_message(self, role: str, content: object) -> None:
         self.messages.append({"role": role, "content": content})
@@ -79,18 +100,25 @@ class Memory:
     def append_execution_result(
         self,
         *,
+        task: TaskSchema,
+        position: int,
         decision: ExecuteDecisionEnum,
         errors: list[ExecuteErrorSchema],
     ) -> EventSchema:
-        current_task = self.get_current_task()
+        if task not in self.tasks:
+            raise ValueError(
+                "Execution result task is not in main-agent memory"
+            )
+        if not 0 <= position < len(self.tasks):
+            raise IndexError("Execution result position is outside task bounds")
         return self.append_event(
             event_type=EventTypeEnum.EXECUTION_RESULT,
             source_type=SourceTypeEnum.RUNTIME,
             payload={
                 "decision": decision.value,
-                "step_number": self.tasks.index(current_task),
-                "step_goal": current_task.task.goal,
-                "task": current_task.task.model_dump(mode="json"),
+                "step_number": position,
+                "step_goal": task.task.goal,
+                "task": task.model_dump(mode="json"),
                 "errors": [error.error for error in errors],
             },
         )

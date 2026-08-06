@@ -31,6 +31,7 @@ from gerbera_harness.memory import EventSchema, Memory, TaskSchema
 @dataclass
 class _ExecutionRunState:
     current_group_index: int = 0
+    tasks_by_group: dict[int, TaskSchema] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,10 @@ class ExecutionRuntime:
                 self._on_group_started,
                 run_state,
             ),
+            on_group_completed=partial(
+                self._on_group_completed,
+                run_state,
+            ),
         )
 
         try:
@@ -80,25 +85,35 @@ class ExecutionRuntime:
 
         self.errors.extend(execution_errors)
 
-        current_task = self.memory.get_current_task()
-        if current_task is None:
-            self._on_group_started(
-                run_state,
-                run_state.current_group_index,
-                action_groups[run_state.current_group_index],
-            )
+        current_position = run_state.current_group_index
+        current_task = self._task_for_group(
+            run_state,
+            current_position,
+            action_groups[current_position],
+        )
+
+        result_position = current_position
+        if decision is ExecuteDecisionEnum.REJECTED:
+            failed_positions = {
+                error.position for error in execution_errors
+            } or {current_position}
+            for position in failed_positions:
+                self._validate_position(position, action_groups)
+                failed_task = self._task_for_group(
+                    run_state,
+                    position,
+                    action_groups[position],
+                )
+                self.memory.fail_task(failed_task)
+            result_position = min(failed_positions)
+            current_task = run_state.tasks_by_group[result_position]
 
         event = self.memory.append_execution_result(
+            task=current_task,
+            position=result_position,
             decision=decision,
             errors=execution_errors,
         )
-
-        if decision is ExecuteDecisionEnum.ACCEPTED:
-            self.memory.complete_task()
-        else:
-            current_task = self.memory.get_current_task()
-            if current_task is not None:
-                current_task.status = "failed"
 
         return ExecutionResult(
             decision=decision,
@@ -114,18 +129,50 @@ class ExecutionRuntime:
         group: ExecuteActionGroupSchema,
     ) -> None:
         run_state.current_group_index = group_index
-        current_task = self.memory.get_current_task()
-        if group_index > 0 and current_task is not None:
-            self.memory.complete_task()
-            current_task = self.memory.get_current_task()
-        if current_task is None:
-            self.memory.tasks.append(
-                TaskSchema(status="in_progress", task=group)
-            )
+        self._task_for_group(run_state, group_index, group)
+
+    def _on_group_completed(
+        self,
+        run_state: _ExecutionRunState,
+        group_index: int,
+        group: ExecuteActionGroupSchema,
+    ) -> None:
+        task = self._task_for_group(run_state, group_index, group)
+        self.memory.complete_task(task)
+
+    def _task_for_group(
+        self,
+        run_state: _ExecutionRunState,
+        group_index: int,
+        group: ExecuteActionGroupSchema,
+    ) -> TaskSchema:
+        existing = run_state.tasks_by_group.get(group_index)
+        if existing is not None:
+            return existing
+
+        assigned_task_ids = {
+            task.id for task in run_state.tasks_by_group.values()
+        }
+        task = next(
+            (
+                candidate
+                for candidate in self.memory.tasks
+                if candidate.status == "in_progress"
+                and candidate.task == group
+                and candidate.id not in assigned_task_ids
+            ),
+            None,
+        )
+        if task is None:
+            task = TaskSchema(status="in_progress", task=group)
+            self.memory.tasks.append(task)
+
+        run_state.tasks_by_group[group_index] = task
+        return task
 
     async def _execute_agent(
         self,
-        _group_index: int,
+        group_index: int,
         action: AgentExecuteSchema,
     ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
         subagent_result = await SubAgentRuntime(
@@ -136,7 +183,22 @@ class ExecutionRuntime:
             timeout_seconds=action.timeout_seconds,
             max_turns=action.max_turns,
         ).run_agent()
-        return subagent_result.decision, subagent_result.errors
+        workflow_errors = [
+            error.model_copy(update={"position": group_index})
+            for error in subagent_result.errors
+        ]
+        return subagent_result.decision, workflow_errors
+
+    @staticmethod
+    def _validate_position(
+        position: int,
+        action_groups: list[ExecuteActionGroupSchema],
+    ) -> None:
+        if not 0 <= position < len(action_groups):
+            raise IndexError(
+                f"Execution position {position} is outside workflow "
+                f"bounds [0, {len(action_groups)})"
+            )
 
     def _execution_groups(self) -> list[ExecuteActionGroupSchema]:
         hypothesis = self.memory.current_hypothesis

@@ -35,6 +35,7 @@ AgentExecutor = Callable[
     Awaitable[tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]],
 ]
 GroupStartedHandler = Callable[[int, ExecuteActionGroupSchema], None]
+GroupCompletedHandler = Callable[[int, ExecuteActionGroupSchema], None]
 
 
 @dataclass
@@ -43,6 +44,7 @@ class ExecutionProcess:
     actions_list: list[ExecuteActionGroupSchema]
     agent_executor: AgentExecutor | None = None
     on_group_started: GroupStartedHandler | None = None
+    on_group_completed: GroupCompletedHandler | None = None
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     async def run_workflow(self) -> ExecuteDecisionEnum:
@@ -180,6 +182,9 @@ class ExecutionProcess:
                             "Action group did not complete",
                         )
                     return ExecuteDecisionEnum.REJECTED
+
+                if self.on_group_completed is not None:
+                    self.on_group_completed(group_index, group)
         finally:
             await self._delete_active_rules(
                 client,
@@ -411,6 +416,11 @@ class ExecutionProcess:
         action: ExecutableActionSchema,
         error: str,
     ) -> None:
+        if not 0 <= group_index < len(self.actions_list):
+            raise IndexError(
+                f"Execution position {group_index} is outside workflow "
+                f"bounds [0, {len(self.actions_list)})"
+            )
         group = self.actions_list[group_index]
         self.errors.append(
             ExecuteErrorSchema(

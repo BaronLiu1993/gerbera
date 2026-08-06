@@ -12,9 +12,7 @@ class ReviewContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
         hypothesis = self.memory.current_hypothesis
         current_task = self.memory.get_current_task()
-        completed_tasks = [
-            task for task in self.memory.tasks if task.status == "completed"
-        ]
+        completed_tasks = self.memory.completed_tasks
         return {
             "phase": "review",
             "goal": self.memory.goal,

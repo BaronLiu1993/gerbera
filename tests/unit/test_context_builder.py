@@ -92,6 +92,7 @@ def test_review_context_allows_completed_workflow_state() -> None:
     memory.tasks.append(
         task("completed", "Record the final temperature", "read_sensor")
     )
+    memory.completed_tasks.append(memory.tasks[0])
 
     context = context_from(ReviewContextBuilder(memory, 20).build())
 
@@ -129,6 +130,7 @@ def test_observation_context_describes_current_step_and_prior_progress(
     memory.tasks.append(
         task("completed", "Record the baseline temperature", "read_sensor")
     )
+    memory.completed_tasks.append(memory.tasks[0])
     memory.tasks.append(
         task("in_progress", "Heat the sample to 30 C", "start_heater")
     )

@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     ExecutionTypeEnum,
 )
@@ -12,12 +14,12 @@ class ExecutionEventSchema(StrictSchema):
     event_description: str
     event_type: ExecutionTypeEnum
     status: ExecuteDecisionEnum
-    position: int  # Position in the linear steps.
+    position: int = Field(ge=0)  # Position in the linear steps.
     error_msg: str | None
 
 
 class ExecuteErrorSchema(StrictSchema):
     event_name: str
     event_type: ExecutionTypeEnum
-    position: int
+    position: int = Field(ge=0)
     error: str

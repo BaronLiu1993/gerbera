@@ -39,6 +39,23 @@ def test_memory_has_independent_default_collections() -> None:
     assert second.messages == []
     assert first.current_hypothesis is None
     assert first.tasks == []
+    assert first.completed_tasks == []
+
+
+def test_failed_task_is_removed_from_completed_tasks() -> None:
+    memory = Memory(goal="Set the motor speed")
+    task = current_task()
+    memory.tasks.append(task)
+
+    memory.complete_task(task)
+    memory.fail_task(task)
+
+    assert task.status == "failed"
+    assert memory.completed_tasks == []
+    assert [event.payload["status"] for event in memory.event_ledger] == [
+        "completed",
+        "failed",
+    ]
 
 
 def test_memory_returns_none_without_current_task() -> None:
@@ -61,11 +78,12 @@ def test_complete_task_moves_the_current_task_and_records_event() -> None:
     task = current_task()
     memory.tasks.append(task)
 
-    result = memory.complete_task()
+    result = memory.complete_task(task)
 
     assert result is None
     assert memory.tasks == [task]
     assert memory.tasks[0].status == "completed"
+    assert memory.completed_tasks == [task]
     assert memory.event_ledger[-1].event_type is (
         EventTypeEnum.TASK_STATUS_CHANGED
     )
