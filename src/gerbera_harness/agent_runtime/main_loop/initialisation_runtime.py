@@ -48,17 +48,25 @@ class InitialisationRuntime:
     model: Model
     memory: Memory
     context_builder: ContextBuilder
+    process: InitialisationProcess
     max_attempts: int = 3
     clarifying_questions: dict[str, Question] = field(default_factory=list)
 
     async def run_initial(
         self,
         user_prompt: str,
+        feedback: list[str],
     ) -> InitialisationResult | None:
         client = self.model.get_agent_client()
 
+        if feedback:
+            self.memory.append_message(
+                "user",
+                json.dumps({"review_feedback": feedback}),
+            )
+
         for _ in range(self.max_attempts):
-            res = InitialisationProcess.run(user_prompt=user_prompt)
+            res = await self.process.run(user_prompt=user_prompt)
             self.memory.append_message("user", res)
             raw_hypothesis = await client.send(
                 self.context_builder.build(),

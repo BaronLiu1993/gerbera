@@ -10,6 +10,9 @@ from gerbera_harness.agent.driver.main_loop import (
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
     ExecuteErrorSchema,
 )
+from gerbera_harness.agent.driver.main_loop.processes.initialisation_process import (
+    InitialisationProcess,
+)
 from gerbera_harness.agent.model.model import Model
 from gerbera_harness.agent_runtime.context_builder import (
     InitialisationContextBuilder,
@@ -46,6 +49,7 @@ class AgentRuntime:
                 memory=self.memory,
                 context_window_size=self.context_window_size,
             ),
+            process=InitialisationProcess(mcp_url=self.mcp_url),
         )
         return self._initialisation_runtime
 
@@ -67,7 +71,7 @@ class AgentRuntime:
             if current_state.state is LoopStateEnum.INITIALISATION:
                 result = await self.initialisation_runtime.run_initial(
                     initial_user_prompt,
-                    self.feedback
+                    self.feedback,
                 )
 
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
