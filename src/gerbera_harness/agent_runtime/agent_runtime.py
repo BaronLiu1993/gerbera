@@ -86,7 +86,19 @@ class AgentRuntime:
                         raise RuntimeError(
                             "Accepted initialisation requires a hypothesis"
                         )
-                    self.memory.set_hypothesis(result.hypothesis)
+                    initialisation_memory = self.memory
+                    self.memory = Memory(
+                        goal=initialisation_memory.goal,
+                        session_id=initialisation_memory.session_id,
+                        messages=list(initialisation_memory.messages),
+                        current_hypothesis=result.hypothesis,
+                        event_ledger=list(
+                            initialisation_memory.event_ledger
+                        ),
+                        world_state_ledger=list(
+                            initialisation_memory.world_state_ledger
+                        ),
+                    )
                     self.memory.initialize_tasks(result.hypothesis)
                     self.session.perform_transition(result.requested_next_state)
                 elif result.decision is InitialisationDecisionEnum.CLARIFY:

@@ -201,7 +201,9 @@ def test_accepted_initialisation_creates_pending_tasks(monkeypatch) -> None:
 
     asyncio.run(runtime.run_agent("Move the motor"))
 
-    assert memory.current_hypothesis is hypothesis
-    assert [task.task for task in memory.tasks] == [group]
-    assert [task.status for task in memory.tasks] == ["pending"]
-    assert memory.completed_tasks == []
+    assert runtime.memory is not memory
+    assert runtime.memory.session_id == memory.session_id
+    assert runtime.memory.current_hypothesis is hypothesis
+    assert [task.task for task in runtime.memory.tasks] == [group]
+    assert [task.status for task in runtime.memory.tasks] == ["pending"]
+    assert runtime.memory.completed_tasks == []

@@ -201,6 +201,3 @@ class Memory:
         )
         self.world_state_ledger.append(world_state)
         return world_state
-
-    def set_hypothesis(self, hypothesis: HypothesisSchema) -> None:
-        self.current_hypothesis = hypothesis
