@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass, field
 import json
 import httpx
@@ -57,8 +58,9 @@ class InitialisationProcess:
             sections.append("No research sources were provided.")
         return "\n\n".join(sections)
 
-    def fetch_url(self, fetch_url: str) -> str:
-        resp = httpx.get(fetch_url, timeout=10.0)
+    async def fetch_url(self, fetch_url: str) -> str:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(fetch_url)
         resp.raise_for_status()
         return resp.text
 
@@ -87,7 +89,10 @@ class InitialisationProcess:
 
         self.available_tool_names = available_tool_names
 
-        sources = {url: self.fetch_url(url) for url in self.urls}
+        source_contents = await asyncio.gather(
+            *(self.fetch_url(url) for url in self.urls)
+        )
+        sources = dict(zip(self.urls, source_contents, strict=True))
         return self.generate_agent_context(
             user_prompt=user_prompt,
             hardware_tools=hardware_tools,
