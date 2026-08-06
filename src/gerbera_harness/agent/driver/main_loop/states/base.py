@@ -14,6 +14,12 @@ class LoopStateEnum(str, Enum):
     REVIEW = "review"
 
 
+class ReviewDecisionEnum(str, Enum):
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    REPLAN = "replan"
+
+
 class InitialisationDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -22,7 +28,7 @@ class InitialisationDecisionEnum(str, Enum):
 
 class ExecuteDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
-    FAILED = "failed"
+    REJECTED = "rejected"
 
 
 @dataclass(frozen=True)
