@@ -10,6 +10,9 @@ from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schem
     ExecuteErrorSchema,
     ExecutionTypeEnum,
 )
+from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
+    ExecutionTypeEnum as ActionExecutionTypeEnum,
+)
 from gerbera_harness.agent.driver.main_loop.states.base import (
     LoopStateEnum,
 )
@@ -43,6 +46,11 @@ def current_task() -> TaskSchema:
             },
         }
     )
+
+
+def test_execution_type_uses_one_enum_with_rule_support() -> None:
+    assert ExecutionTypeEnum is ActionExecutionTypeEnum
+    assert ExecutionTypeEnum.RULE.value == "rule"
 
 
 def current_agent_task() -> TaskSchema:

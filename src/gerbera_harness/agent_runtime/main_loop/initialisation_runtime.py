@@ -50,7 +50,7 @@ class InitialisationRuntime:
     context_builder: ContextBuilder
     process: InitialisationProcess
     max_attempts: int = 3
-    clarifying_questions: dict[str, Question] = field(default_factory=list)
+    clarifying_questions: list[Question] = field(default_factory=list)
 
     async def run_initial(
         self,
@@ -113,13 +113,14 @@ class InitialisationRuntime:
                 )
 
             if decision is InitialisationDecisionEnum.CLARIFY:
-                self.clarifying_questions = [
+                questions = [
                     Question(
                         question=question.question,
                         options=list(question.options),
                     )
                     for question in response.clarifying_questions
                 ]
+                self.clarifying_questions = questions
                 return InitialisationResult(
                     decision=decision,
                     requested_next_state=requested_next_state,
@@ -131,16 +132,30 @@ class InitialisationRuntime:
         return list(self.clarifying_questions)
 
     async def submit_answers(self, answers: list[Answer]):
-        if len(answers) != len(self.clarifying_questions):
-            raise ValueError("Incorrect Amount of Clarifying Questions")
+        answer_ids = [answer.question_id for answer in answers]
+        question_ids = [
+            question.question_id for question in self.clarifying_questions
+        ]
+        if (
+            len(answers) != len(self.clarifying_questions)
+            or sorted(answer_ids) != sorted(question_ids)
+        ):
+            raise ValueError(
+                "Answers must match all clarifying question IDs"
+            )
 
         responses = []
 
         for answer in answers:
+            question = next(
+                question
+                for question in self.clarifying_questions
+                if question.question_id == answer.question_id
+            )
             responses.append(
                 {
                     "question_id": answer.question_id,
-                    "question": answer.question,
+                    "question": question.question,
                     "answer": answer.answer,
                 }
             )

@@ -6,6 +6,7 @@ from gerbera_harness.agent.driver.main_loop import (
     ExecuteDecisionEnum,
     LoopStateEnum,
     Review,
+    ReviewDecisionEnum,
     Session,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -43,16 +44,33 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
                 requested_next_state=LoopStateEnum.REVIEW,
             )
 
+    class FakeReviewRuntime:
+        def __init__(self, model, memory: Memory, context_builder) -> None:
+            self.model = model
+            self.memory = memory
+            self.context_builder = context_builder
+
+        async def run_review(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                decision=ReviewDecisionEnum.ACCEPTED,
+            )
+
     monkeypatch.setattr(
         agent_runtime,
         "ExecutionRuntime",
         FakeExecutionRuntime,
+    )
+    monkeypatch.setattr(
+        agent_runtime,
+        "ReviewRuntime",
+        FakeReviewRuntime,
     )
     runtime = AgentRuntime(
         session=Session(state=Execution()),
         model=model,
         memory=Memory(goal="Move the motor"),
         mcp_url="https://hardware.example.com/mcp",
+        feedback=[],
     )
 
     asyncio.run(runtime.run_agent("unused during execution"))

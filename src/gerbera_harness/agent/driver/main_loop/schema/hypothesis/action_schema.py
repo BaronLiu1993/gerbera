@@ -33,6 +33,7 @@ class ExecutionTypeEnum(str, Enum):
     AGENT = "agent"
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
+    RULE = "rule"
 
 class ExecuteActionParameterSchema(StrictSchema):
     variable: SnakeCaseVariable
