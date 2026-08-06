@@ -32,7 +32,7 @@ class FakeClient:
         self.system_prompts = []
         self.valid_schema = None
 
-    def send(self, messages, system_prompt, valid_schema) -> str:
+    async def send(self, messages, system_prompt, valid_schema) -> str:
         self.system_prompt = system_prompt
         self.system_prompts.append(system_prompt)
         self.valid_schema = valid_schema

@@ -17,7 +17,7 @@ class FakeInitialisationProcess:
 
 
 class FakeClient:
-    def send(self, messages, system_prompt, valid_schema) -> str:
+    async def send(self, messages, system_prompt, valid_schema) -> str:
         assert messages[0]["content"].startswith("# Experiment Context")
         assert system_prompt.startswith("# Initialisation")
         return json.dumps(

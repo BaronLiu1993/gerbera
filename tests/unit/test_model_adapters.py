@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 
@@ -49,11 +51,25 @@ def test_adapter_uses_native_structured_output_field(
 ) -> None:
     captured_request = {}
 
-    def fake_post(url, **kwargs):
-        captured_request.update(kwargs["json"])
-        return FakeResponse(response_payload)
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: float) -> None:
+            captured_request["timeout"] = timeout
 
-    monkeypatch.setattr(model_adapters.httpx, "post", fake_post)
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            pass
+
+        async def post(self, url, **kwargs):
+            captured_request.update(kwargs["json"])
+            return FakeResponse(response_payload)
+
+    monkeypatch.setattr(
+        model_adapters.httpx,
+        "AsyncClient",
+        FakeAsyncClient,
+    )
     schema = {
         "type": "object",
         "properties": {"next_state": {"type": "string"}},
@@ -61,8 +77,9 @@ def test_adapter_uses_native_structured_output_field(
         "additionalProperties": False,
     }
 
-    assert adapter.send([], "state prompt", schema) == "{}"
+    assert asyncio.run(adapter.send([], "state prompt", schema)) == "{}"
     assert schema_from_request(captured_request) is schema
+    assert captured_request["timeout"] == 120.0
 
     if isinstance(adapter, OpenAIAdapter):
         assert captured_request["response_format"]["json_schema"]["strict"] is True
@@ -81,10 +98,23 @@ def test_openai_adapter_includes_response_body_in_http_errors(
         text='{"error":{"message":"Invalid schema"}}',
     )
 
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: float) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            pass
+
+        async def post(self, url, **kwargs):
+            return response
+
     monkeypatch.setattr(
         model_adapters.httpx,
-        "post",
-        lambda *args, **kwargs: response,
+        "AsyncClient",
+        FakeAsyncClient,
     )
 
     adapter = OpenAIAdapter("key", "gpt", 100)
@@ -99,4 +129,46 @@ def test_openai_adapter_includes_response_body_in_http_errors(
         httpx.HTTPStatusError,
         match="OpenAI response.*Invalid schema",
     ):
-        adapter.send([], "state prompt", schema)
+        asyncio.run(adapter.send([], "state prompt", schema))
+
+
+def test_adapter_request_can_be_cancelled(monkeypatch) -> None:
+    request_started = asyncio.Event()
+    request_cancelled = asyncio.Event()
+
+    class HangingAsyncClient:
+        def __init__(self, *, timeout: float) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            pass
+
+        async def post(self, url, **kwargs):
+            request_started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                request_cancelled.set()
+                raise
+
+    monkeypatch.setattr(
+        model_adapters.httpx,
+        "AsyncClient",
+        HangingAsyncClient,
+    )
+    adapter = OpenAIAdapter("key", "gpt", 100)
+
+    async def run_request() -> None:
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(
+                adapter.send([], "state prompt", {}),
+                timeout=0.001,
+            )
+
+        assert request_started.is_set()
+        assert request_cancelled.is_set()
+
+    asyncio.run(run_request())

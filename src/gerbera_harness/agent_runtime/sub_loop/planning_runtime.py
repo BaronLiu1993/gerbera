@@ -33,7 +33,7 @@ class PlanningRuntime:
     async def run_planning(self) -> PlanningStatusEnum:
         client = self.model.get_agent_client()
 
-        raw_response = client.send(
+        raw_response = await client.send(
             self.context_builder.build(),
             PLANNING_PROMPT,
             planning_adapter.json_schema(),
@@ -46,7 +46,7 @@ class PlanningRuntime:
             response.model_dump_json(),
         )
 
-        raw_review = client.send(
+        raw_review = await client.send(
             self.context_builder.build(),
             PLANNING_REVIEW_PROMPT,
             planning_review_adapter.json_schema(),

@@ -47,7 +47,7 @@ class ObservationRuntime:
                 if tool_is_available_during(tool, ToolStage.OBSERVATION)
             )
 
-            raw_response = client.send(
+            raw_response = await client.send(
                 self.context_builder.build(),
                 OBSERVATION_PROMPT,
                 observation_adapter.json_schema(),
@@ -69,7 +69,7 @@ class ObservationRuntime:
                 self._record_tool_result(observation, result)
                 return ObservationStatusEnum.CONTINUE
 
-            review_response = client.send(
+            review_response = await client.send(
                 self.context_builder.build(),
                 OBSERVATION_REVIEW_PROMPT,
                 observation_review_adapter.json_schema(),

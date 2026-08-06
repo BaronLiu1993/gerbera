@@ -50,7 +50,7 @@ class InitialisationRuntime:
         for _ in range(self.max_attempts):
             res = InitialisationProcess.run(user_prompt=user_prompt)
             self.memory.append_message("user", res)
-            raw_hypothesis = client.send(
+            raw_hypothesis = await client.send(
                 self.context_builder.build(),
                 system_prompt,
                 HypothesisSchema.model_json_schema(),
@@ -61,7 +61,7 @@ class InitialisationRuntime:
 
             hypothesis = HypothesisSchema.model_validate(message)
 
-            raw_evaluation = client.send(
+            raw_evaluation = await client.send(
                 self.context_builder.build(),
                 system_prompt,
                 InitialisationResponseSchema.model_json_schema(),
