@@ -86,15 +86,11 @@ def test_planning_response_rejects_agent_actions() -> None:
         PlanningResponseSchema.model_validate(
             {
                 "action": {
-                    "description": "Approach the block.",
                     "action_type": "execute",
                     "execution_type": "agent",
-                    "start_offset_seconds": 0,
                     "goal": "Move within reach.",
                     "completion_criteria": "The block is within reach.",
-                    "input_event_keys": [],
-                    "allowed_tool_calls": ["move"],
-                    "max_iterations": 3,
+                    "max_turns": 3,
                     "timeout_seconds": 30,
                 }
             }

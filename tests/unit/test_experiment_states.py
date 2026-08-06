@@ -72,11 +72,6 @@ def test_initialisation_output_schema_uses_valid_transitions() -> None:
         "enum": ["execution", "initialisation"],
         "type": "string",
     }
-    hypothesis_options = Initialisation.valid_schema["properties"]["hypothesis"][
-        "anyOf"
-    ]
-    assert hypothesis_options[0] == {"$ref": "#/$defs/HypothesisSchema"}
-    assert hypothesis_options[1] == {"type": "null"}
     assert Initialisation.valid_schema["properties"]["decision"] == {
         "type": "string",
         "enum": ["accepted", "rejected", "clarify"],

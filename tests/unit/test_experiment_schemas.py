@@ -77,24 +77,11 @@ def continuous_execute_action() -> dict:
 
 def agent_execute_action() -> dict:
     return {
-        "description": "Approach the detected block.",
         "action_type": "execute",
         "execution_type": "agent",
-        "start_offset_seconds": 0,
         "goal": "Move within grasping range of the block.",
         "completion_criteria": "The block is centered and within reach.",
-        "input_event_keys": [
-            {
-                "event_type": "VISION",
-                "microcontroller_id": "camera-1",
-                "event_name": "block_detected",
-            }
-        ],
-        "allowed_tool_calls": [
-            "move_arm",
-            "turn_on_part-detector",
-        ],
-        "max_iterations": 10,
+        "max_turns": 10,
         "timeout_seconds": 30,
     }
 
@@ -171,6 +158,7 @@ def hypothesis_data(action: dict) -> dict:
     )
     execute_steps = [
         {
+            "goal": "Collect evidence for the hypothesis.",
             "action_type": "execute",
             "actions": [execute_action],
         },
@@ -185,7 +173,6 @@ def hypothesis_data(action: dict) -> dict:
         "independent_variables": ["heater_state"],
         "controlled_variables": ["room_temperature"],
         "assumptions": ["The sensor is calibrated."],
-        "clarifying_questions": [],
         "method": {
             "name": "heating_test",
             "description": "Compare temperature before and after heating.",
@@ -287,6 +274,7 @@ def test_rule_creation_must_be_in_first_execute_group() -> None:
     data["method"]["execute_steps"].insert(
         1,
         {
+            "goal": "Create the temperature safety rule.",
             "action_type": "execute",
             "actions": [rule_creation_action()],
         },
@@ -352,21 +340,24 @@ def test_hypothesis_schema_models_a_bounded_agent_execute_step() -> None:
 
     action = hypothesis.method.execute_steps[0].actions[0]
     assert isinstance(action, AgentExecuteSchema)
-    assert action.max_iterations == 10
+    assert action.goal == "Move within grasping range of the block."
+    assert action.completion_criteria == (
+        "The block is centered and within reach."
+    )
+    assert action.max_turns == 10
     assert action.timeout_seconds == 30
-    assert action.input_event_keys[0].event_type == "VISION"
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("max_iterations", 0),
+        ("goal", ""),
+        ("completion_criteria", ""),
+        ("max_turns", 0),
         ("timeout_seconds", 0),
-        ("input_event_keys", []),
-        ("allowed_tool_calls", []),
     ],
 )
-def test_agent_execute_action_requires_loop_bounds(
+def test_agent_execute_action_requires_goal_criteria_and_loop_bounds(
     field: str,
     value: object,
 ) -> None:
@@ -375,6 +366,23 @@ def test_agent_execute_action_requires_loop_bounds(
 
     with pytest.raises(ValidationError):
         HypothesisSchema.model_validate(hypothesis_data(action))
+
+
+@pytest.mark.parametrize(
+    "parallel_action",
+    [discrete_execute_action(), agent_execute_action()],
+)
+def test_agent_execute_action_must_be_the_only_action_in_its_group(
+    parallel_action: dict,
+) -> None:
+    data = hypothesis_data(agent_execute_action())
+    data["method"]["execute_steps"][0]["actions"].append(parallel_action)
+
+    with pytest.raises(
+        ValidationError,
+        match="must be the only action",
+    ):
+        HypothesisSchema.model_validate(data)
 
 
 def test_continuous_execute_action_declares_emitted_event_keys() -> None:
@@ -400,28 +408,20 @@ def test_hypothesis_schema_excludes_application_owned_fields() -> None:
     assert "observed" not in schema["$defs"]["MethodSchema"]["properties"]
 
 
-def test_initialisation_output_schema_uses_new_hypothesis_schema() -> None:
-    from gerbera_harness.agent.driver.main_loop import Initialisation
+def test_hypothesis_output_schema_uses_current_action_schemas() -> None:
+    schema = HypothesisSchema.model_json_schema()
 
-    hypothesis_schema = Initialisation.valid_schema["properties"]["hypothesis"][
-        "anyOf"
-    ][0]
-
-    assert hypothesis_schema == {"$ref": "#/$defs/HypothesisSchema"}
-    response_schema = Initialisation.valid_schema["$defs"]["HypothesisSchema"]
-    assert "method" in response_schema["properties"]
-    assert "methods" not in response_schema["properties"]
-    assert "ContinuousExecuteSchema" in Initialisation.valid_schema["$defs"]
-    assert "DiscreteExecuteSchema" in Initialisation.valid_schema["$defs"]
-    assert "AgentExecuteSchema" in Initialisation.valid_schema["$defs"]
-    assert "RuleCreationSchema" in Initialisation.valid_schema["$defs"]
-    assert "ReviewSchema" in Initialisation.valid_schema["$defs"]
+    assert "method" in schema["properties"]
+    assert "methods" not in schema["properties"]
+    assert "ContinuousExecuteSchema" in schema["$defs"]
+    assert "DiscreteExecuteSchema" in schema["$defs"]
+    assert "AgentExecuteSchema" in schema["$defs"]
+    assert "RuleCreationSchema" in schema["$defs"]
+    assert "ReviewSchema" in schema["$defs"]
 
 
 def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
-    from gerbera_harness.agent.driver.main_loop import Initialisation
-
-    trigger_mode_schema = Initialisation.valid_schema["$defs"][
+    trigger_mode_schema = HypothesisSchema.model_json_schema()["$defs"][
         "RuleCreationSchema"
     ]["properties"]["trigger_mode"]
 
@@ -431,8 +431,6 @@ def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
 
 
 def test_hypothesis_output_schema_is_strict() -> None:
-    from gerbera_harness.agent.driver.main_loop import Initialisation
-
     def assert_strict_objects(node: object) -> None:
         if isinstance(node, list):
             for item in node:
@@ -450,12 +448,10 @@ def test_hypothesis_output_schema_is_strict() -> None:
         for value in node.values():
             assert_strict_objects(value)
 
-    assert_strict_objects(Initialisation.valid_schema)
+    assert_strict_objects(HypothesisSchema.model_json_schema())
 
 
 def test_hypothesis_output_schema_uses_supported_union_keywords() -> None:
-    from gerbera_harness.agent.driver.main_loop import Initialisation
-
     def assert_no_discriminated_union_keywords(node: object) -> None:
         if isinstance(node, list):
             for item in node:
@@ -471,7 +467,9 @@ def test_hypothesis_output_schema_uses_supported_union_keywords() -> None:
         for value in node.values():
             assert_no_discriminated_union_keywords(value)
 
-    assert_no_discriminated_union_keywords(Initialisation.valid_schema)
+    assert_no_discriminated_union_keywords(
+        HypothesisSchema.model_json_schema()
+    )
 
 
 def test_review_action_requires_an_expected_criterion() -> None:

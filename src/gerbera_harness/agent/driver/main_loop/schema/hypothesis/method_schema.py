@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
+    AgentExecuteSchema,
     ExecuteSchema,
     ReviewSchema,
     RuleCreationSchema,
@@ -41,6 +42,20 @@ class MethodSchema(StrictSchema):
             if group_index != 0:
                 raise ValueError(
                     "Rule creation must be in the first execute group"
+                )
+
+        return self
+
+    @model_validator(mode="after")
+    def require_agent_actions_to_be_isolated(self) -> "MethodSchema":
+        for group in self.execute_steps:
+            if any(
+                isinstance(action, AgentExecuteSchema)
+                for action in group.actions
+            ) and len(group.actions) != 1:
+                raise ValueError(
+                    "An agent action must be the only action in its "
+                    "execute group"
                 )
 
         return self
