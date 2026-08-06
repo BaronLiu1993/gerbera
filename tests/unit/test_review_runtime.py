@@ -21,9 +21,11 @@ class FakeClient:
     def __init__(self, response: dict) -> None:
         self.response = response
         self.output_schema = None
+        self.system_prompt = None
 
     async def send(self, messages, system_prompt, output_schema) -> str:
         self.output_schema = output_schema
+        self.system_prompt = system_prompt
         return json.dumps(self.response)
 
 
@@ -55,13 +57,14 @@ def test_review_runtime_uses_review_response_schema() -> None:
         context_builder=FakeContextBuilder(),
     )
 
-    result = asyncio.run(runtime.run_review("Review the completed work."))
+    result = asyncio.run(runtime.run_review())
 
     assert result.decision is ReviewDecisionEnum.ACCEPTED
     assert result.requested_next_state is None
     assert model.client.output_schema == (
         ReviewResponseSchema.model_json_schema()
     )
+    assert model.client.system_prompt.startswith("# Review")
     assert memory.messages[-1]["role"] == "assistant"
 
 

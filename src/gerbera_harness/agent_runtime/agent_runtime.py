@@ -55,7 +55,7 @@ class AgentRuntime:
         )
 
     @property
-    def review_runtime(self) -> InitialisationRuntime:
+    def review_runtime(self) -> ReviewRuntime:
         return ReviewRuntime(model=self.model, memory=self.memory)
 
     async def run_agent(self, initial_user_prompt: str) -> None:
@@ -64,7 +64,6 @@ class AgentRuntime:
             if current_state.state is LoopStateEnum.INITIALISATION:
                 result = await self.initialisation_runtime.run_initial(
                     initial_user_prompt,
-                    current_state.system_prompt,
                 )
 
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
@@ -91,7 +90,19 @@ class AgentRuntime:
                 else:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.REVIEW:
-                break
+                result = await self.review_runtime.run_review()
+
+                if result.decision is ReviewDecisionEnum.REPLAN:
+                    
+                elif result.decision is ReviewDecisionEnum.ACCEPTED:
+
+                elif result.decision is ReviewDecisionEnum.REJECT
+
+                else:
+                    raise ValueError("Unsupported Decision")
+
+
+
 
             else:
                 raise ValueError("Unsupported Main Loop State Enum")

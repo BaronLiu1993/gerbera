@@ -14,7 +14,7 @@ from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
 )
 
 
-def test_each_experiment_state_loads_its_markdown_prompt() -> None:
+def test_experiment_states_do_not_own_prompts() -> None:
     states = [
         Initialisation(),
         Execution(),
@@ -22,10 +22,10 @@ def test_each_experiment_state_loads_its_markdown_prompt() -> None:
     ]
 
     for state in states:
-        assert state.prompt_path.name == state.prompt_file
-        assert state.system_prompt.startswith("#")
-        assert state.prompt_path.suffix == ".md"
-        assert state.prompt.startswith(f"# {state.state.value.title()}")
+        assert not hasattr(state, "prompt_file")
+        assert not hasattr(state, "prompt_path")
+        assert not hasattr(state, "system_prompt")
+        assert not hasattr(state, "prompt")
 
 
 def test_experiment_cycle_enforces_valid_transitions() -> None:
@@ -96,22 +96,3 @@ def test_initialisation_response_owns_transition_validation() -> None:
             rejection_reasons=[],
             clarifying_questions=[],
         )
-
-
-def test_initialisation_prompt_requires_continuous_time_series() -> None:
-    prompt = Initialisation().system_prompt
-
-    assert "You MUST use `continuous`" in prompt
-    assert "repeated timestamped readings" in prompt
-    assert "IR sensor output remains stable over 30 seconds" in prompt
-    assert "Do not represent a time-series experiment" in prompt
-
-
-def test_initialisation_prompt_requires_parameter_lists() -> None:
-    prompt = Initialisation().system_prompt
-
-    assert "Parameter-list fields are mandatory" in prompt
-    assert "Every `discrete` action must include `params`" in prompt
-    assert "both `forward_tool_call_params` and" in prompt
-    assert "`reverse_tool_call_params`" in prompt
-    assert "Never omit a parameter-list field" in prompt

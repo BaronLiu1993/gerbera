@@ -21,6 +21,17 @@ from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_
     Question,
 )
 from gerbera_harness.memory import Memory
+from gerbera_harness.prompts import PromptTypeEnum, load_prompt
+
+
+INITIALISATION_PROMPT = load_prompt(
+    PromptTypeEnum.MAIN,
+    "INITIALISATION.md",
+)
+INITIALISATION_REVIEW_PROMPT = load_prompt(
+    PromptTypeEnum.MAIN,
+    "INITIALISATION_REVIEW.md",
+)
 
 
 @dataclass(frozen=True)
@@ -43,7 +54,6 @@ class InitialisationRuntime:
     async def run_initial(
         self,
         user_prompt: str,
-        system_prompt: str,
     ) -> InitialisationResult | None:
         client = self.model.get_agent_client()
 
@@ -52,7 +62,7 @@ class InitialisationRuntime:
             self.memory.append_message("user", res)
             raw_hypothesis = await client.send(
                 self.context_builder.build(),
-                system_prompt,
+                INITIALISATION_PROMPT,
                 HypothesisSchema.model_json_schema(),
             )
             message = json.loads(raw_hypothesis)
@@ -63,7 +73,7 @@ class InitialisationRuntime:
 
             raw_evaluation = await client.send(
                 self.context_builder.build(),
-                system_prompt,
+                INITIALISATION_REVIEW_PROMPT,
                 InitialisationResponseSchema.model_json_schema(),
             )
 

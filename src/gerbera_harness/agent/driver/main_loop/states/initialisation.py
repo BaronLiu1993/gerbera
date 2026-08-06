@@ -10,7 +10,6 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
 @dataclass(frozen=True)
 class Initialisation(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.INITIALISATION
-    prompt_file: ClassVar[str] = "INITIALISATION.md"
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.INITIALISATION, LoopStateEnum.EXECUTION}
     )
