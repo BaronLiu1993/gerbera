@@ -1,3 +1,7 @@
+from types import SimpleNamespace
+
+import pytest
+
 from gerbera_harness.memory import (
     EventTypeEnum,
     Memory,
@@ -62,6 +66,25 @@ def test_memory_returns_none_without_current_task() -> None:
     memory = Memory(goal="Test the motor")
 
     assert memory.get_current_task() is None
+
+
+def test_initialise_tasks_creates_pending_lifecycle_once() -> None:
+    memory = Memory(goal="Run the motor workflow")
+    first = current_task().task
+    second = first.model_copy(update={"goal": "Set speed to 20"})
+    hypothesis = SimpleNamespace(
+        method=SimpleNamespace(execute_steps=[first, second])
+    )
+
+    memory.initialize_tasks(hypothesis)
+
+    assert [task.task for task in memory.tasks] == [first, second]
+    assert [task.status for task in memory.tasks] == ["pending", "pending"]
+    assert memory.completed_tasks == []
+    assert memory.get_current_task() is None
+
+    with pytest.raises(RuntimeError, match="already initialized"):
+        memory.initialize_tasks(hypothesis)
 
 
 def test_tasks_have_independent_application_owned_ids() -> None:

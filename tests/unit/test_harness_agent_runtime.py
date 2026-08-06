@@ -79,3 +79,36 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
     assert runtime.errors is not execution_errors
     assert runtime.execution_runtime.model is model
     assert isinstance(runtime.session.state, Review)
+
+
+def test_agent_runtime_pauses_replan_in_review(monkeypatch) -> None:
+    feedback = ["Collect another measurement"]
+
+    class FakeReviewRuntime:
+        def __init__(self, model, memory: Memory, context_builder) -> None:
+            pass
+
+        async def run_review(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                decision=ReviewDecisionEnum.REPLAN,
+                feedback=feedback,
+                requested_next_state=LoopStateEnum.INITIALISATION,
+            )
+
+    monkeypatch.setattr(
+        agent_runtime,
+        "ReviewRuntime",
+        FakeReviewRuntime,
+    )
+    runtime = AgentRuntime(
+        session=Session(state=Review()),
+        model=object(),
+        memory=Memory(goal="Move the motor"),
+        mcp_url="https://hardware.example.com/mcp",
+        feedback=[],
+    )
+
+    asyncio.run(runtime.run_agent("unused during review"))
+
+    assert runtime.feedback == feedback
+    assert isinstance(runtime.session.state, Review)

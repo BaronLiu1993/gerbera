@@ -166,16 +166,17 @@ class ExecutionRuntime:
             (
                 candidate
                 for candidate in self.memory.tasks
-                if candidate.status == "in_progress"
+                if candidate.status in {"pending", "in_progress"}
                 and candidate.task == group
                 and candidate.id not in assigned_task_ids
             ),
             None,
         )
         if task is None:
-            task = TaskSchema(status="in_progress", task=group)
+            task = TaskSchema(status="pending", task=group)
             self.memory.tasks.append(task)
 
+        self.memory.start_task(task)
         run_state.tasks_by_group[group_index] = task
         return task
 
@@ -242,7 +243,7 @@ class ExecutionRuntime:
         groups = [
             task.task
             for task in self.memory.tasks
-            if task.status == "in_progress"
+            if task.status in {"pending", "in_progress"}
         ]
         if not groups:
             raise RuntimeError(

@@ -87,6 +87,7 @@ class AgentRuntime:
                             "Accepted initialisation requires a hypothesis"
                         )
                     self.memory.set_hypothesis(result.hypothesis)
+                    self.memory.initialize_tasks(result.hypothesis)
                     self.session.perform_transition(result.requested_next_state)
                 elif result.decision is InitialisationDecisionEnum.CLARIFY:
                     break
@@ -109,7 +110,10 @@ class AgentRuntime:
 
                 if result.decision is ReviewDecisionEnum.REPLAN:
                     self.feedback = result.feedback
-                    self.session.perform_transition(result.requested_next_state)
+                    # Replanning is intentionally paused while the first
+                    # single-pass workflow is stabilized.
+                    # self.session.perform_transition(result.requested_next_state)
+                    break
                 elif result.decision is ReviewDecisionEnum.ACCEPTED:
                     break
                 elif result.decision is ReviewDecisionEnum.REJECTED:

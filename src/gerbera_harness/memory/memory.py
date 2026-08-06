@@ -44,6 +44,21 @@ class Memory:
             if task.status == "in_progress":
                 return task
 
+    def initialize_tasks(self, hypothesis: HypothesisSchema) -> None:
+        if self.tasks or self.completed_tasks:
+            raise RuntimeError("Task lifecycle is already initialized")
+
+        self.tasks.extend(
+            TaskSchema(status="pending", task=group)
+            for group in hypothesis.method.execute_steps
+        )
+
+    def start_task(self, task: TaskSchema) -> None:
+        current_task = self.get_current_task()
+        if current_task is not None and current_task is not task:
+            raise RuntimeError("Another task is already in progress")
+        self._set_task_status(task, "in_progress")
+
     def complete_task(self, task: TaskSchema) -> None:
         self._set_task_status(task, "completed")
         if task not in self.completed_tasks:
@@ -57,7 +72,7 @@ class Memory:
     def _set_task_status(
         self,
         task: TaskSchema,
-        status: Literal["completed", "failed"],
+        status: Literal["in_progress", "completed", "failed"],
     ) -> None:
         if task not in self.tasks:
             raise ValueError("Cannot update a task outside main-agent memory")
