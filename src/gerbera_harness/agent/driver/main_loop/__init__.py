@@ -2,22 +2,22 @@
 
 from gerbera_harness.agent.driver.main_loop.states import (
     Execution,
+    ExecuteDecisionEnum,
     ExperimentState,
     Initialisation,
     InitialisationDecisionEnum,
     LoopStateEnum,
     Review,
     Session,
-    TextResponseSchema,
 )
 
 __all__ = [
     "Execution",
+    "ExecuteDecisionEnum",
     "ExperimentState",
     "Initialisation",
     "InitialisationDecisionEnum",
     "LoopStateEnum",
     "Review",
     "Session",
-    "TextResponseSchema",
 ]

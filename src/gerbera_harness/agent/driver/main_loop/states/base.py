@@ -5,8 +5,6 @@ from enum import Enum
 from pathlib import Path
 from typing import ClassVar
 
-from pydantic import RootModel
-
 PROMPT_DIRECTORY = Path(__file__).resolve().parents[4] / "prompts" / "main"
 
 
@@ -22,8 +20,9 @@ class InitialisationDecisionEnum(str, Enum):
     CLARIFY = "clarify"
 
 
-class TextResponseSchema(RootModel[str]):
-    pass
+class ExecuteDecisionEnum(str, Enum):
+    ACCEPTED = "accepted"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)

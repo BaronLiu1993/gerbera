@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 
-from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -115,7 +115,6 @@ class SubAgentRuntime:
                 if decision is ObservationStatusEnum.READY:
                     self.session.perform_transition(ExecuteLoopStateEnum.PLAN)
                 elif decision is ObservationStatusEnum.COMPLETE:
-                    self.memory.complete_task()
                     return self._result(ExecuteDecisionEnum.ACCEPTED)
                 elif decision is ObservationStatusEnum.BLOCKED:
                     self._append_error("Observation blocked")

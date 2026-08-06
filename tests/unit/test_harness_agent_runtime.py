@@ -27,9 +27,11 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
             error="motor rejected command",
         )
     ]
+    model = object()
 
     class FakeExecutionRuntime:
-        def __init__(self, memory: Memory, mcp_url: str) -> None:
+        def __init__(self, model, memory: Memory, mcp_url: str) -> None:
+            self.model = model
             self.memory = memory
             self.mcp_url = mcp_url
 
@@ -46,7 +48,7 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
     )
     runtime = AgentRuntime(
         session=Session(state=Execution()),
-        model=object(),
+        model=model,
         memory=Memory(goal="Move the motor"),
         mcp_url="https://hardware.example.com/mcp",
     )
@@ -55,4 +57,5 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
 
     assert runtime.errors == execution_errors
     assert runtime.errors is not execution_errors
+    assert runtime.execution_runtime.model is model
     assert isinstance(runtime.session.state, Review)

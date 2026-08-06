@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -177,7 +177,7 @@ def test_act_status_returns_control_to_observation(
     assert result.turns_completed == 2
     assert act_runtime.action.forward_tool_call == "set_motor"
     assert isinstance(runtime.session.state, ObserveState)
-    assert runtime.memory.tasks[0].status == "completed"
+    assert runtime.memory.tasks[0].status == "in_progress"
     assert runtime.turns_completed == 2
     if status is ToolCallStatusEnum.SUCCESS:
         assert runtime.errors == []
@@ -295,7 +295,7 @@ def test_subagent_runs_observe_plan_act_observe_end_to_end(
 
     assert result.decision is ExecuteDecisionEnum.ACCEPTED
     assert runtime.turns_completed == 4
-    assert runtime.memory.tasks[0].status == "completed"
+    assert runtime.memory.tasks[0].status == "in_progress"
     assert act_runtime.action is runtime.action_plan
 
 

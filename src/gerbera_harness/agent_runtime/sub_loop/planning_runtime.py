@@ -54,7 +54,6 @@ class PlanningRuntime:
         review = planning_review_adapter.validate_json(raw_review)
 
         if review.status is PlanningStatusEnum.COMPLETE:
-            self.memory.complete_task()
             return review.status
 
         if review.status in {

@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import JsonValue
 
-from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (

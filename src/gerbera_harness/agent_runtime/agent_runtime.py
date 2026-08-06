@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from gerbera_harness.agent.driver.main_loop import (
     InitialisationDecisionEnum,
+    ExecuteDecisionEnum,
     LoopStateEnum,
     Session,
 )
@@ -45,6 +46,7 @@ class AgentRuntime:
     @property
     def execution_runtime(self) -> ExecutionRuntime:
         return ExecutionRuntime(
+            model=self.model,
             memory=self.memory,
             mcp_url=self.mcp_url,
         )
@@ -75,10 +77,18 @@ class AgentRuntime:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.EXECUTION:
                 result = await self.execution_runtime.run_execution()
-                self.errors.extend(result.errors)
-                self.session.perform_transition(
-                    result.requested_next_state
-                )
+
+                if result.decision is ExecuteDecisionEnum.ACCEPTED:
+                    self.errors.extend(result.errors)
+                    self.session.perform_transition(
+                        result.requested_next_state
+                    )
+                elif result.decision is ExecuteDecisionEnum.FAILED:
+                    self.session.perform_transition(
+                        result.requested_next_state
+                    )
+                else:
+                    raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.REVIEW:
                 break
 

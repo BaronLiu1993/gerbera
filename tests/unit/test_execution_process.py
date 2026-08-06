@@ -9,7 +9,7 @@ from gerbera_harness.agent.driver.main_loop.processes import (
 from gerbera_harness.agent.driver.main_loop.processes.execution_process import (
     ExecutionProcess,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -225,6 +225,91 @@ def test_execution_process_rejects_agent_actions() -> None:
         asyncio.run(process.run_workflow())
 
     assert process.errors == []
+
+
+def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
+    started_groups: list[int] = []
+    executed_agents: list[tuple[int, AgentExecuteSchema]] = []
+
+    async def execute_agent(
+        group_index: int,
+        action: AgentExecuteSchema,
+    ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
+        executed_agents.append((group_index, action))
+        return ExecuteDecisionEnum.ACCEPTED, []
+
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[
+            ExecuteActionGroupSchema(
+                goal="Install the safety rule.",
+                action_type="execute",
+                actions=[rule_creation_action()],
+            ),
+            ExecuteActionGroupSchema(
+                goal="Approach the block.",
+                action_type="execute",
+                actions=[agent_action()],
+            ),
+            ExecuteActionGroupSchema(
+                goal="Set the motor speed.",
+                action_type="execute",
+                actions=[discrete_action()],
+            ),
+        ],
+        agent_executor=execute_agent,
+        on_group_started=lambda index, group: started_groups.append(index),
+    )
+
+    result = asyncio.run(process.run_workflow())
+
+    assert result is ExecuteDecisionEnum.ACCEPTED
+    assert started_groups == [0, 1, 2]
+    assert executed_agents == [(1, process.actions_list[1].actions[0])]
+    assert [call[0] for call in FakeMCPClient.calls] == [
+        "insert_rule",
+        "set_motor",
+        "delete_rule",
+    ]
+    assert process.errors == []
+
+
+def test_execution_process_stops_workflow_after_failed_agent_group() -> None:
+    error = ExecuteErrorSchema(
+        event_name="Approach the block.",
+        event_type=ExecutionTypeEnum.AGENT,
+        position=0,
+        error="Target is blocked",
+    )
+
+    async def execute_agent(
+        group_index: int,
+        action: AgentExecuteSchema,
+    ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
+        return ExecuteDecisionEnum.FAILED, [error]
+
+    process = ExecutionProcess(
+        mcp_url="https://hardware.example.com/mcp",
+        actions_list=[
+            ExecuteActionGroupSchema(
+                goal="Approach the block.",
+                action_type="execute",
+                actions=[agent_action()],
+            ),
+            ExecuteActionGroupSchema(
+                goal="Set the motor speed.",
+                action_type="execute",
+                actions=[discrete_action()],
+            ),
+        ],
+        agent_executor=execute_agent,
+    )
+
+    result = asyncio.run(process.run_workflow())
+
+    assert result is ExecuteDecisionEnum.FAILED
+    assert process.errors == [error]
+    assert FakeMCPClient.calls == []
 
 
 def test_execution_process_rejects_empty_workflow() -> None:

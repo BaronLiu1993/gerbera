@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
+from pydantic import RootModel
+
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExperimentState,
     InitialisationDecisionEnum,
     LoopStateEnum,
-    TextResponseSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
     build_valid_schema,
@@ -32,5 +33,5 @@ class Review(ExperimentState):
     )
     valid_schema: ClassVar[dict] = build_valid_schema(
         valid_transition_states,
-        TextResponseSchema,
+        RootModel[str],
     )

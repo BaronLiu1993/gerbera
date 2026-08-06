@@ -1,8 +1,9 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from gerbera_harness.agent.driver.main_loop.schema.execute.execute_decision import (
+from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
@@ -10,6 +11,7 @@ from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schem
     ExecutionTypeEnum,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
+    AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     RuleCreationSchema,
@@ -25,14 +27,22 @@ DeterministicActionSchema = (
     | ContinuousExecuteSchema
     | DiscreteExecuteSchema
 )
+ExecutableActionSchema = DeterministicActionSchema | AgentExecuteSchema
 ScheduledActionSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
 ActiveRule = tuple[int, RuleCreationSchema]
+AgentExecutor = Callable[
+    [int, AgentExecuteSchema],
+    Awaitable[tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]],
+]
+GroupStartedHandler = Callable[[int, ExecuteActionGroupSchema], None]
 
 
 @dataclass
 class ExecutionProcess:
     mcp_url: str
     actions_list: list[ExecuteActionGroupSchema]
+    agent_executor: AgentExecutor | None = None
+    on_group_started: GroupStartedHandler | None = None
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     async def run_workflow(self) -> ExecuteDecisionEnum:
@@ -57,8 +67,9 @@ class ExecutionProcess:
                 "ExecutionProcess requires deterministic action groups"
             )
 
-        deterministic_types = (
+        supported_types = (
             RuleCreationSchema,
+            AgentExecuteSchema,
             ContinuousExecuteSchema,
             DiscreteExecuteSchema,
         )
@@ -74,10 +85,32 @@ class ExecutionProcess:
                     "ExecutionProcess requires non-empty action groups"
                 )
 
+            agent_actions = [
+                action
+                for action in group.actions
+                if isinstance(action, AgentExecuteSchema)
+            ]
+            if agent_actions and (
+                len(agent_actions) != 1 or len(group.actions) != 1
+            ):
+                raise ValueError(
+                    "An agent action must be the only action in its "
+                    "execute group"
+                )
+
             for action in group.actions:
-                if not isinstance(action, deterministic_types):
+                if not isinstance(action, supported_types):
                     raise ValueError(
-                        "ExecutionProcess only accepts deterministic actions"
+                        "ExecutionProcess received an unsupported action"
+                    )
+
+                if (
+                    isinstance(action, AgentExecuteSchema)
+                    and self.agent_executor is None
+                ):
+                    raise ValueError(
+                        "ExecutionProcess only accepts deterministic actions "
+                        "without an agent executor"
                     )
 
                 if (
@@ -101,13 +134,31 @@ class ExecutionProcess:
                 previous_error_count = len(self.errors)
 
                 try:
-                    group_decisions = await self._execute_group(
-                        client,
-                        allowed_tool_names,
-                        group_index,
-                        group,
-                        active_rules,
-                    )
+                    if self.on_group_started is not None:
+                        self.on_group_started(group_index, group)
+
+                    first_action = group.actions[0]
+                    if isinstance(first_action, AgentExecuteSchema):
+                        if self.agent_executor is None:
+                            raise RuntimeError(
+                                "Agent executor is not configured"
+                            )
+                        agent_decision, agent_errors = (
+                            await self.agent_executor(
+                                group_index,
+                                first_action,
+                            )
+                        )
+                        self.errors.extend(agent_errors)
+                        group_decisions = [agent_decision]
+                    else:
+                        group_decisions = await self._execute_group(
+                            client,
+                            allowed_tool_names,
+                            group_index,
+                            group,
+                            active_rules,
+                        )
                 except Exception as exc:
                     if len(self.errors) == previous_error_count:
                         self._append_error(
@@ -118,6 +169,17 @@ class ExecutionProcess:
                     return ExecuteDecisionEnum.FAILED
 
                 decisions.extend(group_decisions)
+                if any(
+                    decision is not ExecuteDecisionEnum.ACCEPTED
+                    for decision in group_decisions
+                ):
+                    if len(self.errors) == previous_error_count:
+                        self._append_error(
+                            group_index,
+                            first_action,
+                            "Action group did not complete",
+                        )
+                    return ExecuteDecisionEnum.FAILED
         finally:
             await self._delete_active_rules(
                 client,
@@ -346,7 +408,7 @@ class ExecutionProcess:
     def _append_error(
         self,
         group_index: int,
-        action: DeterministicActionSchema,
+        action: ExecutableActionSchema,
         error: str,
     ) -> None:
         group = self.actions_list[group_index]
