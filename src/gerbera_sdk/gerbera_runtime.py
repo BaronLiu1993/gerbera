@@ -6,6 +6,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field, StrictFloat
 
 from gerbera_sdk.contracts.command_contract import CommandSpec
+from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules import OperatorEnum, RuleTriggerModeEnum
@@ -340,6 +341,7 @@ class GerberaRuntime:
                         ObjectDetectionModelInference,
                     ),
                 ),
+                meta=stage_metadata(ToolStage.OBSERVATION),
             )
 
             def build_turn_off_inference_tool(model_id: str):
@@ -359,6 +361,7 @@ class GerberaRuntime:
                     idempotentHint=True,
                     openWorldHint=False,
                 ),
+                meta=stage_metadata(ToolStage.OBSERVATION),
             )
 
             if isinstance(model, ObjectDetectionModelInference):
@@ -677,6 +680,7 @@ class GerberaRuntime:
                 microcontroller,
                 connection,
                 toggle_annotations,
+                meta=stage_metadata(ToolStage.OBSERVATION),
             )
         elif GerberaRuntime._connection_supports_state_toggle(connection):
             if toggle_annotations is None:

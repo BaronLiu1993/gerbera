@@ -7,6 +7,7 @@ from mcp.types import ToolAnnotations
 import numpy as np
 import pytest
 
+from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
@@ -33,11 +34,19 @@ class FakeApp:
     def __init__(self) -> None:
         self.tools = {}
         self.annotations = {}
+        self.metadata = {}
 
-    def tool(self, name: str, description: str, annotations=None):
+    def tool(
+        self,
+        name: str,
+        description: str,
+        annotations=None,
+        meta=None,
+    ):
         def register(function):
             self.tools[name] = function
             self.annotations[name] = annotations
+            self.metadata[name] = meta
             return function
 
         return register
@@ -202,6 +211,12 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     assert app.annotations[
         "read_openai-vision-language-model"
     ].readOnlyHint is True
+    assert app.metadata[
+        "turn_on_openai-vision-language-model"
+    ] == stage_metadata(ToolStage.OBSERVATION)
+    assert app.metadata[
+        "turn_off_openai-vision-language-model"
+    ] == stage_metadata(ToolStage.OBSERVATION)
 
 
 def test_server_registers_single_object_detection_as_a_tool() -> None:
@@ -315,6 +330,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
 
     GerberaRuntime._register_server_runtime_tools(runtime)
     tool = asyncio.run(app.get_tool("perform_single_part-detector"))
+    turn_on_tool = asyncio.run(app.get_tool("turn_on_part-detector"))
 
     assert tool.parameters["properties"] == {
         "camera_ids": {
@@ -330,6 +346,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         idempotentHint=True,
         openWorldHint=False,
     )
+    assert turn_on_tool.meta == stage_metadata(ToolStage.OBSERVATION)
 
 
 def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
@@ -504,6 +521,12 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
     }
     assert app.annotations["read_ir_sensor"].readOnlyHint is True
     assert app.annotations["turn_on_ir_sensor_stream"].idempotentHint is True
+    assert app.metadata["turn_on_ir_sensor_stream"] == stage_metadata(
+        ToolStage.OBSERVATION
+    )
+    assert app.metadata["turn_off_ir_sensor_stream"] == stage_metadata(
+        ToolStage.OBSERVATION
+    )
 
 
 def test_server_registers_command_spec_as_mcp_tool_schema() -> None:

@@ -17,6 +17,10 @@ from gerbera_harness.memory import (
     SourceTypeEnum,
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
+from gerbera_sdk.contracts.tool_contract import (
+    ToolStage,
+    tool_is_available_during,
+)
 
 OBSERVATION_PROMPT = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
 OBSERVATION_REVIEW_PROMPT = load_prompt(
@@ -40,8 +44,7 @@ class ObservationRuntime:
             allowed_tool_names = frozenset(
                 tool.name
                 for tool in tools
-                if tool.annotations is not None
-                and tool.annotations.readOnlyHint is True
+                if tool_is_available_during(tool, ToolStage.OBSERVATION)
             )
 
             raw_response = client.send(

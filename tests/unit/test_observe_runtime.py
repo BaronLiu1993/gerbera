@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 from mcp.types import ToolAnnotations
 
+from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
+
 from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationStatusEnum,
 )
@@ -61,14 +63,22 @@ class FakeMCPClient:
             SimpleNamespace(
                 name="read_temperature",
                 annotations=ToolAnnotations(readOnlyHint=True),
+                meta=None,
             ),
             SimpleNamespace(
                 name="set_heater",
                 annotations=ToolAnnotations(readOnlyHint=False),
+                meta=None,
+            ),
+            SimpleNamespace(
+                name="turn_on_temperature_stream",
+                annotations=ToolAnnotations(readOnlyHint=False),
+                meta=stage_metadata(ToolStage.OBSERVATION),
             ),
             SimpleNamespace(
                 name="unclassified_tool",
                 annotations=None,
+                meta=None,
             ),
         ]
 
@@ -78,7 +88,9 @@ class FakeMCPClient:
         arguments: dict,
         allowed_tool_names: frozenset[str],
     ) -> dict[str, object]:
-        assert allowed_tool_names == frozenset({"read_temperature"})
+        assert allowed_tool_names == frozenset(
+            {"read_temperature", "turn_on_temperature_stream"}
+        )
         assert name in allowed_tool_names
         return {"value": 22.5, "unit": "celsius"}
 

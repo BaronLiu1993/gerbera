@@ -344,6 +344,7 @@ class ServerRuntime:
         description: str,
         tool_function: Callable[..., Any],
         annotations: ToolAnnotations,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         tool_function.__name__ = name
         tool_function.__doc__ = description
@@ -351,6 +352,7 @@ class ServerRuntime:
             name=name,
             description=description,
             annotations=annotations,
+            meta=meta,
         )(tool_function)
 
     def _register_state_toggle_tool(
@@ -399,6 +401,7 @@ class ServerRuntime:
         tool_name: str,
         description: str,
         annotations: ToolAnnotations,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         tool_function = self._build_stream_toggle_tool_function(
             microcontroller=microcontroller,
@@ -412,6 +415,7 @@ class ServerRuntime:
             annotations=annotations.model_copy(
                 update={"title": description.rstrip(".")}
             ),
+            meta=meta,
         )
 
     def _register_stream_toggle_tools(
@@ -419,6 +423,7 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
         annotations: ToolAnnotations,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
@@ -427,6 +432,7 @@ class ServerRuntime:
             tool_name=f"turn_on_{connection.name}_stream",
             description=f"Turn on continuous streaming for {connection.name}.",
             annotations=annotations,
+            meta=meta,
         )
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
@@ -435,4 +441,5 @@ class ServerRuntime:
             tool_name=f"turn_off_{connection.name}_stream",
             description=f"Turn off continuous streaming for {connection.name}.",
             annotations=annotations,
+            meta=meta,
         )
