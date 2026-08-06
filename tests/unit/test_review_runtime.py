@@ -48,6 +48,7 @@ def test_review_runtime_uses_review_response_schema() -> None:
             "decision": "accepted",
             "next_state": None,
             "hypothesis": None,
+            "feedback": [],
         }
     )
     memory = Memory(goal="Validate the workflow")
@@ -61,6 +62,7 @@ def test_review_runtime_uses_review_response_schema() -> None:
 
     assert result.decision is ReviewDecisionEnum.ACCEPTED
     assert result.requested_next_state is None
+    assert result.feedback == []
     assert model.client.output_schema == (
         ReviewResponseSchema.model_json_schema()
     )
@@ -73,6 +75,7 @@ def test_review_response_owns_transition_validation() -> None:
         decision=ReviewDecisionEnum.REJECTED,
         next_state=LoopStateEnum.INITIALISATION,
         hypothesis=None,
+        feedback=["Collect more evidence."],
     )
 
     assert response.next_state is LoopStateEnum.INITIALISATION
@@ -82,4 +85,5 @@ def test_review_response_owns_transition_validation() -> None:
             decision=ReviewDecisionEnum.REJECTED,
             next_state=None,
             hypothesis=None,
+            feedback=["Collect more evidence."],
         )

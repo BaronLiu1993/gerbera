@@ -51,16 +51,17 @@ class ReviewRuntime:
                 response.model_dump_json(),
             )
 
-            if response.decision is (
+            if response.decision in {
                 ReviewDecisionEnum.ACCEPTED,
                 ReviewDecisionEnum.REPLAN,
                 ReviewDecisionEnum.REJECTED,
-            ):
+            }:
                 # Return For now, if request next state is none it is terminal
                 return ReviewResult(
                     decision=response.decision,
                     requested_next_state=response.next_state,
                     hypothesis=response.hypothesis,
+                    feedback=list(response.feedback),
                 )
 
             else:

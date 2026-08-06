@@ -36,15 +36,15 @@ class AgentRuntime:
     model: Model
     memory: Memory
     mcp_url: str
-    context_window_size: int = 20
     feedback: list[str]
+    context_window_size: int = 20
     errors: list[ExecuteErrorSchema] = field(default_factory=list)
 
     @property
     def initialisation_runtime(self) -> InitialisationRuntime:
         self._initialisation_runtime = InitialisationRuntime(
             model=self.model,
-            memory=self.memory,
+            memory=self.memory,     
             context_builder=InitialisationContextBuilder(
                 memory=self.memory,
                 context_window_size=self.context_window_size,
@@ -63,7 +63,14 @@ class AgentRuntime:
 
     @property
     def review_runtime(self) -> ReviewRuntime:
-        return ReviewRuntime(model=self.model, memory=self.memory)
+        return ReviewRuntime(
+            model=self.model,
+            memory=self.memory,
+            context_builder=ReviewContextBuilder(
+                memory=self.memory,
+                context_window_size=self.context_window_size,
+            ),
+        )
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
