@@ -1,7 +1,10 @@
 from dataclasses import dataclass
+from typing import TypeVar
 
 from gerbera_harness.agent_runtime.context_builder.base import ContextBuilder
 from gerbera_harness.memory import EventSchema
+
+ValueT = TypeVar("ValueT")
 
 
 @dataclass(frozen=True)
@@ -13,12 +16,16 @@ class ReviewContextBuilder(ContextBuilder):
             task for task in self.memory.tasks if task.status == "completed"
         ]
         return {
-            "phase": "observation",
+            "phase": "review",
             "goal": self.memory.goal,
             "hypothesis": (
-                hypothesis.model_dump(mode="json")
+                hypothesis.model_dump(mode="json") if hypothesis else None
             ),
-            "current_step": current_task.model_dump(mode="json"),
+            "current_step": (
+                current_task.model_dump(mode="json")
+                if current_task
+                else None
+            ),
             "completed_steps": [
                 task.model_dump(mode="json")
                 for task in self._recent(completed_tasks)
@@ -33,7 +40,7 @@ class ReviewContextBuilder(ContextBuilder):
             ],
         }
 
-    def _recent(self, values: list[str]) -> list[str]:
+    def _recent(self, values: list[ValueT]) -> list[ValueT]:
         if self.context_window_size == 0:
             return []
         return values[-self.context_window_size :]

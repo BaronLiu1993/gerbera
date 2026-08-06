@@ -129,7 +129,7 @@ class FakeClient:
             ),
         ]
 
-    async def send(self, messages, system_prompt, valid_schema) -> str:
+    async def send(self, messages, system_prompt, output_schema) -> str:
         return self.responses.pop(0)
 
 

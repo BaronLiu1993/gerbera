@@ -100,10 +100,10 @@ class SubAgentRuntime:
                 f"{self.timeout_seconds} seconds"
             )
             self._append_error(str(error))
-            return self._result(ExecuteDecisionEnum.FAILED)
+            return self._result(ExecuteDecisionEnum.REJECTED)
         except Exception as exc:
             self._append_error(str(exc))
-            return self._result(ExecuteDecisionEnum.FAILED)
+            return self._result(ExecuteDecisionEnum.REJECTED)
 
     async def _run_agent_loop(self) -> SubAgentResult:
         while self.turns_completed < self.max_turns:
@@ -118,7 +118,7 @@ class SubAgentRuntime:
                     return self._result(ExecuteDecisionEnum.ACCEPTED)
                 elif decision is ObservationStatusEnum.BLOCKED:
                     self._append_error("Observation blocked")
-                    return self._result(ExecuteDecisionEnum.FAILED)
+                    return self._result(ExecuteDecisionEnum.REJECTED)
             elif current_state.state is ExecuteLoopStateEnum.PLAN:
                 decision = await self.planning_runtime.run_planning()
                 self.turns_completed += 1
@@ -127,7 +127,7 @@ class SubAgentRuntime:
                     self.session.perform_transition(ExecuteLoopStateEnum.ACT)
                 elif decision is PlanningStatusEnum.BLOCKED:
                     self._append_error("Planning blocked")
-                    return self._result(ExecuteDecisionEnum.FAILED)
+                    return self._result(ExecuteDecisionEnum.REJECTED)
                 elif decision is PlanningStatusEnum.COMPLETE:
                     return self._result(ExecuteDecisionEnum.ACCEPTED)
             elif current_state.state is ExecuteLoopStateEnum.ACT:
@@ -160,7 +160,7 @@ class SubAgentRuntime:
 
         reason = f"Subagent exceeded its maximum of {self.max_turns} turns"
         self._append_error(reason)
-        return self._result(ExecuteDecisionEnum.FAILED)
+        return self._result(ExecuteDecisionEnum.REJECTED)
 
     def _result(self, decision: ExecuteDecisionEnum) -> SubAgentResult:
         return SubAgentResult(

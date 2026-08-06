@@ -13,6 +13,7 @@ from gerbera_harness.agent_runtime.context_builder import (
     InitialisationContextBuilder,
     ObservationContextBuilder,
     PlanningContextBuilder,
+    ReviewContextBuilder,
 )
 from gerbera_harness.memory import (
     EventTypeEnum,
@@ -83,6 +84,20 @@ def test_initialisation_context_contains_goal_and_bounded_history() -> None:
         "goal": "Measure the temperature",
     }
     assert context[1:] == [{"role": "assistant", "content": "second"}]
+
+
+def test_review_context_allows_completed_workflow_state() -> None:
+    memory = Memory(goal="Validate the completed workflow")
+    memory.current_hypothesis = FakeHypothesis()
+    memory.tasks.append(
+        task("completed", "Record the final temperature", "read_sensor")
+    )
+
+    context = context_from(ReviewContextBuilder(memory, 20).build())
+
+    assert context["phase"] == "review"
+    assert context["current_step"] is None
+    assert context["completed_steps"][0]["status"] == "completed"
 
 
 def test_execution_context_uses_latest_world_state(

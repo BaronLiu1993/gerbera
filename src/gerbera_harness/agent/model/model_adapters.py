@@ -13,7 +13,7 @@ class AnthropicAdapter:
         self,
         user_messages: list[dict],
         system_prompt: str,
-        valid_schema: dict,
+        output_schema: dict,
     ) -> str:
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             resp = await client.post(
@@ -31,7 +31,7 @@ class AnthropicAdapter:
                     "output_config": {
                         "format": {
                             "type": "json_schema",
-                            "schema": valid_schema,
+                            "schema": output_schema,
                         }
                     },
                 },
@@ -51,7 +51,7 @@ class OpenAIAdapter:
         self,
         user_messages: list[dict],
         system_prompt: str,
-        valid_schema: dict,
+        output_schema: dict,
     ) -> str:
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             resp = await client.post(
@@ -75,7 +75,7 @@ class OpenAIAdapter:
                         "json_schema": {
                             "name": "state_response",
                             "strict": True,
-                            "schema": valid_schema,
+                            "schema": output_schema,
                         },
                     },
                 },
@@ -102,7 +102,7 @@ class GoogleAdapter:
         self,
         user_messages: list[dict],
         system_prompt: str,
-        valid_schema: dict,
+        output_schema: dict,
     ) -> str:
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             resp = await client.post(
@@ -119,7 +119,7 @@ class GoogleAdapter:
                     "response_format": {
                         "type": "text",
                         "mime_type": "application/json",
-                        "schema": valid_schema,
+                        "schema": output_schema,
                     },
                 },
             )

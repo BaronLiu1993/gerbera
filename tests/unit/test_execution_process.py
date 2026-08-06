@@ -286,7 +286,7 @@ def test_execution_process_stops_workflow_after_failed_agent_group() -> None:
         group_index: int,
         action: AgentExecuteSchema,
     ) -> tuple[ExecuteDecisionEnum, list[ExecuteErrorSchema]]:
-        return ExecuteDecisionEnum.FAILED, [error]
+        return ExecuteDecisionEnum.REJECTED, [error]
 
     process = ExecutionProcess(
         mcp_url="https://hardware.example.com/mcp",
@@ -307,7 +307,7 @@ def test_execution_process_stops_workflow_after_failed_agent_group() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result is ExecuteDecisionEnum.FAILED
+    assert result is ExecuteDecisionEnum.REJECTED
     assert process.errors == [error]
     assert FakeMCPClient.calls == []
 
@@ -369,10 +369,10 @@ def test_execution_process_rejects_incomplete_action_statuses() -> None:
         actions_list=[],
     )
     decision = process._build_decision(
-        [ExecuteDecisionEnum.ACCEPTED, ExecuteDecisionEnum.FAILED]
+        [ExecuteDecisionEnum.ACCEPTED, ExecuteDecisionEnum.REJECTED]
     )
 
-    assert decision is ExecuteDecisionEnum.FAILED
+    assert decision is ExecuteDecisionEnum.REJECTED
     assert process.errors == [
         ExecuteErrorSchema(
             event_name="deterministic_actions",
@@ -403,7 +403,7 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result is ExecuteDecisionEnum.FAILED
+    assert result is ExecuteDecisionEnum.REJECTED
     assert process.errors == [
         ExecuteErrorSchema(
             event_name="Set the motor speed.",
@@ -437,7 +437,7 @@ def test_execution_process_fails_when_rule_cleanup_fails() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result is ExecuteDecisionEnum.FAILED
+    assert result is ExecuteDecisionEnum.REJECTED
     assert process.errors == [
         ExecuteErrorSchema(
             event_name="Set the motor speed safely.",
@@ -485,7 +485,7 @@ def test_execution_process_rejects_unknown_tool() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result is ExecuteDecisionEnum.FAILED
+    assert result is ExecuteDecisionEnum.REJECTED
     assert process.errors == [
         ExecuteErrorSchema(
             event_name="Call an unavailable tool.",
@@ -511,7 +511,7 @@ def test_execution_process_stops_continuous_action_on_group_failure() -> None:
 
     result = asyncio.run(process.run_workflow())
 
-    assert result is ExecuteDecisionEnum.FAILED
+    assert result is ExecuteDecisionEnum.REJECTED
     assert process.errors == [
         ExecuteErrorSchema(
             event_name=(

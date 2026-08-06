@@ -8,10 +8,16 @@ from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
     InitialisationResult,
     InitialisationRuntime,
 )
+from gerbera_harness.agent_runtime.main_loop.review_runtime import (
+    ReviewResult,
+    ReviewRuntime,
+)
 
 __all__ = [
     "ExecutionResult",
     "ExecutionRuntime",
     "InitialisationResult",
     "InitialisationRuntime",
+    "ReviewResult",
+    "ReviewRuntime",
 ]

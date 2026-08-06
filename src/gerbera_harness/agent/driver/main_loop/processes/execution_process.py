@@ -59,7 +59,7 @@ class ExecutionProcess:
         except Exception as exc:
             first_action = self.actions_list[0].actions[0]
             self._append_error(0, first_action, str(exc))
-            return ExecuteDecisionEnum.FAILED
+            return ExecuteDecisionEnum.REJECTED
 
     def _validate_workflow(self) -> None:
         if not self.actions_list:
@@ -166,7 +166,7 @@ class ExecutionProcess:
                             group.actions[0],
                             str(exc),
                         )
-                    return ExecuteDecisionEnum.FAILED
+                    return ExecuteDecisionEnum.REJECTED
 
                 decisions.extend(group_decisions)
                 if any(
@@ -179,7 +179,7 @@ class ExecutionProcess:
                             first_action,
                             "Action group did not complete",
                         )
-                    return ExecuteDecisionEnum.FAILED
+                    return ExecuteDecisionEnum.REJECTED
         finally:
             await self._delete_active_rules(
                 client,
@@ -380,15 +380,15 @@ class ExecutionProcess:
     ) -> ExecuteDecisionEnum:
         if not decisions:
             self._append_incomplete_actions_error()
-            return ExecuteDecisionEnum.FAILED
+            return ExecuteDecisionEnum.REJECTED
 
         if self.errors:
-            return ExecuteDecisionEnum.FAILED
+            return ExecuteDecisionEnum.REJECTED
 
         for decision in decisions:
             if decision is not ExecuteDecisionEnum.ACCEPTED:
                 self._append_incomplete_actions_error()
-                return ExecuteDecisionEnum.FAILED
+                return ExecuteDecisionEnum.REJECTED
 
         return ExecuteDecisionEnum.ACCEPTED
 

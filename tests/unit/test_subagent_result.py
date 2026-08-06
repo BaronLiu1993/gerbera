@@ -17,11 +17,11 @@ def test_subagent_result_contains_terminal_execution_data() -> None:
     )
 
     result = SubAgentResult(
-        decision=ExecuteDecisionEnum.FAILED,
+        decision=ExecuteDecisionEnum.REJECTED,
         errors=[error],
         turns_completed=3,
     )
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.errors == [error]
     assert result.turns_completed == 3

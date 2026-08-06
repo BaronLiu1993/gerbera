@@ -21,7 +21,6 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
     SnakeCaseVariable,
     StrictSchema,
-    build_valid_schema,
 )
 
 __all__ = [
@@ -43,5 +42,4 @@ __all__ = [
     "RuleCreationSchema",
     "SnakeCaseVariable",
     "StrictSchema",
-    "build_valid_schema",
 ]

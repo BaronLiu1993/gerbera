@@ -1,11 +1,16 @@
 import pytest
+from pydantic import ValidationError
 
 from gerbera_harness.agent.driver.main_loop import (
     Execution,
     Initialisation,
     InitialisationDecisionEnum,
+    LoopStateEnum,
     Session,
     Review,
+)
+from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
+    InitialisationResponseSchema,
 )
 
 
@@ -28,9 +33,9 @@ def test_experiment_cycle_enforces_valid_transitions() -> None:
     assert Initialisation().valid_transition(Execution.state)
     assert Execution().valid_transition(Execution.state)
     assert Execution().valid_transition(Review.state)
-    assert Review().valid_transition(Execution.state)
-    assert Review().valid_transition(Review.state)
-    assert not Review().valid_transition(Initialisation.state)
+    assert Review().valid_transition(Initialisation.state)
+    assert not Review().valid_transition(Execution.state)
+    assert not Review().valid_transition(Review.state)
 
 
 def test_session_replaces_state_during_transition() -> None:
@@ -66,25 +71,31 @@ def test_session_rejects_invalid_transition() -> None:
     assert session.state is initial_state
 
 
-def test_initialisation_accepts_only_readiness_decisions() -> None:
-    assert Initialisation.valid_decisions == frozenset(
-        {
-            InitialisationDecisionEnum.ACCEPTED,
-            InitialisationDecisionEnum.REJECTED,
-            InitialisationDecisionEnum.CLARIFY,
-        }
+def test_states_do_not_own_model_output_schemas() -> None:
+    for state_type in (Initialisation, Execution, Review):
+        assert not hasattr(state_type, "valid_schema")
+        assert not hasattr(state_type, "valid_decisions")
+
+
+def test_initialisation_response_owns_transition_validation() -> None:
+    response = InitialisationResponseSchema(
+        decision=InitialisationDecisionEnum.ACCEPTED,
+        next_state=LoopStateEnum.EXECUTION,
+        issues=[],
+        rejection_reasons=[],
+        clarifying_questions=[],
     )
 
+    assert response.next_state is LoopStateEnum.EXECUTION
 
-def test_initialisation_output_schema_uses_valid_transitions() -> None:
-    assert Initialisation.valid_schema["properties"]["next_state"] == {
-        "enum": ["execution", "initialisation"],
-        "type": "string",
-    }
-    assert Initialisation.valid_schema["properties"]["decision"] == {
-        "type": "string",
-        "enum": ["accepted", "rejected", "clarify"],
-    }
+    with pytest.raises(ValidationError):
+        InitialisationResponseSchema(
+            decision=InitialisationDecisionEnum.ACCEPTED,
+            next_state=LoopStateEnum.INITIALISATION,
+            issues=[],
+            rejection_reasons=[],
+            clarifying_questions=[],
+        )
 
 
 def test_initialisation_prompt_requires_continuous_time_series() -> None:

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from gerbera_harness.agent.driver.main_loop import (
     Execution,
+    ExecuteDecisionEnum,
     LoopStateEnum,
     Review,
     Session,
@@ -37,6 +38,7 @@ def test_agent_runtime_collects_execution_errors_and_moves_to_review(
 
         async def run_execution(self) -> SimpleNamespace:
             return SimpleNamespace(
+                decision=ExecuteDecisionEnum.ACCEPTED,
                 errors=execution_errors,
                 requested_next_state=LoopStateEnum.REVIEW,
             )

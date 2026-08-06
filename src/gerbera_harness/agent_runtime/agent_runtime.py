@@ -19,6 +19,9 @@ from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
 from gerbera_harness.agent_runtime.main_loop.execution_runtime import (
     ExecutionRuntime,
 )
+from gerbera_harness.agent_runtime.main_loop.review_runtime import (
+    ReviewRuntime,
+)
 from gerbera_harness.memory import Memory
 
 
@@ -51,6 +54,10 @@ class AgentRuntime:
             mcp_url=self.mcp_url,
         )
 
+    @property
+    def review_runtime(self) -> InitialisationRuntime:
+        return ReviewRuntime(model=self.model, memory=self.memory)
+
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
             current_state = self.session.state
@@ -66,9 +73,7 @@ class AgentRuntime:
                             "Accepted initialisation requires a hypothesis"
                         )
                     self.memory.set_hypothesis(result.hypothesis)
-                    self.session.perform_transition(
-                        result.requested_next_state
-                    )
+                    self.session.perform_transition(result.requested_next_state)
                 elif result.decision is InitialisationDecisionEnum.CLARIFY:
                     break
                 elif result.decision is InitialisationDecisionEnum.REJECTED:
@@ -80,30 +85,13 @@ class AgentRuntime:
 
                 if result.decision is ExecuteDecisionEnum.ACCEPTED:
                     self.errors.extend(result.errors)
-                    self.session.perform_transition(
-                        result.requested_next_state
-                    )
-                elif result.decision is ExecuteDecisionEnum.FAILED:
-                    self.session.perform_transition(
-                        result.requested_next_state
-                    )
+                    self.session.perform_transition(result.requested_next_state)
+                elif result.decision is ExecuteDecisionEnum.REJECTED:
+                    self.session.perform_transition(result.requested_next_state)
                 else:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.REVIEW:
                 break
 
-            #     if self.memory.current_hypothesis is None:
-            #         raise RuntimeError(
-            #             "A validated hypothesis is required for execution"
-            #         )
-
-            #     execution_process = ExecutionProcess(
-            #         mcp_url=self.initialisation_process.mcp_url,
-            #         actions_list=(
-            #             self.memory.current_hypothesis.method.execute_steps
-            #         ),
-            #     )
-            #     await execution_process.run_workflow()
-            #     break
-            # elif current_state.state is LoopStateEnum.REVIEW:
-            #     break
+            else:
+                raise ValueError("Unsupported Main Loop State Enum")

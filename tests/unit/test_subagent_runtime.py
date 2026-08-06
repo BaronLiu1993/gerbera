@@ -255,7 +255,7 @@ def test_subagent_stops_after_maximum_completed_turns(monkeypatch) -> None:
 
     result = asyncio.run(runtime.run_agent())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.errors == runtime.errors
     assert result.turns_completed == 3
     assert runtime.turns_completed == 3
@@ -311,7 +311,7 @@ def test_subagent_rejects_invalid_maximum_turns() -> None:
 
     result = asyncio.run(runtime.run_agent())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert runtime.errors[0].error == (
         "Subagent exceeded its maximum of 0 turns"
     )
@@ -333,7 +333,7 @@ def test_subagent_times_out_an_unfinished_task(monkeypatch) -> None:
 
     result = asyncio.run(runtime.run_agent())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert runtime.turns_completed == 0
 
 
@@ -374,7 +374,7 @@ def test_subagent_rejects_invalid_timeout() -> None:
 
     result = asyncio.run(runtime.run_agent())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert runtime.errors[0].error == (
         "Subagent task timed out after 0 seconds"
     )
@@ -419,7 +419,7 @@ def test_subagent_propagates_blocked_observation(monkeypatch) -> None:
 
     result = asyncio.run(runtime.run_agent())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.errors == runtime.errors
     assert runtime.errors[0].event_name == "observe"
     assert runtime.errors[0].error == "Observation blocked"
@@ -432,7 +432,7 @@ class FakePlanningClient:
             '{"status":"ready","feedback":"Action is feasible"}',
         ]
 
-    async def send(self, messages, system_prompt, valid_schema) -> str:
+    async def send(self, messages, system_prompt, output_schema) -> str:
         return self.responses.pop(0)
 
 

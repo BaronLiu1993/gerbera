@@ -14,6 +14,9 @@ from gerbera_harness.agent.driver.main_loop import (
     LoopStateEnum,
     Session,
 )
+from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
+    InitialisationResponseSchema,
+)
 
 
 class FakeInitialisationProcess:
@@ -30,12 +33,12 @@ class FakeClient:
         self.responses = iter(responses)
         self.system_prompt = None
         self.system_prompts = []
-        self.valid_schema = None
+        self.output_schema = None
 
-    async def send(self, messages, system_prompt, valid_schema) -> str:
+    async def send(self, messages, system_prompt, output_schema) -> str:
         self.system_prompt = system_prompt
         self.system_prompts.append(system_prompt)
-        self.valid_schema = valid_schema
+        self.output_schema = output_schema
         return json.dumps(next(self.responses))
 
 
@@ -179,7 +182,9 @@ def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     assert model.client.system_prompts[1].startswith(
         "# Initialisation Hypothesis Review"
     )
-    assert model.client.valid_schema == Initialisation.valid_schema
+    assert model.client.output_schema == (
+        InitialisationResponseSchema.model_json_schema()
+    )
     assert len(FakeExecutionProcess.instances) == 1
     execution = FakeExecutionProcess.instances[0]
     assert execution.mcp_url == "https://hardware.example.com/mcp"

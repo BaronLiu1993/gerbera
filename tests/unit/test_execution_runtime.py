@@ -100,7 +100,7 @@ class FakeExecutionProcess:
                     action,
                 )
                 self.errors.extend(errors)
-                if decision is ExecuteDecisionEnum.FAILED:
+                if decision is ExecuteDecisionEnum.REJECTED:
                     return decision
         return type(self).result
 
@@ -192,7 +192,7 @@ def test_execution_runtime_runs_one_task_and_requests_review() -> None:
 
 
 def test_execution_runtime_records_failure_and_requests_review() -> None:
-    FakeExecutionProcess.result = ExecuteDecisionEnum.FAILED
+    FakeExecutionProcess.result = ExecuteDecisionEnum.REJECTED
     FakeExecutionProcess.errors = [
         ExecuteErrorSchema(
             event_name="Set the motor speed to 10",
@@ -210,9 +210,9 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
 
     result = asyncio.run(runtime.run_execution())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.requested_next_state is LoopStateEnum.REVIEW
-    assert result.event.payload["decision"] == "failed"
+    assert result.event.payload["decision"] == "rejected"
     assert result.event.payload["errors"] == ["motor rejected command"]
     assert memory.event_ledger == [result.event]
     assert result.errors[0].error == "motor rejected command"
@@ -220,7 +220,7 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
 
 
 def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
-    FakeExecutionProcess.result = ExecuteDecisionEnum.FAILED
+    FakeExecutionProcess.result = ExecuteDecisionEnum.REJECTED
     FakeExecutionProcess.errors = [
         ExecuteErrorSchema(
             event_name="deterministic_actions",
@@ -238,7 +238,7 @@ def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
 
     result = asyncio.run(runtime.run_execution())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.event.payload["errors"] == [
         "Not all deterministic actions completed"
     ]
@@ -258,7 +258,7 @@ def test_execution_runtime_captures_process_exceptions() -> None:
 
     result = asyncio.run(runtime.run_execution())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert runtime.errors[0].error == "invalid execution wiring"
     assert result.errors[0].error == "invalid execution wiring"
     assert result.event.payload["errors"] == ["invalid execution wiring"]
@@ -322,7 +322,7 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
         error="Target is occluded",
     )
     FakeSubAgentRuntime.result = SubAgentResult(
-        decision=ExecuteDecisionEnum.FAILED,
+        decision=ExecuteDecisionEnum.REJECTED,
         errors=[error],
         turns_completed=2,
     )
@@ -336,7 +336,7 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
 
     result = asyncio.run(runtime.run_execution())
 
-    assert result.decision is ExecuteDecisionEnum.FAILED
+    assert result.decision is ExecuteDecisionEnum.REJECTED
     assert result.errors == [error]
     assert runtime.errors == [error]
     assert result.event.payload["errors"] == ["Target is occluded"]
