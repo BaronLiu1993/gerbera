@@ -69,7 +69,7 @@ class OpenAIAdapter:
                         },
                         *user_messages,
                     ],
-                    "max_tokens": self.max_tokens,
+                    "max_completion_tokens": self.max_tokens,
                     "response_format": {
                         "type": "json_schema",
                         "json_schema": {
