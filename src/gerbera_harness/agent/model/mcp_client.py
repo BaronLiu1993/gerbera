@@ -7,7 +7,7 @@ from mcp.types import Tool
 
 
 class _MCPToolParameter(Protocol):
-    variable: str
+    tool_parameter: str
     value: Any
 
 
@@ -43,12 +43,13 @@ class MCPClient:
         arguments: dict[str, Any] = {}
 
         for parameter in parameters:
-            if parameter.variable in arguments:
+            if parameter.tool_parameter in arguments:
                 raise ValueError(
-                    f"Duplicate MCP tool parameter: {parameter.variable}"
+                    "Duplicate MCP tool parameter: "
+                    f"{parameter.tool_parameter}"
                 )
 
-            arguments[parameter.variable] = parameter.value
+            arguments[parameter.tool_parameter] = parameter.value
 
         return arguments
 

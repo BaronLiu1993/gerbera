@@ -13,6 +13,10 @@ initial plan's goal, completion criteria, allowed tools, ordering, time limits,
 and physical constraints. Do not invent capabilities or assume an unobserved
 physical condition.
 
+For every tool argument, set `tool_parameter` to the exact input name from the
+selected tool schema. For example, a servo command can use `angle` with a value
+of `180`.
+
 Choose only the next action to execute. After it runs, the system will observe
 the physical result and plan again from the updated message history.
 

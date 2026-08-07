@@ -9,13 +9,13 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
 
 
 def action_parameter(
-    variable: str,
+    tool_parameter: str,
     value: bool | int | float | str,
     parameter_type: str,
     unit: str | None = None,
 ) -> dict[str, object]:
     return {
-        "variable": variable,
+        "tool_parameter": tool_parameter,
         "value": value,
         "unit": unit,
         "type": parameter_type,
@@ -36,7 +36,7 @@ def action_parameter(
                 "forward_tool_call": "write_motor",
                 "params": [
                     action_parameter(
-                        "commanded_angle",
+                        "angle",
                         90,
                         "int",
                         "degrees",

@@ -171,9 +171,11 @@ Every deterministic tool call must:
 
 - use an exact available tool name;
 - use only parameters declared by that tool's input schema;
-- provide each parameter's lowercase `snake_case` variable, concrete value,
-  unit or `null`, and scalar type; and
+- set `tool_parameter` to the exact input name from the selected tool schema;
+- provide each parameter's concrete value, unit or `null`, and scalar type; and
 - preserve the ordering and cleanup required by the method.
+
+For example, a servo command can use `tool_parameter: angle` with `value: 180`.
 
 Parameter-list fields are mandatory and must never be omitted:
 

@@ -23,9 +23,9 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema impo
 )
 
 
-def parameter(variable: str, value, parameter_type: str) -> dict:
+def parameter(tool_parameter: str, value, parameter_type: str) -> dict:
     return {
-        "variable": variable,
+        "tool_parameter": tool_parameter,
         "value": value,
         "unit": None,
         "type": parameter_type,
@@ -138,7 +138,7 @@ class FakeMCPClient:
     @staticmethod
     def build_arguments(parameters) -> dict:
         return {
-            parameter.variable: parameter.value
+            parameter.tool_parameter: parameter.value
             for parameter in parameters
         }
 

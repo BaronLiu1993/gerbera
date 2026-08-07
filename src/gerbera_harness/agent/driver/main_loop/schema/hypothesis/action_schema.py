@@ -36,7 +36,9 @@ class ExecutionTypeEnum(str, Enum):
     RULE = "rule"
 
 class ExecuteActionParameterSchema(StrictSchema):
-    variable: SnakeCaseVariable
+    tool_parameter: SnakeCaseVariable = Field(
+        description="Exact input name from the MCP tool schema.",
+    )
     value: bool | int | float | str
     unit: str | None
     type: ParameterTypeSchema

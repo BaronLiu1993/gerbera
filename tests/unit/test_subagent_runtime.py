@@ -89,7 +89,7 @@ def planned_action():
                 "forward_tool_call": "set_motor",
                 "params": [
                     {
-                        "variable": "speed",
+                        "tool_parameter": "speed",
                         "value": 10,
                         "unit": None,
                         "type": "int",

@@ -78,8 +78,8 @@ def test_mcp_client_requires_an_active_connection() -> None:
 
 def test_mcp_client_builds_tool_arguments() -> None:
     parameters = [
-        SimpleNamespace(variable="enabled", value=True),
-        SimpleNamespace(variable="sample_rate", value=10),
+        SimpleNamespace(tool_parameter="enabled", value=True),
+        SimpleNamespace(tool_parameter="sample_rate", value=10),
     ]
 
     assert MCPClient.build_arguments(parameters) == {
@@ -90,8 +90,8 @@ def test_mcp_client_builds_tool_arguments() -> None:
 
 def test_mcp_client_rejects_duplicate_tool_arguments() -> None:
     parameters = [
-        SimpleNamespace(variable="enabled", value=True),
-        SimpleNamespace(variable="enabled", value=False),
+        SimpleNamespace(tool_parameter="enabled", value=True),
+        SimpleNamespace(tool_parameter="enabled", value=False),
     ]
 
     with pytest.raises(ValueError, match="Duplicate MCP tool parameter"):

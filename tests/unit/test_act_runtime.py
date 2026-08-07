@@ -15,9 +15,9 @@ from gerbera_harness.agent_runtime.sub_loop import act_runtime
 from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
 
 
-def parameter(variable: str, value: object, parameter_type: str) -> dict:
+def parameter(tool_parameter: str, value: object, parameter_type: str) -> dict:
     return {
-        "variable": variable,
+        "tool_parameter": tool_parameter,
         "value": value,
         "unit": None,
         "type": parameter_type,
@@ -87,7 +87,7 @@ class FakeMCPClient:
     @staticmethod
     def build_arguments(parameters) -> dict:
         return {
-            parameter.variable: parameter.value
+            parameter.tool_parameter: parameter.value
             for parameter in parameters
         }
 

@@ -13,13 +13,13 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
 
 
 def action_parameter(
-    variable: str,
+    tool_parameter: str,
     value: bool | int | float | str,
     parameter_type: str,
     unit: str | None = None,
 ) -> dict:
     return {
-        "variable": variable,
+        "tool_parameter": tool_parameter,
         "value": value,
         "unit": unit,
         "type": parameter_type,
@@ -37,7 +37,7 @@ def discrete_execute_action() -> dict:
         "forward_tool_call": "write_motor",
         "params": [
             action_parameter(
-                variable="commanded_angle",
+                tool_parameter="angle",
                 value=90,
                 parameter_type="int",
                 unit="degrees",
@@ -59,7 +59,7 @@ def continuous_execute_action() -> dict:
         "reverse_tool_call": "stop_heater",
         "forward_tool_call_params": [
             action_parameter(
-                variable="heater_state",
+                tool_parameter="heater_state",
                 value=True,
                 parameter_type="bool",
             )
@@ -189,6 +189,7 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
 
     action = hypothesis.method.execute_steps[0].actions[0]
     assert action.forward_tool_call == "write_motor"
+    assert action.params[0].tool_parameter == "angle"
     assert action.params[0].value == 90
 
 
@@ -515,9 +516,9 @@ def test_hypothesis_rejects_non_snake_case_variables(
         HypothesisSchema.model_validate(data)
 
 
-def test_action_parameter_rejects_non_snake_case_variable() -> None:
+def test_action_parameter_rejects_invalid_tool_parameter() -> None:
     action = discrete_execute_action()
-    action["params"][0]["variable"] = "sample count"
+    action["params"][0]["tool_parameter"] = "servo angle"
 
     with pytest.raises(ValidationError, match="string_pattern_mismatch"):
         HypothesisSchema.model_validate(hypothesis_data(action))
