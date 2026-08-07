@@ -148,9 +148,15 @@ Choose the execution type from the operation's actual semantics:
   stability, or variation during an interval.
 - Use `discrete` only for one bounded command or one-shot reading that does not
   collect a time series.
-- Use `agent` only when the next action genuinely cannot be determined before
-  runtime.
+- Use `agent` only when execution must repeatedly observe changing physical
+  state and choose the next action from those observations.
 - Use `rule` only for a deterministic condition-triggered response.
+
+Prefer deterministic actions. If the tool name, arguments, ordering, and
+duration can be known during initialisation, use `discrete` or `continuous`.
+Do not use an agent for a fixed actuator command, a known servo angle, a
+one-shot reading, a fixed-duration stream, or a predetermined sequence of MCP
+calls.
 
 Do not represent a time-series experiment as discrete readings when continuous
 streaming tools are available.
@@ -179,6 +185,9 @@ Parameter-list fields are mandatory and must never be omitted:
   accepts no inputs.
 - Never omit a parameter-list field because its list is empty.
 
+The context exposes hardware tool parameters exactly as they must be passed.
+List those scalar parameters directly.
+
 An ordinary continuous action must have a positive `duration_seconds`.
 `forward_tool_call` starts the operation and `reverse_tool_call` stops it
 safely. Declare every emitted observation channel in `emitted_event_keys`, or
@@ -187,17 +196,24 @@ table for streamed data, use that exact table in the final review.
 
 ### Agent actions
 
-Use `execution_type: agent` only for bounded adaptive work. Define:
+Use `execution_type: agent` only for bounded closed-loop work where execution
+must observe a physical result before it can determine the next action. This
+includes perception-guided movement, searching for an unknown target, and
+adjusting an actuator until an observed completion criterion becomes true.
+
+Do not use an agent merely because an operation affects hardware or because
+the outcome should later be reviewed. Known hardware commands are
+deterministic actions.
+
+Define:
 
 - a concrete `goal`;
 - measurable `completion_criteria`;
-- observed `input_event_keys`;
-- an exact `allowed_tool_calls` allowlist;
-- a positive `max_iterations`; and
+- a positive `max_turns`; and
 - a positive `timeout_seconds`.
 
-These fields contain the nested observe-decide-act loop. Do not use an agent
-action when the approved method already determines the exact next tool call.
+The runtime supplies the nested observe-plan-act loop. Do not use an agent
+action when the approved method already determines the next tool call.
 
 ## Rule Planning
 

@@ -10,6 +10,11 @@ Check that the hypothesis is falsifiable, its variables are measurable, every
 operation uses an available capability, the method can produce the required
 evidence, and the final review can evaluate that evidence.
 
+Reject or correct unnecessary agent actions. A fixed actuator command, known
+servo angle, one-shot reading, fixed-duration stream, or predetermined tool
+sequence must use deterministic execution. Permit an agent action only when
+changing physical observations must determine the next action at runtime.
+
 If the candidate is sound, return it with `decision` set to `accepted` and
 `next_state` set to `execution`. You may directly apply small corrections such
 as wording, variable consistency, missing required parameters, or alignment

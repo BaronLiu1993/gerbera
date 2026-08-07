@@ -1,15 +1,17 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from inspect import Parameter, Signature
 from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import Field, StrictFloat
 
 from gerbera_sdk.contracts.command_contract import (
     CommandSpec,
     ParameterSpec,
     ParameterType,
 )
+from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
@@ -25,6 +27,13 @@ from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
+from gerbera_sdk.events.rules import OperatorEnum, RuleTriggerModeEnum
+from gerbera_sdk.inference import (
+    Inference,
+    ObjectDetectionModelInference,
+    VisionLanguageModelFrameEnvironment,
+)
+from gerbera_sdk.utils import StrictSchema
 
 _PARAMETER_TYPES: dict[ParameterType, type] = {
     ParameterType.STRING: str,
@@ -40,6 +49,24 @@ EventCatalog = dict[
 ]
 
 
+class SubscribedCameraCatalogEntry(StrictSchema):
+    camera_id: str
+    name: str
+
+
+class ModelCatalogEntry(StrictSchema):
+    model_id: str
+    name: str
+    description: str
+    model_type: Literal["object_detection", "vision_language_model"]
+    subscribed_cameras: list[SubscribedCameraCatalogEntry]
+    is_running: bool
+    turn_on_tool: str
+    turn_off_tool: str
+    read_tool: str
+    single_inference_tool: str
+
+
 @dataclass
 class ServerRuntime:
     hardware_system: HardwareSystem
@@ -48,15 +75,12 @@ class ServerRuntime:
     stream_controller: StreamController
     event_worker: EventWorker
     app: FastMCP
-    camera_runtime: CameraRuntime | None = None
-    model_runtime: ModelRuntime | None = None
-    rule_bus: RuleBus = field(default_factory=RuleBus)
-    rule_buffer: RuleBuffer = field(init=False)
-    agent_runtime: AgentRuntime | None = None
-    event_listener: EventListener | None = None
-
-    def __post_init__(self) -> None:
-        self.rule_buffer = RuleBuffer(rule_bus=self.rule_bus)
+    camera_runtime: CameraRuntime
+    model_runtime: ModelRuntime
+    agent_runtime: AgentRuntime
+    event_listener: EventListener
+    rule_bus: RuleBus
+    rule_buffer: RuleBuffer
 
     def _register_mcp_event(
         self,
@@ -114,18 +138,14 @@ class ServerRuntime:
 
         for event_key, event in self.event_bus.events.items():
             event_type, microcontroller_id, event_name = event_key
-            connection = connections.get(
-                (microcontroller_id, event_name)
-            )
+            connection = connections[(microcontroller_id, event_name)]
             metadata: EventMetadata = {
                 "event_type": event_type,
                 "microcontroller_id": microcontroller_id,
                 "event_name": event_name,
-                "connection_name": connection.name if connection else "",
-                "component_type": (
-                    connection.component_type if connection else ""
-                ),
-                "description": connection.description if connection else "",
+                "connection_name": connection.name,
+                "component_type": connection.component_type,
+                "description": connection.description,
                 "streamable": event.streamable,
             }
             catalog.setdefault(event_type, {}).setdefault(
@@ -134,34 +154,6 @@ class ServerRuntime:
             )[event_name] = metadata
 
         return catalog
-
-    def _start_event_listener(self) -> None:
-        if self.event_listener is not None:
-            raise RuntimeError("Event listener is already running")
-
-        event_listener = EventListener(
-            hardware_system=self.hardware_system,
-            _serial_pool=self.board_runtime.serial_pool,
-            _threads={},
-            _event_bus=self.event_bus,
-            _rule_buffer=self.rule_buffer,
-        )
-        self.event_listener = event_listener
-        try:
-            event_listener.create_listeners()
-        except Exception:
-            try:
-                event_listener.stop_listeners()
-            finally:
-                self.event_listener = None
-            raise
-
-    def _stop_event_listener(self) -> None:
-        if self.event_listener is None:
-            raise RuntimeError("Event listener is not running")
-
-        self.event_listener.stop_listeners()
-        self.event_listener = None
 
     def _send_connection_command(
         self,
@@ -220,45 +212,37 @@ class ServerRuntime:
 
             return tool_function
 
-        params_model = self._build_tool_params_model(
-            connection,
-            command,
-        )
-
-        def tool_function(params: BaseModel) -> dict[str, str]:
-            values = params.model_dump(exclude_none=True)
+        def tool_function(**values: Any) -> dict[str, str]:
             serialized = {
                 name: str(value)
                 for name, value in values.items()
+                if value is not None
             }
             return connection.perform_action(action, serialized)
 
-        tool_function.__annotations__["params"] = params_model
-        return tool_function
-
-    def _build_tool_params_model(
-        self,
-        connection: Connection,
-        command: CommandSpec,
-    ) -> type[BaseModel]:
-        fields: dict[str, tuple[Any, Any]] = {}
+        parameters: list[Parameter] = []
+        annotations: dict[str, Any] = {"return": dict[str, str]}
         for name, parameter in command.params.items():
             annotation = self._build_parameter_annotation(parameter)
-            default = ... if parameter.required else None
+            default = Parameter.empty if parameter.required else None
             if not parameter.required:
                 annotation |= None
-            fields[name] = (annotation, default)
+            annotations[name] = annotation
+            parameters.append(
+                Parameter(
+                    name=name,
+                    kind=Parameter.KEYWORD_ONLY,
+                    default=default,
+                    annotation=annotation,
+                )
+            )
 
-        model_name = (
-            f"{connection.name.title().replace('_', '')}"
-            f"{command.method.title()}Params"
+        tool_function.__annotations__ = annotations
+        tool_function.__signature__ = Signature(
+            parameters=parameters,
+            return_annotation=dict[str, str],
         )
-
-        return create_model(
-            model_name,
-            __config__=ConfigDict(extra="forbid"),
-            **fields,
-        )
+        return tool_function
 
     def _build_parameter_annotation(
         self,
@@ -442,4 +426,407 @@ class ServerRuntime:
             description=f"Turn off continuous streaming for {connection.name}.",
             annotations=annotations,
             meta=meta,
+        )
+
+    def register_tools(self) -> None:
+        self._register_hardware_tools()
+        self._register_rule_tools()
+        self._register_event_catalog_tool()
+
+    def _register_hardware_tools(self) -> None:
+        for microcontroller in self.hardware_system.microcontrollers:
+            for connection in microcontroller.connections:
+                self._register_connection_tools(microcontroller, connection)
+
+        self._register_camera_tools()
+        self._register_inference_tools()
+
+    @staticmethod
+    def _command_is_state_toggle(command: CommandSpec) -> bool:
+        if command.method.strip().upper() != "WRITE":
+            return False
+
+        state = command.params.get("state")
+        return state is not None and {"on", "off"}.issubset(state.enum)
+
+    @classmethod
+    def _connection_supports_state_toggle(cls, connection: Connection) -> bool:
+        for command in CommandCompiler.command_specs(connection):
+            if cls._command_is_state_toggle(command):
+                return True
+        return False
+
+    @classmethod
+    def _connection_supports_stream_toggle(cls, connection: Connection) -> bool:
+        return (
+            connection.database is not None
+            and cls._connection_supports_state_toggle(connection)
+        )
+
+    def _register_connection_tools(
+        self,
+        microcontroller: Microcontroller,
+        connection: Connection,
+    ) -> None:
+        supports_stream = self._connection_supports_stream_toggle(connection)
+        toggle_annotations: ToolAnnotations | None = None
+
+        for command in CommandCompiler.command_specs(connection):
+            annotations = CommandCompiler.command_annotations(connection, command)
+            self._register_connection_action(
+                microcontroller,
+                connection,
+                command,
+            )
+            if not (supports_stream and self._command_is_state_toggle(command)):
+                self._register_connection_tool(connection, command, annotations)
+            if self._command_is_state_toggle(command):
+                toggle_annotations = annotations
+
+        if supports_stream:
+            self._register_stream_toggle_tools(
+                microcontroller,
+                connection,
+                toggle_annotations,
+                meta=stage_metadata(ToolStage.OBSERVATION),
+            )
+        elif self._connection_supports_state_toggle(connection):
+            self._register_state_toggle_tools(connection, toggle_annotations)
+
+    def _register_camera_tools(self) -> None:
+        for camera in self.hardware_system.cameras:
+            camera_key = camera.camera_id
+
+            def build_capture_frames_tool(camera_key: str):
+                def capture_frames_from_camera(
+                    image_count: Annotated[int, Field(ge=1, le=20)] = 1,
+                    interval_seconds: Annotated[
+                        float,
+                        Field(ge=0.0, le=60.0),
+                    ] = 0.0,
+                ) -> list[str]:
+                    frames = self.camera_runtime.capture_frames(
+                        camera_key=camera_key,
+                        image_count=image_count,
+                        interval_seconds=interval_seconds,
+                    )
+                    return [frame.to_base64_string() for frame in frames]
+
+                return capture_frames_from_camera
+
+            self._register_tool(
+                name=f"capture_frames_from_{camera.name}",
+                description=(
+                    f"Capture one or more current images from {camera.name}. "
+                    "image_count controls the batch size and interval_seconds "
+                    "controls the delay between images. Returns the images as "
+                    "Base64 strings for precise vision inference."
+                ),
+                tool_function=build_capture_frames_tool(camera_key),
+                annotations=ToolAnnotations(
+                    title=f"Capture frames from {camera.name}",
+                    readOnlyHint=True,
+                    destructiveHint=False,
+                    idempotentHint=True,
+                    openWorldHint=False,
+                ),
+            )
+
+    def _register_inference_tools(self) -> None:
+        registered_models: dict[str, tuple[str, Inference]] = {}
+        for model_id, inference in self.model_runtime.model_inferences.items():
+            if inference.name in registered_models:
+                raise ValueError(
+                    f"Inference model name must be unique: {inference.name}"
+                )
+            registered_models[inference.name] = (model_id, inference)
+
+        for model_id, model in registered_models.values():
+            self._register_inference_model_tools(model_id, model)
+
+        if registered_models:
+            self._register_model_catalog_tool(registered_models)
+
+    def _register_inference_model_tools(
+        self,
+        model_id: str,
+        model: Inference,
+    ) -> None:
+        def turn_on_inference() -> None:
+            self.model_runtime.turn_on_model(model_id)
+
+        def turn_off_inference() -> None:
+            self.model_runtime.turn_off_model(model_id)
+
+        self._register_tool(
+            name=f"turn_on_{model.name}",
+            description=f"Start continuous inference for {model.name}.",
+            tool_function=turn_on_inference,
+            annotations=ToolAnnotations(
+                title=f"Start continuous inference for {model.name}",
+                readOnlyHint=False,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=not isinstance(
+                    model,
+                    ObjectDetectionModelInference,
+                ),
+            ),
+            meta=stage_metadata(ToolStage.OBSERVATION),
+        )
+        self._register_tool(
+            name=f"turn_off_{model.name}",
+            description=f"Stop continuous inference for {model.name}.",
+            tool_function=turn_off_inference,
+            annotations=ToolAnnotations(
+                title=f"Stop continuous inference for {model.name}",
+                readOnlyHint=False,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+            meta=stage_metadata(ToolStage.OBSERVATION),
+        )
+
+        if isinstance(model, ObjectDetectionModelInference):
+            self._register_object_detection_tools(model_id, model)
+        else:
+            self._register_vision_language_model_tools(model_id, model)
+
+    def _register_object_detection_tools(
+        self,
+        model_id: str,
+        model: ObjectDetectionModelInference,
+    ) -> None:
+        def read_model_output(camera_id: str) -> dict[str, object]:
+            result = self.model_runtime.read_model_output(model_id, camera_id)
+            return result.model_dump(mode="json", exclude={"frame"})
+
+        def predict_with_model(
+            camera_ids: Annotated[list[str], Field(min_length=1)],
+        ) -> list[dict[str, object]]:
+            results = self.model_runtime.single_inference(model_id, camera_ids)
+            return [
+                result.model_dump(mode="json", exclude={"frame"})
+                for result in results
+            ]
+
+        self._register_tool(
+            name=f"read_{model.name}",
+            description=(
+                f"Read the latest continuous inference output from "
+                f"{model.name} for a subscribed camera ID."
+            ),
+            tool_function=read_model_output,
+            annotations=ToolAnnotations(
+                title=f"Read latest inference from {model.name}",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self._register_tool(
+            name=f"perform_single_{model.name}",
+            description=(
+                f"{model.description} Provide one or more IDs of subscribed "
+                "cameras with current frames."
+            ),
+            tool_function=predict_with_model,
+            annotations=ToolAnnotations(
+                title=f"Perform one-shot inference with {model.name}",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+        )
+
+    def _register_vision_language_model_tools(
+        self,
+        model_id: str,
+        model: Inference,
+    ) -> None:
+        def read_model_output(
+            camera_id: str,
+        ) -> VisionLanguageModelFrameEnvironment:
+            return self.model_runtime.read_model_output(model_id, camera_id)
+
+        def predict_with_model(
+            frames: Annotated[list[str], Field(min_length=1)],
+        ) -> VisionLanguageModelFrameEnvironment:
+            return self.model_runtime.single_inference(model_id, frames)
+
+        self._register_tool(
+            name=f"read_{model.name}",
+            description=(
+                f"Read the latest continuous inference output from "
+                f"{model.name} for a subscribed camera ID."
+            ),
+            tool_function=read_model_output,
+            annotations=ToolAnnotations(
+                title=f"Read latest inference from {model.name}",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self._register_tool(
+            name=f"perform_single_{model.name}",
+            description=(
+                f"{model.description} Provide one or more Base64 image strings."
+            ),
+            tool_function=predict_with_model,
+            annotations=ToolAnnotations(
+                title=f"Perform one-shot inference with {model.name}",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=True,
+            ),
+        )
+
+    def _register_model_catalog_tool(
+        self,
+        registered_models: dict[str, tuple[str, Inference]],
+    ) -> None:
+        def list_configured_models() -> list[ModelCatalogEntry]:
+            catalog: list[ModelCatalogEntry] = []
+            for model_id, model in registered_models.values():
+                model_type = (
+                    "object_detection"
+                    if isinstance(model, ObjectDetectionModelInference)
+                    else "vision_language_model"
+                )
+                cameras: list[SubscribedCameraCatalogEntry] = []
+                for camera in model.subscribed_cameras:
+                    cameras.append(
+                        SubscribedCameraCatalogEntry(
+                            camera_id=camera.camera_id,
+                            name=camera.name,
+                        )
+                    )
+                catalog.append(
+                    ModelCatalogEntry(
+                        model_id=model_id,
+                        name=model.name,
+                        description=model.description,
+                        model_type=model_type,
+                        subscribed_cameras=cameras,
+                        is_running=model.is_running,
+                        turn_on_tool=f"turn_on_{model.name}",
+                        turn_off_tool=f"turn_off_{model.name}",
+                        read_tool=f"read_{model.name}",
+                        single_inference_tool=f"perform_single_{model.name}",
+                    )
+                )
+            return catalog
+
+        self._register_tool(
+            name="list_configured_models",
+            description=(
+                "List configured inference models, their model IDs, "
+                "subscribed camera IDs, current running state, and exact "
+                "lifecycle, read, and single-inference tool names."
+            ),
+            tool_function=list_configured_models,
+            annotations=ToolAnnotations(
+                title="List configured inference models",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+        )
+
+    def _register_rule_tools(self) -> None:
+        def insert_rule(
+            event_type: str,
+            microcontroller_id: str,
+            event_name: str,
+            expected_value: Annotated[
+                StrictFloat,
+                Field(allow_inf_nan=False),
+            ],
+            operator: OperatorEnum,
+            callback_body: str,
+            trigger_mode: RuleTriggerModeEnum = RuleTriggerModeEnum.REPEAT,
+        ) -> dict[str, str]:
+            return self.agent_runtime.insert_rule(
+                event_type=event_type,
+                microcontroller_id=microcontroller_id,
+                event_name=event_name,
+                expected_value=expected_value,
+                operator=operator,
+                callback_body=callback_body,
+                trigger_mode=trigger_mode,
+            )
+
+        self._register_tool(
+            name="insert_rule",
+            description=(
+                "Create and register a rule for a hardware event. "
+                "callback_body must contain only the Python statements for "
+                "async callback(mcp_url, value). The runtime imports httpx "
+                "and fastmcp.Client, adds the fixed function definition, and "
+                "binds the configured MCP URL and finite-float sensor value. "
+                "The agent must use the mcp_url parameter and must not provide "
+                "or hardcode an endpoint."
+            ),
+            tool_function=insert_rule,
+            annotations=ToolAnnotations(
+                title="Create an event rule",
+                readOnlyHint=False,
+                destructiveHint=False,
+                idempotentHint=False,
+                openWorldHint=False,
+            ),
+        )
+
+        def delete_rule(
+            event_type: str,
+            microcontroller_id: str,
+            event_name: str,
+        ) -> dict[str, str]:
+            return self.agent_runtime.delete_rule(
+                event_type=event_type,
+                microcontroller_id=microcontroller_id,
+                event_name=event_name,
+            )
+
+        self._register_tool(
+            name="delete_rule",
+            description=(
+                "Delete the rule registered for a hardware event and remove "
+                "its local callback script."
+            ),
+            tool_function=delete_rule,
+            annotations=ToolAnnotations(
+                title="Delete an event rule",
+                readOnlyHint=False,
+                destructiveHint=True,
+                idempotentHint=False,
+                openWorldHint=False,
+            ),
+        )
+
+    def _register_event_catalog_tool(self) -> None:
+        def list_rule_events() -> EventCatalog:
+            return self.get_event_catalog()
+
+        self._register_tool(
+            name="list_rule_events",
+            description=(
+                "List the registered hardware events that can be used "
+                "when creating rules."
+            ),
+            tool_function=list_rule_events,
+            annotations=ToolAnnotations(
+                title="List events available for rules",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
         )

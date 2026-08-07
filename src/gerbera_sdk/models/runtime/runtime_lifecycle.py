@@ -8,7 +8,8 @@ from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.stream_controller import StreamController
 
 
 @dataclass
@@ -17,23 +18,15 @@ class RuntimeLifecycle:
     camera_runtime: CameraRuntime
     database_runtime: DatabaseRuntime
     model_runtime: ModelRuntime
-    server_runtime: ServerRuntime | None = None
-
-    def bind_server_runtime(self, server_runtime: ServerRuntime) -> None:
-        if self.server_runtime is not None:
-            raise RuntimeError("Server runtime is already bound")
-        self.server_runtime = server_runtime
+    event_listener: EventListener
+    stream_controller: StreamController
 
     @asynccontextmanager
     async def __call__(
         self,
         server: FastMCP,
     ) -> AsyncGenerator[dict[str, object], None]:
-        server_runtime = self.server_runtime
-        if server_runtime is None:
-            raise RuntimeError("Server runtime is not bound")
-
-        with self._start_resources(server_runtime):
+        with self._start_resources():
             yield {
                 "board_runtime": self.board_runtime,
                 "camera_runtime": self.camera_runtime,
@@ -43,7 +36,6 @@ class RuntimeLifecycle:
 
     def _start_resources(
         self,
-        server_runtime: ServerRuntime,
     ) -> ExitStack:
         cleanup = ExitStack()
         try:
@@ -55,10 +47,10 @@ class RuntimeLifecycle:
 
             self.database_runtime.start()
             cleanup.callback(self.database_runtime.stop)
-            cleanup.callback(server_runtime.stream_controller.flush_all)
+            cleanup.callback(self.stream_controller.flush_all)
 
-            server_runtime._start_event_listener()
-            cleanup.callback(server_runtime._stop_event_listener)
+            self.event_listener.create_listeners()
+            cleanup.callback(self.event_listener.stop_listeners)
 
             self.model_runtime.turn_on_all_models()
             cleanup.callback(self.model_runtime.turn_off_all_models)

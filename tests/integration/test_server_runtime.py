@@ -10,8 +10,9 @@ import pytest
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
+from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
+from gerbera_sdk.events.rules.rule_bus import RuleBus
 from gerbera_sdk.events.stream_controller import StreamController
-from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModelFrameEnvironment,
 )
@@ -26,7 +27,7 @@ from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.server_runtime import ServerRuntime as _ServerRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 
 
@@ -62,6 +63,14 @@ class FakeSerialConnection:
         self.on_write()
 
 
+def ServerRuntime(**dependencies) -> _ServerRuntime:
+    rule_bus = dependencies.setdefault("rule_bus", RuleBus())
+    dependencies.setdefault("rule_buffer", RuleBuffer(rule_bus))
+    dependencies.setdefault("agent_runtime", SimpleNamespace())
+    dependencies.setdefault("event_listener", SimpleNamespace())
+    return _ServerRuntime(**dependencies)
+
+
 def test_server_registers_camera_capture_tool() -> None:
     camera = Camera(
         camera_id="local-camera",
@@ -88,9 +97,10 @@ def test_server_registers_camera_capture_tool() -> None:
         event_worker=EventWorker(),
         app=app,
         camera_runtime=camera_runtime,
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
     result = app.tools["capture_frames_from_local_camera"](3, 0.25)
 
     assert captured_batches == [
@@ -120,9 +130,10 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         event_worker=EventWorker(),
         app=app,
         camera_runtime=SimpleNamespace(capture_frames=lambda **kwargs: []),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
     tool = asyncio.run(app.get_tool("capture_frames_from_local_camera"))
     properties = tool.parameters["properties"]
 
@@ -174,6 +185,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
             model_inferences={"vision-id": model},
             single_inference=lambda model_id, frames: (
@@ -192,7 +204,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         ),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
     result = app.tools["perform_single_openai-vision-language-model"](
         ["first-base64", "second-base64"]
     )
@@ -252,6 +264,7 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
             model_inferences={"detector-id": inference},
             single_inference=lambda model_id, camera_ids: (
@@ -264,7 +277,7 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
         ),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
     result = app.tools["perform_single_local_object_detection_model"](
         ["camera-id"]
     )
@@ -319,6 +332,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
             model_inferences={"detector-id": inference},
             single_inference=lambda model_id, camera_id: None,
@@ -328,7 +342,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         ),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
     tool = asyncio.run(app.get_tool("perform_single_part-detector"))
     turn_on_tool = asyncio.run(app.get_tool("turn_on_part-detector"))
 
@@ -376,6 +390,7 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         stream_controller=StreamController(EventBus()),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
             model_inferences={
                 "vision-id": vision_inference,
@@ -396,7 +411,7 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         ),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
 
     app.tools["turn_on_workspace-vlm"]()
     app.tools["turn_on_part-detector"]()
@@ -421,9 +436,11 @@ def test_server_does_not_register_camera_lifecycle_tools() -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
 
     assert {
         "capture_frames_from_local_camera",
@@ -453,10 +470,12 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
     runtime._register_events()
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
     event = event_bus.get_handler(
         ("MCP", board.id, board.connections[0].event_name)
     )
@@ -510,9 +529,11 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    GerberaRuntime._register_server_runtime_tools(runtime)
+    runtime._register_hardware_tools()
 
     assert set(app.tools) == {
         "read_ir_sensor",
@@ -547,6 +568,8 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
     runtime._register_connection_tool(
         connection,
@@ -555,7 +578,6 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
     )
 
     tool = asyncio.run(app.get_tool("write_motor"))
-    params_schema = tool.parameters["$defs"]["MotorWriteParams"]
     assert tool.description == "Set servo angle."
     assert tool.annotations == ToolAnnotations(
         title="Set motor servo angle",
@@ -564,7 +586,7 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         idempotentHint=True,
         openWorldHint=False,
     )
-    assert params_schema == {
+    assert tool.parameters == {
         "additionalProperties": False,
         "properties": {
             "angle": {
@@ -578,11 +600,54 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         "type": "object",
     }
 
-    asyncio.run(tool.run({"params": {"angle": 90}}))
+    asyncio.run(tool.run({"angle": 90}))
     assert captured_params == [{"angle": "90"}]
 
     with pytest.raises(ValueError, match="less than or equal to 180"):
-        asyncio.run(tool.run({"params": {"angle": 181}}))
+        asyncio.run(tool.run({"angle": 181}))
+
+
+def test_server_preserves_required_and_optional_registry_parameters() -> None:
+    connection = Connection(
+        "motor",
+        "dcmotor",
+        {"in1": "5", "in2": "6", "enable": "9"},
+    )
+    command = CommandCompiler.command_specs(connection)[0]
+    captured_params = []
+    connection.register_action(
+        "WRITE",
+        lambda params: captured_params.append(params) or params,
+    )
+
+    event_bus = EventBus()
+    app = FastMCP("test")
+    runtime = ServerRuntime(
+        hardware_system=object(),
+        board_runtime=object(),
+        event_bus=event_bus,
+        stream_controller=StreamController(event_bus),
+        event_worker=EventWorker(),
+        app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
+    )
+    runtime._register_connection_tool(
+        connection,
+        command,
+        CommandCompiler.command_annotations(connection, command),
+    )
+
+    tool = asyncio.run(app.get_tool("write_motor"))
+    assert tool.parameters["required"] == ["direction"]
+    assert set(tool.parameters["properties"]) == {"direction", "speed"}
+
+    asyncio.run(tool.run({"direction": "stop"}))
+    asyncio.run(tool.run({"direction": "forward", "speed": 120}))
+    assert captured_params == [
+        {"direction": "stop"},
+        {"direction": "forward", "speed": "120"},
+    ]
 
 
 def test_server_registers_agent_rule_tool(tmp_path) -> None:
@@ -595,6 +660,8 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
     runtime.agent_runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
@@ -603,7 +670,7 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
         rules_path=tmp_path / ".gerbera" / "rules",
     )
 
-    GerberaRuntime._register_agent_runtime_tool(runtime)
+    runtime._register_rule_tools()
 
     tool = asyncio.run(app.get_tool("insert_rule"))
     assert tool.annotations == ToolAnnotations(
@@ -678,10 +745,12 @@ def test_server_exposes_registered_events_as_nested_catalog(
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
     runtime._register_events()
 
-    GerberaRuntime._register_event_catalog_tool(runtime)
+    runtime._register_event_catalog_tool()
 
     tool = asyncio.run(app.get_tool("list_rule_events"))
     assert tool.annotations.readOnlyHint is True
@@ -724,6 +793,8 @@ def test_database_backed_tool_description_includes_table_name() -> None:
         stream_controller=object(),
         event_worker=EventWorker(),
         app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
     runtime._register_connection_tool(
@@ -739,8 +810,11 @@ def test_database_backed_tool_description_includes_table_name() -> None:
     )
 
 
-def test_event_listener_lifecycle_is_strict() -> None:
+def test_server_uses_prebuilt_rule_and_listener_dependencies() -> None:
     event_bus = EventBus()
+    rule_bus = RuleBus()
+    rule_buffer = RuleBuffer(rule_bus)
+    event_listener = SimpleNamespace()
     runtime = ServerRuntime(
         hardware_system=HardwareSystem(),
         board_runtime=SimpleNamespace(serial_pool={}),
@@ -748,22 +822,16 @@ def test_event_listener_lifecycle_is_strict() -> None:
         stream_controller=StreamController(event_bus),
         event_worker=EventWorker(),
         app=FakeApp(),
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
+        rule_bus=rule_bus,
+        rule_buffer=rule_buffer,
+        event_listener=event_listener,
     )
 
-    assert runtime.rule_bus.rule_bus == {}
-    assert runtime.rule_buffer.buffer == {}
-
-    with pytest.raises(RuntimeError, match="not running"):
-        runtime._stop_event_listener()
-
-    runtime._start_event_listener()
-    assert runtime.event_listener is not None
-    assert runtime.event_listener._rule_buffer is runtime.rule_buffer
-
-    with pytest.raises(RuntimeError, match="already running"):
-        runtime._start_event_listener()
-
-    runtime._stop_event_listener()
+    assert runtime.rule_bus is rule_bus
+    assert runtime.rule_buffer is rule_buffer
+    assert runtime.event_listener is event_listener
 
 
 def test_stream_off_waits_for_buffered_database_writes() -> None:
@@ -788,6 +856,8 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
         stream_controller=stream_controller,
         event_worker=event_worker,
         app=FakeApp(),
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
     )
     tool = runtime._build_stream_toggle_tool_function(
         microcontroller=object(),
