@@ -16,12 +16,12 @@ class ExecuteActionGroupSchema(StrictSchema):
     action_type: Literal["execute"]
     actions: (
         Annotated[
-            list[AgentExecuteSchema],
-            Field(min_length=1, max_length=1),
-        ]
-        | Annotated[
             list[DeterministicExecuteSchema],
             Field(min_length=1),
+        ]
+        | Annotated[
+            list[AgentExecuteSchema],
+            Field(min_length=1, max_length=1),
         ]
     )
 

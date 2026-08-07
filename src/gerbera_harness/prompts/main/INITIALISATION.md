@@ -152,10 +152,12 @@ Choose the execution type from the operation's actual semantics:
   state and choose the next action from those observations.
 - Use `rule` only for a deterministic condition-triggered response.
 
-Prefer deterministic actions. If the tool name, arguments, ordering, and
-duration can be known during initialisation, use `discrete` or `continuous`.
-Do not use an agent for a fixed actuator command, a known servo angle, a
-one-shot reading, a fixed-duration stream, or a predetermined sequence of MCP
+PREFER DETERMINISTIC ACTIONS WHEN THE REQUIRED BEHAVIOR IS KNOWN. If the tool
+name, arguments, ordering, or duration can be determined during initialisation,
+you MUST use `discrete` or `continuous`. Use an `agent` action only when a new
+physical observation must determine an otherwise unknown next action at
+runtime. Do not use an agent for a fixed actuator command, a known servo angle,
+a one-shot reading, a fixed-duration stream, or a predetermined sequence of MCP
 calls.
 
 Do not represent a time-series experiment as discrete readings when continuous
@@ -176,6 +178,31 @@ Every deterministic tool call must:
 - preserve the ordering and cleanup required by the method.
 
 For example, a servo command can use `tool_parameter: angle` with `value: 180`.
+
+A known servo command must look like this deterministic action pattern:
+
+```json
+{
+  "description": "Set the servo to 180 degrees.",
+  "action_type": "execute",
+  "execution_type": "discrete",
+  "start_offset_seconds": 0,
+  "dependent_variables": [],
+  "independent_variables": ["servo_angle"],
+  "forward_tool_call": "write_servo_motor",
+  "params": [
+    {
+      "tool_parameter": "angle",
+      "value": 180,
+      "unit": "degrees",
+      "type": "int"
+    }
+  ]
+}
+```
+
+Use the actual registered tool name from context. Never convert this known call
+into an agent goal.
 
 Parameter-list fields are mandatory and must never be omitted:
 

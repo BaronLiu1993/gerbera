@@ -16,6 +16,9 @@ Reject or correct unnecessary agent actions. A fixed actuator command, known
 servo angle, one-shot reading, fixed-duration stream, or predetermined tool
 sequence must use deterministic execution. Permit an agent action only when
 changing physical observations must determine the next action at runtime.
+If a candidate uses an agent for a known tool call, you MUST replace it with a
+discrete or continuous action in the returned hypothesis. Never accept that
+candidate unchanged.
 
 If the candidate is sound, return `accepted` with `next_state` set to
 `execution`. Accepted responses must have empty `issues`, `rejection_reasons`,

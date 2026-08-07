@@ -76,6 +76,8 @@ class RuleCreationSchema(StrictSchema):
 
 
 class AgentExecuteSchema(StrictSchema):
+    """Adaptive closed-loop action used only when observations choose the next action."""
+
     action_type: Literal["execute"]
     execution_type: Literal["agent"]
     goal: str = Field(min_length=1)
@@ -85,6 +87,8 @@ class AgentExecuteSchema(StrictSchema):
 
 
 class ContinuousExecuteSchema(StrictSchema):
+    """Deterministic action with known start, duration, and cleanup calls."""
+
     description: str
     action_type: Literal["execute"]
     execution_type: Literal["continuous"]
@@ -109,6 +113,8 @@ class ContinuousExecuteSchema(StrictSchema):
 
 
 class DiscreteExecuteSchema(StrictSchema):
+    """Preferred deterministic action for one known MCP tool call."""
+
     description: str
     action_type: Literal["execute"]
     execution_type: Literal["discrete"]
@@ -154,9 +160,9 @@ class ReviewSchema(StrictSchema):
 # Union Schemas
 ExecuteSchema = (
     RuleCreationSchema
-    | AgentExecuteSchema
     | ContinuousExecuteSchema
     | DiscreteExecuteSchema
+    | AgentExecuteSchema
 )
 
 DeterministicExecuteSchema = (
