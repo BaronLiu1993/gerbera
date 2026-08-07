@@ -73,11 +73,10 @@ class InitialisationRuntime:
                 INITIALISATION_PROMPT,
                 HypothesisSchema.model_json_schema(),
             )
-            message = json.loads(raw_hypothesis)
-
-            self.memory.append_message("assistant", message)
-
-            hypothesis = HypothesisSchema.model_validate(message)
+            hypothesis = HypothesisSchema.model_validate_json(
+                raw_hypothesis
+            )
+            self.memory.append_message("assistant", raw_hypothesis)
 
             raw_evaluation = await client.send(
                 self.context_builder.build(),

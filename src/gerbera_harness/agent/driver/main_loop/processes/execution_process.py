@@ -75,6 +75,8 @@ class ExecutionProcess:
                             group=group,
                             active_rules=active_rules,
                         )
+
+                        print(decision)
                     except Exception:
                         decision = ExecuteDecisionEnum.REJECTED
 

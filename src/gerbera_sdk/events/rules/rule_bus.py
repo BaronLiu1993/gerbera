@@ -28,9 +28,6 @@ class RuleBus:
 
         self.rule_bus[event_key] = rule
 
-    def get_rule(self, event_key: EventKey) -> Rule | None:
-        return self.rule_bus.get(event_key)
-
     def unregister_rule(
         self,
         event_type: str,
@@ -48,6 +45,9 @@ class RuleBus:
             raise ValueError(
                 f"Rule is not registered for event: {event_key}"
             ) from exc
+
+    def get_rule(self, event_key: EventKey) -> Rule | None:
+            return self.rule_bus.get(event_key)
 
     async def emit_evaluation_event(
         self,

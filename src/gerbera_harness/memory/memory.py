@@ -28,7 +28,7 @@ class Memory:
     goal: str
     # The workflow orchestrator should set this to the main agent run_id.
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    messages: list[dict[str, object]] = field(default_factory=list)
+    messages: list[dict[str, str]] = field(default_factory=list)
     current_hypothesis: HypothesisSchema | None = None
     tasks: list[TaskSchema] = field(default_factory=list)
     # Owned by the main-agent execution lifecycle. Subagents may read this
@@ -93,7 +93,7 @@ class Memory:
             },
         )
 
-    def append_message(self, role: str, content: object) -> None:
+    def append_message(self, role: str, content: str) -> None:
         self.messages.append({"role": role, "content": content})
 
     def append_event(

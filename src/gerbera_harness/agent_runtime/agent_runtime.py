@@ -77,6 +77,8 @@ class AgentRuntime:
                     self.feedback,
                 )
 
+                print(result)
+
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
                     if result.hypothesis is None:
                         raise RuntimeError(
@@ -105,7 +107,7 @@ class AgentRuntime:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.EXECUTION:
                 result = await self.execution_runtime.run_execution()
-
+                print(result)
                 if result.decision is ExecuteDecisionEnum.ACCEPTED:
                     self.session.perform_transition(result.requested_next_state)
                 elif result.decision is ExecuteDecisionEnum.REJECTED:
@@ -114,7 +116,7 @@ class AgentRuntime:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.REVIEW:
                 result = await self.review_runtime.run_review()
-
+                print(result)
                 if result.decision is ReviewDecisionEnum.REPLAN:
                     self.feedback = result.feedback
                     # Replanning is intentionally paused while the first
