@@ -45,13 +45,11 @@ class Memory:
                 return task
 
     def initialize_tasks(self, hypothesis: HypothesisSchema) -> None:
-        if self.tasks or self.completed_tasks:
-            raise RuntimeError("Task lifecycle is already initialized")
+        if self.tasks:
+            raise RuntimeError("Tasks are already initialized")
 
-        self.tasks.extend(
-            TaskSchema(status="pending", task=group)
-            for group in hypothesis.method.execute_steps
-        )
+        for group in hypothesis.method.execute_steps:
+            self.tasks.append(TaskSchema(status="pending", task=group))
 
     def start_task(self, task: TaskSchema) -> None:
         current_task = self.get_current_task()
@@ -74,20 +72,15 @@ class Memory:
         task: TaskSchema,
         status: Literal["in_progress", "completed", "failed"],
     ) -> None:
-        if task not in self.tasks:
-            raise ValueError("Cannot update a task outside main-agent memory")
-
-        if task.status == status:
-            return
+        position = self.tasks.index(task)
 
         task.status = status
-        idx = self.tasks.index(task)
         self.append_event(
             event_type=EventTypeEnum.TASK_STATUS_CHANGED,
             source_type=SourceTypeEnum.RUNTIME,
             payload={
                 "status": status,
-                "step_number": idx,
+                "step_number": position,
                 "step_goal": task.task.goal,
                 "content": task.model_dump(mode="json"),
             },
@@ -119,60 +112,44 @@ class Memory:
         position: int,
         decision: ExecuteDecisionEnum,
         errors: list[ExecuteErrorSchema],
-    ) -> EventSchema:
-        return self.commit_execution_result(
-            task=task,
-            position=position,
-            decision=decision,
-            errors=errors,
-            observations=[],
-            tool_events=[],
-        )
-
-    def commit_execution_result(
-        self,
-        *,
-        task: TaskSchema,
-        position: int,
-        decision: ExecuteDecisionEnum,
-        errors: list[ExecuteErrorSchema],
         observations: list[WorldStateSchema],
         tool_events: list[dict[str, object]],
     ) -> EventSchema:
-        if task not in self.tasks:
-            raise ValueError(
-                "Execution result task is not in main-agent memory"
-            )
-        if not 0 <= position < len(self.tasks):
+        task_position = self.tasks.index(task)
+        if task_position != position:
             raise IndexError("Execution result position is outside task bounds")
 
-        committed_errors = (
-            list(errors)
-            if decision is ExecuteDecisionEnum.REJECTED
-            else []
-        )
-        tool_payloads = [dict(event) for event in tool_events]
-        observation_values = list(observations)
-        events = [
-            EventSchema(
-                event_type=EventTypeEnum.TOOL_CALL,
-                source_type=SourceTypeEnum.MCP_TOOL,
-                payload=payload,
-                session_id=self.session_id,
+        committed_errors: list[ExecuteErrorSchema] = []
+        if decision is ExecuteDecisionEnum.REJECTED:
+            committed_errors = list(errors)
+
+        events: list[EventSchema] = []
+        for tool_event in tool_events:
+            events.append(
+                EventSchema(
+                    event_type=EventTypeEnum.TOOL_CALL,
+                    source_type=SourceTypeEnum.MCP_TOOL,
+                    payload=dict(tool_event),
+                    session_id=self.session_id,
+                )
             )
-            for payload in tool_payloads
-        ]
-        events.extend(
-            EventSchema(
-                event_type=EventTypeEnum.WORLD_STATE_UPDATED,
-                source_type=SourceTypeEnum.MODEL,
-                payload={
-                    "world_state": observation.model_dump(mode="json")
-                },
-                session_id=self.session_id,
+
+        for observation in observations:
+            events.append(
+                EventSchema(
+                    event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+                    source_type=SourceTypeEnum.MODEL,
+                    payload={
+                        "world_state": observation.model_dump(mode="json")
+                    },
+                    session_id=self.session_id,
+                )
             )
-            for observation in observation_values
-        )
+
+        error_messages: list[str] = []
+        for error in committed_errors:
+            error_messages.append(error.error)
+
         result_event = EventSchema(
             event_type=EventTypeEnum.EXECUTION_RESULT,
             source_type=SourceTypeEnum.RUNTIME,
@@ -181,13 +158,13 @@ class Memory:
                 "step_number": position,
                 "step_goal": task.task.goal,
                 "task": task.model_dump(mode="json"),
-                "errors": [error.error for error in committed_errors],
+                "errors": error_messages,
             },
             session_id=self.session_id,
         )
         events.append(result_event)
 
-        self.world_state_ledger.extend(observation_values)
+        self.world_state_ledger.extend(observations)
         self.event_ledger.extend(events)
         return result_event
 

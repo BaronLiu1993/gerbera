@@ -295,7 +295,12 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
     assert result.event.payload["errors"] == []
     assert [event.event_type for event in memory.event_ledger] == [
         EventTypeEnum.TASK_STATUS_CHANGED,
+        EventTypeEnum.TASK_STATUS_CHANGED,
         EventTypeEnum.EXECUTION_RESULT,
+    ]
+    assert [event.payload["status"] for event in memory.event_ledger[:2]] == [
+        "in_progress",
+        "failed",
     ]
     assert memory.tasks[0].status == "failed"
 

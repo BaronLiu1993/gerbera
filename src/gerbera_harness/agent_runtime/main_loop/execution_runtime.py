@@ -76,7 +76,7 @@ class ExecutionRuntime:
         if decision is ExecuteDecisionEnum.REJECTED:
             self.memory.fail_task(current_task)
 
-        event = self.memory.commit_execution_result(
+        event = self.memory.append_execution_result(
             task=current_task,
             position=current_position,
             decision=decision,

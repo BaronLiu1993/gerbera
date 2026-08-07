@@ -165,7 +165,7 @@ def test_execution_result_commits_evidence_and_errors_together() -> None:
         "result": None,
     }
 
-    result = memory.commit_execution_result(
+    result = memory.append_execution_result(
         task=task,
         position=0,
         decision=ExecuteDecisionEnum.REJECTED,
@@ -188,7 +188,7 @@ def test_execution_commit_validates_before_writing_evidence() -> None:
     memory.tasks.append(task)
 
     with pytest.raises(IndexError):
-        memory.commit_execution_result(
+        memory.append_execution_result(
             task=task,
             position=1,
             decision=ExecuteDecisionEnum.REJECTED,
