@@ -49,8 +49,8 @@ class RuntimeLifecycle:
             cleanup.callback(self.database_runtime.stop)
             cleanup.callback(self.stream_controller.flush_all)
 
-            self.event_listener.create_listeners()
             cleanup.callback(self.event_listener.stop_listeners)
+            self.event_listener.create_listeners()
 
             self.model_runtime.turn_on_all_models()
             cleanup.callback(self.model_runtime.turn_off_all_models)

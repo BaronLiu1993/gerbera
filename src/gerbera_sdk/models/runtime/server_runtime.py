@@ -129,11 +129,11 @@ class ServerRuntime:
                 self._register_stream_event(microcontroller, connection)
 
     def get_event_catalog(self) -> EventCatalog:
-        connections = {
-            (microcontroller.id, connection.event_name): connection
-            for microcontroller in self.hardware_system.microcontrollers
-            for connection in microcontroller.connections
-        }
+        connections: dict[tuple[str, str], Connection] = {}
+        for microcontroller in self.hardware_system.microcontrollers:
+            for connection in microcontroller.connections:
+                key = (microcontroller.id, connection.event_name)
+                connections[key] = connection
         catalog: EventCatalog = {}
 
         for event_key, event in self.event_bus.events.items():
@@ -468,10 +468,9 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
+        commands = CommandCompiler.command_specs(connection)
         supports_stream = self._connection_supports_stream_toggle(connection)
-        toggle_annotations: ToolAnnotations | None = None
-
-        for command in CommandCompiler.command_specs(connection):
+        for command in commands:
             annotations = CommandCompiler.command_annotations(connection, command)
             self._register_connection_action(
                 microcontroller,
@@ -480,9 +479,20 @@ class ServerRuntime:
             )
             if not (supports_stream and self._command_is_state_toggle(command)):
                 self._register_connection_tool(connection, command, annotations)
-            if self._command_is_state_toggle(command):
-                toggle_annotations = annotations
 
+        if not self._connection_supports_state_toggle(connection):
+            return
+
+        for command in commands:
+            if self._command_is_state_toggle(command):
+                toggle_command = command
+                break
+        else:
+            raise RuntimeError("State toggle command is not registered")
+        toggle_annotations = CommandCompiler.command_annotations(
+            connection,
+            toggle_command,
+        )
         if supports_stream:
             self._register_stream_toggle_tools(
                 microcontroller,
@@ -490,7 +500,7 @@ class ServerRuntime:
                 toggle_annotations,
                 meta=stage_metadata(ToolStage.OBSERVATION),
             )
-        elif self._connection_supports_state_toggle(connection):
+        else:
             self._register_state_toggle_tools(connection, toggle_annotations)
 
     def _register_camera_tools(self) -> None:
@@ -510,7 +520,10 @@ class ServerRuntime:
                         image_count=image_count,
                         interval_seconds=interval_seconds,
                     )
-                    return [frame.to_base64_string() for frame in frames]
+                    encoded_frames: list[str] = []
+                    for frame in frames:
+                        encoded_frames.append(frame.to_base64_string())
+                    return encoded_frames
 
                 return capture_frames_from_camera
 
@@ -606,10 +619,12 @@ class ServerRuntime:
             camera_ids: Annotated[list[str], Field(min_length=1)],
         ) -> list[dict[str, object]]:
             results = self.model_runtime.single_inference(model_id, camera_ids)
-            return [
-                result.model_dump(mode="json", exclude={"frame"})
-                for result in results
-            ]
+            serialized_results: list[dict[str, object]] = []
+            for result in results:
+                serialized_results.append(
+                    result.model_dump(mode="json", exclude={"frame"})
+                )
+            return serialized_results
 
         self._register_tool(
             name=f"read_{model.name}",

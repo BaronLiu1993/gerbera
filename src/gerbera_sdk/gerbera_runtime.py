@@ -49,7 +49,7 @@ class GerberaRuntime:
 
         event_bus = EventBus()
         stream_controller = StreamController(event_bus)
-        rule_bus = RuleBus() 
+        rule_bus = RuleBus()
         rule_buffer = RuleBuffer(rule_bus)
         event_listener = EventListener(
             hardware_system=hardware_system,
