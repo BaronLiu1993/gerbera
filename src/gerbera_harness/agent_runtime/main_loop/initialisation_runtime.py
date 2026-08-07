@@ -73,9 +73,7 @@ class InitialisationRuntime:
                 INITIALISATION_PROMPT,
                 HypothesisSchema.model_json_schema(),
             )
-            hypothesis = HypothesisSchema.model_validate_json(
-                raw_hypothesis
-            )
+            
             self.memory.append_message("assistant", raw_hypothesis)
 
             raw_evaluation = await client.send(
@@ -86,7 +84,7 @@ class InitialisationRuntime:
 
             response = InitialisationResponseSchema.model_validate_json(
                 raw_evaluation
-            )
+            ).response
 
             self.memory.append_message(
                 "assistant",
@@ -100,7 +98,7 @@ class InitialisationRuntime:
                 return InitialisationResult(
                     decision=decision,
                     requested_next_state=requested_next_state,
-                    hypothesis=hypothesis,
+                    hypothesis=response.hypothesis,
                 )
             # Not Physically Possible
             if decision is InitialisationDecisionEnum.REJECTED:

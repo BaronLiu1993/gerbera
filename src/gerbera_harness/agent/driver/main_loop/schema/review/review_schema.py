@@ -1,12 +1,5 @@
-from __future__ import annotations
-
 from typing import Literal
 
-from pydantic import model_validator
-
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
-    HypothesisSchema,
-)
 from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
 from gerbera_harness.agent.driver.main_loop.states.base import (
     LoopStateEnum,
@@ -14,19 +7,30 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
 )
 
 
-class ReviewResponseSchema(StrictSchema):
-    decision: ReviewDecisionEnum
-    next_state: Literal[LoopStateEnum.INITIALISATION] | None
-    hypothesis: HypothesisSchema | None
+class AcceptedReviewResponseSchema(StrictSchema):
+    decision: Literal[ReviewDecisionEnum.ACCEPTED]
+    next_state: None
     feedback: list[str]
 
-    @model_validator(mode="after")
-    def validate_decision_transition(self) -> "ReviewResponseSchema":
-        if self.decision is ReviewDecisionEnum.ACCEPTED:
-            if self.next_state is not None:
-                raise ValueError("ACCEPTED review must finish the workflow")
-        elif self.next_state is not LoopStateEnum.INITIALISATION:
-            raise ValueError(
-                "REJECTED review must return to INITIALISATION"
-            )
-        return self
+
+class RejectedReviewResponseSchema(StrictSchema):
+    decision: Literal[ReviewDecisionEnum.REJECTED]
+    next_state: None
+    feedback: list[str]
+
+
+class ReplanReviewResponseSchema(StrictSchema):
+    decision: Literal[ReviewDecisionEnum.REPLAN]
+    next_state: Literal[LoopStateEnum.INITIALISATION]
+    feedback: list[str]
+
+
+ReviewDecisionResponseSchema = (
+    AcceptedReviewResponseSchema
+    | RejectedReviewResponseSchema
+    | ReplanReviewResponseSchema
+)
+
+
+class ReviewResponseSchema(StrictSchema):
+    response: ReviewDecisionResponseSchema

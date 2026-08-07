@@ -1,9 +1,12 @@
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field
 
 from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
     QuestionSchema,
+)
+from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
+    HypothesisSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
 from gerbera_harness.agent.driver.main_loop.states.base import (
@@ -12,44 +15,39 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
 )
 
 
-class InitialisationResponseSchema(StrictSchema):
-    decision: InitialisationDecisionEnum
-    next_state: Literal[
-        LoopStateEnum.INITIALISATION,
-        LoopStateEnum.EXECUTION,
-    ]
+class AcceptedInitialisationResponseSchema(StrictSchema):
+    decision: Literal[InitialisationDecisionEnum.ACCEPTED]
+    next_state: Literal[LoopStateEnum.EXECUTION]
+    hypothesis: HypothesisSchema
+    issues: list[str] = Field(max_length=0)
+    rejection_reasons: list[str] = Field(max_length=0)
+    clarifying_questions: list[QuestionSchema] = Field(max_length=0)
+
+
+class RejectedInitialisationResponseSchema(StrictSchema):
+    decision: Literal[InitialisationDecisionEnum.REJECTED]
+    next_state: Literal[LoopStateEnum.INITIALISATION]
+    hypothesis: None
     issues: list[str]
-    rejection_reasons: list[str]
-    clarifying_questions: list[QuestionSchema]
+    rejection_reasons: list[str] = Field(min_length=1)
+    clarifying_questions: list[QuestionSchema] = Field(max_length=0)
 
-    @model_validator(mode="after")
-    def validate_decision_payload(self) -> "InitialisationResponseSchema":
-        if self.decision is InitialisationDecisionEnum.ACCEPTED:
-            if self.clarifying_questions:
-                raise ValueError(
-                    "ACCEPTED cannot contain clarifying questions"
-                )
-            if self.next_state is not LoopStateEnum.EXECUTION:
-                raise ValueError("ACCEPTED must transition to EXECUTION")
 
-        elif self.decision is InitialisationDecisionEnum.CLARIFY:
-            if not self.clarifying_questions:
-                raise ValueError(
-                    "CLARIFY requires at least one question"
-                )
-            if self.next_state is not LoopStateEnum.INITIALISATION:
-                raise ValueError(
-                    "CLARIFY must remain in INITIALISATION"
-                )
+class ClarifyInitialisationResponseSchema(StrictSchema):
+    decision: Literal[InitialisationDecisionEnum.CLARIFY]
+    next_state: Literal[LoopStateEnum.INITIALISATION]
+    hypothesis: None
+    issues: list[str]
+    rejection_reasons: list[str] = Field(max_length=0)
+    clarifying_questions: list[QuestionSchema] = Field(min_length=1)
 
-        elif self.decision is InitialisationDecisionEnum.REJECTED:
-            if self.clarifying_questions:
-                raise ValueError(
-                    "REJECTED cannot contain clarifying questions"
-                )
-            if self.next_state is not LoopStateEnum.INITIALISATION:
-                raise ValueError(
-                    "REJECTED must remain in INITIALISATION"
-                )
 
-        return self
+InitialisationDecisionResponseSchema = (
+    AcceptedInitialisationResponseSchema
+    | RejectedInitialisationResponseSchema
+    | ClarifyInitialisationResponseSchema
+)
+
+
+class InitialisationResponseSchema(StrictSchema):
+    response: InitialisationDecisionResponseSchema

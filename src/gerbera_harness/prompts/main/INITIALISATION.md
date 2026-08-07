@@ -215,6 +215,9 @@ Define:
 The runtime supplies the nested observe-plan-act loop. Do not use an agent
 action when the approved method already determines the next tool call.
 
+An agent action must be the only action in its execute group. Put deterministic
+actions in separate execute groups.
+
 ## Rule Planning
 
 A rule is a deterministic runtime check:

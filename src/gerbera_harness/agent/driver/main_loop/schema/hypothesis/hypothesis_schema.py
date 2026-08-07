@@ -1,6 +1,3 @@
-from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
-    QuestionSchema,
-)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     MethodSchema,
 )

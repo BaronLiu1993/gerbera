@@ -11,6 +11,9 @@ from gerbera_harness.agent.driver.main_loop.states.base import (
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     AgentExecuteSchema,
 )
+from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+    ExecuteErrorSchema,
+)
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
@@ -32,6 +35,7 @@ from gerbera_harness.memory import (
 @dataclass
 class _ExecutionRunState:
     current_group_index: int = 0
+    errors: list[ExecuteErrorSchema] = field(default_factory=list)
     observations: list[WorldStateSchema] = field(default_factory=list)
     tool_events: list[dict[str, object]] = field(default_factory=list)
 
@@ -76,7 +80,7 @@ class ExecutionRuntime:
             task=current_task,
             position=current_position,
             decision=decision,
-            errors=[],
+            errors=run_state.errors,
             observations=run_state.observations,
             tool_events=[
                 *process.tool_events,
@@ -129,6 +133,8 @@ class ExecutionRuntime:
         )
         subagent_result = await subagent.run_agent()
 
+        if subagent_result.decision is ExecuteDecisionEnum.REJECTED:
+            run_state.errors.extend(subagent_result.errors)
         run_state.observations.extend(subagent_result.observations)
         for event in subagent_result.tool_events:
             run_state.tool_events.append(dict(event))

@@ -157,4 +157,10 @@ ExecuteSchema = (
     | DiscreteExecuteSchema
 )
 
+DeterministicExecuteSchema = (
+    RuleCreationSchema
+    | ContinuousExecuteSchema
+    | DiscreteExecuteSchema
+)
+
 ActionSchema = ExecuteSchema | ReviewSchema

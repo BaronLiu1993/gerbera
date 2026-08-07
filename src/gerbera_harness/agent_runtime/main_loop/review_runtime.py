@@ -1,8 +1,5 @@
 from dataclasses import dataclass
 
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
-    HypothesisSchema,
-)
 from gerbera_harness.agent.driver.main_loop.schema.review import (
     ReviewResponseSchema,
 )
@@ -15,7 +12,6 @@ from gerbera_harness.agent_runtime.context_builder import ContextBuilder
 from gerbera_harness.memory import Memory
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
-
 REVIEW_PROMPT = load_prompt(PromptTypeEnum.MAIN, "REVIEW.md")
 
 
@@ -23,7 +19,6 @@ REVIEW_PROMPT = load_prompt(PromptTypeEnum.MAIN, "REVIEW.md")
 class ReviewResult:
     decision: ReviewDecisionEnum
     requested_next_state: LoopStateEnum | None
-    hypothesis: HypothesisSchema | None
     feedback: list[str]
 
 
@@ -36,33 +31,26 @@ class ReviewRuntime:
 
     async def run_review(self) -> ReviewResult:
         client = self.model.get_agent_client()
+        review_context = self.context_builder.build()
 
         for _ in range(self.max_attempts):
             raw_response = await client.send(
-                self.context_builder.build(),
+                review_context,
                 REVIEW_PROMPT,
                 ReviewResponseSchema.model_json_schema(),
             )
-
-            response = ReviewResponseSchema.model_validate_json(raw_response)
+            envelope = ReviewResponseSchema.model_validate_json(raw_response)
+            response = envelope.response
 
             self.memory.append_message(
                 "assistant",
                 response.model_dump_json(),
             )
 
-            if response.decision in {
-                ReviewDecisionEnum.ACCEPTED,
-                ReviewDecisionEnum.REPLAN,
-                ReviewDecisionEnum.REJECTED,
-            }:
-                # Return For now, if request next state is none it is terminal
-                return ReviewResult(
-                    decision=response.decision,
-                    requested_next_state=response.next_state,
-                    hypothesis=response.hypothesis,
-                    feedback=list(response.feedback),
-                )
+            return ReviewResult(
+                decision=response.decision,
+                requested_next_state=response.next_state,
+                feedback=list(response.feedback),
+            )
 
-            else:
-                raise ValueError("Decision is not supported")
+        raise RuntimeError("Review completed without producing a result")

@@ -1,10 +1,10 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     AgentExecuteSchema,
-    ExecuteSchema,
+    DeterministicExecuteSchema,
     ReviewSchema,
     RuleCreationSchema,
 )
@@ -14,7 +14,16 @@ from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
 class ExecuteActionGroupSchema(StrictSchema):
     goal: str
     action_type: Literal["execute"]
-    actions: list[ExecuteSchema] = Field(min_length=1)
+    actions: (
+        Annotated[
+            list[AgentExecuteSchema],
+            Field(min_length=1, max_length=1),
+        ]
+        | Annotated[
+            list[DeterministicExecuteSchema],
+            Field(min_length=1),
+        ]
+    )
 
 
 class ReviewActionGroupSchema(StrictSchema):
@@ -42,20 +51,6 @@ class MethodSchema(StrictSchema):
             if group_index != 0:
                 raise ValueError(
                     "Rule creation must be in the first execute group"
-                )
-
-        return self
-
-    @model_validator(mode="after")
-    def require_agent_actions_to_be_isolated(self) -> "MethodSchema":
-        for group in self.execute_steps:
-            if any(
-                isinstance(action, AgentExecuteSchema)
-                for action in group.actions
-            ) and len(group.actions) != 1:
-                raise ValueError(
-                    "An agent action must be the only action in its "
-                    "execute group"
                 )
 
         return self

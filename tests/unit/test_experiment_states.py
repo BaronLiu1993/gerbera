@@ -12,6 +12,9 @@ from gerbera_harness.agent.driver.main_loop import (
 from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
     InitialisationResponseSchema,
 )
+from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
+    HypothesisSchema,
+)
 
 
 def test_experiment_states_do_not_own_prompts() -> None:
@@ -49,13 +52,13 @@ def test_session_replaces_state_during_transition() -> None:
     assert session.state is not initial_state
 
 
-def test_main_loop_sessions_have_independent_run_ids() -> None:
+def test_main_loop_sessions_have_independent_session_ids() -> None:
     first = Session()
     second = Session()
 
-    assert first.run_id
-    assert second.run_id
-    assert first.run_id != second.run_id
+    assert first.session_id
+    assert second.session_id
+    assert first.session_id != second.session_id
 
 
 def test_session_rejects_invalid_transition() -> None:
@@ -78,21 +81,45 @@ def test_states_do_not_own_model_output_schemas() -> None:
 
 
 def test_initialisation_response_owns_transition_validation() -> None:
+    hypothesis = HypothesisSchema.model_construct()
     response = InitialisationResponseSchema(
-        decision=InitialisationDecisionEnum.ACCEPTED,
-        next_state=LoopStateEnum.EXECUTION,
-        issues=[],
-        rejection_reasons=[],
-        clarifying_questions=[],
+        response={
+            "decision": InitialisationDecisionEnum.ACCEPTED,
+            "next_state": LoopStateEnum.EXECUTION,
+            "hypothesis": hypothesis,
+            "issues": [],
+            "rejection_reasons": [],
+            "clarifying_questions": [],
+        }
     )
 
-    assert response.next_state is LoopStateEnum.EXECUTION
+    assert response.response.next_state is LoopStateEnum.EXECUTION
 
     with pytest.raises(ValidationError):
         InitialisationResponseSchema(
-            decision=InitialisationDecisionEnum.ACCEPTED,
-            next_state=LoopStateEnum.INITIALISATION,
-            issues=[],
-            rejection_reasons=[],
-            clarifying_questions=[],
+            response={
+                "decision": InitialisationDecisionEnum.ACCEPTED,
+                "next_state": LoopStateEnum.INITIALISATION,
+                "hypothesis": hypothesis,
+                "issues": [],
+                "rejection_reasons": [],
+                "clarifying_questions": [],
+            }
+        )
+
+    with pytest.raises(ValidationError):
+        InitialisationResponseSchema(
+            response={
+                "decision": InitialisationDecisionEnum.REJECTED,
+                "next_state": LoopStateEnum.INITIALISATION,
+                "hypothesis": None,
+                "issues": ["More information is required."],
+                "rejection_reasons": ["The workflow cannot proceed."],
+                "clarifying_questions": [
+                    {
+                        "question": "How long should collection run?",
+                        "options": ["10 seconds", "30 seconds"],
+                    }
+                ],
+            }
         )

@@ -42,14 +42,19 @@ class FakeContextBuilder:
         return [{"role": "user", "content": "Review the evidence."}]
 
 
+def response_envelope(response: dict) -> dict:
+    return {"response": response}
+
+
 def test_review_runtime_uses_review_response_schema() -> None:
     model = FakeModel(
-        {
-            "decision": "accepted",
-            "next_state": None,
-            "hypothesis": None,
-            "feedback": [],
-        }
+        response_envelope(
+            {
+                "decision": "accepted",
+                "next_state": None,
+                "feedback": [],
+            }
+        )
     )
     memory = Memory(goal="Validate the workflow")
     runtime = ReviewRuntime(
@@ -71,19 +76,74 @@ def test_review_runtime_uses_review_response_schema() -> None:
 
 
 def test_review_response_owns_transition_validation() -> None:
-    response = ReviewResponseSchema(
-        decision=ReviewDecisionEnum.REJECTED,
-        next_state=LoopStateEnum.INITIALISATION,
-        hypothesis=None,
-        feedback=["Collect more evidence."],
+    envelope = ReviewResponseSchema.model_validate(
+        response_envelope(
+            {
+                "decision": ReviewDecisionEnum.REJECTED,
+                "next_state": None,
+                "feedback": ["Collect more evidence."],
+            }
+        )
     )
 
-    assert response.next_state is LoopStateEnum.INITIALISATION
+    assert envelope.response.next_state is None
 
     with pytest.raises(ValidationError):
-        ReviewResponseSchema(
-            decision=ReviewDecisionEnum.REJECTED,
-            next_state=None,
-            hypothesis=None,
-            feedback=["Collect more evidence."],
+        ReviewResponseSchema.model_validate(
+            response_envelope(
+                {
+                    "decision": ReviewDecisionEnum.REJECTED,
+                    "next_state": LoopStateEnum.INITIALISATION,
+                    "feedback": ["Collect more evidence."],
+                }
+            )
         )
+
+    with pytest.raises(ValidationError):
+        ReviewResponseSchema.model_validate(
+            response_envelope(
+                {
+                    "decision": ReviewDecisionEnum.ACCEPTED,
+                    "next_state": LoopStateEnum.INITIALISATION,
+                    "feedback": [],
+                }
+            )
+        )
+
+    replan = ReviewResponseSchema.model_validate(
+        response_envelope(
+            {
+                "decision": ReviewDecisionEnum.REPLAN,
+                "next_state": LoopStateEnum.INITIALISATION,
+                "feedback": ["Create another plan."],
+            }
+        )
+    )
+    assert replan.response.next_state is LoopStateEnum.INITIALISATION
+
+
+def test_review_schema_has_an_object_root() -> None:
+    schema = ReviewResponseSchema.model_json_schema()
+
+    assert schema["type"] == "object"
+    assert "anyOf" not in schema
+    assert "anyOf" in schema["properties"]["response"]
+
+
+def test_review_runtime_fails_on_invalid_transition() -> None:
+    runtime = ReviewRuntime(
+        model=FakeModel(
+            response_envelope(
+                {
+                    "decision": "accepted",
+                    "next_state": "initialisation",
+                    "feedback": [],
+                }
+            )
+        ),
+        memory=Memory(goal="Validate the workflow"),
+        context_builder=FakeContextBuilder(),
+    )
+
+    with pytest.raises(ValidationError):
+        asyncio.run(runtime.run_review())

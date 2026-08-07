@@ -454,7 +454,7 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
     result = asyncio.run(runtime.run_execution())
 
     assert result.decision is ExecuteDecisionEnum.REJECTED
-    assert result.event.payload["errors"] == []
+    assert result.event.payload["errors"] == ["Target is occluded"]
     assert memory.get_current_task() is None
 
 
