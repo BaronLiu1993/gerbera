@@ -137,13 +137,13 @@ This is intentionally short to avoid PostgreSQL identifier length issues. It is 
 
 Use `name` and `description` for readability.
 
-## Database Rules
+## Streaming Rules
 
-Database support is device-specific.
+Streaming support is device-specific.
 
-- Not every connection should receive a database.
-- `DatabaseRuntime` creates stream tables only for database-compatible builders.
-- A hardware system can define one database at the top level.
-- That database may be propagated downward only when the device builder supports database streaming.
+- Not every connection should stream data.
+- Connections express intent with `stream=True`.
+- `DatabaseRuntime` creates stream tables only for streamable device builders.
+- The runtime owns the database used for persisted stream data.
 
 This area is still in flux and should be simplified later.

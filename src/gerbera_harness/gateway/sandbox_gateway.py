@@ -14,6 +14,7 @@ class SandboxResult:
 
 @dataclass
 class SandboxGateway:
+    @staticmethod
     def build_image(self) -> None:
         try:
             subprocess.run(
@@ -36,6 +37,7 @@ class SandboxGateway:
         except subprocess.CalledProcessError as exc:
             raise RuntimeError("Failed to build sandbox image") from exc
 
+    @staticmethod
     def run_sandbox(
         self,
         session_id: str,

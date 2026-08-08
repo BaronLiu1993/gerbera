@@ -1,4 +1,4 @@
-from gerbera_sdk.firmware.generator import Generator
+from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
@@ -15,7 +15,7 @@ def test_models_generate_routed_firmware_for_read_and_write_components(
         ]
     )
 
-    firmware = Generator.build_firmware(board)
+    firmware = FirmwareGenerator(board).build()
 
     assert "#include <Arduino.h>" in firmware
     assert "void handle_sensor" in firmware

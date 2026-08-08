@@ -2,7 +2,7 @@ import subprocess
 import shutil
 from pathlib import Path
 
-from gerbera_sdk.firmware.generator import Generator
+from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.paths import FIRMWARE_PATH
 
@@ -15,7 +15,7 @@ class Flash:
         sketch_paths: dict[str, Path] = {}
 
         for microcontroller in hardware_system.microcontrollers:
-            firmware_code = Generator.build_firmware(microcontroller)
+            firmware_code = FirmwareGenerator(microcontroller).build()
             microcontroller_root = FIRMWARE_PATH / microcontroller.id
             microcontroller_root.mkdir(parents=True, exist_ok=True)
             sketch_path = microcontroller_root / f"{microcontroller.id}.ino"

@@ -7,7 +7,7 @@ Contracts describe what a device or database table needs. They do not perform ru
 ## Files
 
 ```text
-command_contract.py     CommandSpec, ParameterSpec, ParameterType.
+command_contract.py     CommandSpec, ParameterSpec.
 firmware_contract.py    PinModeSpec, LibrarySpec, ColumnSpec, ColumnType.
 ```
 
@@ -16,7 +16,7 @@ firmware_contract.py    PinModeSpec, LibrarySpec, ColumnSpec, ColumnType.
 This folder owns:
 
 - valid command parameter metadata
-- parameter types, enum values, min/max constraints
+- numeric command parameter metadata and min/max constraints
 - pin mode declarations
 - Arduino library declarations
 - database column declarations

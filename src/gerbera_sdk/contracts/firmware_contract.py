@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gerbera_sdk.models.hardware.connection import Connection
 
 
 class PinMode(str, Enum):
@@ -9,19 +15,6 @@ class PinMode(str, Enum):
 class ColumnType(str, Enum):
     INTEGER = "INTEGER"
     FLOAT = "DOUBLE PRECISION"
-    TIMESTAMP = "TIMESTAMP"
-    TEXT = "TEXT"
-    BOOLEAN = "BOOLEAN"
-
-
-class OutputEventType(str, Enum):
-    MCP = "MCP"
-    STREAM = "STREAM"
-
-
-class OutputFieldType(str, Enum):
-    INTEGER = "INTEGER"
-    FLOAT = "FLOAT"
     TIMESTAMP = "TIMESTAMP"
     TEXT = "TEXT"
     BOOLEAN = "BOOLEAN"
@@ -50,6 +43,8 @@ class ColumnSpec:
 
 
 @dataclass(frozen=True)
-class OutputFieldSpec:
-    type: OutputFieldType
-    description: str = ""
+class StreamContract:
+    event_name: str
+    table_name: str
+    schema: dict[str, ColumnSpec]
+    connection: "Connection"

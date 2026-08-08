@@ -13,11 +13,18 @@ class Connection:
     pins: dict[Pin, str]
     microcontroller_id: str = ""
     description: str = ""
+    stream: bool = False
     database: Optional[Database] = None
     actions: dict[
         str,
-        Callable[[Optional[dict[str, str]]], dict[str, str]],
+        Callable[[dict[str, object]], dict[str, str]],
     ] = field(default_factory=dict, repr=False)
+
+    @property
+    def stream_enabled(self) -> bool:
+        # Transitional compatibility: old callers used database presence to
+        # request streaming. New callers should set stream=True.
+        return self.stream or self.database is not None
 
     @property
     def event_name(self) -> str:
@@ -30,14 +37,14 @@ class Connection:
     def register_action(
         self,
         action: str,
-        callback: Callable[[Optional[dict[str, str]]], dict[str, str]],
+        callback: Callable[[dict[str, object]], dict[str, str]],
     ) -> None:
         self.actions[action.strip().upper()] = callback
 
     def perform_action(
         self,
         action: str,
-        params: Optional[dict[str, str]] = None,
+        params: dict[str, object],
     ) -> dict[str, str]:
         normalized_action = action.strip().upper()
         if normalized_action not in self.actions:

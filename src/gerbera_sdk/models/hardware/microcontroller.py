@@ -3,11 +3,10 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from gerbera_sdk.firmware.configurations import DEVICES_MAPPING
+from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec
 from gerbera_sdk.models.hardware.connection import Connection
 
-CONFIG_PATH = Path("config.json")
 
 @dataclass
 class Microcontroller:
@@ -16,6 +15,7 @@ class Microcontroller:
     baud_rate: int = 115200
     description: Optional[str] = None
     connections: list[Connection] = field(default_factory=list)
+    config_path: Path = Path("config.json")
 
     @property
     def id(self) -> str:
@@ -32,10 +32,10 @@ class Microcontroller:
 
     def _get_microcontroller_id_from_config(self) -> str | None:
 
-        if not CONFIG_PATH.exists():
+        if not self.config_path.exists():
             raise FileNotFoundError("Config.json Not Found")
 
-        config = json.loads(CONFIG_PATH.read_text())
+        config = json.loads(self.config_path.read_text())
 
         registry = config.get("devices")
 
@@ -57,13 +57,7 @@ class Microcontroller:
         normalized_library_names: set[str] = set()
 
         for connection in self.connections:
-            if connection.component_type not in DEVICES_MAPPING:
-                raise ValueError(
-                    f"Unsupported component type for library resolution: "
-                    f"{connection.component_type}"
-                )
-
-            builder = DEVICES_MAPPING[connection.component_type]()
+            builder = get_device_builder(connection.component_type)
             for library in builder.required_libraries():
                 install_name = library.install.strip()
                 normalized_install_name = install_name.lower()

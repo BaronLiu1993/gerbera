@@ -6,8 +6,6 @@ from gerbera_sdk.models.hardware.connection import Connection
 
 
 class MG996RFirmwareBuilder(SG90FirmwareBuilder):
-    template_name = "mg996r_write"
-
     def annotations(
         self,
         connection: Connection,

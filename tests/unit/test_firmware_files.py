@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from gerbera_sdk.firmware.flash import Flash
-from gerbera_sdk.firmware.generator import Generator
+from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 
 
 def test_generated_firmware_is_stored_in_gerbera(
@@ -11,9 +11,9 @@ def test_generated_firmware_is_stored_in_gerbera(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        Generator,
-        "build_firmware",
-        lambda microcontroller: "// generated firmware",
+        FirmwareGenerator,
+        "build",
+        lambda self: "// generated firmware",
     )
     hardware_system = SimpleNamespace(
         microcontrollers=[SimpleNamespace(id="board-1")]

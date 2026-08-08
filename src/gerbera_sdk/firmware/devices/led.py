@@ -1,14 +1,12 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
+from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
 from gerbera_sdk.models.hardware.connection import Connection
 
 
 class LEDFirmwareBuilder(BaseFirmwareBuilder):
-    template_name = "led_write"
-
     def required_libraries(self) -> list:
         return []
 
@@ -27,10 +25,10 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
                 description="Set the LED state.",
                 params={
                     "state": ParameterSpec(
-                        type=ParameterType.STRING,
                         required=True,
-                        enum=["on", "off"],
-                        description="Desired LED state.",
+                        min=0,
+                        max=1,
+                        description="1 turns the LED on; 0 turns it off.",
                     ),
                 },
             )
@@ -55,24 +53,26 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
         out_pin = connection.pins["out"]
 
         return f"""void handle_{connection.name}(const String& input) {{
-  String value = parameterValue(input, "state");
+  String stateValue = parameterValue(input, "state");
 
-  if (value.length() == 0) {{
+  if (stateValue.length() == 0) {{
     Serial.println("MCP,{connection.event_name},error:invalid_arg");
     return;
   }}
 
-  if (value == "on") {{
+  float state = stateValue.toFloat();
+
+  if (state == 1) {{
     digitalWrite({out_pin}, HIGH);
-    Serial.println("MCP,{connection.event_name},state:on");
+    Serial.println("MCP,{connection.event_name},state:1");
     return;
   }}
 
-  if (value == "off") {{
+  if (state == 0) {{
     digitalWrite({out_pin}, LOW);
-    Serial.println("MCP,{connection.event_name},state:off");
+    Serial.println("MCP,{connection.event_name},state:0");
     return;
   }}
 
-  Serial.println("MCP,{connection.event_name},error:invalid_value");
+  Serial.println("MCP,{connection.event_name},error:invalid_state");
 }}"""

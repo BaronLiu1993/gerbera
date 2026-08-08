@@ -6,11 +6,7 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field, StrictFloat
 
-from gerbera_sdk.contracts.command_contract import (
-    CommandSpec,
-    ParameterSpec,
-    ParameterType,
-)
+from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
@@ -34,13 +30,6 @@ from gerbera_sdk.inference import (
     VisionLanguageModelFrameEnvironment,
 )
 from gerbera_sdk.utils import StrictSchema
-
-_PARAMETER_TYPES: dict[ParameterType, type] = {
-    ParameterType.STRING: str,
-    ParameterType.INT: int,
-    ParameterType.FLOAT: float,
-    ParameterType.BOOL: bool,
-}
 
 EventMetadata = dict[str, str | bool]
 EventCatalog = dict[
@@ -104,7 +93,7 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
-        if connection.database is None:
+        if not connection.stream_enabled:
             return
 
         event = Event(
@@ -160,7 +149,7 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
         action: str,
-        params: dict[str, str] | None = None,
+        params: dict[str, object],
     ) -> dict[str, str]:
         serial_connection = self.board_runtime.get_serial_connection(
             microcontroller
@@ -188,7 +177,7 @@ class ServerRuntime:
         action = command.method.strip().upper()
 
         def action_function(
-            params: dict[str, str] | None = None,
+            params: dict[str, object],
         ) -> dict[str, str]:
             return self._send_connection_command(
                 microcontroller=microcontroller,
@@ -208,17 +197,12 @@ class ServerRuntime:
         if not command.params:
 
             def tool_function() -> dict[str, str]:
-                return connection.perform_action(action)
+                return connection.perform_action(action, {})
 
             return tool_function
 
         def tool_function(**values: Any) -> dict[str, str]:
-            serialized = {
-                name: str(value)
-                for name, value in values.items()
-                if value is not None
-            }
-            return connection.perform_action(action, serialized)
+            return connection.perform_action(action, values)
 
         parameters: list[Parameter] = []
         annotations: dict[str, Any] = {"return": dict[str, str]}
@@ -248,12 +232,8 @@ class ServerRuntime:
         self,
         parameter: ParameterSpec,
     ) -> Any:
-        value_type: Any = _PARAMETER_TYPES[parameter.type]
-        if parameter.enum:
-            value_type = Literal.__getitem__(tuple(parameter.enum))
-
         return Annotated[
-            value_type,
+            float,
             Field(
                 description=parameter.description or None,
                 ge=parameter.min,
@@ -265,12 +245,12 @@ class ServerRuntime:
         self,
         microcontroller: Microcontroller,
         connection: Connection,
-        state: str,
+        state: int,
     ) -> Callable[[], dict[str, str]]:
         def tool_function() -> dict[str, str]:
             response = connection.perform_action("WRITE", {"state": state})
 
-            if state == "off":
+            if state == 0:
                 self.stream_controller.stop_stream(
                     microcontroller,
                     connection,
@@ -284,7 +264,7 @@ class ServerRuntime:
     def _build_state_toggle_tool_function(
         self,
         connection: Connection,
-        state: str,
+        state: int,
     ) -> Callable[[], dict[str, str]]:
         def tool_function() -> dict[str, str]:
             return connection.perform_action("WRITE", {"state": state})
@@ -303,7 +283,7 @@ class ServerRuntime:
                 f"Command description is required: "
                 f"{command.method},{connection.name}"
             )
-        if connection.database is not None:
+        if connection.stream_enabled:
             description += (
                 f" Collected data is stored in table "
                 f"`{connection.event_name}`."
@@ -342,7 +322,7 @@ class ServerRuntime:
     def _register_state_toggle_tool(
         self,
         connection: Connection,
-        state: str,
+        state: int,
         tool_name: str,
         description: str,
         annotations: ToolAnnotations,
@@ -364,14 +344,14 @@ class ServerRuntime:
     ) -> None:
         self._register_state_toggle_tool(
             connection=connection,
-            state="on",
+            state=1,
             tool_name=f"turn_on_{connection.name}",
             description=f"Turn on {connection.name}.",
             annotations=annotations,
         )
         self._register_state_toggle_tool(
             connection=connection,
-            state="off",
+            state=0,
             tool_name=f"turn_off_{connection.name}",
             description=f"Turn off {connection.name}.",
             annotations=annotations,
@@ -381,7 +361,7 @@ class ServerRuntime:
         self,
         microcontroller: Microcontroller,
         connection: Connection,
-        state: str,
+        state: int,
         tool_name: str,
         description: str,
         annotations: ToolAnnotations,
@@ -412,7 +392,7 @@ class ServerRuntime:
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
             connection=connection,
-            state="on",
+            state=1,
             tool_name=f"turn_on_{connection.name}_stream",
             description=f"Turn on continuous streaming for {connection.name}.",
             annotations=annotations,
@@ -421,7 +401,7 @@ class ServerRuntime:
         self._register_stream_toggle_tool(
             microcontroller=microcontroller,
             connection=connection,
-            state="off",
+            state=0,
             tool_name=f"turn_off_{connection.name}_stream",
             description=f"Turn off continuous streaming for {connection.name}.",
             annotations=annotations,
@@ -447,7 +427,7 @@ class ServerRuntime:
             return False
 
         state = command.params.get("state")
-        return state is not None and {"on", "off"}.issubset(state.enum)
+        return state is not None and state.min == 0 and state.max == 1
 
     @classmethod
     def _connection_supports_state_toggle(cls, connection: Connection) -> bool:
@@ -459,7 +439,7 @@ class ServerRuntime:
     @classmethod
     def _connection_supports_stream_toggle(cls, connection: Connection) -> bool:
         return (
-            connection.database is not None
+            connection.stream_enabled
             and cls._connection_supports_state_toggle(connection)
         )
 

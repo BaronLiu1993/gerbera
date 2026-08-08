@@ -13,12 +13,12 @@ def test_connection_rejects_an_unregistered_action() -> None:
     connection = Connection("led", "led", {"out": "13"})
 
     with pytest.raises(RuntimeError, match="not registered"):
-        connection.perform_action("WRITE")
+        connection.perform_action("WRITE", {})
 
 
 def test_connection_normalizes_registered_actions() -> None:
     connection = Connection("led", "led", {"out": "13"})
-    connection.register_action(" write ", lambda params: params or {})
+    connection.register_action(" write ", lambda params: params)
 
     assert connection.perform_action("WRITE", {"state": "on"}) == {"state": "on"}
 

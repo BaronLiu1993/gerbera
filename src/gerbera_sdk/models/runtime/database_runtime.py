@@ -7,10 +7,9 @@ from gerbera_sdk.contracts.firmware_contract import ColumnSpec, ColumnType
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.database import Database
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.database import Table
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
-# CLEAN UP THIS class it is super messy 
 FRAMES_TABLE_NAME = "frames"
 FRAMES_TABLE_SCHEMA: dict[str, ColumnSpec] = {
     "id": ColumnSpec(
@@ -40,18 +39,19 @@ FRAMES_TABLE_SCHEMA: dict[str, ColumnSpec] = {
 class DatabaseRuntime:
     hardware_system: HardwareSystem
     event_worker: EventWorker
-    _table_databases: dict[str, Database] = field(default_factory=dict)
+    database: Database | None = None
+    _registered_tables: set[str] = field(default_factory=set)
 
     def start(self) -> None:
         self._create_tables()
-        if not self._table_databases:
+        if not self._registered_tables:
             return
 
         self.event_worker.configure_writer(self)
         self.event_worker.start()
 
     def stop(self) -> None:
-        if not self._table_databases:
+        if not self._registered_tables:
             return
 
         try:
@@ -67,9 +67,12 @@ class DatabaseRuntime:
         if not payload:
             return
 
-        database = self._table_databases.get(table_name)
-        if database is None:
+        if table_name not in self._registered_tables:
             raise RuntimeError(f"Database table is not registered: {table_name}")
+
+        database = self._runtime_database()
+        if database is None:
+            raise RuntimeError("Database runtime is not configured")
 
         keys = payload[0].keys()
         query = sql.SQL(
@@ -85,49 +88,60 @@ class DatabaseRuntime:
                 cursor.executemany(query, payload)
 
     def _create_tables(self) -> None:
-        # TODO: Create the runtime memory table here when its schema is defined.
-        frames_database = next(
-            (
-                connection.database
-                for microcontroller in self.hardware_system.microcontrollers
-                for connection in microcontroller.connections
-                if connection.database is not None
-            ),
-            None,
+        database = self._runtime_database()
+        if database is None:
+            return
+
+        self._create_database_table(
+            database,
+            FRAMES_TABLE_NAME,
+            FRAMES_TABLE_SCHEMA,
         )
-        if frames_database is not None:
-            self._create_database_table(
-                frames_database,
-                FRAMES_TABLE_NAME,
-                FRAMES_TABLE_SCHEMA,
-            )
-            self._table_databases[FRAMES_TABLE_NAME] = frames_database
+        self._registered_tables.add(FRAMES_TABLE_NAME)
 
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
-                database = connection.database
-                if database is None:
+                builder = get_device_builder(connection.component_type)
+                contract = builder.build_stream_contract(connection)
+                if contract is None:
                     continue
 
-                builder = get_device_builder(
-                    connection.component_type,
-                    context="database provisioning",
+                self._create_database_table(
+                    database,
+                    contract.table_name,
+                    contract.schema,
                 )
-                if not builder.supports_database:
-                    raise ValueError(
-                        f"{connection.component_type} does not support database streaming"
-                    )
+                self._registered_tables.add(contract.table_name)
 
-                table_name = connection.event_name
-                registered_database = self._table_databases.get(table_name)
-                if registered_database is not None and registered_database != database:
-                    raise ValueError(
-                        f"Database table is assigned to multiple databases: {table_name}"
-                    )
+    def _runtime_database(self) -> Database | None:
+        if self.database is not None:
+            return self.database
 
-                schema = builder.required_schema(connection)
-                self._create_database_table(database, table_name, schema)
-                self._table_databases[table_name] = database
+        legacy_databases = [
+            connection.database
+            for microcontroller in self.hardware_system.microcontrollers
+            for connection in microcontroller.connections
+            if connection.database is not None
+        ]
+        if not legacy_databases:
+            return None
+
+        database = legacy_databases[0]
+        if any(candidate != database for candidate in legacy_databases[1:]):
+            raise ValueError("DatabaseRuntime supports one database per run")
+        return database
+
+    def create_table(
+        self,
+        table_name: str,
+        schema: dict[str, ColumnSpec],
+    ) -> None:
+        database = self._runtime_database()
+        if database is None:
+            raise RuntimeError("Database runtime is not configured")
+
+        self._create_database_table(database, table_name, schema)
+        self._registered_tables.add(table_name)
 
     def _create_database_table(
         self,

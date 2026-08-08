@@ -479,11 +479,11 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
     event = event_bus.get_handler(
         ("MCP", board.id, board.connections[0].event_name)
     )
-    serial_connection.on_write = lambda: event.perform_work({"state": "on"})
+    serial_connection.on_write = lambda: event.perform_work({"state": "1"})
     response = app.tools["turn_on_status_led"]()
 
-    assert response == {"state": "on"}
-    assert serial_connection.commands == ["WRITE,status_led,state:on"]
+    assert response == {"state": "1"}
+    assert serial_connection.commands == ["WRITE,status_led,state:1.0"]
     assert set(app.tools) == {
         "write_status_led",
         "turn_on_status_led",
@@ -593,7 +593,7 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
                 "description": "Servo angle in degrees.",
                 "maximum": 180,
                 "minimum": 0,
-                "type": "integer",
+                "type": "number",
             }
         },
         "required": ["angle"],
@@ -601,7 +601,7 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
     }
 
     asyncio.run(tool.run({"angle": 90}))
-    assert captured_params == [{"angle": "90"}]
+    assert captured_params == [{"angle": 90}]
 
     with pytest.raises(ValueError, match="less than or equal to 180"):
         asyncio.run(tool.run({"angle": 181}))
@@ -642,11 +642,11 @@ def test_server_preserves_required_and_optional_registry_parameters() -> None:
     assert tool.parameters["required"] == ["direction"]
     assert set(tool.parameters["properties"]) == {"direction", "speed"}
 
-    asyncio.run(tool.run({"direction": "stop"}))
-    asyncio.run(tool.run({"direction": "forward", "speed": 120}))
+    asyncio.run(tool.run({"direction": 0}))
+    asyncio.run(tool.run({"direction": 1, "speed": 120}))
     assert captured_params == [
-        {"direction": "stop"},
-        {"direction": "forward", "speed": "120"},
+        {"direction": 0},
+        {"direction": 1, "speed": 120},
     ]
 
 
@@ -862,7 +862,7 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
     tool = runtime._build_stream_toggle_tool_function(
         microcontroller=object(),
         connection=connection,
-        state="off",
+        state=0,
     )
 
     assert tool() == {"status": "off"}

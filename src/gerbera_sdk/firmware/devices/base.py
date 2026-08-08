@@ -6,17 +6,16 @@ from gerbera_sdk.contracts.command_contract import CommandSpec
 from gerbera_sdk.contracts.firmware_contract import (
     ColumnSpec,
     LibrarySpec,
-    OutputEventType,
-    OutputFieldSpec,
     PinModeSpec,
+    StreamContract,
 )
 from gerbera_sdk.models.hardware.connection import Connection
 
 
 class BaseFirmwareBuilder(ABC):
-    template_name: str = ""
-    supports_database: bool = False
+    supports_streaming: bool = False
 
+    # Optional, depending on the device
     # Optional hook for devices that need global runtime objects.
     def build_definitions(self, connection: Connection) -> str:
         return ""
@@ -29,18 +28,31 @@ class BaseFirmwareBuilder(ABC):
     def build_stream_lines(self, connection: Connection) -> list[str]:
         return []
 
-    # Optional hook for generating schema when a database is connected.
-    # Key is column name and value is the SQL column spec.
-    def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
+    # Optional hook for stream table schema. Key is column name.
+    def stream_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
         return {}
 
-    # Optional hook for defining the fields that MCP/STREAM can emit.
-    def output_contract(
+    def build_stream_contract(
         self,
         connection: Connection,
-    ) -> dict[OutputEventType, dict[str, OutputFieldSpec]]:
-        return {}
+    ) -> StreamContract | None:
+        if not connection.stream_enabled:
+            return None
 
+        if not self.supports_streaming:
+            raise ValueError(
+                f"{connection.component_type} does not support streaming"
+            )
+
+        return StreamContract(
+            event_name=connection.event_name,
+            table_name=connection.event_name,
+            schema=self.stream_schema(connection),
+            connection=connection,
+        )
+
+
+    # All Required to Implement
     @abstractmethod
     def required_libraries(self) -> list[LibrarySpec]:
         raise NotImplementedError

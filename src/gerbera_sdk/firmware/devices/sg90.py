@@ -1,14 +1,12 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
+from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.contracts.firmware_contract import LibrarySpec, PinModeSpec
 from gerbera_sdk.models.hardware.connection import Connection
 
 
 class SG90FirmwareBuilder(BaseFirmwareBuilder):
-    template_name = "sg90_write"
-
     def required_libraries(self) -> list[LibrarySpec]:
         return [
             LibrarySpec(
@@ -18,7 +16,6 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
         ]
 
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:
-        _ = connection
         return []
 
     def required_commands(self, connection: Connection) -> list[CommandSpec]:
@@ -29,7 +26,6 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
                 description="Set servo angle.",
                 params={
                     "angle": ParameterSpec(
-                        type=ParameterType.INT,
                         required=True,
                         min=0,
                         max=180,

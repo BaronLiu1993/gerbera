@@ -1,6 +1,9 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
+from gerbera_sdk.contracts.command_contract import (
+    CommandSpec,
+    ParameterSpec,
+)
 from gerbera_sdk.contracts.firmware_contract import ColumnSpec, ColumnType
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
@@ -8,8 +11,7 @@ from gerbera_sdk.models.hardware.connection import Connection
 
 
 class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
-    template_name = "hcsr04_read"
-    supports_database = True
+    supports_streaming = True
 
     def required_libraries(self) -> list:
         return []
@@ -34,7 +36,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
             )
         ]
 
-        if connection.database is None:
+        if not connection.stream_enabled:
             return commands
 
         commands.append(
@@ -42,12 +44,12 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
                 method="WRITE",
                 params={
                     "state": ParameterSpec(
-                        type=ParameterType.STRING,
-                        enum=["on", "off"],
-                        description="Turn continuous HC-SR04 stream on or off.",
+                        min=0,
+                        max=1,
+                        description="1 turns continuous HC-SR04 streaming on; 0 turns it off.",
                     )
                 },
-                description="Turn continuous HC-SR04 stream on or off.",
+                description="Set continuous HC-SR04 streaming. Use state 1 for on and 0 for off.",
             )
         )
         return commands
@@ -76,8 +78,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
             )
         raise ValueError(f"Unsupported HC-SR04 command: {command.method}")
 
-    def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
-        _ = connection
+    def stream_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
         return {
             "id": ColumnSpec(
                 type=ColumnType.INTEGER,
@@ -98,13 +99,13 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
         }
 
     def build_definitions(self, connection: Connection) -> str:
-        if connection.database is None:
+        if not connection.stream_enabled:
             return ""
 
         return f"bool {connection.name}_stream_on = false;"
 
     def build_stream_lines(self, connection: Connection) -> list[str]:
-        if connection.database is None:
+        if not connection.stream_enabled:
             return []
 
         read_distance = self._build_distance_read_lines(connection)
@@ -123,7 +124,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
     def build_handler(self, connection: Connection) -> str:
         read_distance = "\n".join(self._build_distance_read_lines(connection, indent="  "))
 
-        if connection.database is None:
+        if not connection.stream_enabled:
             return f"""void handle_{connection.name}(const String& input) {{
   (void)input;
 {read_distance}
@@ -141,16 +142,22 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
   String action = actionOf(input);
 
   if (action == "WRITE") {{
-    String state = parameterValue(input, "state");
-    if (state == "on") {{
-      {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.event_name},status:on");
+    String stateValue = parameterValue(input, "state");
+    if (stateValue.length() == 0) {{
+      Serial.println("MCP,{connection.event_name},error:invalid_arg");
       return;
     }}
 
-    if (state == "off") {{
+    float state = stateValue.toFloat();
+    if (state == 1) {{
+      {connection.name}_stream_on = true;
+      Serial.println("MCP,{connection.event_name},state:1");
+      return;
+    }}
+
+    if (state == 0) {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.event_name},status:off");
+      Serial.println("MCP,{connection.event_name},state:0");
       return;
     }}
 

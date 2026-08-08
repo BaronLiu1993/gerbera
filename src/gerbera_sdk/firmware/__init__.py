@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gerbera_sdk.firmware.flash import Flash
-    from gerbera_sdk.firmware.generator import Generator
+    from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 
 __all__ = [
     "Flash",
-    "Generator",
+    "FirmwareGenerator",
 ]
 
 
@@ -17,8 +17,8 @@ def __getattr__(name: str):
         from gerbera_sdk.firmware.flash import Flash
 
         return Flash
-    if name == "Generator":
-        from gerbera_sdk.firmware.generator import Generator
+    if name == "FirmwareGenerator":
+        from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 
-        return Generator
+        return FirmwareGenerator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

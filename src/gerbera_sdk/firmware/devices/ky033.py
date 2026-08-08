@@ -1,15 +1,21 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
-from gerbera_sdk.contracts.firmware_contract import ColumnSpec, ColumnType
-from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
+from gerbera_sdk.contracts.command_contract import (
+    CommandSpec,
+    ParameterSpec,
+)
+from gerbera_sdk.contracts.firmware_contract import (
+    ColumnSpec,
+    ColumnType,
+    PinMode,
+    PinModeSpec,
+)
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.models.hardware.connection import Connection
 
 
 class KY033FirmwareBuilder(BaseFirmwareBuilder):
-    template_name = "ky033_read"
-    supports_database = True
+    supports_streaming = True
 
     def required_libraries(self) -> list:
         return []
@@ -29,23 +35,20 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
                 description="Read the current KY-033 line tracking sensor value.",
             )
         ]
-
-        if connection.database is None:
-            return commands
-
-        commands.append(
-            CommandSpec(
-                method="WRITE",
-                params={
-                    "state": ParameterSpec(
-                        type=ParameterType.STRING,
-                        enum=["on", "off"],
-                        description="Turn continuous KY-033 stream on or off.",
-                    )
-                },
-                description="Turn continuous KY-033 stream on or off.",
+        if connection.stream_enabled:
+            commands.append(
+                CommandSpec(
+                    method="WRITE",
+                    params={
+                        "state": ParameterSpec(
+                            min=0,
+                            max=1,
+                            description="1 turns continuous KY-033 streaming on; 0 turns it off.",
+                        )
+                    },
+                    description="Set continuous KY-033 streaming. Use state 1 for on and 0 for off.",
+                )
             )
-        )
         return commands
 
     def annotations(
@@ -72,7 +75,8 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
             )
         raise ValueError(f"Unsupported KY-033 command: {command.method}")
 
-    def required_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
+    def stream_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
+        _ = connection
         return {
             "id": ColumnSpec(
                 type=ColumnType.INTEGER,
@@ -93,13 +97,13 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
         }
 
     def build_definitions(self, connection: Connection) -> str:
-        if connection.database is None:
+        if not connection.stream_enabled:
             return ""
 
         return f"bool {connection.name}_stream_on = false;"
 
     def build_stream_lines(self, connection: Connection) -> list[str]:
-        if connection.database is None:
+        if not connection.stream_enabled:
             return []
 
         out_pin = connection.pins["out"]
@@ -115,7 +119,7 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
     def build_handler(self, connection: Connection) -> str:
         out_pin = connection.pins["out"]
 
-        if connection.database is None:
+        if not connection.stream_enabled:
             return f"""void handle_{connection.name}(const String& input) {{
   (void)input;
   int value = digitalRead({out_pin});
@@ -127,16 +131,22 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
   String action = actionOf(input);
 
   if (action == "WRITE") {{
-    String state = parameterValue(input, "state");
-    if (state == "on") {{
-      {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.event_name},status:on");
+    String stateValue = parameterValue(input, "state");
+    if (stateValue.length() == 0) {{
+      Serial.println("MCP,{connection.event_name},error:invalid_arg");
       return;
     }}
 
-    if (state == "off") {{
+    float state = stateValue.toFloat();
+    if (state == 1) {{
+      {connection.name}_stream_on = true;
+      Serial.println("MCP,{connection.event_name},state:1");
+      return;
+    }}
+
+    if (state == 0) {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.event_name},status:off");
+      Serial.println("MCP,{connection.event_name},state:0");
       return;
     }}
 

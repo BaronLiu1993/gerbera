@@ -1,14 +1,12 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec, ParameterType
+from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
 from gerbera_sdk.contracts.firmware_contract import PinMode, PinModeSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.models.hardware.connection import Connection
 
 
 class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
-    template_name = "dcmotor_write"
-
     def required_libraries(self) -> list:
         return []
 
@@ -29,20 +27,18 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
         ]
 
     def required_commands(self, connection: Connection) -> list[CommandSpec]:
-        _ = connection
         return [
             CommandSpec(
                 method="WRITE",
-                description="Set brushed DC motor direction and speed.",
+                description="Set brushed DC motor direction and speed. Use direction 1 for forward, -1 for reverse, and 0 for stop.",
                 params={
                     "direction": ParameterSpec(
-                        type=ParameterType.STRING,
                         required=True,
-                        enum=["forward", "reverse", "stop"],
-                        description="Motor direction.",
+                        min=-1,
+                        max=1,
+                        description="1 drives forward; -1 drives reverse; 0 stops.",
                     ),
                     "speed": ParameterSpec(
-                        type=ParameterType.INT,
                         required=False,
                         min=0,
                         max=255,
@@ -73,14 +69,16 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
         enable_pin = connection.pins["enable"]
 
         return f"""void handle_{connection.name}(const String& input) {{
-  String direction = parameterValue(input, "direction");
+  String directionValue = parameterValue(input, "direction");
   String speedValue = parameterValue(input, "speed");
   int speed = 255;
 
-  if (direction.length() == 0) {{
+  if (directionValue.length() == 0) {{
     Serial.println("MCP,{connection.event_name},error:invalid_arg");
     return;
   }}
+
+  float direction = directionValue.toFloat();
 
   if (speedValue.length() > 0) {{
     speed = speedValue.toInt();
@@ -92,27 +90,27 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     }}
   }}
 
-  if (direction == "forward") {{
+  if (direction == 1) {{
     digitalWrite({in1_pin}, HIGH);
     digitalWrite({in2_pin}, LOW);
     analogWrite({enable_pin}, speed);
-    Serial.println("MCP,{connection.event_name},status:forward");
+    Serial.println("MCP,{connection.event_name},status:1");
     return;
   }}
 
-  if (direction == "reverse") {{
+  if (direction == -1) {{
     digitalWrite({in1_pin}, LOW);
     digitalWrite({in2_pin}, HIGH);
     analogWrite({enable_pin}, speed);
-    Serial.println("MCP,{connection.event_name},status:reverse");
+    Serial.println("MCP,{connection.event_name},status:-1");
     return;
   }}
 
-  if (direction == "stop") {{
+  if (direction == 0) {{
     digitalWrite({in1_pin}, LOW);
     digitalWrite({in2_pin}, LOW);
     analogWrite({enable_pin}, 0);
-    Serial.println("MCP,{connection.event_name},status:stop");
+    Serial.println("MCP,{connection.event_name},status:0");
     return;
   }}
 

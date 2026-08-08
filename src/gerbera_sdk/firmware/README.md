@@ -6,9 +6,7 @@ The firmware folder owns Arduino sketch generation, parsing code, command routin
 
 ```text
 configurations.py       Registry for supported devices and microcontroller packages.
-generator.py            Assembles complete Arduino sketches.
-parser.py               Generates command parser helpers.
-routing.py              Generates setup() and loop() dispatch code.
+firmware_generator.py   Assembles complete Arduino sketches.
 flash.py                Compiles/uploads generated sketches.
 devices/                Per-component firmware builders.
 ```
@@ -46,13 +44,13 @@ This folder does not own:
 
 ```mermaid
 flowchart TD
-    A[Microcontroller] --> B[Generator.build_firmware]
+    A[Microcontroller] --> B[FirmwareGenerator.build]
     B --> C[build includes]
     B --> D[build parser helpers]
     B --> E[build device definitions]
     B --> F[build device handlers]
-    B --> G[Routing.build_setup_code]
-    B --> H[Routing.build_loop_code]
+    B --> G[build setup]
+    B --> H[build loop]
     C --> I[Arduino sketch]
     D --> I
     E --> I
