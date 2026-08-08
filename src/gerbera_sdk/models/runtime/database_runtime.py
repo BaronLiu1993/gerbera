@@ -10,7 +10,7 @@ from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.database import Table
 
-
+# CLEAN UP THIS class it is super messy 
 FRAMES_TABLE_NAME = "frames"
 FRAMES_TABLE_SCHEMA: dict[str, ColumnSpec] = {
     "id": ColumnSpec(
