@@ -23,7 +23,10 @@ class Sandbox:
 
     # We need to pass in commands for SQL query,
     def run_query(self, query: str):
-        self.database_gateway.query(query)
+        try:
+            self.database_gateway.execute_query(query)
+        except Exception as err:
+            raise ValueError(f"SQL Query Failed to Run: {err}")
 
     # Script Execution
     def _write_executable(self, code: str, name: str) -> Path:
@@ -33,7 +36,7 @@ class Sandbox:
         try:
             script_path.write_text(code)
         except OSError as exc:
-            self.delete_executable()
+            self._delete_executable()
             raise ValueError("Failed to write script") from exc
 
         return script_path
