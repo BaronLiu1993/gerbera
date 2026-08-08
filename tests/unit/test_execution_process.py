@@ -170,8 +170,8 @@ async def reject_agent(group_index, action) -> ExecuteDecisionEnum:
 
 def make_execution_process(**kwargs) -> ExecutionProcess:
     kwargs.setdefault("agent_executor", reject_agent)
-    kwargs.setdefault("on_group_started", lambda index, group: None)
-    kwargs.setdefault("on_group_completed", lambda index, group: None)
+    kwargs.setdefault("on_group_started", lambda index: None)
+    kwargs.setdefault("on_group_completed", lambda index: None)
     return ExecutionProcess(**kwargs)
 
 
@@ -271,10 +271,8 @@ def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
             ),
         ],
         agent_executor=execute_agent,
-        on_group_started=lambda index, group: started_groups.append(index),
-        on_group_completed=lambda index, group: completed_groups.append(
-            index
-        ),
+        on_group_started=lambda index: started_groups.append(index),
+        on_group_completed=lambda index: completed_groups.append(index),
     )
 
     result = asyncio.run(process.run_workflow())
@@ -349,9 +347,7 @@ def test_execution_process_completes_task_after_retry() -> None:
             )
         ],
         agent_executor=execute_agent,
-        on_group_completed=lambda index, group: completed_groups.append(
-            index
-        ),
+        on_group_completed=lambda index: completed_groups.append(index),
     )
 
     result = asyncio.run(process.run_workflow())

@@ -98,7 +98,6 @@ class ExecutionRuntime:
         self,
         run_state: _ExecutionRunState,
         group_index: int,
-        _group: ExecuteActionGroupSchema,
     ) -> None:
         self.memory.start_task(self.memory.tasks[group_index])
         run_state.current_group_index = group_index
@@ -106,7 +105,6 @@ class ExecutionRuntime:
     def _on_group_completed(
         self,
         group_index: int,
-        _group: ExecuteActionGroupSchema,
     ) -> None:
         self.memory.complete_task(self.memory.tasks[group_index])
 

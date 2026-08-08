@@ -27,8 +27,8 @@ AgentExecutor = Callable[
     [int, AgentExecuteSchema],
     Awaitable[ExecuteDecisionEnum],
 ]
-GroupStartedHandler = Callable[[int, ExecuteActionGroupSchema], None]
-GroupCompletedHandler = Callable[[int, ExecuteActionGroupSchema], None]
+GroupStartedHandler = Callable[[int], None]
+GroupCompletedHandler = Callable[[int], None]
 
 
 @dataclass
@@ -63,7 +63,7 @@ class ExecutionProcess:
 
         try:
             for group_index, group in enumerate(self.actions_list):
-                self.on_group_started(group_index, group)
+                self.on_group_started(group_index)
 
                 decision = ExecuteDecisionEnum.REJECTED
                 for _ in range(self.max_task_attempts):
@@ -86,7 +86,7 @@ class ExecutionProcess:
                 if decision is ExecuteDecisionEnum.REJECTED:
                     return ExecuteDecisionEnum.REJECTED
 
-                self.on_group_completed(group_index, group)
+                self.on_group_completed(group_index)
         finally:
             await self._delete_active_rules(
                 client,

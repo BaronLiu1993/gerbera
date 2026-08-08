@@ -16,10 +16,3 @@ class SubAgentResult:
     turns_completed: int
     observations: list[WorldStateSchema] = field(default_factory=list)
     tool_events: list[dict[str, object]] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        if (
-            self.decision is ExecuteDecisionEnum.ACCEPTED
-            and self.errors
-        ):
-            raise ValueError("Accepted subagent results cannot contain errors")

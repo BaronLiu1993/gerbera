@@ -146,7 +146,7 @@ class FakeExecutionProcess:
         if type(self).failure is not None:
             raise type(self).failure
         for group_index, group in enumerate(self.actions_list):
-            self.on_group_started(group_index, group)
+            self.on_group_started(group_index)
             action = group.actions[0]
             if action.execution_type == "agent":
                 decision = await self.agent_executor(
@@ -156,7 +156,7 @@ class FakeExecutionProcess:
                 if decision is ExecuteDecisionEnum.REJECTED:
                     return decision
             if type(self).result is ExecuteDecisionEnum.ACCEPTED:
-                self.on_group_completed(group_index, group)
+                self.on_group_completed(group_index)
         return type(self).result
 
 
