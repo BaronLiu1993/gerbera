@@ -1,3 +1,7 @@
+REVOKE TEMPORARY ON DATABASE gerbera FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+
 CREATE USER gerbera_schema_owner
 WITH
     PASSWORD 'schema_password'
@@ -26,8 +30,6 @@ TO gerbera_schema_owner,
    gerbera_writer,
    gerbera_reader;
 
-REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-
 GRANT CREATE, USAGE ON SCHEMA public
 TO gerbera_schema_owner;
 
@@ -35,7 +37,7 @@ GRANT USAGE ON SCHEMA public
 TO gerbera_writer,
    gerbera_reader;
 
-GRANT INSERT ON ALL TABLES IN SCHEMA public
+GRANT INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public
 TO gerbera_writer;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public
@@ -47,7 +49,7 @@ TO gerbera_writer;
 ALTER DEFAULT PRIVILEGES
 FOR ROLE gerbera_schema_owner
 IN SCHEMA public
-GRANT INSERT ON TABLES
+GRANT INSERT, UPDATE, DELETE, TRUNCATE ON TABLES
 TO gerbera_writer;
 
 ALTER DEFAULT PRIVILEGES

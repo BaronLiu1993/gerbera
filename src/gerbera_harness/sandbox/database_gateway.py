@@ -2,6 +2,7 @@ from psycopg_pool import AsyncConnectionPool
 from dataclasses import dataclass
 from functools import cached_property
 
+
 # Connect with read only database users ONLY
 # Create sql gateway user and then the main one has the main gerbera user for writing tables
 @dataclass
@@ -34,7 +35,8 @@ class DatabaseGateway:
 
     async def run_query(self, query: str):
         async with self.connection_pool() as conn:
-            conn.execute("BEGIN READ ONLY")
+            await conn.execute("BEGIN READ ONLY")
+            await conn.execute("SET statement_timeout = '10s'")
             async with conn.cursor() as cur:
                 await cur.execute(query)
                 columns = [column.name for column in cur.description]
@@ -46,6 +48,3 @@ class DatabaseGateway:
             results.append(dict(zip(columns, row, strict=True)))
 
         return results
-        
-        
-        
