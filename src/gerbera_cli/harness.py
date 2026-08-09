@@ -42,6 +42,7 @@ def run_local_harness():
         [
             "docker",
             "run",
+            "-d",
             "--rm",
             "--name",
             HARNESS_CONTAINER,

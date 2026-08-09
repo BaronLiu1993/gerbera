@@ -1,3 +1,4 @@
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -6,6 +7,7 @@ import typer
 
 from gerbera_cli.harness import run_local_harness
 from gerbera_cli.initialise import default_config, load_board_data, CONFIG_PATH
+from gerbera_cli.server import create_stream_tables, local_server_config
 
 app = typer.Typer()
 
@@ -90,17 +92,28 @@ def harness():
     selection = questionary.select("Select Harness Deployment", choices).ask()
 
     if selection == "local":
-        run_local_harness()
         config = json.loads(CONFIG_PATH.read_text())
-        config["harness"] = {
-            "type": "local",
-            "host": "127.0.0.1",
-            "port": 8000,
-            "base_url": "http://127.0.0.1:8000",
-        }
+        hardware = load_hardware(config)
+        run_local_harness()
+        create_stream_tables(hardware)
+        config["server"] = local_server_config()
         CONFIG_PATH.write_text(json.dumps(config, indent=4))
     else:
         pass
+
+
+def load_hardware(config: dict):
+    entry_point = Path(config["entry_point"])
+    hardware_name = config["hardware_name"]
+
+    if not entry_point.is_absolute():
+        entry_point = CONFIG_PATH.parent / entry_point
+
+    spec = importlib.util.spec_from_file_location("gerbera_user_app", entry_point)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return getattr(module, hardware_name)
 
 
 def main():
