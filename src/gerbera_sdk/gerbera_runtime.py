@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 from fastmcp import FastMCP
@@ -24,7 +25,7 @@ class GerberaRuntime:
         flash_firmware: bool = True,
     ) -> None:
         if install_dependencies:
-            GerberaRuntime._install_dependencies(hardware_system)
+            GerberaRuntime.install_dependencies(hardware_system)
 
         if flash_firmware:
             Flash.flash(hardware_system)
@@ -36,11 +37,11 @@ class GerberaRuntime:
         mcp_url: str = "",
         **transport_kwargs,
     ) -> None:
-        GerberaRuntime._validate_unique_connection_names(hardware_system)
+        GerberaRuntime.validate_unique_connection_names(hardware_system)
 
+        database = GerberaRuntime.runtime_database()
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
-        database = GerberaRuntime._runtime_database(hardware_system)
         event_worker = EventWorker(database=database)
         model_runtime = ModelRuntime(hardware_system)
 
@@ -76,12 +77,12 @@ class GerberaRuntime:
             reaction_bus=reaction_bus,
         )
 
-        server_runtime._register_events()
+        server_runtime.register_events()
         server_runtime.register_tools()
         app.run(transport=transport, **transport_kwargs)
 
     @staticmethod
-    def _validate_unique_connection_names(
+    def validate_unique_connection_names(
         hardware_system: HardwareSystem,
     ) -> None:
         connection_owners: dict[str, str] = {}
@@ -102,26 +103,19 @@ class GerberaRuntime:
 
                 connection_owners[normalized_name] = microcontroller.id
 
+    # Change the database layer after
     @staticmethod
-    def _runtime_database(hardware_system: HardwareSystem) -> Database:
-        databases: list[Database] = []
-        for microcontroller in hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
-                if connection.database is not None:
-                    databases.append(connection.database)
-
-        if not databases:
-            raise ValueError("Gerbera runtime requires a database")
-
-        database = databases[0]
-        for candidate in databases[1:]:
-            if candidate != database:
-                raise ValueError("Gerbera runtime supports one database per run")
-
-        return database
+    def runtime_database() -> Database:
+        return Database(
+            host=os.environ.get("GERBERA_DATABASE_HOST", "127.0.0.1"),
+            port=int(os.environ.get("GERBERA_DATABASE_PORT", "6432")),
+            user=os.environ.get("GERBERA_WRITER_USER", "gerbera_writer"),
+            password=os.environ.get("GERBERA_WRITER_PASSWORD", "writer_password"),
+            databaseName=os.environ.get("GERBERA_DATABASE_NAME", "gerbera"),
+        )
 
     @staticmethod
-    def _install_dependencies(hardware_system: HardwareSystem) -> None:
+    def install_dependencies(hardware_system: HardwareSystem) -> None:
         for package_name in hardware_system._get_required_microcontroller_libraries():
             subprocess.run(
                 ["arduino-cli", "core", "install", package_name],

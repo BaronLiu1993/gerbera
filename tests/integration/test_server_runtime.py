@@ -102,7 +102,7 @@ def test_server_registers_camera_capture_tool() -> None:
         model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
     result = app.tools["capture_frames_from_local_camera"](3, 0.25)
 
     assert captured_batches == [
@@ -134,7 +134,7 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
     tool = asyncio.run(app.get_tool("capture_frames_from_local_camera"))
     properties = tool.parameters["properties"]
 
@@ -204,7 +204,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         ),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
     result = app.tools["perform_single_openai-vision-language-model"](
         ["first-base64", "second-base64"]
     )
@@ -276,7 +276,7 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
         ),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
     result = app.tools["perform_single_local_object_detection_model"](
         ["camera-id"]
     )
@@ -340,7 +340,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         ),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
     tool = asyncio.run(app.get_tool("perform_single_part-detector"))
     turn_on_tool = asyncio.run(app.get_tool("turn_on_part-detector"))
 
@@ -408,7 +408,7 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         ),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
 
     app.tools["turn_on_workspace-vlm"]()
     app.tools["turn_on_part-detector"]()
@@ -436,7 +436,7 @@ def test_server_does_not_register_camera_lifecycle_tools() -> None:
         model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
 
     assert {
         "capture_frames_from_local_camera",
@@ -469,8 +469,8 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    runtime._register_events()
-    runtime._register_hardware_tools()
+    runtime.register_events()
+    runtime.register_hardware_tools()
     event = event_bus.get_event(
         "MCP",
         board.id,
@@ -529,7 +529,7 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
         model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    runtime._register_hardware_tools()
+    runtime.register_hardware_tools()
 
     assert set(app.tools) == {
         "read_ir_sensor",
@@ -566,7 +566,7 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
     )
-    runtime._register_connection_tool(
+    runtime.register_connection_tool(
         connection,
         command,
         CommandCompiler.command_annotations(connection, command),
@@ -626,7 +626,7 @@ def test_server_preserves_required_and_optional_registry_parameters() -> None:
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
     )
-    runtime._register_connection_tool(
+    runtime.register_connection_tool(
         connection,
         command,
         CommandCompiler.command_annotations(connection, command),
@@ -672,9 +672,9 @@ def test_server_exposes_registered_events_as_nested_catalog(
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
     )
-    runtime._register_events()
+    runtime.register_events()
 
-    runtime._register_event_catalog_tool()
+    runtime.register_event_catalog_tool()
 
     tool = asyncio.run(app.get_tool("list_reaction_events"))
     assert tool.annotations.readOnlyHint is True
@@ -720,7 +720,7 @@ def test_database_backed_tool_description_includes_table_name() -> None:
         model_runtime=SimpleNamespace(model_inferences={}),
     )
 
-    runtime._register_connection_tool(
+    runtime.register_connection_tool(
         connection,
         command,
         CommandCompiler.command_annotations(connection, command),
@@ -777,7 +777,7 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
     )
-    tool = runtime._build_stream_toggle_tool_function(
+    tool = runtime.build_stream_toggle_tool_function(
         microcontroller=object(),
         connection=connection,
         state=0,

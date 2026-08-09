@@ -9,8 +9,12 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
-from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
+from gerbera_sdk.firmware.firmware_schema import (
+    CommandSpec,
+    ParameterSpec,
+    ToolStage,
+    stage_metadata,
+)
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
@@ -70,14 +74,14 @@ class ServerRuntime:
     event_read_poll_seconds: float = 0.02
 
     def register_tools(self) -> None:
-        self._register_hardware_tools()
+        self.register_hardware_tools()
         # Reaction MCP tools are disabled until reaction execution moves to harness.
-        # self._register_reaction_tools()
-        self._register_event_catalog_tool()
+        # self.register_reaction_tools()
+        self.register_event_catalog_tool()
 
     # Event registration and catalog helpers.
 
-    def _register_mcp_event(
+    def register_mcp_event(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -98,7 +102,7 @@ class ServerRuntime:
             event,
         )
 
-    def _register_stream_event(
+    def register_stream_event(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -122,11 +126,11 @@ class ServerRuntime:
             event,
         )
 
-    def _register_events(self) -> None:
+    def register_events(self) -> None:
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
-                self._register_mcp_event(microcontroller, connection)
-                self._register_stream_event(microcontroller, connection)
+                self.register_mcp_event(microcontroller, connection)
+                self.register_stream_event(microcontroller, connection)
 
     def get_event_catalog(self) -> EventCatalog:
         connections: dict[tuple[str, str], Connection] = {}
@@ -157,7 +161,7 @@ class ServerRuntime:
 
     # Connection command dispatch and MCP tool generation.
 
-    def _read_latest_event_value(
+    def read_latest_event_value(
         self,
         event_key: tuple[str, str, str],
         previous_value: dict[str, str] | None,
@@ -173,7 +177,7 @@ class ServerRuntime:
 
         return None
 
-    def _send_connection_command(
+    def send_connection_command(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -193,9 +197,9 @@ class ServerRuntime:
         previous_value = self.event_bus.get_event(*event_key).read_latest()
 
         serial_connection.write(built_command)
-        return self._read_latest_event_value(event_key, previous_value)
+        return self.read_latest_event_value(event_key, previous_value)
 
-    def _register_connection_action(
+    def register_connection_action(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -206,7 +210,7 @@ class ServerRuntime:
         def action_function(
             params: dict[str, object],
         ) -> dict[str, str] | None:
-            return self._send_connection_command(
+            return self.send_connection_command(
                 microcontroller=microcontroller,
                 connection=connection,
                 action=action,
@@ -215,7 +219,7 @@ class ServerRuntime:
 
         connection.register_action(action, action_function)
 
-    def _build_tool_function(
+    def build_tool_function(
         self,
         connection: Connection,
         command: CommandSpec,
@@ -234,7 +238,7 @@ class ServerRuntime:
         parameters: list[Parameter] = []
         annotations: dict[str, Any] = {"return": dict[str, str] | None}
         for name, parameter in command.params.items():
-            annotation = self._build_parameter_annotation(parameter)
+            annotation = self.build_parameter_annotation(parameter)
             default = Parameter.empty if parameter.required else None
             if not parameter.required:
                 annotation |= None
@@ -255,7 +259,7 @@ class ServerRuntime:
         )
         return tool_function
 
-    def _build_parameter_annotation(
+    def build_parameter_annotation(
         self,
         parameter: ParameterSpec,
     ) -> Any:
@@ -268,7 +272,7 @@ class ServerRuntime:
             ),
         ]
 
-    def _build_stream_toggle_tool_function(
+    def build_stream_toggle_tool_function(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -290,7 +294,7 @@ class ServerRuntime:
 
         return tool_function
 
-    def _build_state_toggle_tool_function(
+    def build_state_toggle_tool_function(
         self,
         connection: Connection,
         state: int,
@@ -300,7 +304,7 @@ class ServerRuntime:
 
         return tool_function
 
-    def _register_connection_tool(
+    def register_connection_tool(
         self,
         connection: Connection,
         command: CommandSpec,
@@ -320,18 +324,18 @@ class ServerRuntime:
 
         action = command.method.strip().lower()
         tool_name = f"{action}_{connection.name}"
-        tool_function = self._build_tool_function(
+        tool_function = self.build_tool_function(
             connection,
             command,
         )
-        self._register_tool(
+        self.register_tool(
             name=tool_name,
             description=description,
             tool_function=tool_function,
             annotations=annotations,
         )
 
-    def _register_tool(
+    def register_tool(
         self,
         name: str,
         description: str,
@@ -350,7 +354,7 @@ class ServerRuntime:
 
     # On/off tool helpers for stateful and streamable devices.
 
-    def _register_state_toggle_tool(
+    def register_state_toggle_tool(
         self,
         connection: Connection,
         state: int,
@@ -358,8 +362,8 @@ class ServerRuntime:
         description: str,
         annotations: ToolAnnotations,
     ) -> None:
-        tool_function = self._build_state_toggle_tool_function(connection, state)
-        self._register_tool(
+        tool_function = self.build_state_toggle_tool_function(connection, state)
+        self.register_tool(
             name=tool_name,
             description=description,
             tool_function=tool_function,
@@ -368,19 +372,19 @@ class ServerRuntime:
             ),
         )
 
-    def _register_state_toggle_tools(
+    def register_state_toggle_tools(
         self,
         connection: Connection,
         annotations: ToolAnnotations,
     ) -> None:
-        self._register_state_toggle_tool(
+        self.register_state_toggle_tool(
             connection=connection,
             state=1,
             tool_name=f"turn_on_{connection.name}",
             description=f"Turn on {connection.name}.",
             annotations=annotations,
         )
-        self._register_state_toggle_tool(
+        self.register_state_toggle_tool(
             connection=connection,
             state=0,
             tool_name=f"turn_off_{connection.name}",
@@ -388,7 +392,7 @@ class ServerRuntime:
             annotations=annotations,
         )
 
-    def _register_stream_toggle_tool(
+    def register_stream_toggle_tool(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -398,12 +402,12 @@ class ServerRuntime:
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
-        tool_function = self._build_stream_toggle_tool_function(
+        tool_function = self.build_stream_toggle_tool_function(
             microcontroller=microcontroller,
             connection=connection,
             state=state,
         )
-        self._register_tool(
+        self.register_tool(
             name=tool_name,
             description=description,
             tool_function=tool_function,
@@ -413,14 +417,14 @@ class ServerRuntime:
             meta=meta,
         )
 
-    def _register_stream_toggle_tools(
+    def register_stream_toggle_tools(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
-        self._register_stream_toggle_tool(
+        self.register_stream_toggle_tool(
             microcontroller=microcontroller,
             connection=connection,
             state=1,
@@ -429,7 +433,7 @@ class ServerRuntime:
             annotations=annotations,
             meta=meta,
         )
-        self._register_stream_toggle_tool(
+        self.register_stream_toggle_tool(
             microcontroller=microcontroller,
             connection=connection,
             state=0,
@@ -441,16 +445,16 @@ class ServerRuntime:
 
     # Hardware, camera, and model tool registration.
 
-    def _register_hardware_tools(self) -> None:
+    def register_hardware_tools(self) -> None:
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
-                self._register_connection_tools(microcontroller, connection)
+                self.register_connection_tools(microcontroller, connection)
 
-        self._register_camera_tools()
-        self._register_inference_tools()
+        self.register_camera_tools()
+        self.register_inference_tools()
 
     @staticmethod
-    def _command_is_state_toggle(command: CommandSpec) -> bool:
+    def command_is_state_toggle(command: CommandSpec) -> bool:
         if command.method.strip().upper() != "WRITE":
             return False
 
@@ -458,41 +462,41 @@ class ServerRuntime:
         return state is not None and state.min == 0 and state.max == 1
 
     @classmethod
-    def _connection_supports_state_toggle(cls, connection: Connection) -> bool:
+    def connection_supports_state_toggle(cls, connection: Connection) -> bool:
         for command in CommandCompiler.command_specs(connection):
-            if cls._command_is_state_toggle(command):
+            if cls.command_is_state_toggle(command):
                 return True
         return False
 
     @classmethod
-    def _connection_supports_stream_toggle(cls, connection: Connection) -> bool:
+    def connection_supports_stream_toggle(cls, connection: Connection) -> bool:
         return (
             connection.stream_enabled
-            and cls._connection_supports_state_toggle(connection)
+            and cls.connection_supports_state_toggle(connection)
         )
 
-    def _register_connection_tools(
+    def register_connection_tools(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
         commands = CommandCompiler.command_specs(connection)
-        supports_stream = self._connection_supports_stream_toggle(connection)
+        supports_stream = self.connection_supports_stream_toggle(connection)
         for command in commands:
             annotations = CommandCompiler.command_annotations(connection, command)
-            self._register_connection_action(
+            self.register_connection_action(
                 microcontroller,
                 connection,
                 command,
             )
-            if not (supports_stream and self._command_is_state_toggle(command)):
-                self._register_connection_tool(connection, command, annotations)
+            if not (supports_stream and self.command_is_state_toggle(command)):
+                self.register_connection_tool(connection, command, annotations)
 
-        if not self._connection_supports_state_toggle(connection):
+        if not self.connection_supports_state_toggle(connection):
             return
 
         for command in commands:
-            if self._command_is_state_toggle(command):
+            if self.command_is_state_toggle(command):
                 toggle_command = command
                 break
         else:
@@ -502,16 +506,16 @@ class ServerRuntime:
             toggle_command,
         )
         if supports_stream:
-            self._register_stream_toggle_tools(
+            self.register_stream_toggle_tools(
                 microcontroller,
                 connection,
                 toggle_annotations,
                 meta=stage_metadata(ToolStage.OBSERVATION),
             )
         else:
-            self._register_state_toggle_tools(connection, toggle_annotations)
+            self.register_state_toggle_tools(connection, toggle_annotations)
 
-    def _register_camera_tools(self) -> None:
+    def register_camera_tools(self) -> None:
         for camera in self.hardware_system.cameras:
             camera_key = camera.camera_id
 
@@ -535,7 +539,7 @@ class ServerRuntime:
 
                 return capture_frames_from_camera
 
-            self._register_tool(
+            self.register_tool(
                 name=f"capture_frames_from_{camera.name}",
                 description=(
                     f"Capture one or more current images from {camera.name}. "
@@ -553,7 +557,7 @@ class ServerRuntime:
                 ),
             )
 
-    def _register_inference_tools(self) -> None:
+    def register_inference_tools(self) -> None:
         registered_models: dict[str, tuple[str, Inference]] = {}
         for model_id, inference in self.model_runtime.model_inferences.items():
             if inference.name in registered_models:
@@ -563,12 +567,12 @@ class ServerRuntime:
             registered_models[inference.name] = (model_id, inference)
 
         for model_id, model in registered_models.values():
-            self._register_inference_model_tools(model_id, model)
+            self.register_inference_model_tools(model_id, model)
 
         if registered_models:
-            self._register_model_catalog_tool(registered_models)
+            self.register_model_catalog_tool(registered_models)
 
-    def _register_inference_model_tools(
+    def register_inference_model_tools(
         self,
         model_id: str,
         model: Inference,
@@ -579,7 +583,7 @@ class ServerRuntime:
         def turn_off_inference() -> None:
             self.model_runtime.turn_off_model(model_id)
 
-        self._register_tool(
+        self.register_tool(
             name=f"turn_on_{model.name}",
             description=f"Start continuous inference for {model.name}.",
             tool_function=turn_on_inference,
@@ -595,7 +599,7 @@ class ServerRuntime:
             ),
             meta=stage_metadata(ToolStage.OBSERVATION),
         )
-        self._register_tool(
+        self.register_tool(
             name=f"turn_off_{model.name}",
             description=f"Stop continuous inference for {model.name}.",
             tool_function=turn_off_inference,
@@ -610,11 +614,11 @@ class ServerRuntime:
         )
 
         if isinstance(model, ObjectDetectionModelInference):
-            self._register_object_detection_tools(model_id, model)
+            self.register_object_detection_tools(model_id, model)
         else:
-            self._register_vision_language_model_tools(model_id, model)
+            self.register_vision_language_model_tools(model_id, model)
 
-    def _register_object_detection_tools(
+    def register_object_detection_tools(
         self,
         model_id: str,
         model: ObjectDetectionModelInference,
@@ -634,7 +638,7 @@ class ServerRuntime:
                 )
             return serialized_results
 
-        self._register_tool(
+        self.register_tool(
             name=f"read_{model.name}",
             description=(
                 f"Read the latest continuous inference output from "
@@ -649,7 +653,7 @@ class ServerRuntime:
                 openWorldHint=False,
             ),
         )
-        self._register_tool(
+        self.register_tool(
             name=f"perform_single_{model.name}",
             description=(
                 f"{model.description} Provide one or more IDs of subscribed "
@@ -665,7 +669,7 @@ class ServerRuntime:
             ),
         )
 
-    def _register_vision_language_model_tools(
+    def register_vision_language_model_tools(
         self,
         model_id: str,
         model: Inference,
@@ -680,7 +684,7 @@ class ServerRuntime:
         ) -> VisionLanguageModelFrameEnvironment:
             return self.model_runtime.single_inference(model_id, frames)
 
-        self._register_tool(
+        self.register_tool(
             name=f"read_{model.name}",
             description=(
                 f"Read the latest continuous inference output from "
@@ -695,7 +699,7 @@ class ServerRuntime:
                 openWorldHint=False,
             ),
         )
-        self._register_tool(
+        self.register_tool(
             name=f"perform_single_{model.name}",
             description=(
                 f"{model.description} Provide one or more Base64 image strings."
@@ -710,7 +714,7 @@ class ServerRuntime:
             ),
         )
 
-    def _register_model_catalog_tool(
+    def register_model_catalog_tool(
         self,
         registered_models: dict[str, tuple[str, Inference]],
     ) -> None:
@@ -746,7 +750,7 @@ class ServerRuntime:
                 )
             return catalog
 
-        self._register_tool(
+        self.register_tool(
             name="list_configured_models",
             description=(
                 "List configured inference models, their model IDs, "
@@ -765,11 +769,11 @@ class ServerRuntime:
 
     # Reaction and event catalog tools.
 
-    def _register_event_catalog_tool(self) -> None:
+    def register_event_catalog_tool(self) -> None:
         def list_reaction_events() -> EventCatalog:
             return self.get_event_catalog()
 
-        self._register_tool(
+        self.register_tool(
             name="list_reaction_events",
             description=(
                 "List the registered hardware events that can be used "

@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from gerbera_sdk.models.hardware.connection import Connection
 from enum import Enum
+from typing import Any
+
+TOOL_STAGES_META_KEY = "gerbera.dev/tool-stages"
 
 @dataclass(frozen=True)
 class ParameterSpec:
@@ -59,3 +62,10 @@ class StreamContract:
     schema: dict[str, ColumnSpec]
     connection: "Connection"
 
+
+class ToolStage(str, Enum):
+    OBSERVATION = "observation"
+
+
+def stage_metadata(*stages: ToolStage) -> dict[str, Any]:
+    return {TOOL_STAGES_META_KEY: [stage.value for stage in stages]}

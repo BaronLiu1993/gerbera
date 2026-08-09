@@ -21,7 +21,7 @@ def test_runtime_rejects_globally_duplicate_connection_names() -> None:
     )
 
     with pytest.raises(ValueError, match="globally unique"):
-        GerberaRuntime._validate_unique_connection_names(hardware_system)
+        GerberaRuntime.validate_unique_connection_names(hardware_system)
 
 
 def test_runtime_rejects_empty_connection_names() -> None:
@@ -35,10 +35,15 @@ def test_runtime_rejects_empty_connection_names() -> None:
     )
 
     with pytest.raises(ValueError, match="cannot be empty"):
-        GerberaRuntime._validate_unique_connection_names(hardware_system)
+        GerberaRuntime.validate_unique_connection_names(hardware_system)
 
 
-def test_runtime_requires_database() -> None:
+def test_runtime_uses_local_writer_database_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("GERBERA_DATABASE_HOST", raising=False)
+    monkeypatch.delenv("GERBERA_DATABASE_PORT", raising=False)
+    monkeypatch.delenv("GERBERA_WRITER_USER", raising=False)
+    monkeypatch.delenv("GERBERA_WRITER_PASSWORD", raising=False)
+    monkeypatch.delenv("GERBERA_DATABASE_NAME", raising=False)
     hardware_system = SimpleNamespace(
         microcontrollers=[
             SimpleNamespace(
@@ -48,19 +53,13 @@ def test_runtime_requires_database() -> None:
         ]
     )
 
-    with pytest.raises(ValueError, match="requires a database"):
-        GerberaRuntime._runtime_database(hardware_system)
+    database = GerberaRuntime.runtime_database()
 
-
-def test_runtime_uses_configured_database() -> None:
-    database = Database("localhost", 5432, "user", "password", "gerbera")
-    hardware_system = SimpleNamespace(
-        microcontrollers=[
-            SimpleNamespace(
-                id="board-a",
-                connections=[SimpleNamespace(database=database)],
-            )
-        ]
+    assert database == Database(
+        host="127.0.0.1",
+        port=6432,
+        user="gerbera_writer",
+        password="writer_password",
+        databaseName="gerbera",
     )
 
-    assert GerberaRuntime._runtime_database(hardware_system) is database
