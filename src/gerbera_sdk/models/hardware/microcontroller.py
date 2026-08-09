@@ -19,9 +19,9 @@ class Microcontroller:
 
     @property
     def id(self) -> str:
-        return self._get_microcontroller_id_from_config()
+        return self.get_microcontroller_id_from_config()
 
-    def _get_used_pins(self) -> set[str]:
+    def get_used_pins(self) -> set[str]:
         used_pins: set[str] = set()
 
         for existing_connection in self.connections:
@@ -30,7 +30,7 @@ class Microcontroller:
 
         return used_pins
 
-    def _get_microcontroller_id_from_config(self) -> str | None:
+    def get_microcontroller_id_from_config(self) -> str | None:
 
         if not self.config_path.exists():
             raise FileNotFoundError("Config.json Not Found")
@@ -80,7 +80,7 @@ class Microcontroller:
                     f"{connection.name}"
                 )
 
-            used_pins = self._get_used_pins()
+            used_pins = self.get_used_pins()
             for pin in connection.pins.values():
                 if pin in used_pins:
                     raise ValueError(f"Pin already in use on board {self.id}: {pin}")
