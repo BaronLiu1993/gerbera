@@ -278,7 +278,7 @@ def test_reaction_bus_returns_no_results_for_unknown_event() -> None:
     ) is None
 
 
-def test_reaction_buffer_stores_value_and_emits_reaction_evaluation() -> None:
+def test_reaction_bus_stores_value_and_emits_reaction_evaluation() -> None:
     reaction_bus = ReactionBus()
     reaction_bus.register_reaction(
         *EVENT_KEY,
@@ -293,49 +293,49 @@ def test_reaction_buffer_stores_value_and_emits_reaction_evaluation() -> None:
             ),
         ),
     )
-    reaction_buffer = ReactionBuffer(reaction_bus)
-    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
+    reaction_bus = reaction_bus
+    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
 
     result = asyncio.run(
-        reaction_buffer.update_buffer_value(*EVENT_KEY, {"value": "30"})
+        reaction_bus.update_reaction_value(*EVENT_KEY, {"value": "30"})
     )
 
     assert result == 30.0
-    assert reaction_buffer.buffer[EVENT_KEY] == 30.0
+    assert reaction_bus.latest_values[EVENT_KEY] == 30.0
 
 
-def test_reaction_buffer_does_not_replace_value_when_reregistered() -> None:
-    reaction_buffer = ReactionBuffer(ReactionBus())
-    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
+def test_reaction_bus_does_not_replace_value_when_reregistered() -> None:
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
     asyncio.run(
-        reaction_buffer.update_buffer_value(*EVENT_KEY, {"value": 10})
+        reaction_bus.update_reaction_value(*EVENT_KEY, {"value": 10})
     )
-    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
+    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
 
-    assert reaction_buffer.buffer[EVENT_KEY] == 10.0
+    assert reaction_bus.latest_values[EVENT_KEY] == 10.0
 
 
-def test_reaction_buffer_ignores_unknown_event() -> None:
-    reaction_buffer = ReactionBuffer(ReactionBus())
+def test_reaction_bus_ignores_unknown_event() -> None:
+    reaction_bus = ReactionBus()
 
     result = asyncio.run(
-        reaction_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+        reaction_bus.update_reaction_value(*EVENT_KEY, {"value": 30})
     )
 
     assert result is None
-    assert reaction_buffer.buffer == {}
+    assert reaction_bus.latest_values == {}
 
 
-def test_reaction_buffer_rejects_non_numeric_sensor_value() -> None:
-    reaction_buffer = ReactionBuffer(ReactionBus())
-    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
+def test_reaction_bus_rejects_non_numeric_sensor_value() -> None:
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
 
     with pytest.raises(ValueError, match="finite numbers"):
         asyncio.run(
-            reaction_buffer.update_buffer_value(
+            reaction_bus.update_reaction_value(
                 *EVENT_KEY,
                 {"value": "on"},
             )
         )
 
-    assert reaction_buffer.buffer[EVENT_KEY] is None
+    assert reaction_bus.latest_values[EVENT_KEY] is None

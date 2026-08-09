@@ -10,7 +10,6 @@ import pytest
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
-from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModelFrameEnvironment,
@@ -72,7 +71,7 @@ def _event_worker() -> EventWorker:
 
 def ServerRuntime(**dependencies) -> _ServerRuntime:
     reaction_bus = dependencies.setdefault("reaction_bus", ReactionBus())
-    dependencies.setdefault("reaction_buffer", ReactionBuffer(reaction_bus))
+    dependencies.setdefault("reaction_bus", reaction_bus)
     dependencies.setdefault("agent_runtime", SimpleNamespace())
     dependencies.setdefault("event_listener", SimpleNamespace())
     return _ServerRuntime(**dependencies)
@@ -663,7 +662,7 @@ def test_server_registers_agent_reaction_tool(tmp_path) -> None:
     runtime.agent_runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=runtime.reaction_bus,
-        reaction_buffer=runtime.reaction_buffer,
+        reaction_bus=runtime.reaction_bus,
         reactions_path=tmp_path / ".gerbera" / "reactions",
     )
 
@@ -696,7 +695,7 @@ def test_server_registers_agent_reaction_tool(tmp_path) -> None:
     assert reaction.condition.expected == 20.0
     assert type(reaction.condition.expected) is float
     assert reaction.trigger_mode.value == "repeat"
-    assert event_key in runtime.reaction_buffer.buffer
+    assert event_key in runtime.reaction_bus.latest_values
     assert len(list(runtime.agent_runtime.reactions_path.glob("*.py"))) == 1
 
     delete_tool = asyncio.run(app.get_tool("delete_reaction"))
@@ -712,7 +711,7 @@ def test_server_registers_agent_reaction_tool(tmp_path) -> None:
     )
 
     assert runtime.reaction_bus.get_reaction(event_key) is None
-    assert event_key not in runtime.reaction_buffer.buffer
+    assert event_key not in runtime.reaction_bus.latest_values
     assert list(runtime.agent_runtime.reactions_path.glob("*.py")) == []
 
 
@@ -808,7 +807,6 @@ def test_database_backed_tool_description_includes_table_name() -> None:
 def test_server_uses_prebuilt_reaction_and_listener_dependencies() -> None:
     event_bus = EventBus()
     reaction_bus = ReactionBus()
-    reaction_buffer = ReactionBuffer(reaction_bus)
     event_listener = SimpleNamespace()
     runtime = ServerRuntime(
         hardware_system=HardwareSystem(),
@@ -819,12 +817,12 @@ def test_server_uses_prebuilt_reaction_and_listener_dependencies() -> None:
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
         reaction_bus=reaction_bus,
-        reaction_buffer=reaction_buffer,
+        reaction_bus=reaction_bus,
         event_listener=event_listener,
     )
 
     assert runtime.reaction_bus is reaction_bus
-    assert runtime.reaction_buffer is reaction_buffer
+    assert runtime.reaction_bus is reaction_bus
     assert runtime.event_listener is event_listener
 
 

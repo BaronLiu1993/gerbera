@@ -10,7 +10,6 @@ import uuid
 from gerbera_sdk.events.reactions import (
     OperatorEnum,
     Reaction,
-    ReactionBuffer,
     ReactionBus,
     ReactionCallback,
     ReactionCondition,
@@ -29,7 +28,6 @@ ReactionScriptCallback = Callable[[str, float], Awaitable[object]]
 class AgentRuntime:
     mcp_url: str
     reaction_bus: ReactionBus
-    reaction_buffer: ReactionBuffer
     reactions_path: Path = field(default_factory=lambda: REACTIONS_PATH)
     valid_event_keys: Container[tuple[str, str, str]] | None = None
 
@@ -83,12 +81,6 @@ class AgentRuntime:
             event_name=event_name,
             reaction=reaction,
         )
-        self.reaction_buffer.register_event_in_buffer(
-            event_type=event_type,
-            microcontroller_id=microcontroller_id,
-            event_name=event_name,
-        )
-
         return {
             "reaction_id": reaction.id,
             "script_path": str(script_path),
@@ -111,11 +103,6 @@ class AgentRuntime:
 
         script_path = self._reaction_script_path(event_key)
         self.reaction_bus.unregister_reaction(
-            event_type=event_type,
-            microcontroller_id=microcontroller_id,
-            event_name=event_name,
-        )
-        self.reaction_buffer.unregister_event_from_buffer(
             event_type=event_type,
             microcontroller_id=microcontroller_id,
             event_name=event_name,

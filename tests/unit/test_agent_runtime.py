@@ -5,8 +5,7 @@ import pytest
 
 from gerbera_sdk.events.reactions import (
     OperatorEnum,
-    ReactionBuffer,
-    ReactionBus,
+        ReactionBus,
     ReactionTriggerModeEnum,
 )
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
@@ -21,7 +20,7 @@ def test_reaction_script_filename_is_the_event_key_hash(tmp_path) -> None:
     runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=reaction_bus,
-        reaction_buffer=ReactionBuffer(reaction_bus),
+        reaction_bus=reaction_bus,
         reactions_path=tmp_path,
     )
 
@@ -35,7 +34,7 @@ def test_agent_runtime_rejects_an_unregistered_event_key(tmp_path) -> None:
     runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=reaction_bus,
-        reaction_buffer=ReactionBuffer(reaction_bus),
+        reaction_bus=reaction_bus,
         reactions_path=tmp_path,
         valid_event_keys={EVENT_KEY},
     )
@@ -55,11 +54,10 @@ def test_agent_runtime_rejects_an_unregistered_event_key(tmp_path) -> None:
 
 def test_agent_runtime_writes_and_registers_reaction_script(tmp_path) -> None:
     reaction_bus = ReactionBus()
-    reaction_buffer = ReactionBuffer(reaction_bus)
     runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=reaction_bus,
-        reaction_buffer=reaction_buffer,
+        reaction_bus=reaction_bus,
         reactions_path=tmp_path / ".gerbera" / "reactions",
     )
 
@@ -86,7 +84,7 @@ def test_agent_runtime_writes_and_registers_reaction_script(tmp_path) -> None:
         "async def callback(mcp_url, value):\n"
         "    return {'mcp_url': mcp_url, 'value': value}\n"
     )
-    assert EVENT_KEY in reaction_buffer.buffer
+    assert EVENT_KEY in reaction_bus.latest_values
     reaction = reaction_bus.get_reaction(EVENT_KEY)
     assert reaction is not None
     assert reaction.condition.expected == 20.0
@@ -112,7 +110,7 @@ def test_agent_runtime_rejects_non_finite_expected_before_writing_script(
     runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=reaction_bus,
-        reaction_buffer=ReactionBuffer(reaction_bus),
+        reaction_bus=reaction_bus,
         reactions_path=tmp_path / ".gerbera" / "reactions",
     )
 
@@ -137,7 +135,7 @@ def test_agent_runtime_rejects_complete_callback_function(
     runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=reaction_bus,
-        reaction_buffer=ReactionBuffer(reaction_bus),
+        reaction_bus=reaction_bus,
         reactions_path=tmp_path / ".gerbera" / "reactions",
     )
 
@@ -160,11 +158,10 @@ def test_agent_runtime_rejects_complete_callback_function(
 
 def test_agent_runtime_deletes_reaction_and_local_script(tmp_path) -> None:
     reaction_bus = ReactionBus()
-    reaction_buffer = ReactionBuffer(reaction_bus)
     runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
         reaction_bus=reaction_bus,
-        reaction_buffer=reaction_buffer,
+        reaction_bus=reaction_bus,
         reactions_path=tmp_path / ".gerbera" / "reactions",
     )
     created = runtime.insert_reaction(
@@ -184,7 +181,7 @@ def test_agent_runtime_deletes_reaction_and_local_script(tmp_path) -> None:
 
     assert deleted == created
     assert reaction_bus.get_reaction(EVENT_KEY) is None
-    assert EVENT_KEY not in reaction_buffer.buffer
+    assert EVENT_KEY not in reaction_bus.latest_values
     assert not (
         runtime.reactions_path / f"{hash_event_key(EVENT_KEY)}.py"
     ).exists()

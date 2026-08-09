@@ -23,7 +23,6 @@ from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
-from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions import OperatorEnum, ReactionTriggerModeEnum
 from gerbera_sdk.inference import (
@@ -70,7 +69,6 @@ class ServerRuntime:
     agent_runtime: AgentRuntime
     event_listener: EventListener
     reaction_bus: ReactionBus
-    reaction_buffer: ReactionBuffer
     event_read_timeout_seconds: float = 1.0
     event_read_poll_seconds: float = 0.02
 

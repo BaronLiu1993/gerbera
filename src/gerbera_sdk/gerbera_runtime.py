@@ -5,7 +5,6 @@ from fastmcp import FastMCP
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
-from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.database import Database
@@ -48,17 +47,15 @@ class GerberaRuntime:
 
         event_bus = EventBus()
         reaction_bus = ReactionBus()
-        reaction_buffer = ReactionBuffer(reaction_bus)
         event_listener = EventListener(
             hardware_system=hardware_system,
             serial_pool=board_runtime.serial_pool,
             event_bus=event_bus,
-            reaction_buffer=reaction_buffer,
+            reaction_bus=reaction_bus,
         )
         agent_runtime = AgentRuntime(
             mcp_url=mcp_url,
             reaction_bus=reaction_bus,
-            reaction_buffer=reaction_buffer,
             valid_event_keys=event_bus.events,
         )
 
@@ -85,7 +82,6 @@ class GerberaRuntime:
             agent_runtime=agent_runtime,
             event_listener=event_listener,
             reaction_bus=reaction_bus,
-            reaction_buffer=reaction_buffer,
         )
 
         server_runtime._register_events()

@@ -3,7 +3,6 @@ from gerbera_sdk.events.reactions.callback_script import (
     normalize_reaction_callback_body,
 )
 from gerbera_sdk.events.reactions.reaction import Reaction, ReactionTriggerModeEnum
-from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions.reaction_callback import ReactionCallback
 from gerbera_sdk.events.reactions.reaction_condition import (
@@ -16,7 +15,6 @@ __all__ = [
     "OperatorEnum",
     "Reaction",
     "ReactionTriggerModeEnum",
-    "ReactionBuffer",
     "ReactionBus",
     "ReactionCallback",
     "ReactionCondition",

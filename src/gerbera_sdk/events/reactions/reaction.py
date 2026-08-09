@@ -16,23 +16,30 @@ class ReactionTriggerModeEnum(str, Enum):
 class Reaction:
     condition: ReactionCondition
     callback: ReactionCallback
+    latest_value: float | None = None
     trigger_mode: ReactionTriggerModeEnum = ReactionTriggerModeEnum.REPEAT
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    _has_triggered: bool = field(default=False, init=False, repr=False)
-    _trigger_lock: Lock = field(default_factory=Lock, init=False, repr=False)
+    has_triggered: bool = field(default=False, init=False, repr=False)
+    trigger_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
-    @property
-    def has_triggered(self) -> bool:
-        with self._trigger_lock:
-            return self._has_triggered
-
-    def claim_trigger(self) -> bool:
+    def can_trigger(self) -> bool:
         if self.trigger_mode == ReactionTriggerModeEnum.REPEAT:
             return True
 
-        with self._trigger_lock:
-            if self._has_triggered:
+        with self.trigger_lock:
+            if self.has_triggered:
                 return False
 
-            self._has_triggered = True
+            self.has_triggered = True
             return True
+
+    async def perform_work(self) -> object | None:
+        if self.latest_value is None:
+            return
+
+        if not self.condition.evaluate_condition(self.latest_value):
+            return
+
+        if not self.can_trigger():
+            return
+
+        return await self.callback(val=self.latest_value)

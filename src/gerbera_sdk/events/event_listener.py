@@ -1,12 +1,13 @@
 from collections.abc import Mapping
+import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 import threading
 
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
-from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
 
 
 
@@ -21,7 +22,7 @@ class EventListener:
     event_bus: EventBus
 
     # Reaction code
-    reaction_buffer: ReactionBuffer
+    reaction_bus: ReactionBus
     reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
             max_workers=1,
@@ -101,12 +102,12 @@ class EventListener:
                 payload,
             )
 
-            # self.dispatch_event_to_reaction_buffer(
-            #     event_type,
-            #     microcontroller_id,
-            #     event_name,
-            #     payload,
-            # )
+            self.dispatch_event_to_reaction_bus(
+                event_type,
+                microcontroller_id,
+                event_name,
+                payload,
+            )
 
     def parse_payload(self, line: str):
         res_payload = {}
@@ -143,21 +144,20 @@ class EventListener:
         )
         handler.perform_work(payload)
 
-    # def dispatch_event_to_reaction_buffer(
-    #     self,
-    #     event_type: str,
-    #     microcontroller_id: str,
-    #     event_name: str,
-    #     payload: dict[str, str],
-    # ) -> Future[object | None]:
-    #     future = self.reaction_executor.submit(
-    #         asyncio.run,
-    #         self.reaction_buffer.update_buffer_value(
-    #             event_type,
-    #             microcontroller_id,
-    #             event_name,
-    #             payload,
-    #         ),
-    #     )
-    #     future.add_done_callback(self._log_reaction_failure)
-    #     return future
+    def dispatch_event_to_reaction_bus(
+        self,
+        event_type: str,
+        microcontroller_id: str,
+        event_name: str,
+        payload: dict[str, str],
+    ) -> Future[object | None]:
+        future = self.reaction_executor.submit(
+            asyncio.run,
+            self.reaction_bus.update_reaction_value(
+                event_type,
+                microcontroller_id,
+                event_name,
+                payload,
+            ),
+        )
+        return future
