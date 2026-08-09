@@ -9,6 +9,7 @@ from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
+from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
@@ -44,7 +45,10 @@ class GerberaRuntime:
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker()
-        database_runtime = DatabaseRuntime(hardware_system, event_worker)
+        database_runtime = DatabaseRuntime(
+            event_worker=event_worker,
+            database=GerberaRuntime._runtime_database(hardware_system),
+        )
         model_runtime = ModelRuntime(hardware_system)
 
         event_bus = EventBus()
@@ -117,6 +121,24 @@ class GerberaRuntime:
                     )
 
                 connection_owners[normalized_name] = microcontroller.id
+
+    @staticmethod
+    def _runtime_database(hardware_system: HardwareSystem) -> Database:
+        databases: list[Database] = []
+        for microcontroller in hardware_system.microcontrollers:
+            for connection in microcontroller.connections:
+                if connection.database is not None:
+                    databases.append(connection.database)
+
+        if not databases:
+            raise ValueError("Gerbera runtime requires a database")
+
+        database = databases[0]
+        for candidate in databases[1:]:
+            if candidate != database:
+                raise ValueError("Gerbera runtime supports one database per run")
+
+        return database
 
     @staticmethod
     def _install_dependencies(hardware_system: HardwareSystem) -> None:

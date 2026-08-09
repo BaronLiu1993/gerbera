@@ -24,7 +24,7 @@ It is not responsible for:
 server_runtime.py       MCP tools, events, listeners, and command dispatch.
 agent_runtime.py        Agent-created rule scripts and live rule registration.
 board_runtime.py        Per-process board transport pool and lifecycle.
-database_runtime.py     Database table provisioning and write lifecycle.
+database_runtime.py     Database write lifecycle.
 command_runtime.py      Command compilation and response parsing.
 ```
 
@@ -58,9 +58,7 @@ command_runtime.py      Command compilation and response parsing.
 
 `DatabaseRuntime` owns:
 
-- validating database-capable connections
-- creating stream tables and indexes
-- routing table writes to the correct database
+- routing table writes to the configured database
 - starting, flushing, and stopping the database write worker
 
 `CommandCompiler` owns:
@@ -96,4 +94,4 @@ The runtime layer should know how the system runs.
 
 The hardware layer should only know what the system is.
 
-If a class needs to start threads, open ports, register MCP tools, create tables, or configure the event worker, it belongs in runtime rather than hardware.
+If a class needs to start threads, open ports, register MCP tools, or configure the event worker, it belongs in runtime rather than hardware.

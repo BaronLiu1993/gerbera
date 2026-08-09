@@ -85,7 +85,7 @@ Current runtime responsibilities are split like this:
   Owns event registration, tool registration, command dispatch, and MCP app interaction.
 
 - `DatabaseRuntime`
-  Owns stream table provisioning and asynchronous database writes.
+  Owns asynchronous database writes. Table provisioning belongs to harness.
 
 - `GerberaRuntime`
   Is the composition root that wires board, database, and server runtimes together in the right order.

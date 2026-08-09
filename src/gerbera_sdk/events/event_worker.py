@@ -6,13 +6,6 @@ from typing import Protocol
 import uuid
 
 
-class DatabaseWriter(Protocol):
-    def write_database_table(
-        self,
-        table_name: str,
-        payload: list[dict[str, str]],
-    ) -> None: ...
-
 
 @dataclass(frozen=True)
 class WriteJob:

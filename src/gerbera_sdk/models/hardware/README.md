@@ -143,7 +143,7 @@ Streaming support is device-specific.
 
 - Not every connection should stream data.
 - Connections express intent with `stream=True`.
-- `DatabaseRuntime` creates stream tables only for streamable device builders.
-- The runtime owns the database used for persisted stream data.
+- Harness provisions stream tables from compiled stream contracts.
+- `DatabaseRuntime` only writes stream data to already-provisioned tables.
 
 This area is still in flux and should be simplified later.

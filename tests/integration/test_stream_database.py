@@ -2,7 +2,6 @@ from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
 
@@ -39,7 +38,7 @@ class FakeDatabaseConnection:
         pass
 
 
-def test_stream_payload_is_provisioned_buffered_and_written(
+def test_stream_payload_is_buffered_and_written(
     device_registry,
     monkeypatch,
 ) -> None:
@@ -56,14 +55,13 @@ def test_stream_payload_is_provisioned_buffered_and_written(
             )
         ]
     )
-    hardware_system = HardwareSystem(microcontrollers=[board])
     cursor = FakeCursor()
     monkeypatch.setattr(
         "gerbera_sdk.models.runtime.database_runtime.psycopg.connect",
         lambda dsn: FakeDatabaseConnection(cursor),
     )
     worker = EventWorker(retry_delay_seconds=0)
-    runtime = DatabaseRuntime(hardware_system, worker)
+    runtime = DatabaseRuntime(worker, database=database)
 
     runtime.start()
     table_name = board.connections[0].event_name
@@ -79,14 +77,8 @@ def test_stream_payload_is_provisioned_buffered_and_written(
     event.flush()
     runtime.stop()
 
-    assert set(database.table_names["frames"].schema) == {
-        "id",
-        "base64_string",
-        "camera_name",
-        "timestamp",
-    }
-    assert table_name in database.table_names
-    assert cursor.executed
+    assert database.table_names == {}
+    assert cursor.executed == []
     assert len(cursor.batches) == 1
     assert cursor.batches[0][0]["value"] == "1"
     assert "created_at" in cursor.batches[0][0]
