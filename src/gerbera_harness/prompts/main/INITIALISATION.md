@@ -131,7 +131,7 @@ Action roles:
   evidence with the expected result. It does not collect new hardware data.
 
 Put `expected` inside each `review` action. Ordinary execute actions do not
-have an `expected` field. `RuleCreationSchema.expected` is the rule's numeric
+have an `expected` field. `ReactionCreationSchema.expected` is the reaction's numeric
 comparison value and is the only exception.
 
 Create separate execute groups when testing different independent-variable
@@ -150,7 +150,7 @@ Choose the execution type from the operation's actual semantics:
   collect a time series.
 - Use `agent` only when execution must repeatedly observe changing physical
   state and choose the next action from those observations.
-- Use `rule` only for a deterministic condition-triggered response.
+- Use `reaction` only for a deterministic condition-triggered response.
 
 PREFER DETERMINISTIC ACTIONS WHEN THE REQUIRED BEHAVIOR IS KNOWN. If the tool
 name, arguments, ordering, or duration can be determined during initialisation,
@@ -247,9 +247,9 @@ action when the approved method already determines the next tool call.
 An agent action must be the only action in its execute group. Put deterministic
 actions in separate execute groups.
 
-## Rule Planning
+## Reaction Planning
 
-A rule is a deterministic runtime check:
+A reaction is a deterministic runtime check:
 
 `when actual_event_value <operator> expected_value, run callback`
 
@@ -257,13 +257,13 @@ It compares one incoming event value with one concrete, finite numeric value.
 It must not perform interpretation, probabilistic reasoning, or post-experiment
 analysis.
 
-When a rule is required:
+When a reaction is required:
 
-- Use `RuleCreationSchema` with `action_type: execute` and
-  `execution_type: rule`.
-- Put every rule in the first execute group. The executor creates all rules in
+- Use `ReactionCreationSchema` with `action_type: execute` and
+  `execution_type: reaction`.
+- Put every reaction in the first execute group. The executor creates all reactions in
   that group before starting its other actions.
-- Register the rule before any stream, stimulus, or action that can emit its
+- Register the reaction before any stream, stimulus, or action that can emit its
   watched event.
 - Set `create_tool_call` and `delete_tool_call` to exact available tools.
 - Use an exact event key from context. Its `event_type` must be `STREAM`, never
@@ -271,8 +271,8 @@ When a rule is required:
 - Use only an operator accepted by the tool schema.
 - Use `once` for a one-time side effect and `repeat` only when the callback must
   run for every matching event.
-- Account for one condition per rule and one rule per event key.
-- Delete active rules after execution, including when a later group fails.
+- Account for one condition per reaction and one reaction per event key.
+- Delete active reactions after execution, including when a later group fails.
 
 Put only the Python body of `async callback(mcp_url, value)` in `callable`. Do
 not include imports, the function definition, parameters, or outer indentation.
@@ -292,11 +292,11 @@ The runtime transports the body as the MCP `callback_body`, validates it, and
 places it inside the fixed callback template. Do not include a local path or
 claim that a file already exists.
 
-`RuleCreationSchema` does not use ordinary parameter-list fields. A rule does
+`ReactionCreationSchema` does not use ordinary parameter-list fields. A reaction does
 not replace the final review.
 
 If no deterministic condition-triggered response is necessary, do not create a
-rule.
+reaction.
 
 ## Review Contract
 

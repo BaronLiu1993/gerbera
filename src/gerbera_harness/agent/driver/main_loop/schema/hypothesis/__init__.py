@@ -10,7 +10,7 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     ParameterTypeSchema,
     ReviewSchema,
     ReviewVariableSchema,
-    RuleCreationSchema,
+    ReactionCreationSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
     HypothesisSchema,
@@ -37,5 +37,5 @@ __all__ = [
     "ReviewSchema",
     "ReviewActionGroupSchema",
     "ReviewVariableSchema",
-    "RuleCreationSchema",
+    "ReactionCreationSchema",
 ]

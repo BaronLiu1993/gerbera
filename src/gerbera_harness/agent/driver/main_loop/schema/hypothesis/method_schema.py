@@ -6,7 +6,7 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     AgentExecuteSchema,
     DeterministicExecuteSchema,
     ReviewSchema,
-    RuleCreationSchema,
+    ReactionCreationSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
 
@@ -38,19 +38,19 @@ class MethodSchema(StrictSchema):
     final_review: ReviewActionGroupSchema
 
     @model_validator(mode="after")
-    def require_rules_in_first_execute_group(self) -> "MethodSchema":
+    def require_reactions_in_first_execute_group(self) -> "MethodSchema":
         for group_index, group in enumerate(self.execute_steps):
-            rule_actions = [
+            reaction_actions = [
                 action
                 for action in group.actions
-                if isinstance(action, RuleCreationSchema)
+                if isinstance(action, ReactionCreationSchema)
             ]
-            if not rule_actions:
+            if not reaction_actions:
                 continue
 
             if group_index != 0:
                 raise ValueError(
-                    "Rule creation must be in the first execute group"
+                    "Reaction creation must be in the first execute group"
                 )
 
         return self

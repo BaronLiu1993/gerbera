@@ -31,11 +31,11 @@ workspace:
 ```text
 .gerbera/
 ├── firmware/
-└── rules/
+└── reactions/
 ```
 
-Generated board firmware is stored under `.gerbera/firmware/`. Custom rule
-scripts belong under `.gerbera/rules/`. Next, define the hardware variable in
+Generated board firmware is stored under `.gerbera/firmware/`. Custom reaction
+scripts belong under `.gerbera/reactions/`. Next, define the hardware variable in
 the selected entry-point file and start local setup:
 
 ```bash
@@ -83,7 +83,7 @@ The CLI owns:
 
 - detecting attached boards
 - writing local board declarations into `config.json`
-- creating `.gerbera/firmware/` and `.gerbera/rules/`
+- creating `.gerbera/firmware/` and `.gerbera/reactions/`
 - loading the user-declared hardware entry point
 - local setup and runtime orchestration
 - external deployment commands
@@ -109,6 +109,6 @@ flowchart TD
     H --> I[gerbera deploy]
 ```
 
-## Rule
+## Reaction
 
 CLI orchestration can feed the SDK runtime, but hardware behavior should stay in SDK models and firmware device builders.

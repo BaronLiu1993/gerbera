@@ -6,7 +6,7 @@ import threading
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
-from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
+from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
 
 
 
@@ -20,12 +20,12 @@ class EventListener:
     # Where events are stored
     event_bus: EventBus
 
-    # Rule code
-    rule_buffer: RuleBuffer
-    rule_executor: ThreadPoolExecutor = field(
+    # Reaction code
+    reaction_buffer: ReactionBuffer
+    reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
             max_workers=1,
-            thread_name_prefix="gerbera-rule-callback",
+            thread_name_prefix="gerbera-reaction-callback",
         )
     )
 
@@ -70,7 +70,7 @@ class EventListener:
         with self.lifecycle_lock:
             self.threads = alive_threads
 
-        self.rule_executor.shutdown(wait=True, cancel_futures=True)
+        self.reaction_executor.shutdown(wait=True, cancel_futures=True)
 
         if alive_threads:
             names = ", ".join(thread.name for thread in alive_threads.values())
@@ -101,7 +101,7 @@ class EventListener:
                 payload,
             )
 
-            # self.dispatch_event_to_rule_buffer(
+            # self.dispatch_event_to_reaction_buffer(
             #     event_type,
             #     microcontroller_id,
             #     event_name,
@@ -143,21 +143,21 @@ class EventListener:
         )
         handler.perform_work(payload)
 
-    # def dispatch_event_to_rule_buffer(
+    # def dispatch_event_to_reaction_buffer(
     #     self,
     #     event_type: str,
     #     microcontroller_id: str,
     #     event_name: str,
     #     payload: dict[str, str],
     # ) -> Future[object | None]:
-    #     future = self.rule_executor.submit(
+    #     future = self.reaction_executor.submit(
     #         asyncio.run,
-    #         self.rule_buffer.update_buffer_value(
+    #         self.reaction_buffer.update_buffer_value(
     #             event_type,
     #             microcontroller_id,
     #             event_name,
     #             payload,
     #         ),
     #     )
-    #     future.add_done_callback(self._log_rule_failure)
+    #     future.add_done_callback(self._log_reaction_failure)
     #     return future

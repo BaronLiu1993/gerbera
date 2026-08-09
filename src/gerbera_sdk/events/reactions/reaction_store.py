@@ -2,15 +2,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 import uuid
 
-from gerbera_sdk.events.utils import EventKey, build_event_key
-from gerbera_sdk.events.rules.rule_bus import RuleBus
-from gerbera_sdk.events.rules.rule_condition import parse_rule_value
+from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.events.reactions.reaction_condition import parse_reaction_value
 
 
 @dataclass
-class RuleBuffer:
-    rule_bus: RuleBus
-    buffer: dict[EventKey, float | None] = field(default_factory=dict)
+class ReactionBuffer:
+    reaction_bus: ReactionBus
+    buffer: dict[tuple[str, str, str], float | None] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def register_event_in_buffer(
@@ -19,7 +18,7 @@ class RuleBuffer:
         microcontroller_id: str,
         event_name: str,
     ) -> None:
-        event_key = build_event_key(
+        event_key = (
             event_type,
             microcontroller_id,
             event_name,
@@ -36,7 +35,7 @@ class RuleBuffer:
         microcontroller_id: str,
         event_name: str,
     ) -> None:
-        event_key = build_event_key(
+        event_key = (
             event_type,
             microcontroller_id,
             event_name,
@@ -50,7 +49,7 @@ class RuleBuffer:
         event_name: str,
         payload: Mapping[str, object],
     ) -> object | None:
-        event_key = build_event_key(
+        event_key = (
             event_type,
             microcontroller_id,
             event_name,
@@ -59,6 +58,6 @@ class RuleBuffer:
         if event_key not in self.buffer or len(payload) != 1:
             return
 
-        value = parse_rule_value(next(iter(payload.values())))
+        value = parse_reaction_value(next(iter(payload.values())))
         self.buffer[event_key] = value
-        return await self.rule_bus.emit_evaluation_event(event_key, value)
+        return await self.reaction_bus.emit_evaluation_event(event_key, value)

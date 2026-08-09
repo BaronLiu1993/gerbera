@@ -10,8 +10,8 @@ import pytest
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
-from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
-from gerbera_sdk.events.rules.rule_bus import RuleBus
+from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
+from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModelFrameEnvironment,
 )
@@ -71,8 +71,8 @@ def _event_worker() -> EventWorker:
 
 
 def ServerRuntime(**dependencies) -> _ServerRuntime:
-    rule_bus = dependencies.setdefault("rule_bus", RuleBus())
-    dependencies.setdefault("rule_buffer", RuleBuffer(rule_bus))
+    reaction_bus = dependencies.setdefault("reaction_bus", ReactionBus())
+    dependencies.setdefault("reaction_buffer", ReactionBuffer(reaction_bus))
     dependencies.setdefault("agent_runtime", SimpleNamespace())
     dependencies.setdefault("event_listener", SimpleNamespace())
     return _ServerRuntime(**dependencies)
@@ -648,7 +648,7 @@ def test_server_preserves_required_and_optional_registry_parameters() -> None:
     ]
 
 
-def test_server_registers_agent_rule_tool(tmp_path) -> None:
+def test_server_registers_agent_reaction_tool(tmp_path) -> None:
     event_bus = EventBus()
     app = FastMCP("test")
     runtime = ServerRuntime(
@@ -662,16 +662,16 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     )
     runtime.agent_runtime = AgentRuntime(
         mcp_url="https://hardware.example.com/mcp",
-        rule_bus=runtime.rule_bus,
-        rule_buffer=runtime.rule_buffer,
-        rules_path=tmp_path / ".gerbera" / "rules",
+        reaction_bus=runtime.reaction_bus,
+        reaction_buffer=runtime.reaction_buffer,
+        reactions_path=tmp_path / ".gerbera" / "reactions",
     )
 
-    runtime._register_rule_tools()
+    runtime._register_reaction_tools()
 
-    tool = asyncio.run(app.get_tool("insert_rule"))
+    tool = asyncio.run(app.get_tool("insert_reaction"))
     assert tool.annotations == ToolAnnotations(
-        title="Create an event rule",
+        title="Create an event reaction",
         readOnlyHint=False,
         destructiveHint=False,
         idempotentHint=False,
@@ -691,15 +691,15 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
     )
 
     event_key = ("STREAM", "board-1", "temperature")
-    rule = runtime.rule_bus.get_rule(event_key)
-    assert rule is not None
-    assert rule.condition.expected == 20.0
-    assert type(rule.condition.expected) is float
-    assert rule.trigger_mode.value == "repeat"
-    assert event_key in runtime.rule_buffer.buffer
-    assert len(list(runtime.agent_runtime.rules_path.glob("*.py"))) == 1
+    reaction = runtime.reaction_bus.get_reaction(event_key)
+    assert reaction is not None
+    assert reaction.condition.expected == 20.0
+    assert type(reaction.condition.expected) is float
+    assert reaction.trigger_mode.value == "repeat"
+    assert event_key in runtime.reaction_buffer.buffer
+    assert len(list(runtime.agent_runtime.reactions_path.glob("*.py"))) == 1
 
-    delete_tool = asyncio.run(app.get_tool("delete_rule"))
+    delete_tool = asyncio.run(app.get_tool("delete_reaction"))
     assert delete_tool.annotations.destructiveHint is True
     asyncio.run(
         delete_tool.run(
@@ -711,9 +711,9 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
         )
     )
 
-    assert runtime.rule_bus.get_rule(event_key) is None
-    assert event_key not in runtime.rule_buffer.buffer
-    assert list(runtime.agent_runtime.rules_path.glob("*.py")) == []
+    assert runtime.reaction_bus.get_reaction(event_key) is None
+    assert event_key not in runtime.reaction_buffer.buffer
+    assert list(runtime.agent_runtime.reactions_path.glob("*.py")) == []
 
 
 def test_server_exposes_registered_events_as_nested_catalog(
@@ -748,7 +748,7 @@ def test_server_exposes_registered_events_as_nested_catalog(
 
     runtime._register_event_catalog_tool()
 
-    tool = asyncio.run(app.get_tool("list_rule_events"))
+    tool = asyncio.run(app.get_tool("list_reaction_events"))
     assert tool.annotations.readOnlyHint is True
     result = asyncio.run(tool.run({}))
     catalog = result.structured_content
@@ -805,10 +805,10 @@ def test_database_backed_tool_description_includes_table_name() -> None:
     )
 
 
-def test_server_uses_prebuilt_rule_and_listener_dependencies() -> None:
+def test_server_uses_prebuilt_reaction_and_listener_dependencies() -> None:
     event_bus = EventBus()
-    rule_bus = RuleBus()
-    rule_buffer = RuleBuffer(rule_bus)
+    reaction_bus = ReactionBus()
+    reaction_buffer = ReactionBuffer(reaction_bus)
     event_listener = SimpleNamespace()
     runtime = ServerRuntime(
         hardware_system=HardwareSystem(),
@@ -818,13 +818,13 @@ def test_server_uses_prebuilt_rule_and_listener_dependencies() -> None:
         app=FakeApp(),
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
-        rule_bus=rule_bus,
-        rule_buffer=rule_buffer,
+        reaction_bus=reaction_bus,
+        reaction_buffer=reaction_buffer,
         event_listener=event_listener,
     )
 
-    assert runtime.rule_bus is rule_bus
-    assert runtime.rule_buffer is rule_buffer
+    assert runtime.reaction_bus is reaction_bus
+    assert runtime.reaction_buffer is reaction_buffer
     assert runtime.event_listener is event_listener
 
 

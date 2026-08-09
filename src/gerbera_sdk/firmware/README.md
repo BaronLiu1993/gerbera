@@ -87,6 +87,6 @@ This same identifier is reused for:
 - event bus routing
 - stream table naming
 
-## Rule
+## Reaction
 
 Keep generated firmware thin. It should parse command strings, touch hardware, and emit structured serial lines.

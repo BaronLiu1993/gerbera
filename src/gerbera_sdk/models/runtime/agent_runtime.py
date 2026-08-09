@@ -7,38 +7,33 @@ from types import ModuleType
 from typing import cast
 import uuid
 
-from gerbera_sdk.events.rules import (
+from gerbera_sdk.events.reactions import (
     OperatorEnum,
-    Rule,
-    RuleBuffer,
-    RuleBus,
-    RuleCallback,
-    RuleCondition,
-    RuleTriggerModeEnum,
-    build_rule_callback_script,
-    parse_rule_value,
+    Reaction,
+    ReactionBuffer,
+    ReactionBus,
+    ReactionCallback,
+    ReactionCondition,
+    ReactionTriggerModeEnum,
+    build_reaction_callback_script,
+    parse_reaction_value,
 )
-from gerbera_sdk.paths import RULES_PATH
-from gerbera_sdk.utils import (
-    EventKey,
-    build_event_key,
-    hash_event_key,
-    require_configured_mcp_url,
-)
+from gerbera_sdk.paths import REACTIONS_PATH
+from gerbera_sdk.utils import hash_event_key
 
 
-RuleScriptCallback = Callable[[str, float], Awaitable[object]]
+ReactionScriptCallback = Callable[[str, float], Awaitable[object]]
 
 
 @dataclass
 class AgentRuntime:
     mcp_url: str
-    rule_bus: RuleBus
-    rule_buffer: RuleBuffer
-    rules_path: Path = field(default_factory=lambda: RULES_PATH)
-    valid_event_keys: Container[EventKey] | None = None
+    reaction_bus: ReactionBus
+    reaction_buffer: ReactionBuffer
+    reactions_path: Path = field(default_factory=lambda: REACTIONS_PATH)
+    valid_event_keys: Container[tuple[str, str, str]] | None = None
 
-    def insert_rule(
+    def insert_reaction(
         self,
         event_type: str,
         microcontroller_id: str,
@@ -46,11 +41,10 @@ class AgentRuntime:
         expected_value: float,
         operator: OperatorEnum,
         callback_body: str,
-        trigger_mode: RuleTriggerModeEnum = RuleTriggerModeEnum.REPEAT,
+        trigger_mode: ReactionTriggerModeEnum = ReactionTriggerModeEnum.REPEAT,
     ) -> dict[str, str]:
-        configured_mcp_url = require_configured_mcp_url(self.mcp_url)
-        normalized_expected = parse_rule_value(expected_value)
-        event_key = build_event_key(
+        normalized_expected = parse_reaction_value(expected_value)
+        event_key = (
             event_type,
             microcontroller_id,
             event_name,
@@ -60,93 +54,93 @@ class AgentRuntime:
             and event_key not in self.valid_event_keys
         ):
             raise ValueError(f"Event key is not registered: {event_key}")
-        if self.rule_bus.get_rule(event_key) is not None:
-            raise ValueError(f"Rule already registered for event: {event_key}")
+        if self.reaction_bus.get_reaction(event_key) is not None:
+            raise ValueError(f"Reaction already registered for event: {event_key}")
 
-        rule_id = str(uuid.uuid4())
-        script_path = self._rule_script_path(event_key)
+        reaction_id = str(uuid.uuid4())
+        script_path = self._reaction_script_path(event_key)
         callback = self._write_and_load_callback(
             script_path=script_path,
-            module_name=f"_gerbera_rule_{rule_id.replace('-', '_')}",
-            callback_script=build_rule_callback_script(callback_body),
+            module_name=f"_gerbera_reaction_{reaction_id.replace('-', '_')}",
+            callback_script=build_reaction_callback_script(callback_body),
         )
-        rule = Rule(
-            condition=RuleCondition(
+        reaction = Reaction(
+            condition=ReactionCondition(
                 expected=normalized_expected,
                 operator=operator,
             ),
-            callback=RuleCallback(
+            callback=ReactionCallback(
                 callback=callback,
-                mcp_url=configured_mcp_url,
+                mcp_url=self.mcp_url,
             ),
             trigger_mode=trigger_mode,
-            id=rule_id,
+            id=reaction_id,
         )
 
-        self.rule_bus.register_rule(
+        self.reaction_bus.register_reaction(
             event_type=event_type,
             microcontroller_id=microcontroller_id,
             event_name=event_name,
-            rule=rule,
+            reaction=reaction,
         )
-        self.rule_buffer.register_event_in_buffer(
+        self.reaction_buffer.register_event_in_buffer(
             event_type=event_type,
             microcontroller_id=microcontroller_id,
             event_name=event_name,
         )
 
         return {
-            "rule_id": rule.id,
+            "reaction_id": reaction.id,
             "script_path": str(script_path),
         }
 
-    def delete_rule(
+    def delete_reaction(
         self,
         event_type: str,
         microcontroller_id: str,
         event_name: str,
     ) -> dict[str, str]:
-        event_key = build_event_key(
+        event_key = (
             event_type,
             microcontroller_id,
             event_name,
         )
-        rule = self.rule_bus.get_rule(event_key)
-        if rule is None:
-            raise ValueError(f"Rule is not registered for event: {event_key}")
+        reaction = self.reaction_bus.get_reaction(event_key)
+        if reaction is None:
+            raise ValueError(f"Reaction is not registered for event: {event_key}")
 
-        script_path = self._rule_script_path(event_key)
-        self.rule_bus.unregister_rule(
+        script_path = self._reaction_script_path(event_key)
+        self.reaction_bus.unregister_reaction(
             event_type=event_type,
             microcontroller_id=microcontroller_id,
             event_name=event_name,
         )
-        self.rule_buffer.unregister_event_from_buffer(
+        self.reaction_buffer.unregister_event_from_buffer(
             event_type=event_type,
             microcontroller_id=microcontroller_id,
             event_name=event_name,
         )
-        sys.modules.pop(f"_gerbera_rule_{rule.id.replace('-', '_')}", None)
+        sys.modules.pop(f"_gerbera_reaction_{reaction.id.replace('-', '_')}", None)
         script_path.unlink(missing_ok=True)
 
         return {
-            "rule_id": rule.id,
+            "reaction_id": reaction.id,
             "script_path": str(script_path),
         }
 
-    def _rule_script_path(
+    def _reaction_script_path(
         self,
-        event_key: EventKey,
+        event_key: tuple[str, str, str],
     ) -> Path:
-        return self.rules_path / f"{hash_event_key(event_key)}.py"
+        return self.reactions_path / f"{hash_event_key(event_key)}.py"
 
     def _write_and_load_callback(
         self,
         script_path: Path,
         module_name: str,
         callback_script: str,
-    ) -> RuleScriptCallback:
-        self.rules_path.mkdir(parents=True, exist_ok=True)
+    ) -> ReactionScriptCallback:
+        self.reactions_path.mkdir(parents=True, exist_ok=True)
         script_path.write_text(callback_script)
 
         try:
@@ -163,10 +157,10 @@ class AgentRuntime:
             callback = getattr(module, "callback", None)
             if not inspect.iscoroutinefunction(callback):
                 raise TypeError(
-                    "Rule script must define async callback(mcp_url, value)"
+                    "Reaction script must define async callback(mcp_url, value)"
                 )
 
-            return cast(RuleScriptCallback, callback)
+            return cast(ReactionScriptCallback, callback)
         except Exception:
             sys.modules.pop(module_name, None)
             script_path.unlink(missing_ok=True)

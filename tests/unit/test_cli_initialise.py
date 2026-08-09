@@ -82,4 +82,4 @@ def test_init_creates_config_and_gerbera_directories(
     assert config_path.exists()
     assert (tmp_path / ".gerbera" / "firmware").is_dir()
     assert (tmp_path / ".gerbera" / "models").is_dir()
-    assert (tmp_path / ".gerbera" / "rules").is_dir()
+    assert (tmp_path / ".gerbera" / "reactions").is_dir()

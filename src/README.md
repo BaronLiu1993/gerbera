@@ -19,6 +19,6 @@ flowchart TD
     D --> E[Firmware and runtime server]
 ```
 
-## Rule
+## Reaction
 
 Keep CLI concerns in `gerbera_cli` and runtime/domain concerns in `gerbera_sdk`.

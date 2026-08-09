@@ -87,7 +87,7 @@ classDiagram
     Connection "0..1" --> "0..1" Database
 ```
 
-## Identity Rules
+## Identity Reactions
 
 `HardwareSystem.id`
 
@@ -135,7 +135,7 @@ This is intentionally short to avoid PostgreSQL identifier length issues. It is 
 
 Use `name` and `description` for readability.
 
-## Streaming Rules
+## Streaming Reactions
 
 Streaming support is device-specific.
 

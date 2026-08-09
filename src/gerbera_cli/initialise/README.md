@@ -10,7 +10,7 @@ Commands may:
 
 - inspect local hardware
 - write local registry files
-- create `.gerbera/firmware/` and `.gerbera/rules/`
+- create `.gerbera/firmware/` and `.gerbera/reactions/`
 - call setup helpers
 - print actionable user output
 

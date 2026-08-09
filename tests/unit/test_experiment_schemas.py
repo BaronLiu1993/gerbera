@@ -2,13 +2,13 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from gerbera_sdk.events.event_key import EventKey
-from gerbera_sdk.events.rules import RuleTriggerModeEnum
+from gerbera_sdk.events.reactions import ReactionTriggerModeEnum
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
     ActionSchema,
     AgentExecuteSchema,
     HypothesisSchema,
     ReviewSchema,
-    RuleCreationSchema,
+    ReactionCreationSchema,
 )
 
 
@@ -86,13 +86,13 @@ def agent_execute_action() -> dict:
     }
 
 
-def rule_creation_action() -> dict:
+def reaction_creation_action() -> dict:
     return {
         "description": "Watch for excessive temperature.",
         "action_type": "execute",
-        "execution_type": "rule",
-        "create_tool_call": "insert_rule",
-        "delete_tool_call": "delete_rule",
+        "execution_type": "reaction",
+        "create_tool_call": "insert_reaction",
+        "delete_tool_call": "delete_reaction",
         "event_key": {
             "event_type": "STREAM",
             "microcontroller_id": "board-1",
@@ -193,91 +193,91 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
     assert action.params[0].value == 90
 
 
-def test_hypothesis_schema_models_a_rule_creation_step() -> None:
+def test_hypothesis_schema_models_a_reaction_creation_step() -> None:
     hypothesis = HypothesisSchema.model_validate(
-        hypothesis_data(rule_creation_action())
+        hypothesis_data(reaction_creation_action())
     )
 
     action = hypothesis.method.execute_steps[0].actions[0]
-    assert isinstance(action, RuleCreationSchema)
+    assert isinstance(action, ReactionCreationSchema)
     assert isinstance(action.event_key, EventKey)
     assert action.event_key.event_name == "temperature"
     assert action.callable == "return None"
     assert action.expected == 20.0
     assert type(action.expected) is float
-    assert action.trigger_mode == RuleTriggerModeEnum.REPEAT
+    assert action.trigger_mode == ReactionTriggerModeEnum.REPEAT
 
 
-def test_rule_creation_accepts_once_trigger_mode() -> None:
-    action = rule_creation_action()
+def test_reaction_creation_accepts_once_trigger_mode() -> None:
+    action = reaction_creation_action()
     action["trigger_mode"] = "once"
 
-    rule = RuleCreationSchema.model_validate(action)
+    reaction = ReactionCreationSchema.model_validate(action)
 
-    assert rule.trigger_mode == RuleTriggerModeEnum.ONCE
+    assert reaction.trigger_mode == ReactionTriggerModeEnum.ONCE
 
 
 @pytest.mark.parametrize(
     "expected",
     ["on", "1", True, False, float("inf"), float("nan")],
 )
-def test_rule_creation_requires_a_finite_numeric_expected(
+def test_reaction_creation_requires_a_finite_numeric_expected(
     expected: object,
 ) -> None:
-    action = rule_creation_action()
+    action = reaction_creation_action()
     action["expected"] = expected
 
     with pytest.raises(ValidationError):
-        RuleCreationSchema.model_validate(action)
+        ReactionCreationSchema.model_validate(action)
 
 
-def test_rule_creation_rejects_a_complete_function() -> None:
-    action = rule_creation_action()
+def test_reaction_creation_rejects_a_complete_function() -> None:
+    action = reaction_creation_action()
     action["callable"] = (
         "async def callback(mcp_url, value):\n"
         "    return value\n"
     )
 
     with pytest.raises(ValidationError, match="cannot define functions"):
-        RuleCreationSchema.model_validate(action)
+        ReactionCreationSchema.model_validate(action)
 
 
-def test_rule_creation_rejects_callback_imports() -> None:
-    action = rule_creation_action()
+def test_reaction_creation_rejects_callback_imports() -> None:
+    action = reaction_creation_action()
     action["callable"] = "import httpx\nreturn None"
 
     with pytest.raises(ValidationError, match="contain imports"):
-        RuleCreationSchema.model_validate(action)
+        ReactionCreationSchema.model_validate(action)
 
 
 @pytest.mark.parametrize("parameter", ["mcp_url", "value"])
-def test_rule_creation_rejects_reassigned_callback_parameters(
+def test_reaction_creation_rejects_reassigned_callback_parameters(
     parameter: str,
 ) -> None:
-    action = rule_creation_action()
+    action = reaction_creation_action()
     action["callable"] = f"{parameter} = None\nreturn None"
 
     with pytest.raises(ValidationError, match="cannot reassign"):
-        RuleCreationSchema.model_validate(action)
+        ReactionCreationSchema.model_validate(action)
 
 
-def test_rule_creation_normalizes_a_multiline_callback_body() -> None:
-    action = rule_creation_action()
+def test_reaction_creation_normalizes_a_multiline_callback_body() -> None:
+    action = reaction_creation_action()
     action["callable"] = "  if value:\n      return value\n  return None"
 
-    rule = RuleCreationSchema.model_validate(action)
+    reaction = ReactionCreationSchema.model_validate(action)
 
-    assert rule.callable == "if value:\n    return value\nreturn None"
+    assert reaction.callable == "if value:\n    return value\nreturn None"
 
 
-def test_rule_creation_must_be_in_first_execute_group() -> None:
+def test_reaction_creation_must_be_in_first_execute_group() -> None:
     data = hypothesis_data(discrete_execute_action())
     data["method"]["execute_steps"].insert(
         1,
         {
-            "goal": "Create the temperature safety rule.",
+            "goal": "Create the temperature safety reaction.",
             "action_type": "execute",
-            "actions": [rule_creation_action()],
+            "actions": [reaction_creation_action()],
         },
     )
 
@@ -285,8 +285,8 @@ def test_rule_creation_must_be_in_first_execute_group() -> None:
         HypothesisSchema.model_validate(data)
 
 
-def test_rule_creation_can_share_the_first_execute_group() -> None:
-    data = hypothesis_data(rule_creation_action())
+def test_reaction_creation_can_share_the_first_execute_group() -> None:
+    data = hypothesis_data(reaction_creation_action())
     data["method"]["execute_steps"][0]["actions"].append(
         discrete_execute_action()
     )
@@ -414,17 +414,17 @@ def test_hypothesis_output_schema_uses_current_action_schemas() -> None:
     assert "ContinuousExecuteSchema" in schema["$defs"]
     assert "DiscreteExecuteSchema" in schema["$defs"]
     assert "AgentExecuteSchema" in schema["$defs"]
-    assert "RuleCreationSchema" in schema["$defs"]
+    assert "ReactionCreationSchema" in schema["$defs"]
     assert "ReviewSchema" in schema["$defs"]
 
 
 def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
     trigger_mode_schema = HypothesisSchema.model_json_schema()["$defs"][
-        "RuleCreationSchema"
+        "ReactionCreationSchema"
     ]["properties"]["trigger_mode"]
 
     assert trigger_mode_schema == {
-        "$ref": "#/$defs/RuleTriggerModeEnum",
+        "$ref": "#/$defs/ReactionTriggerModeEnum",
     }
 
 

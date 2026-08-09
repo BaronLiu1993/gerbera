@@ -14,7 +14,7 @@ It is the layer that turns a declared hardware system into:
 
 ```text
 contracts/          Shared typed contracts for commands, firmware, and schemas.
-events/             Event routing, stream buffering, and event rules.
+events/             Event routing, stream buffering, and event reactions.
 firmware/           Firmware generation, flashing, and device builders.
 harness/            Agent, experiment, and memory support.
 models/             Hardware declarations and board, database, and server runtimes.

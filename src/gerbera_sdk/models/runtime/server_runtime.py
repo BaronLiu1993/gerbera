@@ -23,9 +23,9 @@ from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
-from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
-from gerbera_sdk.events.rules.rule_bus import RuleBus
-from gerbera_sdk.events.rules import OperatorEnum, RuleTriggerModeEnum
+from gerbera_sdk.events.reactions.reaction_store import ReactionBuffer
+from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.events.reactions import OperatorEnum, ReactionTriggerModeEnum
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
@@ -38,7 +38,6 @@ EventCatalog = dict[
     str,
     dict[str, dict[str, EventMetadata]],
 ]
-EventKey = tuple[str, str, str]
 
 
 class SubscribedCameraCatalogEntry(StrictSchema):
@@ -70,14 +69,14 @@ class ServerRuntime:
     model_runtime: ModelRuntime
     agent_runtime: AgentRuntime
     event_listener: EventListener
-    rule_bus: RuleBus
-    rule_buffer: RuleBuffer
+    reaction_bus: ReactionBus
+    reaction_buffer: ReactionBuffer
     event_read_timeout_seconds: float = 1.0
     event_read_poll_seconds: float = 0.02
 
     def register_tools(self) -> None:
         self._register_hardware_tools()
-        self._register_rule_tools()
+        self._register_reaction_tools()
         self._register_event_catalog_tool()
 
     # Event registration and catalog helpers.
@@ -164,7 +163,7 @@ class ServerRuntime:
 
     def _read_latest_event_value(
         self,
-        event_key: EventKey,
+        event_key: tuple[str, str, str],
         previous_value: dict[str, str] | None,
     ) -> dict[str, str] | None:
         deadline = time.monotonic() + self.event_read_timeout_seconds
@@ -768,10 +767,10 @@ class ServerRuntime:
             ),
         )
 
-    # Rule and event catalog tools.
+    # Reaction and event catalog tools.
 
-    def _register_rule_tools(self) -> None:
-        def insert_rule(
+    def _register_reaction_tools(self) -> None:
+        def insert_reaction(
             event_type: str,
             microcontroller_id: str,
             event_name: str,
@@ -781,9 +780,9 @@ class ServerRuntime:
             ],
             operator: OperatorEnum,
             callback_body: str,
-            trigger_mode: RuleTriggerModeEnum = RuleTriggerModeEnum.REPEAT,
+            trigger_mode: ReactionTriggerModeEnum = ReactionTriggerModeEnum.REPEAT,
         ) -> dict[str, str]:
-            return self.agent_runtime.insert_rule(
+            return self.agent_runtime.insert_reaction(
                 event_type=event_type,
                 microcontroller_id=microcontroller_id,
                 event_name=event_name,
@@ -794,9 +793,9 @@ class ServerRuntime:
             )
 
         self._register_tool(
-            name="insert_rule",
+            name="insert_reaction",
             description=(
-                "Create and register a rule for a hardware event. "
+                "Create and register a reaction for a hardware event. "
                 "callback_body must contain only the Python statements for "
                 "async callback(mcp_url, value). The runtime imports httpx "
                 "and fastmcp.Client, adds the fixed function definition, and "
@@ -804,9 +803,9 @@ class ServerRuntime:
                 "The agent must use the mcp_url parameter and must not provide "
                 "or hardcode an endpoint."
             ),
-            tool_function=insert_rule,
+            tool_function=insert_reaction,
             annotations=ToolAnnotations(
-                title="Create an event rule",
+                title="Create an event reaction",
                 readOnlyHint=False,
                 destructiveHint=False,
                 idempotentHint=False,
@@ -814,26 +813,26 @@ class ServerRuntime:
             ),
         )
 
-        def delete_rule(
+        def delete_reaction(
             event_type: str,
             microcontroller_id: str,
             event_name: str,
         ) -> dict[str, str]:
-            return self.agent_runtime.delete_rule(
+            return self.agent_runtime.delete_reaction(
                 event_type=event_type,
                 microcontroller_id=microcontroller_id,
                 event_name=event_name,
             )
 
         self._register_tool(
-            name="delete_rule",
+            name="delete_reaction",
             description=(
-                "Delete the rule registered for a hardware event and remove "
+                "Delete the reaction registered for a hardware event and remove "
                 "its local callback script."
             ),
-            tool_function=delete_rule,
+            tool_function=delete_reaction,
             annotations=ToolAnnotations(
-                title="Delete an event rule",
+                title="Delete an event reaction",
                 readOnlyHint=False,
                 destructiveHint=True,
                 idempotentHint=False,
@@ -842,18 +841,18 @@ class ServerRuntime:
         )
 
     def _register_event_catalog_tool(self) -> None:
-        def list_rule_events() -> EventCatalog:
+        def list_reaction_events() -> EventCatalog:
             return self.get_event_catalog()
 
         self._register_tool(
-            name="list_rule_events",
+            name="list_reaction_events",
             description=(
                 "List the registered hardware events that can be used "
-                "when creating rules."
+                "when creating reactions."
             ),
-            tool_function=list_rule_events,
+            tool_function=list_reaction_events,
             annotations=ToolAnnotations(
-                title="List events available for rules",
+                title="List events available for reactions",
                 readOnlyHint=True,
                 destructiveHint=False,
                 idempotentHint=True,

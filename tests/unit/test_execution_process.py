@@ -16,7 +16,7 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
-    RuleCreationSchema,
+    ReactionCreationSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
@@ -91,14 +91,14 @@ def agent_action() -> AgentExecuteSchema:
     )
 
 
-def rule_creation_action() -> RuleCreationSchema:
-    return RuleCreationSchema.model_validate(
+def reaction_creation_action() -> ReactionCreationSchema:
+    return ReactionCreationSchema.model_validate(
         {
             "description": "Watch for excessive temperature.",
             "action_type": "execute",
-            "execution_type": "rule",
-            "create_tool_call": "insert_rule",
-            "delete_tool_call": "delete_rule",
+            "execution_type": "reaction",
+            "create_tool_call": "insert_reaction",
+            "delete_tool_call": "delete_reaction",
             "event_key": {
                 "event_type": "STREAM",
                 "microcontroller_id": "board-1",
@@ -131,8 +131,8 @@ class FakeMCPClient:
             SimpleNamespace(name="set_motor"),
             SimpleNamespace(name="start_sensor"),
             SimpleNamespace(name="stop_sensor"),
-            SimpleNamespace(name="insert_rule"),
-            SimpleNamespace(name="delete_rule"),
+            SimpleNamespace(name="insert_reaction"),
+            SimpleNamespace(name="delete_reaction"),
         ]
 
     @staticmethod
@@ -255,9 +255,9 @@ def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[
             ExecuteActionGroupSchema(
-                goal="Install the safety rule.",
+                goal="Install the safety reaction.",
                 action_type="execute",
-                actions=[rule_creation_action()],
+                actions=[reaction_creation_action()],
             ),
             ExecuteActionGroupSchema(
                 goal="Approach the block.",
@@ -282,9 +282,9 @@ def test_execution_process_coordinates_all_groups_with_agent_executor() -> None:
     assert completed_groups == [0, 1, 2]
     assert executed_agents == [(1, process.actions_list[1].actions[0])]
     assert [call[0] for call in FakeMCPClient.calls] == [
-        "insert_rule",
+        "insert_reaction",
         "set_motor",
-        "delete_rule",
+        "delete_reaction",
     ]
 
 
@@ -357,11 +357,11 @@ def test_execution_process_completes_task_after_retry() -> None:
     assert completed_groups == [0]
 
 
-def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
+def test_execution_process_creates_reaction_before_action_and_deletes_it() -> None:
     group = ExecuteActionGroupSchema(
         goal="Set the motor speed safely.",
         action_type="execute",
-        actions=[discrete_action(), rule_creation_action()],
+        actions=[discrete_action(), reaction_creation_action()],
     )
     process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
@@ -377,7 +377,7 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
     }
     assert FakeMCPClient.calls == [
         (
-            "insert_rule",
+            "insert_reaction",
             {
                 **event_key,
                 "expected_value": 20.0,
@@ -387,20 +387,20 @@ def test_execution_process_creates_rule_before_action_and_deletes_it() -> None:
             },
         ),
         ("set_motor", {"speed": 10}),
-        ("delete_rule", event_key),
+        ("delete_reaction", event_key),
     ]
     assert result is ExecuteDecisionEnum.ACCEPTED
 
 
-def test_execution_process_deletes_rule_when_later_group_fails() -> None:
+def test_execution_process_deletes_reaction_when_later_group_fails() -> None:
     FakeMCPClient.failing_tools = {"set_motor"}
     process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[
             ExecuteActionGroupSchema(
-                goal="Install the safety rule.",
+                goal="Install the safety reaction.",
                 action_type="execute",
-                actions=[rule_creation_action()],
+                actions=[reaction_creation_action()],
             ),
             ExecuteActionGroupSchema(
                 goal="Set the motor speed.",
@@ -416,7 +416,7 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
     assert FakeMCPClient.calls.count(("set_motor", {"speed": 10})) == 3
 
     assert FakeMCPClient.calls[-1] == (
-        "delete_rule",
+        "delete_reaction",
         {
             "event_type": "STREAM",
             "microcontroller_id": "board-1",
@@ -425,19 +425,19 @@ def test_execution_process_deletes_rule_when_later_group_fails() -> None:
     )
 
 
-def test_execution_process_fails_when_rule_cleanup_fails() -> None:
-    FakeMCPClient.failing_tools = {"delete_rule"}
+def test_execution_process_fails_when_reaction_cleanup_fails() -> None:
+    FakeMCPClient.failing_tools = {"delete_reaction"}
     group = ExecuteActionGroupSchema(
         goal="Set the motor speed safely.",
         action_type="execute",
-        actions=[rule_creation_action(), discrete_action()],
+        actions=[reaction_creation_action(), discrete_action()],
     )
     process = make_execution_process(
         mcp_url="https://hardware.example.com/mcp",
         actions_list=[group],
     )
 
-    with pytest.raises(RuntimeError, match="delete_rule"):
+    with pytest.raises(RuntimeError, match="delete_reaction"):
         asyncio.run(process.run_workflow())
 
 

@@ -50,9 +50,9 @@ def current_task() -> TaskSchema:
     )
 
 
-def test_execution_type_uses_one_enum_with_rule_support() -> None:
+def test_execution_type_uses_one_enum_with_reaction_support() -> None:
     assert ExecutionTypeEnum is ActionExecutionTypeEnum
-    assert ExecutionTypeEnum.RULE.value == "rule"
+    assert ExecutionTypeEnum.REACTION.value == "reaction"
 
 
 @pytest.mark.parametrize(

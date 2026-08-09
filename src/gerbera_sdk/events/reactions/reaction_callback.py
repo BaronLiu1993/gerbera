@@ -4,7 +4,7 @@ import uuid
 
 
 @dataclass
-class RuleCallback:
+class ReactionCallback:
     callback: Callable[[str, float], Awaitable[object]]
     mcp_url: str
     val: float | None = None

@@ -4,7 +4,7 @@ Use the initialised experiment plan and the observation history to produce the
 next executable plan for the current physical state.
 
 Return exactly one execution action permitted by the response schema. The
-action must be either continuous or discrete. Do not emit agent, rule-creation,
+action must be either continuous or discrete. Do not emit agent, reaction-creation,
 review, or observation actions.
 
 Treat the message history as the source of truth for the current world state.

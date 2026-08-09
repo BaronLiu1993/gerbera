@@ -3,11 +3,10 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StrictFloat, field_validator
 
-from gerbera_sdk.events.event_key import EventKey
-from gerbera_sdk.events.rules import (
+from gerbera_sdk.events.reactions import (
     OperatorEnum,
-    RuleTriggerModeEnum,
-    normalize_rule_callback_body,
+    ReactionTriggerModeEnum,
+    normalize_reaction_callback_body,
 )
 
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
@@ -33,7 +32,7 @@ class ExecutionTypeEnum(str, Enum):
     AGENT = "agent"
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
-    RULE = "rule"
+    REACTION = "reaction"
 
 class ExecuteActionParameterSchema(StrictSchema):
     tool_parameter: SnakeCaseVariable = Field(
@@ -44,13 +43,13 @@ class ExecuteActionParameterSchema(StrictSchema):
     type: ParameterTypeSchema
 
 
-class RuleCreationSchema(StrictSchema):
+class ReactionCreationSchema(StrictSchema):
     description: str
     action_type: Literal["execute"]
-    execution_type: Literal["rule"]
+    execution_type: Literal["reaction"]
     create_tool_call: str = Field(min_length=1)
     delete_tool_call: str = Field(min_length=1)
-    event_key: EventKey
+    event_key: tuple[str, str, str]
     callable: str = Field(
         min_length=1,
         description=(
@@ -67,12 +66,12 @@ class RuleCreationSchema(StrictSchema):
         StrictFloat,
         Field(allow_inf_nan=False),
     ]
-    trigger_mode: RuleTriggerModeEnum
+    trigger_mode: ReactionTriggerModeEnum
 
     @field_validator("callable")
     @classmethod
     def validate_callable_body(cls, value: str) -> str:
-        return normalize_rule_callback_body(value)
+        return normalize_reaction_callback_body(value)
 
 
 class AgentExecuteSchema(StrictSchema):
@@ -105,7 +104,7 @@ class ContinuousExecuteSchema(StrictSchema):
     reverse_tool_call: str = Field(min_length=1)
     forward_tool_call_params: list[ExecuteActionParameterSchema]
     reverse_tool_call_params: list[ExecuteActionParameterSchema]
-    emitted_event_keys: list[EventKey] = Field(
+    emitted_event_keys: list[tuple[str, str, str]] = Field(
         description=(
             "Event channels that emit observations while this action runs."
         ),
@@ -159,14 +158,14 @@ class ReviewSchema(StrictSchema):
 
 # Union Schemas
 ExecuteSchema = (
-    RuleCreationSchema
+    ReactionCreationSchema
     | ContinuousExecuteSchema
     | DiscreteExecuteSchema
     | AgentExecuteSchema
 )
 
 DeterministicExecuteSchema = (
-    RuleCreationSchema
+    ReactionCreationSchema
     | ContinuousExecuteSchema
     | DiscreteExecuteSchema
 )

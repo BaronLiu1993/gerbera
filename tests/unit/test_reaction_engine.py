@@ -4,15 +4,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from gerbera_sdk.events.rules import (
+from gerbera_sdk.events.reactions import (
     OperatorEnum,
-    Rule,
-    RuleBuffer,
-    RuleBus,
-    RuleCallback,
-    RuleCondition,
-    RuleTriggerModeEnum,
-    parse_rule_value,
+    Reaction,
+    ReactionBuffer,
+    ReactionBus,
+    ReactionCallback,
+    ReactionCondition,
+    ReactionTriggerModeEnum,
+    parse_reaction_value,
 )
 
 
@@ -40,19 +40,19 @@ def async_callback(
         (OperatorEnum.GREATER_THAN_EQUAL, 10.0, 10.0, True),
     ],
 )
-def test_rule_condition_evaluates_supported_operators(
+def test_reaction_condition_evaluates_supported_operators(
     operator: OperatorEnum,
     actual: float,
     expected: float,
     matches: bool,
 ) -> None:
-    condition = RuleCondition(expected=expected, operator=operator)
+    condition = ReactionCondition(expected=expected, operator=operator)
 
     assert condition.evaluate_condition(actual) is matches
 
 
-def test_rule_condition_does_not_match_missing_value() -> None:
-    condition = RuleCondition(
+def test_reaction_condition_does_not_match_missing_value() -> None:
+    condition = ReactionCondition(
         expected=1.0,
         operator=OperatorEnum.NOT_EQUAL,
     )
@@ -68,8 +68,8 @@ def test_rule_condition_does_not_match_missing_value() -> None:
         (1.25, 1.25),
     ],
 )
-def test_parse_rule_value_returns_a_float(value: object, expected: float) -> None:
-    parsed = parse_rule_value(value)
+def test_parse_reaction_value_returns_a_float(value: object, expected: float) -> None:
+    parsed = parse_reaction_value(value)
 
     assert parsed == expected
     assert type(parsed) is float
@@ -79,13 +79,13 @@ def test_parse_rule_value_returns_a_float(value: object, expected: float) -> Non
     "value",
     ["on", True, False, float("inf"), float("nan")],
 )
-def test_parse_rule_value_rejects_non_finite_numbers(value: object) -> None:
+def test_parse_reaction_value_rejects_non_finite_numbers(value: object) -> None:
     with pytest.raises(ValueError, match="finite numbers"):
-        parse_rule_value(value)
+        parse_reaction_value(value)
 
 
-def test_rule_callback_stores_value_and_returns_callable_result() -> None:
-    callback = RuleCallback(
+def test_reaction_callback_stores_value_and_returns_callable_result() -> None:
+    callback = ReactionCallback(
         callback=async_callback(lambda value: value * 2),
         mcp_url=MCP_URL,
     )
@@ -96,7 +96,7 @@ def test_rule_callback_stores_value_and_returns_callable_result() -> None:
     assert callback.val == 4.0
 
 
-def test_rule_callback_passes_mcp_url_and_value_to_script() -> None:
+def test_reaction_callback_passes_mcp_url_and_value_to_script() -> None:
     calls: list[tuple[str, float]] = []
 
     async def script_callback(
@@ -106,7 +106,7 @@ def test_rule_callback_passes_mcp_url_and_value_to_script() -> None:
         calls.append((mcp_url, value))
         return {"trigger_value": value}
 
-    callback = RuleCallback(
+    callback = ReactionCallback(
         callback=script_callback,
         mcp_url=MCP_URL,
     )
@@ -118,16 +118,16 @@ def test_rule_callback_passes_mcp_url_and_value_to_script() -> None:
     assert calls == [(MCP_URL, 1.0)]
 
 
-def test_rule_bus_evaluates_rule_registered_for_event() -> None:
-    rule_bus = RuleBus()
-    rule_bus.register_rule(
+def test_reaction_bus_evaluates_reaction_registered_for_event() -> None:
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction(
         *EVENT_KEY,
-        Rule(
-            condition=RuleCondition(
+        Reaction(
+            condition=ReactionCondition(
                 expected=20.0,
                 operator=OperatorEnum.GREATER_THAN,
             ),
-            callback=RuleCallback(
+            callback=ReactionCallback(
                 callback=async_callback(
                     lambda value: f"high:{value}",
                 ),
@@ -137,109 +137,109 @@ def test_rule_bus_evaluates_rule_registered_for_event() -> None:
     )
 
     assert (
-        asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 30.0))
+        asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 30.0))
         == "high:30.0"
     )
 
 
-def test_repeat_rule_runs_for_every_matching_event() -> None:
+def test_repeat_reaction_runs_for_every_matching_event() -> None:
     callback_values: list[float] = []
-    rule_bus = RuleBus()
-    rule_bus.register_rule(
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction(
         *EVENT_KEY,
-        Rule(
-            condition=RuleCondition(
+        Reaction(
+            condition=ReactionCondition(
                 expected=1.0,
                 operator=OperatorEnum.EQUAL,
             ),
-            callback=RuleCallback(
+            callback=ReactionCallback(
                 callback=async_callback(
                     lambda value: callback_values.append(value),
                 ),
                 mcp_url=MCP_URL,
             ),
-            trigger_mode=RuleTriggerModeEnum.REPEAT,
+            trigger_mode=ReactionTriggerModeEnum.REPEAT,
         ),
     )
 
-    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 1.0))
-    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 1.0))
+    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0))
+    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0))
 
     assert callback_values == [1.0, 1.0]
 
 
-def test_once_rule_runs_only_for_first_matching_event() -> None:
+def test_once_reaction_runs_only_for_first_matching_event() -> None:
     callback_values: list[float] = []
-    rule = Rule(
-        condition=RuleCondition(
+    reaction = Reaction(
+        condition=ReactionCondition(
             expected=1.0,
             operator=OperatorEnum.EQUAL,
         ),
-        callback=RuleCallback(
+        callback=ReactionCallback(
             callback=async_callback(
                 lambda value: callback_values.append(value),
             ),
             mcp_url=MCP_URL,
         ),
-        trigger_mode=RuleTriggerModeEnum.ONCE,
+        trigger_mode=ReactionTriggerModeEnum.ONCE,
     )
-    rule_bus = RuleBus()
-    rule_bus.register_rule(*EVENT_KEY, rule)
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction(*EVENT_KEY, reaction)
 
-    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 0.0))
-    asyncio.run(rule_bus.emit_evaluation_event(EVENT_KEY, 1.0))
+    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 0.0))
+    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0))
     second_result = asyncio.run(
-        rule_bus.emit_evaluation_event(EVENT_KEY, 1.0)
+        reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0)
     )
 
     assert callback_values == [1.0]
-    assert rule.has_triggered is True
+    assert reaction.has_triggered is True
     assert second_result is None
 
 
-def test_once_rule_claim_is_atomic() -> None:
-    rule = Rule(
-        condition=RuleCondition(
+def test_once_reaction_claim_is_atomic() -> None:
+    reaction = Reaction(
+        condition=ReactionCondition(
             expected=1.0,
             operator=OperatorEnum.EQUAL,
         ),
-        callback=RuleCallback(
+        callback=ReactionCallback(
             callback=async_callback(lambda value: value),
             mcp_url=MCP_URL,
         ),
-        trigger_mode=RuleTriggerModeEnum.ONCE,
+        trigger_mode=ReactionTriggerModeEnum.ONCE,
     )
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        claims = list(executor.map(lambda _: rule.claim_trigger(), range(32)))
+        claims = list(executor.map(lambda _: reaction.claim_trigger(), range(32)))
 
     assert claims.count(True) == 1
     assert claims.count(False) == 31
 
 
-def test_rule_bus_rejects_second_rule_for_same_event() -> None:
-    rule_bus = RuleBus()
-    rule = Rule(
-        condition=RuleCondition(
+def test_reaction_bus_rejects_second_reaction_for_same_event() -> None:
+    reaction_bus = ReactionBus()
+    reaction = Reaction(
+        condition=ReactionCondition(
             expected=20.0,
             operator=OperatorEnum.GREATER_THAN,
         ),
-        callback=RuleCallback(
+        callback=ReactionCallback(
             callback=async_callback(lambda value: value),
             mcp_url=MCP_URL,
         ),
     )
-    rule_bus.register_rule(*EVENT_KEY, rule)
+    reaction_bus.register_reaction(*EVENT_KEY, reaction)
 
     with pytest.raises(ValueError, match="already registered"):
-        rule_bus.register_rule(
+        reaction_bus.register_reaction(
             *EVENT_KEY,
-            Rule(
-                condition=RuleCondition(
+            Reaction(
+                condition=ReactionCondition(
                     expected=50.0,
                     operator=OperatorEnum.GREATER_THAN,
                 ),
-                callback=RuleCallback(
+                callback=ReactionCallback(
                     callback=async_callback(lambda value: value),
                     mcp_url=MCP_URL,
                 ),
@@ -247,16 +247,16 @@ def test_rule_bus_rejects_second_rule_for_same_event() -> None:
         )
 
 
-def test_rule_bus_returns_none_when_rule_does_not_match() -> None:
-    rule_bus = RuleBus()
-    rule_bus.register_rule(
+def test_reaction_bus_returns_none_when_reaction_does_not_match() -> None:
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction(
         *EVENT_KEY,
-        Rule(
-            condition=RuleCondition(
+        Reaction(
+            condition=ReactionCondition(
                 expected=50.0,
                 operator=OperatorEnum.GREATER_THAN,
             ),
-            callback=RuleCallback(
+            callback=ReactionCallback(
                 callback=async_callback(
                     lambda value: f"very-high:{value}",
                 ),
@@ -266,76 +266,76 @@ def test_rule_bus_returns_none_when_rule_does_not_match() -> None:
     )
 
     assert asyncio.run(
-        rule_bus.emit_evaluation_event(EVENT_KEY, 30.0)
+        reaction_bus.emit_evaluation_event(EVENT_KEY, 30.0)
     ) is None
 
 
-def test_rule_bus_returns_no_results_for_unknown_event() -> None:
-    rule_bus = RuleBus()
+def test_reaction_bus_returns_no_results_for_unknown_event() -> None:
+    reaction_bus = ReactionBus()
 
     assert asyncio.run(
-        rule_bus.emit_evaluation_event(EVENT_KEY, 30.0)
+        reaction_bus.emit_evaluation_event(EVENT_KEY, 30.0)
     ) is None
 
 
-def test_rule_buffer_stores_value_and_emits_rule_evaluation() -> None:
-    rule_bus = RuleBus()
-    rule_bus.register_rule(
+def test_reaction_buffer_stores_value_and_emits_reaction_evaluation() -> None:
+    reaction_bus = ReactionBus()
+    reaction_bus.register_reaction(
         *EVENT_KEY,
-        Rule(
-            condition=RuleCondition(
+        Reaction(
+            condition=ReactionCondition(
                 expected=20.0,
                 operator=OperatorEnum.GREATER_THAN,
             ),
-            callback=RuleCallback(
+            callback=ReactionCallback(
                 callback=async_callback(lambda value: value),
                 mcp_url=MCP_URL,
             ),
         ),
     )
-    rule_buffer = RuleBuffer(rule_bus)
-    rule_buffer.register_event_in_buffer(*EVENT_KEY)
+    reaction_buffer = ReactionBuffer(reaction_bus)
+    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
 
     result = asyncio.run(
-        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": "30"})
+        reaction_buffer.update_buffer_value(*EVENT_KEY, {"value": "30"})
     )
 
     assert result == 30.0
-    assert rule_buffer.buffer[EVENT_KEY] == 30.0
+    assert reaction_buffer.buffer[EVENT_KEY] == 30.0
 
 
-def test_rule_buffer_does_not_replace_value_when_reregistered() -> None:
-    rule_buffer = RuleBuffer(RuleBus())
-    rule_buffer.register_event_in_buffer(*EVENT_KEY)
+def test_reaction_buffer_does_not_replace_value_when_reregistered() -> None:
+    reaction_buffer = ReactionBuffer(ReactionBus())
+    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
     asyncio.run(
-        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 10})
+        reaction_buffer.update_buffer_value(*EVENT_KEY, {"value": 10})
     )
-    rule_buffer.register_event_in_buffer(*EVENT_KEY)
+    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
 
-    assert rule_buffer.buffer[EVENT_KEY] == 10.0
+    assert reaction_buffer.buffer[EVENT_KEY] == 10.0
 
 
-def test_rule_buffer_ignores_unknown_event() -> None:
-    rule_buffer = RuleBuffer(RuleBus())
+def test_reaction_buffer_ignores_unknown_event() -> None:
+    reaction_buffer = ReactionBuffer(ReactionBus())
 
     result = asyncio.run(
-        rule_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
+        reaction_buffer.update_buffer_value(*EVENT_KEY, {"value": 30})
     )
 
     assert result is None
-    assert rule_buffer.buffer == {}
+    assert reaction_buffer.buffer == {}
 
 
-def test_rule_buffer_rejects_non_numeric_sensor_value() -> None:
-    rule_buffer = RuleBuffer(RuleBus())
-    rule_buffer.register_event_in_buffer(*EVENT_KEY)
+def test_reaction_buffer_rejects_non_numeric_sensor_value() -> None:
+    reaction_buffer = ReactionBuffer(ReactionBus())
+    reaction_buffer.register_event_in_buffer(*EVENT_KEY)
 
     with pytest.raises(ValueError, match="finite numbers"):
         asyncio.run(
-            rule_buffer.update_buffer_value(
+            reaction_buffer.update_buffer_value(
                 *EVENT_KEY,
                 {"value": "on"},
             )
         )
 
-    assert rule_buffer.buffer[EVENT_KEY] is None
+    assert reaction_buffer.buffer[EVENT_KEY] is None

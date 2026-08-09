@@ -6,20 +6,20 @@ import uuid
 from pydantic import Field, StrictFloat, TypeAdapter, ValidationError
 
 
-_RULE_FLOAT_ADAPTER = TypeAdapter(
+_REACTION_FLOAT_ADAPTER = TypeAdapter(
     Annotated[StrictFloat, Field(allow_inf_nan=False)]
 )
 
 
-def parse_rule_value(value: object) -> float:
+def parse_reaction_value(value: object) -> float:
     if isinstance(value, bool):
-        raise ValueError("Rule values must be finite numbers")
+        raise ValueError("Reaction values must be finite numbers")
 
     try:
         normalized_value = float(value)
-        return _RULE_FLOAT_ADAPTER.validate_python(normalized_value)
+        return _REACTION_FLOAT_ADAPTER.validate_python(normalized_value)
     except (TypeError, ValueError, ValidationError) as exc:
-        raise ValueError("Rule values must be finite numbers") from exc
+        raise ValueError("Reaction values must be finite numbers") from exc
 
 
 class OperatorEnum(str, Enum):
@@ -32,13 +32,13 @@ class OperatorEnum(str, Enum):
 
 
 @dataclass
-class RuleCondition:
+class ReactionCondition:
     expected: float
     operator: OperatorEnum
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def __post_init__(self) -> None:
-        self.expected = parse_rule_value(self.expected)
+        self.expected = parse_reaction_value(self.expected)
 
     def evaluate_condition(self, actual: float | None) -> bool:
         if actual is None:

@@ -22,7 +22,7 @@ It is not responsible for:
 
 ```text
 server_runtime.py       MCP tools, events, listeners, and command dispatch.
-agent_runtime.py        Agent-created rule scripts and live rule registration.
+agent_runtime.py        Agent-created reaction scripts and live reaction registration.
 board_runtime.py        Per-process board transport pool and lifecycle.
 command_runtime.py      Command compilation and response parsing.
 ```
@@ -45,9 +45,9 @@ command_runtime.py      Command compilation and response parsing.
 
 `AgentRuntime` owns:
 
-- writing generated callback scripts to `.gerbera/rules/`
+- writing generated callback scripts to `.gerbera/reactions/`
 - loading the script's async `callback(mcp_url, value)` function
-- registering the resulting rule with the live rule bus and buffer
+- registering the resulting reaction with the live reaction bus and buffer
 
 `BoardRuntime` owns:
 
@@ -83,7 +83,7 @@ flowchart TD
     D --> M[Database]
 ```
 
-## Boundary Rule
+## Boundary Reaction
 
 The runtime layer should know how the system runs.
 

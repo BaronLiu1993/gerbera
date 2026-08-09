@@ -10,7 +10,7 @@ event_bus.py            Event registry and routing lookup.
 event.py                MCP response events and STREAM buffer events.
 buffer.py               In-memory batch buffer.
 event_worker.py         Background queue for database stream writes.
-rules/                  Event rules, conditions, callbacks, and latest values.
+reactions/                  Event reactions, conditions, callbacks, and latest values.
 ```
 
 ## Ownership
@@ -22,7 +22,7 @@ This folder owns:
 - buffering stream payloads
 - flushing partial stream buffers
 - queueing stream batches for the database
-- evaluating registered event rules without blocking serial listeners
+- evaluating registered event reactions without blocking serial listeners
 
 This folder does not own:
 
@@ -41,8 +41,8 @@ flowchart TD
     C -->|STREAM| E[EventBus STREAM event]
     D --> F[Event.latest_val]
     E --> G[Buffer]
-    B --> R[Rule buffer]
-    R --> S[Async rule callback]
+    B --> R[Reaction buffer]
+    R --> S[Async reaction callback]
     G --> H[EventWorker]
     H --> I[Database]
 ```
