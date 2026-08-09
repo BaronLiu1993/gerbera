@@ -2,9 +2,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 import uuid
 
+from gerbera_sdk.events.utils import EventKey, build_event_key
 from gerbera_sdk.events.rules.rule_bus import RuleBus
 from gerbera_sdk.events.rules.rule_condition import parse_rule_value
-from gerbera_sdk.utils import EventKey, build_event_key
 
 
 @dataclass

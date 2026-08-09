@@ -9,6 +9,7 @@ import pytest
 
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
@@ -63,9 +64,18 @@ class FakeSerialConnection:
         self.on_write()
 
 
+def _database() -> Database:
+    return Database("localhost", 5432, "user", "password", "gerbera")
+
+
+def _event_worker() -> EventWorker:
+    return EventWorker(database=_database())
+
+
 def ServerRuntime(**dependencies) -> _ServerRuntime:
     rule_bus = dependencies.setdefault("rule_bus", RuleBus())
     dependencies.setdefault("rule_buffer", RuleBuffer(rule_bus))
+    dependencies.setdefault("event_store", EventStore())
     dependencies.setdefault("agent_runtime", SimpleNamespace())
     dependencies.setdefault("event_listener", SimpleNamespace())
     return _ServerRuntime(**dependencies)
@@ -94,7 +104,7 @@ def test_server_registers_camera_capture_tool() -> None:
         board_runtime=object(),
         event_bus=EventBus(),
         stream_controller=StreamController(EventBus()),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=camera_runtime,
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -127,7 +137,7 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         board_runtime=object(),
         event_bus=EventBus(),
         stream_controller=StreamController(EventBus()),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(capture_frames=lambda **kwargs: []),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -183,7 +193,7 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
@@ -262,7 +272,7 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
@@ -330,7 +340,7 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
@@ -388,7 +398,7 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         board_runtime=object(),
         event_bus=EventBus(),
         stream_controller=StreamController(EventBus()),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(
@@ -434,7 +444,7 @@ def test_server_does_not_register_camera_lifecycle_tools() -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -468,7 +478,7 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         board_runtime=board_runtime,
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -476,8 +486,10 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
 
     runtime._register_events()
     runtime._register_hardware_tools()
-    event = event_bus.get_handler(
-        ("MCP", board.id, board.connections[0].event_name)
+    event = event_bus.get_event(
+        "MCP",
+        board.id,
+        board.connections[0].event_name,
     )
     serial_connection.on_write = lambda: event.perform_work({"state": "1"})
     response = app.tools["turn_on_status_led"]()
@@ -527,7 +539,7 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -566,7 +578,7 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -627,7 +639,7 @@ def test_server_preserves_required_and_optional_registry_parameters() -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -658,7 +670,7 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -743,7 +755,7 @@ def test_server_exposes_registered_events_as_nested_catalog(
         board_runtime=object(),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -791,7 +803,7 @@ def test_database_backed_tool_description_includes_table_name() -> None:
         board_runtime=object(),
         event_bus=EventBus(),
         stream_controller=object(),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
@@ -820,7 +832,7 @@ def test_server_uses_prebuilt_rule_and_listener_dependencies() -> None:
         board_runtime=SimpleNamespace(serial_pool={}),
         event_bus=event_bus,
         stream_controller=StreamController(event_bus),
-        event_worker=EventWorker(),
+        event_worker=_event_worker(),
         app=FakeApp(),
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),

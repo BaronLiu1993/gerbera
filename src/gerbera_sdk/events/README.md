@@ -9,7 +9,7 @@ event_listener.py       Background serial reader per microcontroller.
 event_bus.py            Event registry and routing lookup.
 event.py                MCP response events and STREAM buffer events.
 buffer.py               In-memory batch buffer.
-event_worker.py         Injected write queue consumed under DatabaseRuntime lifecycle.
+event_worker.py         Background queue for database stream writes.
 stream_controller.py    Stream lifecycle operations such as flush on stop.
 rules/                  Event rules, conditions, callbacks, and latest values.
 ```
@@ -22,7 +22,7 @@ This folder owns:
 - routing by `(event_type, microcontroller_id, event_name)`
 - buffering stream payloads
 - flushing partial stream buffers
-- queueing stream batches for the database runtime
+- queueing stream batches for the database
 - evaluating registered event rules without blocking serial listeners
 
 This folder does not own:
@@ -36,7 +36,7 @@ This folder does not own:
 
 ```mermaid
 flowchart TD
-    A[Serial line] --> B[EventListener._parse_payload]
+    A[Serial line] --> B[EventListener.parse_payload]
     B --> C{event_type}
     C -->|MCP| D[EventBus MCP event]
     C -->|STREAM| E[EventBus STREAM event]

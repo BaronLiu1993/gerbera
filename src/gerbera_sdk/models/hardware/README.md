@@ -2,14 +2,14 @@
 
 READ: we will need to clean up the code for this modelling. It is messy right now and does not fully reflect the intended user experience yet. THE SOURCE OF TRUTH FOR MICROCONTROLLERS IS `config.json["devices"]`.
 
-The models folder owns the hardware declaration graph and the database model used by the runtime.
+The models folder owns the hardware declaration graph and the database connection used by the runtime.
 
 Models should stay focused on:
 
 - relationships
 - identity
 - validation
-- database metadata
+- database connection metadata
 
 ## Files
 
@@ -17,8 +17,7 @@ Models should stay focused on:
 hardware_system.py      Top-level hardware declaration.
 microcontroller.py      Board identity resolved from config.json via port.
 connection.py           One declared device connection on a board.
-database.py             PostgreSQL connection details and table metadata.
-table.py                In-memory table metadata.
+database.py             PostgreSQL connection details and insert execution.
 pin.py                  Pin model support.
 ```
 
@@ -31,7 +30,6 @@ This folder owns:
 - stable board and connection identity
 - connection event naming
 - database attachment metadata
-- database attachment and table metadata
 
 This folder does not own:
 
@@ -144,6 +142,6 @@ Streaming support is device-specific.
 - Not every connection should stream data.
 - Connections express intent with `stream=True`.
 - Harness provisions stream tables from compiled stream contracts.
-- `DatabaseRuntime` only writes stream data to already-provisioned tables.
+- `Database` only writes stream data to already-provisioned tables.
 
 This area is still in flux and should be simplified later.

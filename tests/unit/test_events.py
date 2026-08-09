@@ -7,6 +7,7 @@ import pytest
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker, WriteJob
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
@@ -18,48 +19,41 @@ from gerbera_sdk.events.rules.rule_condition import (
 )
 
 
-@pytest.mark.parametrize(
-    ("table_name", "worker", "message"),
-    [
-        (None, EventWorker(), "table_name"),
-        ("readings", None, "event_worker"),
-    ],
-)
-def test_stream_event_requires_its_dependencies(
-    table_name: str | None,
-    worker: EventWorker | None,
-    message: str,
-) -> None:
-    with pytest.raises(RuntimeError, match=message):
-        Event(
-            event_type="STREAM",
-            microcontroller_id="board-1",
-            event_name="sensor",
-            streamable=True,
-            table_name=table_name,
-            event_worker=worker,
-        )
+class FakeDatabase:
+    def write_database_table(self, table_name, payload) -> None:
+        pass
 
 
 def test_event_bus_rejects_duplicate_and_missing_events() -> None:
     event_bus = EventBus()
-    event = Event("MCP", "board-1", "sensor")
+    event = Event(
+        event_type="MCP",
+        microcontroller_id="board-1",
+        event_name="sensor",
+        streamable=False,
+        table_name="sensor",
+        event_worker=EventWorker(database=FakeDatabase()),
+        event_store=EventStore(),
+    )
     event_bus.add_event("MCP", "board-1", "sensor", event)
 
     with pytest.raises(RuntimeError, match="already exists"):
         event_bus.add_event("MCP", "board-1", "sensor", event)
 
     with pytest.raises(RuntimeError, match="does not exist"):
-        event_bus.get_handler(("MCP", "board-1", "missing"))
+        event_bus.get_event("MCP", "board-1", "missing")
 
 
 def test_event_worker_requeues_a_failed_write_until_retry_limit() -> None:
-    class FailingWriter:
+    class FailingDatabase:
         def write_database_table(self, table_name, payload) -> None:
             raise OSError("database unavailable")
 
-    worker = EventWorker(max_retries=1, retry_delay_seconds=0)
-    worker.configure_writer(FailingWriter())
+    worker = EventWorker(
+        database=FailingDatabase(),
+        max_retries=1,
+        retry_delay_seconds=0,
+    )
 
     worker._process_job(WriteJob("readings", [{"value": "1"}]))
     retry = worker._queue.get_nowait()
@@ -72,15 +66,15 @@ def test_event_worker_requeues_a_failed_write_until_retry_limit() -> None:
 def test_listener_rejects_duplicate_payload_keys() -> None:
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
-        _serial_pool={},
-        _threads={},
-        _event_bus=EventBus(),
-        _rule_buffer=RuleBuffer(RuleBus()),
+        serial_pool={},
+        threads={},
+        event_bus=EventBus(),
+        rule_buffer=RuleBuffer(RuleBus()),
     )
 
-    assert listener._parse_payload("invalid") is None
+    assert listener.parse_payload("invalid") is None
     with pytest.raises(ValueError, match="Key already exists"):
-        listener._parse_payload("MCP,sensor,value:1,value:2")
+        listener.parse_payload("MCP,sensor,value:1,value:2")
 
 
 def test_listener_updates_registered_rule_buffer_value() -> None:
@@ -88,13 +82,13 @@ def test_listener_updates_registered_rule_buffer_value() -> None:
     rule_buffer.register_event_in_buffer("STREAM", "board-1", "sensor")
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
-        _serial_pool={},
-        _threads={},
-        _event_bus=EventBus(),
-        _rule_buffer=rule_buffer,
+        serial_pool={},
+        threads={},
+        event_bus=EventBus(),
+        rule_buffer=rule_buffer,
     )
 
-    rule_future = listener._dispatch_event_to_rule_buffer(
+    rule_future = listener.dispatch_event_to_rule_buffer(
         "STREAM",
         "board-1",
         "sensor",
@@ -139,13 +133,13 @@ def test_listener_does_not_wait_for_async_rule_callback() -> None:
     rule_buffer.register_event_in_buffer("STREAM", "board-1", "sensor")
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
-        _serial_pool={},
-        _threads={},
-        _event_bus=EventBus(),
-        _rule_buffer=rule_buffer,
+        serial_pool={},
+        threads={},
+        event_bus=EventBus(),
+        rule_buffer=rule_buffer,
     )
 
-    rule_future = listener._dispatch_event_to_rule_buffer(
+    rule_future = listener.dispatch_event_to_rule_buffer(
         "STREAM",
         "board-1",
         "sensor",
@@ -184,13 +178,13 @@ def test_listener_logs_async_rule_callback_failure(caplog) -> None:
     rule_buffer.register_event_in_buffer("STREAM", "board-1", "sensor")
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
-        _serial_pool={},
-        _threads={},
-        _event_bus=EventBus(),
-        _rule_buffer=rule_buffer,
+        serial_pool={},
+        threads={},
+        event_bus=EventBus(),
+        rule_buffer=rule_buffer,
     )
 
-    rule_future = listener._dispatch_event_to_rule_buffer(
+    rule_future = listener.dispatch_event_to_rule_buffer(
         "STREAM",
         "board-1",
         "sensor",
@@ -205,7 +199,7 @@ def test_listener_logs_async_rule_callback_failure(caplog) -> None:
     assert "servo unavailable" in caplog.text
 
 
-def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:
+def test_listener_fails_when_transport_shutdown_fails() -> None:
     class FailingConnection:
         def destroy(self) -> None:
             raise OSError("close failed")
@@ -223,17 +217,17 @@ def test_listener_joins_threads_even_when_transport_shutdown_fails() -> None:
     thread = Thread()
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
-        _serial_pool={"board-1": FailingConnection()},
-        _threads={"board-1": thread},
-        _event_bus=EventBus(),
-        _rule_buffer=RuleBuffer(RuleBus()),
+        serial_pool={"board-1": FailingConnection()},
+        threads={"board-1": thread},
+        event_bus=EventBus(),
+        rule_buffer=RuleBuffer(RuleBus()),
     )
 
     with pytest.raises(OSError, match="close failed"):
         listener.stop_listeners()
 
-    assert thread.joined is True
-    assert listener._threads == {}
+    assert thread.joined is False
+    assert listener.threads == {"board-1": thread}
 
 
 def test_listener_keeps_a_thread_tracked_when_join_times_out() -> None:
@@ -249,13 +243,13 @@ def test_listener_keeps_a_thread_tracked_when_join_times_out() -> None:
     thread = Thread()
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
-        _serial_pool={},
-        _threads={"board-1": thread},
-        _event_bus=EventBus(),
-        _rule_buffer=RuleBuffer(RuleBus()),
+        serial_pool={},
+        threads={"board-1": thread},
+        event_bus=EventBus(),
+        rule_buffer=RuleBuffer(RuleBus()),
     )
 
     with pytest.raises(RuntimeError, match="did not stop"):
         listener.stop_listeners(timeout=0)
 
-    assert listener._threads == {"board-1": thread}
+    assert listener.threads == {"board-1": thread}

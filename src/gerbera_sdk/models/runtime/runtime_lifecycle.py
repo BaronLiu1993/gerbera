@@ -4,19 +4,19 @@ from typing import AsyncGenerator
 
 from fastmcp import FastMCP
 
-from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
+from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.stream_controller import StreamController
+from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
+from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 
 
 @dataclass
 class RuntimeLifecycle:
     board_runtime: BoardRuntime
     camera_runtime: CameraRuntime
-    database_runtime: DatabaseRuntime
+    event_worker: EventWorker
     model_runtime: ModelRuntime
     event_listener: EventListener
     stream_controller: StreamController
@@ -30,7 +30,7 @@ class RuntimeLifecycle:
             yield {
                 "board_runtime": self.board_runtime,
                 "camera_runtime": self.camera_runtime,
-                "database_runtime": self.database_runtime,
+                "event_worker": self.event_worker,
                 "model_runtime": self.model_runtime,
             }
 
@@ -45,8 +45,9 @@ class RuntimeLifecycle:
             self.camera_runtime.start_cameras()
             cleanup.callback(self.camera_runtime.clean_up_cameras)
 
-            self.database_runtime.start()
-            cleanup.callback(self.database_runtime.stop)
+            self.event_worker.start()
+            cleanup.callback(self.event_worker.stop)
+            cleanup.callback(self.event_worker.wait_until_idle)
             cleanup.callback(self.stream_controller.flush_all)
 
             cleanup.callback(self.event_listener.stop_listeners)

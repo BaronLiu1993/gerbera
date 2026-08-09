@@ -33,6 +33,6 @@ flowchart TD
     E --> F[Write local/public endpoints to config.json]
     F --> G[GerberaRuntime.run HTTP]
     G --> H[BoardRuntime]
-    G --> I[DatabaseRuntime]
+    G --> I[EventWorker]
     G --> J[ServerRuntime]
 ```

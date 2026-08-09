@@ -24,7 +24,6 @@ It is not responsible for:
 server_runtime.py       MCP tools, events, listeners, and command dispatch.
 agent_runtime.py        Agent-created rule scripts and live rule registration.
 board_runtime.py        Per-process board transport pool and lifecycle.
-database_runtime.py     Database write lifecycle.
 command_runtime.py      Command compilation and response parsing.
 ```
 
@@ -33,7 +32,7 @@ command_runtime.py      Command compilation and response parsing.
 `GerberaRuntime` owns:
 
 - startup and shutdown order
-- constructing one event worker and injecting it into database and server runtimes
+- resolving the database and constructing one event worker for stream writes
 
 `ServerRuntime` owns:
 
@@ -56,11 +55,6 @@ command_runtime.py      Command compilation and response parsing.
 - looking up the active serial connection for a board
 - closing active serial connections
 
-`DatabaseRuntime` owns:
-
-- routing table writes to the configured database
-- starting, flushing, and stopping the database write worker
-
 `CommandCompiler` owns:
 
 - reading command specs from device builders
@@ -74,7 +68,7 @@ command_runtime.py      Command compilation and response parsing.
 flowchart TD
     A[HardwareSystem] --> B[GerberaRuntime]
     B --> C[BoardRuntime.start]
-    B --> D[DatabaseRuntime.start]
+    B --> D[EventWorker.start]
     B --> E[ServerRuntime]
     E --> F[Register MCP/STREAM events and tools]
     E --> G[Start EventListener]
@@ -86,6 +80,7 @@ flowchart TD
     J --> G
     K --> L[MCP response or stream buffer]
     L --> D
+    D --> M[Database]
 ```
 
 ## Boundary Rule

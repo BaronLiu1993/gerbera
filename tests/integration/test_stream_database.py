@@ -1,49 +1,28 @@
 from gerbera_sdk.events.event import Event
+from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
 
 
-class FakeCursor:
+class FakeDatabase(Database):
     def __init__(self) -> None:
-        self.executed = []
         self.batches = []
 
-    def execute(self, query) -> None:
-        self.executed.append(query)
+        super().__init__("localhost", 5432, "user", "password", "gerbera")
 
-    def executemany(self, query, payload) -> None:
+    def write_database_table(
+        self,
+        table_name: str,
+        payload: list[dict[str, str]],
+    ) -> None:
         self.batches.append(list(payload))
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, *args) -> None:
-        pass
-
-
-class FakeDatabaseConnection:
-    def __init__(self, cursor: FakeCursor) -> None:
-        self._cursor = cursor
-
-    def cursor(self) -> FakeCursor:
-        return self._cursor
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args) -> None:
-        pass
-
-
-def test_stream_payload_is_buffered_and_written(
-    device_registry,
-    monkeypatch,
-) -> None:
+def test_stream_payload_is_buffered_and_written(device_registry) -> None:
     device_registry({"board-1": "/dev/board-1"})
-    database = Database("localhost", 5432, "user", "password", "gerbera")
+    database = FakeDatabase()
     board = Microcontroller(port="/dev/board-1", fqbn="arduino:avr:uno")
     board.add_connections(
         [
@@ -55,15 +34,10 @@ def test_stream_payload_is_buffered_and_written(
             )
         ]
     )
-    cursor = FakeCursor()
-    monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.database_runtime.psycopg.connect",
-        lambda dsn: FakeDatabaseConnection(cursor),
-    )
-    worker = EventWorker(retry_delay_seconds=0)
-    runtime = DatabaseRuntime(worker, database=database)
+    worker = EventWorker(database=database, retry_delay_seconds=0)
+    event_store = EventStore()
 
-    runtime.start()
+    worker.start()
     table_name = board.connections[0].event_name
     event = Event(
         "STREAM",
@@ -72,13 +46,13 @@ def test_stream_payload_is_buffered_and_written(
         streamable=True,
         table_name=table_name,
         event_worker=worker,
+        event_store=event_store,
     )
     event.perform_work({"value": "1"})
     event.flush()
-    runtime.stop()
+    worker.stop()
 
-    assert database.table_names == {}
-    assert cursor.executed == []
-    assert len(cursor.batches) == 1
-    assert cursor.batches[0][0]["value"] == "1"
-    assert "created_at" in cursor.batches[0][0]
+    assert len(database.batches) == 1
+    assert event_store.latest(("STREAM", board.id, table_name)) == {"value": "1"}
+    assert database.batches[0][0]["value"] == "1"
+    assert "created_at" in database.batches[0][0]

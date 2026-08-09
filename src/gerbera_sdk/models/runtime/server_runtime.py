@@ -11,6 +11,7 @@ from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.models.hardware.connection import Connection
@@ -61,6 +62,7 @@ class ServerRuntime:
     hardware_system: HardwareSystem
     board_runtime: BoardRuntime
     event_bus: EventBus
+    event_store: EventStore
     stream_controller: StreamController
     event_worker: EventWorker
     app: FastMCP
@@ -80,6 +82,10 @@ class ServerRuntime:
             event_type="MCP",
             microcontroller_id=microcontroller.id,
             event_name=connection.event_name,
+            streamable=False,
+            table_name=connection.event_name,
+            event_worker=self.event_worker,
+            event_store=self.event_store,
         )
         self.event_bus.add_event(
             "MCP",
@@ -103,6 +109,7 @@ class ServerRuntime:
             streamable=True,
             table_name=connection.event_name,
             event_worker=self.event_worker,
+            event_store=self.event_store,
         )
         self.event_bus.add_event(
             "STREAM",
@@ -160,13 +167,11 @@ class ServerRuntime:
             params=params,
         )
 
-        event = self.event_bus.get_handler(
-            ("MCP", microcontroller.id, connection.event_name)
-        )
-        event.clear_responses()
+        event_key = ("MCP", microcontroller.id, connection.event_name)
+        self.event_store.clear(event_key)
 
         serial_connection.write(built_command)
-        return event.wait_for_response()
+        return self.event_store.wait_for(event_key)
 
     def _register_connection_action(
         self,

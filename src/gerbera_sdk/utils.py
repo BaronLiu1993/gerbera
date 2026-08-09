@@ -5,21 +5,13 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict
 
+from gerbera_sdk.events.utils import EventKey, build_event_key
 
 MAX_EVENT_NAME_LENGTH = 63
-EventKey = tuple[str, str, str]
 
 
 class StrictSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
-
-def build_event_key(
-    event_type: str,
-    microcontroller_id: str,
-    event_name: str,
-) -> EventKey:
-    return (event_type, microcontroller_id, event_name)
 
 
 def hash_event_key(event_key: EventKey) -> str:

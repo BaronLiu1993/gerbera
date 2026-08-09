@@ -20,9 +20,10 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
             start_cameras=lambda: calls.append("cameras.start"),
             clean_up_cameras=lambda: calls.append("cameras.clean_up"),
         ),
-        database_runtime=SimpleNamespace(
-            start=lambda: calls.append("database.start"),
-            stop=lambda: calls.append("database.stop"),
+        event_worker=SimpleNamespace(
+            start=lambda: calls.append("worker.start"),
+            wait_until_idle=lambda: calls.append("worker.wait"),
+            stop=lambda: calls.append("worker.stop"),
         ),
         model_runtime=SimpleNamespace(
             turn_on_all_models=lambda: calls.append("models.start"),
@@ -52,14 +53,15 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
     assert calls == [
         "board.start",
         "cameras.start",
-        "database.start",
+        "worker.start",
         "listener.start",
         "models.start",
         "server.run",
         "models.stop",
         "listener.stop",
         "streams.flush",
-        "database.stop",
+        "worker.wait",
+        "worker.stop",
         "cameras.clean_up",
         "board.close",
     ]

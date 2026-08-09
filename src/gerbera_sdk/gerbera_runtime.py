@@ -4,6 +4,7 @@ from fastmcp import FastMCP
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
@@ -14,7 +15,6 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.database_runtime import DatabaseRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
@@ -44,23 +44,21 @@ class GerberaRuntime:
 
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
-        event_worker = EventWorker()
-        database_runtime = DatabaseRuntime(
-            event_worker=event_worker,
-            database=GerberaRuntime._runtime_database(hardware_system),
-        )
+        database = GerberaRuntime._runtime_database(hardware_system)
+        event_worker = EventWorker(database=database)
         model_runtime = ModelRuntime(hardware_system)
 
         event_bus = EventBus()
+        event_store = EventStore()
         stream_controller = StreamController(event_bus)
         rule_bus = RuleBus()
         rule_buffer = RuleBuffer(rule_bus)
         event_listener = EventListener(
             hardware_system=hardware_system,
-            _serial_pool=board_runtime.serial_pool,
-            _threads={},
-            _event_bus=event_bus,
-            _rule_buffer=rule_buffer,
+            serial_pool=board_runtime.serial_pool,
+            threads={},
+            event_bus=event_bus,
+            rule_buffer=rule_buffer,
         )
         agent_runtime = AgentRuntime(
             mcp_url=mcp_url,
@@ -72,7 +70,7 @@ class GerberaRuntime:
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,
             camera_runtime=camera_runtime,
-            database_runtime=database_runtime,
+            event_worker=event_worker,
             model_runtime=model_runtime,
             event_listener=event_listener,
             stream_controller=stream_controller,
@@ -85,6 +83,7 @@ class GerberaRuntime:
             hardware_system=hardware_system,
             board_runtime=board_runtime,
             event_bus=event_bus,
+            event_store=event_store,
             stream_controller=stream_controller,
             event_worker=event_worker,
             app=app,

@@ -51,7 +51,7 @@ flowchart TD
     A --> E[GerberaRuntime]
     E --> F[BoardRuntime]
     E --> G[ServerRuntime]
-    E --> Q[DatabaseRuntime]
+    E --> Q[EventWorker]
     G --> H[MCP Tools]
     F --> I[Serial Connections]
     I --> J[Firmware]
@@ -59,9 +59,8 @@ flowchart TD
     K --> L[EventBus]
     L --> M[MCP Responses]
     L --> N[Stream Buffers]
-    N --> O[EventWorker]
-    Q --> O
-    O --> P[Database]
+    N --> Q
+    Q --> P[Database]
 ```
 
 ## Runtime Entry Point
@@ -72,7 +71,7 @@ Use `GerberaRuntime` in [gerbera_runtime.py](/Users/jiexuanliu/Desktop/firecrack
   Installs Arduino dependencies and flashes firmware when requested.
 
 - `run(...)`
-  Builds the board, database, and server runtimes, starts them in order, runs the MCP app, and closes resources on exit.
+  Builds the board runtime, event worker, and server runtime, starts them in order, runs the MCP app, and closes resources on exit.
 
 ## Runtime Shape
 
@@ -84,8 +83,11 @@ Current runtime responsibilities are split like this:
 - `ServerRuntime`
   Owns event registration, tool registration, command dispatch, and MCP app interaction.
 
-- `DatabaseRuntime`
-  Owns asynchronous database writes. Table provisioning belongs to harness.
+- `Database`
+  Owns database credentials and insert execution. Table provisioning belongs to harness.
+
+- `EventWorker`
+  Owns asynchronous stream write queueing and retry.
 
 - `GerberaRuntime`
-  Is the composition root that wires board, database, and server runtimes together in the right order.
+  Is the composition root that wires board, event, database, and server objects together in the right order.

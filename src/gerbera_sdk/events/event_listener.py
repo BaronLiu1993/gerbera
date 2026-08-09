@@ -2,94 +2,114 @@ import asyncio
 from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-import logging
+import threading
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
-from gerbera_sdk.utils import build_event_key
-import threading
-import uuid
-from serial import SerialException
 
 
-logger = logging.getLogger(__name__)
 
-
+# Runs at runtime
 @dataclass
 class EventListener:
     hardware_system: HardwareSystem
-    _serial_pool: Mapping[str, SerialConnection]
-    _threads: dict[str, threading.Thread]
-    _event_bus: EventBus
-    _rule_buffer: RuleBuffer
-    _rule_executor: ThreadPoolExecutor = field(
-        default_factory=lambda: ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix="gerbera-rule-callback",
-        )
-    )
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    _stop_event: threading.Event = field(default_factory=threading.Event)
-    _lifecycle_lock: threading.RLock = field(
+    serial_pool: Mapping[str, SerialConnection]
+    threads: dict[str, threading.Thread]  # Multiple threads to run the loop
+
+    # Where events are stored
+    event_bus: EventBus
+
+    # Where events are
+    # rule_buffer: RuleBuffer
+    # rule_executor: ThreadPoolExecutor = field(
+    #     default_factory=lambda: ThreadPoolExecutor(
+    #         max_workers=1,
+    #         thread_name_prefix="gerbera-rule-callback",
+    #     )
+    # )
+
+    # Stops every single thread
+    stop_event: threading.Event = field(default_factory=threading.Event)
+    lifecycle_lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
         repr=False,
     )
 
     def create_listeners(self) -> None:
-        with self._lifecycle_lock:
-            self._stop_event.clear()
+        with self.lifecycle_lock:
+            self.stop_event.clear()
             for microcontroller in self.hardware_system.microcontrollers:
                 microcontroller_id = microcontroller.id
 
                 thread = threading.Thread(
-                    target=self._listen_loop,
+                    target=self.listen_loop,
                     args=(microcontroller_id,),
                     daemon=False,
                     name=f"serial-listener-{microcontroller_id}",
                 )
 
-                self._threads[microcontroller_id] = thread
+                self.threads[microcontroller_id] = thread
                 thread.start()
 
     def stop_listeners(self, timeout: float = 2.0) -> None:
-        with self._lifecycle_lock:
-            self._stop_event.set()
-            threads = list(self._threads.items())
+        with self.lifecycle_lock:
+            self.stop_event.set()
+            threads = list(self.threads.items())
 
-        first_error: Exception | None = None
-        try:
-            for serial_connection in self._serial_pool.values():
-                try:
-                    serial_connection.destroy()
-                except Exception as exc:
-                    if first_error is None:
-                        first_error = exc
-        finally:
-            alive_threads: dict[str, threading.Thread] = {}
-            for microcontroller_id, thread in threads:
-                thread.join(timeout=timeout)
-                if thread.is_alive():
-                    alive_threads[microcontroller_id] = thread
-                    if first_error is None:
-                        first_error = RuntimeError(
-                            f"Event listener thread did not stop: {thread.name}"
-                        )
+        for serial_connection in self.serial_pool.values():
+            serial_connection.destroy()
 
-            with self._lifecycle_lock:
-                self._threads = alive_threads
+        alive_threads = {}
+        for microcontroller_id, thread in threads:
+            thread.join(timeout=timeout)
+            if thread.is_alive():
+                alive_threads[microcontroller_id] = thread
 
-            self._rule_executor.shutdown(
-                wait=True,
-                cancel_futures=True,
+        with self.lifecycle_lock:
+            self.threads = alive_threads
+
+        # self.rule_executor.shutdown(wait=True, cancel_futures=True)
+
+        if alive_threads:
+            names = ", ".join(thread.name for thread in alive_threads.values())
+            raise RuntimeError(f"Event listener threads did not stop: {names}")
+
+    def listen_loop(self, microcontroller_id):
+        serial_connection = self.serial_pool[microcontroller_id]
+        while not self.stop_event.is_set():
+            line = serial_connection.readline()
+
+            if isinstance(line, bytes):
+                line = line.decode(errors="ignore")
+
+            line = line.strip()
+            if not line:
+                continue
+
+            parsed_payload = self.parse_payload(line)
+            if parsed_payload is None:
+                continue
+
+            event_type, event_name, payload = parsed_payload
+
+            self.dispatch_to_event_bus(
+                event_type,
+                microcontroller_id,
+                event_name,
+                payload,
             )
 
-        if first_error is not None:
-            raise first_error
+            # self.dispatch_event_to_rule_buffer(
+            #     event_type,
+            #     microcontroller_id,
+            #     event_name,
+            #     payload,
+            # )
 
-    def _parse_payload(self, line: str):
+    def parse_payload(self, line: str):
         res_payload = {}
 
         tokens = line.split(",")
@@ -109,82 +129,37 @@ class EventListener:
 
         return event_type, event_name, res_payload
 
-
-    def _dispatch_event_to_event_bus(
+    # disptach the event to event bus
+    def dispatch_to_event_bus(
         self,
         event_type: str,
         microcontroller_id: str,
         event_name: str,
         payload: dict[str, str],
     ) -> None:
-        event_key = build_event_key(event_type, microcontroller_id, event_name)
-        handler = self._event_bus.get_handler(event_key)
+        handler = self.event_bus.get_event(
+            event_type,
+            microcontroller_id,
+            event_name,
+        )
         handler.perform_work(payload)
 
-    def _dispatch_event_to_rule_buffer(
-        self,
-        event_type: str,
-        microcontroller_id: str,
-        event_name: str,
-        payload: dict[str, str],
-    ) -> Future[object | None]:
-        future = self._rule_executor.submit(
-            asyncio.run,
-            self._rule_buffer.update_buffer_value(
-                event_type,
-                microcontroller_id,
-                event_name,
-                payload,
-            ),
-        )
-        future.add_done_callback(self._log_rule_failure)
-        return future
-
-    @staticmethod
-    def _log_rule_failure(future: Future[object | None]) -> None:
-        exception = future.exception()
-        if exception is not None:
-            logger.error(
-                "Rule evaluation failed",
-                exc_info=(
-                    type(exception),
-                    exception,
-                    exception.__traceback__,
-                ),
-            )
-
-    def _listen_loop(self, microcontroller_id):
-        serial_connection = self._serial_pool[microcontroller_id]
-        while not self._stop_event.is_set():
-            try:
-                line = serial_connection.readline()
-            except (OSError, SerialException):
-                if self._stop_event.is_set():
-                    return
-                raise
-
-            if isinstance(line, bytes):
-                line = line.decode(errors="ignore")
-            line = line.strip()
-            if not line:
-                continue
-
-            parsed_payload = self._parse_payload(line)
-            if parsed_payload is None:
-                continue
-
-            event_type, event_name, payload = parsed_payload
-
-            self._dispatch_event_to_event_bus(
-                event_type,
-                microcontroller_id,
-                event_name,
-                payload,
-            )
-
-            self._dispatch_event_to_rule_buffer(
-                event_type,
-                microcontroller_id,
-                event_name,
-                payload,
-            )
+    # # Fix soon
+    # def dispatch_event_to_rule_buffer(
+    #     self,
+    #     event_type: str,
+    #     microcontroller_id: str,
+    #     event_name: str,
+    #     payload: dict[str, str],
+    # ) -> Future[object | None]:
+    #     future = self.rule_executor.submit(
+    #         asyncio.run,
+    #         self.rule_buffer.update_buffer_value(
+    #             event_type,
+    #             microcontroller_id,
+    #             event_name,
+    #             payload,
+    #         ),
+    #     )
+    #     future.add_done_callback(self._log_rule_failure)
+    #     return future
