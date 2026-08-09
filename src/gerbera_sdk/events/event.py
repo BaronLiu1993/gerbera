@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import cached_property
@@ -14,7 +16,7 @@ class Event:
     streamable: bool
     table_name: str
     event_worker: EventWorker
-    event_store: object # Object payload if MCP event, read from there to get it 
+    latest_val: dict[str, str] | None = None
 
     @cached_property
     def buffer(self) -> Buffer:
@@ -33,14 +35,16 @@ class Event:
 
     def perform_work(self, payload: dict[str, str]) -> None:
         normalized_payload = dict(payload)
-        normalized_payload["created_at"] = datetime.now(timezone.utc)
+        self.latest_val = normalized_payload
 
         if self.streamable:
-            self.buffer.write(normalized_payload)
+            stream_payload = dict(normalized_payload)
+            stream_payload["created_at"] = datetime.now(timezone.utc)
+            self.buffer.write(stream_payload)
             return
+        
+    def read_latest(self) -> dict[str, str] | None:
+        return self.latest_val
 
-        self.event_store = normalized_payload
-
-    # For flushing the partial records manually for just this one
     def flush(self) -> list[dict[str, str]]:
         return self.buffer.flush()

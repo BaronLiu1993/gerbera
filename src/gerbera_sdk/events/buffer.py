@@ -17,8 +17,8 @@ class Buffer:
             self.flush()
 
     # Flush now, lets call this when server is shutting down
-    def flush(self) -> list[dict[str, str]]:
+    def flush(self) -> None:
         batch = list(self.items)
         self.items.clear()
-        self.event_worker.insert_into_queue(self.table_name, batch)
-        return batch
+        self.event_worker.write_to_db(self.table_name, batch)
+        

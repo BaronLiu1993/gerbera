@@ -33,8 +33,8 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
             create_listeners=lambda: calls.append("listener.start"),
             stop_listeners=lambda: calls.append("listener.stop"),
         ),
-        stream_controller=SimpleNamespace(
-            flush_all=lambda: calls.append("streams.flush"),
+        event_bus=SimpleNamespace(
+            flush_event_buffers=lambda: calls.append("streams.flush"),
         ),
     )
 

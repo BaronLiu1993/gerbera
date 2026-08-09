@@ -4,9 +4,9 @@ from typing import AsyncGenerator
 
 from fastmcp import FastMCP
 
+from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.event_listener import EventListener
-from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
@@ -19,7 +19,7 @@ class RuntimeLifecycle:
     event_worker: EventWorker
     model_runtime: ModelRuntime
     event_listener: EventListener
-    stream_controller: StreamController
+    event_bus: EventBus
 
     @asynccontextmanager
     async def __call__(
@@ -48,7 +48,7 @@ class RuntimeLifecycle:
             self.event_worker.start()
             cleanup.callback(self.event_worker.stop)
             cleanup.callback(self.event_worker.wait_until_idle)
-            cleanup.callback(self.stream_controller.flush_all)
+            cleanup.callback(self.event_bus.flush_event_buffers)
 
             cleanup.callback(self.event_listener.stop_listeners)
             self.event_listener.create_listeners()

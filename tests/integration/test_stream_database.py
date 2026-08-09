@@ -1,5 +1,4 @@
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
@@ -35,7 +34,6 @@ def test_stream_payload_is_buffered_and_written(device_registry) -> None:
         ]
     )
     worker = EventWorker(database=database, retry_delay_seconds=0)
-    event_store = EventStore()
 
     worker.start()
     table_name = board.connections[0].event_name
@@ -46,13 +44,13 @@ def test_stream_payload_is_buffered_and_written(device_registry) -> None:
         streamable=True,
         table_name=table_name,
         event_worker=worker,
-        event_store=event_store,
+        latest_val=None,
     )
     event.perform_work({"value": "1"})
     event.flush()
     worker.stop()
 
     assert len(database.batches) == 1
-    assert event_store.latest(("STREAM", board.id, table_name)) == {"value": "1"}
+    assert event.latest_val == {"value": "1"}
     assert database.batches[0][0]["value"] == "1"
     assert "created_at" in database.batches[0][0]

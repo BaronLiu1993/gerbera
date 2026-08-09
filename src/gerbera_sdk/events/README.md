@@ -10,7 +10,6 @@ event_bus.py            Event registry and routing lookup.
 event.py                MCP response events and STREAM buffer events.
 buffer.py               In-memory batch buffer.
 event_worker.py         Background queue for database stream writes.
-stream_controller.py    Stream lifecycle operations such as flush on stop.
 rules/                  Event rules, conditions, callbacks, and latest values.
 ```
 
@@ -40,7 +39,7 @@ flowchart TD
     B --> C{event_type}
     C -->|MCP| D[EventBus MCP event]
     C -->|STREAM| E[EventBus STREAM event]
-    D --> F[Event response queue]
+    D --> F[Event.latest_val]
     E --> G[Buffer]
     B --> R[Rule buffer]
     R --> S[Async rule callback]
@@ -56,9 +55,9 @@ flowchart TD
     B --> C{max_size hit?}
     C -->|yes| D[Buffer.flush]
     C -->|no| E[Keep partial batch in memory]
-    F[turn_off stream] --> G[StreamController.stop_stream]
+    F[turn_off stream] --> G[EventBus.get_event]
     G --> D
-    H[server.close] --> I[StreamController.flush_all]
+    H[server.close] --> I[EventBus.flush_event_buffers]
     I --> D
     D --> J[EventWorker.write_to_db]
 ```

@@ -8,7 +8,7 @@ from gerbera_sdk.events.event import Event
 class EventBus:
     events: dict[tuple[str, str, str], Event] = field(default_factory=dict)
 
-    def add_event(
+    def write_event(
         self,
         event_type: str,
         microcontroller_id: str,

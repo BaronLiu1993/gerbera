@@ -2,7 +2,7 @@ import threading
 
 import pytest
 
-from gerbera_sdk.events.event_worker import EventWorker
+from gerbera_sdk.events.event_worker import EventWorker, WriteJob
 
 
 class BlockingWriter:
@@ -43,7 +43,7 @@ def test_wait_until_idle_waits_for_active_database_write() -> None:
 
     wait_thread.join(timeout=1)
     worker.stop()
-    assert worker._thread is None
+    assert worker.thread is None
     assert database.payloads == [[{"value": "1"}]]
 
 
@@ -56,13 +56,14 @@ class FailingWriter:
         raise OSError("database unavailable")
 
 
-def test_flush_now_surfaces_database_write_failure() -> None:
+def test_process_job_surfaces_database_write_failure() -> None:
     worker = EventWorker(
         database=FailingWriter(),
         max_retries=0,
         retry_delay_seconds=0,
     )
-    worker.write_to_db("sensor_readings", [{"value": "1"}])
 
-    with pytest.raises(OSError, match="database unavailable"):
-        worker.flush_now()
+    with pytest.raises(RuntimeError, match="Failed to Write to Database"):
+        worker.process_job(
+            WriteJob("sensor_readings", [{"value": "1"}])
+        )

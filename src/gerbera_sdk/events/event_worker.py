@@ -27,40 +27,49 @@ class EventWorker:
         init=False,
         repr=False,
     )
-    thread: threading.Thread | None = field(default=None, init=False, repr=False)
-    stop_event: threading.Event = field(
-        default_factory=threading.Event,
-        init=False,
-        repr=False,
-    )
+    stop_event: threading.Event | None = None
+    thread: threading.Thread | None = None
 
-    # Turn on and off the worker thread
     def start(self) -> None:
-        if self.thread is not None and self.thread.is_alive():
-            return
+        if self.thread is not None:
+            raise RuntimeError("EventWorker is already running")
 
-        self.stop_event.clear()
-        self.thread = threading.Thread(
+        stop_event = threading.Event()
+        thread = threading.Thread(
             target=self.run,
             daemon=False,
             name="gerbera-event-worker",
         )
-        self.thread.start()
+        self.stop_event = stop_event
+        self.thread = thread
+
+        try:
+            thread.start()
+        except RuntimeError:
+            self.stop_event = None
+            self.thread = None
+            raise
 
     def stop(self, timeout: float = 2.0) -> None:
-        if self._thread is None:
+        stop_event = self.stop_event
+        thread = self.thread
+        if stop_event is None or thread is None:
             return
-        self.stop_event.set()
 
-        self.thread.join(timeout=timeout)
-        if self.thread.is_alive():
+        stop_event.set()
+        thread.join(timeout=timeout)
+        if thread.is_alive():
             raise RuntimeError("EventWorker thread did not stop")
 
-        self._thread = None
+        self.stop_event = None
+        self.thread = None
 
-    # Function that works on another thread and continually checks the queue and then processes it
     def run(self) -> None:
-        while not self.stop_event.is_set():
+        stop_event = self.stop_event
+        if stop_event is None:
+            raise RuntimeError("EventWorker is not running")
+
+        while not stop_event.is_set():
             try:
                 job = self.queue.get(timeout=0.5)
             except Empty:
@@ -71,8 +80,7 @@ class EventWorker:
             finally:
                 self.queue.task_done()
 
-    # Actual function that puts new write jobs into the queue
-    def insert_into_queue(
+    def write_to_db(
         self,
         table_name: str,
         batch: list[dict[str, str]],
@@ -87,7 +95,6 @@ class EventWorker:
             )
         )
 
-    # Actual method that writes to database
     def process_job(self, job: WriteJob) -> None:
         try:
             self.database.write_database_table(job.table_name, job.batch)
@@ -95,7 +102,6 @@ class EventWorker:
             if job.retry_count >= self.max_retries:
                 raise RuntimeError("Failed to Write to Database")
 
-            # Put it back into the queue
             time.sleep(self.retry_delay_seconds)
             self.queue.put(
                 WriteJob(

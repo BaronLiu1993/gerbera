@@ -1,5 +1,8 @@
+# Server runtime registers MCP tools and wires hardware events into the app.
+
 from dataclasses import dataclass
 from inspect import Parameter, Signature
+import time
 from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
@@ -11,9 +14,7 @@ from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
-from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
-from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
@@ -37,6 +38,7 @@ EventCatalog = dict[
     str,
     dict[str, dict[str, EventMetadata]],
 ]
+EventKey = tuple[str, str, str]
 
 
 class SubscribedCameraCatalogEntry(StrictSchema):
@@ -62,8 +64,6 @@ class ServerRuntime:
     hardware_system: HardwareSystem
     board_runtime: BoardRuntime
     event_bus: EventBus
-    event_store: EventStore
-    stream_controller: StreamController
     event_worker: EventWorker
     app: FastMCP
     camera_runtime: CameraRuntime
@@ -72,6 +72,15 @@ class ServerRuntime:
     event_listener: EventListener
     rule_bus: RuleBus
     rule_buffer: RuleBuffer
+    event_read_timeout_seconds: float = 1.0
+    event_read_poll_seconds: float = 0.02
+
+    def register_tools(self) -> None:
+        self._register_hardware_tools()
+        self._register_rule_tools()
+        self._register_event_catalog_tool()
+
+    # Event registration and catalog helpers.
 
     def _register_mcp_event(
         self,
@@ -85,9 +94,9 @@ class ServerRuntime:
             streamable=False,
             table_name=connection.event_name,
             event_worker=self.event_worker,
-            event_store=self.event_store,
+            latest_val=None,
         )
-        self.event_bus.add_event(
+        self.event_bus.write_event(
             "MCP",
             microcontroller.id,
             connection.event_name,
@@ -109,9 +118,9 @@ class ServerRuntime:
             streamable=True,
             table_name=connection.event_name,
             event_worker=self.event_worker,
-            event_store=self.event_store,
+            latest_val=None,
         )
-        self.event_bus.add_event(
+        self.event_bus.write_event(
             "STREAM",
             microcontroller.id,
             connection.event_name,
@@ -151,13 +160,31 @@ class ServerRuntime:
 
         return catalog
 
+    # Connection command dispatch and MCP tool generation.
+
+    def _read_latest_event_value(
+        self,
+        event_key: EventKey,
+        previous_value: dict[str, str] | None,
+    ) -> dict[str, str] | None:
+        deadline = time.monotonic() + self.event_read_timeout_seconds
+        while time.monotonic() < deadline:
+            event = self.event_bus.get_event(*event_key)
+            latest_value = event.read_latest()
+            if latest_value is not None and latest_value is not previous_value:
+                return latest_value
+
+            time.sleep(self.event_read_poll_seconds)
+
+        return None
+
     def _send_connection_command(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
         action: str,
         params: dict[str, object],
-    ) -> dict[str, str]:
+    ) -> dict[str, str] | None:
         serial_connection = self.board_runtime.get_serial_connection(
             microcontroller
         )
@@ -168,10 +195,10 @@ class ServerRuntime:
         )
 
         event_key = ("MCP", microcontroller.id, connection.event_name)
-        self.event_store.clear(event_key)
+        previous_value = self.event_bus.get_event(*event_key).read_latest()
 
         serial_connection.write(built_command)
-        return self.event_store.wait_for(event_key)
+        return self._read_latest_event_value(event_key, previous_value)
 
     def _register_connection_action(
         self,
@@ -183,7 +210,7 @@ class ServerRuntime:
 
         def action_function(
             params: dict[str, object],
-        ) -> dict[str, str]:
+        ) -> dict[str, str] | None:
             return self._send_connection_command(
                 microcontroller=microcontroller,
                 connection=connection,
@@ -197,20 +224,20 @@ class ServerRuntime:
         self,
         connection: Connection,
         command: CommandSpec,
-    ) -> Callable[..., dict[str, str]]:
+    ) -> Callable[..., dict[str, str] | None]:
         action = command.method.strip().upper()
         if not command.params:
 
-            def tool_function() -> dict[str, str]:
+            def tool_function() -> dict[str, str] | None:
                 return connection.perform_action(action, {})
 
             return tool_function
 
-        def tool_function(**values: Any) -> dict[str, str]:
+        def tool_function(**values: Any) -> dict[str, str] | None:
             return connection.perform_action(action, values)
 
         parameters: list[Parameter] = []
-        annotations: dict[str, Any] = {"return": dict[str, str]}
+        annotations: dict[str, Any] = {"return": dict[str, str] | None}
         for name, parameter in command.params.items():
             annotation = self._build_parameter_annotation(parameter)
             default = Parameter.empty if parameter.required else None
@@ -229,7 +256,7 @@ class ServerRuntime:
         tool_function.__annotations__ = annotations
         tool_function.__signature__ = Signature(
             parameters=parameters,
-            return_annotation=dict[str, str],
+            return_annotation=dict[str, str] | None,
         )
         return tool_function
 
@@ -256,10 +283,12 @@ class ServerRuntime:
             response = connection.perform_action("WRITE", {"state": state})
 
             if state == 0:
-                self.stream_controller.stop_stream(
-                    microcontroller,
-                    connection,
+                stream_event = self.event_bus.get_event(
+                    "STREAM",
+                    microcontroller.id,
+                    connection.event_name,
                 )
+                stream_event.flush()
                 self.event_worker.wait_until_idle()
 
             return response
@@ -323,6 +352,8 @@ class ServerRuntime:
             annotations=annotations,
             meta=meta,
         )(tool_function)
+
+    # On/off tool helpers for stateful and streamable devices.
 
     def _register_state_toggle_tool(
         self,
@@ -413,10 +444,7 @@ class ServerRuntime:
             meta=meta,
         )
 
-    def register_tools(self) -> None:
-        self._register_hardware_tools()
-        self._register_rule_tools()
-        self._register_event_catalog_tool()
+    # Hardware, camera, and model tool registration.
 
     def _register_hardware_tools(self) -> None:
         for microcontroller in self.hardware_system.microcontrollers:
@@ -739,6 +767,8 @@ class ServerRuntime:
                 openWorldHint=False,
             ),
         )
+
+    # Rule and event catalog tools.
 
     def _register_rule_tools(self) -> None:
         def insert_rule(

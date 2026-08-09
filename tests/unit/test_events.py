@@ -7,7 +7,6 @@ import pytest
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
-from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker, WriteJob
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
@@ -33,12 +32,12 @@ def test_event_bus_rejects_duplicate_and_missing_events() -> None:
         streamable=False,
         table_name="sensor",
         event_worker=EventWorker(database=FakeDatabase()),
-        event_store=EventStore(),
+        latest_val=None,
     )
-    event_bus.add_event("MCP", "board-1", "sensor", event)
+    event_bus.write_event("MCP", "board-1", "sensor", event)
 
     with pytest.raises(RuntimeError, match="already exists"):
-        event_bus.add_event("MCP", "board-1", "sensor", event)
+        event_bus.write_event("MCP", "board-1", "sensor", event)
 
     with pytest.raises(RuntimeError, match="does not exist"):
         event_bus.get_event("MCP", "board-1", "missing")
@@ -55,12 +54,12 @@ def test_event_worker_requeues_a_failed_write_until_retry_limit() -> None:
         retry_delay_seconds=0,
     )
 
-    worker._process_job(WriteJob("readings", [{"value": "1"}]))
-    retry = worker._queue.get_nowait()
+    worker.process_job(WriteJob("readings", [{"value": "1"}]))
+    retry = worker.queue.get_nowait()
     assert retry.retry_count == 1
 
-    with pytest.raises(OSError, match="database unavailable"):
-        worker._process_job(retry)
+    with pytest.raises(RuntimeError, match="Failed to Write to Database"):
+        worker.process_job(retry)
 
 
 def test_listener_rejects_duplicate_payload_keys() -> None:

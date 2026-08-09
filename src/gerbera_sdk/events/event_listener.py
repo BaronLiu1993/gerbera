@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -21,14 +20,14 @@ class EventListener:
     # Where events are stored
     event_bus: EventBus
 
-    # Where events are
-    # rule_buffer: RuleBuffer
-    # rule_executor: ThreadPoolExecutor = field(
-    #     default_factory=lambda: ThreadPoolExecutor(
-    #         max_workers=1,
-    #         thread_name_prefix="gerbera-rule-callback",
-    #     )
-    # )
+    # Rule code
+    rule_buffer: RuleBuffer
+    rule_executor: ThreadPoolExecutor = field(
+        default_factory=lambda: ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="gerbera-rule-callback",
+        )
+    )
 
     # Stops every single thread
     stop_event: threading.Event = field(default_factory=threading.Event)
@@ -71,13 +70,13 @@ class EventListener:
         with self.lifecycle_lock:
             self.threads = alive_threads
 
-        # self.rule_executor.shutdown(wait=True, cancel_futures=True)
+        self.rule_executor.shutdown(wait=True, cancel_futures=True)
 
         if alive_threads:
             names = ", ".join(thread.name for thread in alive_threads.values())
             raise RuntimeError(f"Event listener threads did not stop: {names}")
 
-    def listen_loop(self, microcontroller_id):
+    def listen_loop(self, microcontroller_id) -> None:
         serial_connection = self.serial_pool[microcontroller_id]
         while not self.stop_event.is_set():
             line = serial_connection.readline()
@@ -144,7 +143,6 @@ class EventListener:
         )
         handler.perform_work(payload)
 
-    # # Fix soon
     # def dispatch_event_to_rule_buffer(
     #     self,
     #     event_type: str,

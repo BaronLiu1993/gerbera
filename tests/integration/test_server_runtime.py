@@ -9,11 +9,9 @@ import pytest
 
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
-from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModelFrameEnvironment,
 )
@@ -75,7 +73,6 @@ def _event_worker() -> EventWorker:
 def ServerRuntime(**dependencies) -> _ServerRuntime:
     rule_bus = dependencies.setdefault("rule_bus", RuleBus())
     dependencies.setdefault("rule_buffer", RuleBuffer(rule_bus))
-    dependencies.setdefault("event_store", EventStore())
     dependencies.setdefault("agent_runtime", SimpleNamespace())
     dependencies.setdefault("event_listener", SimpleNamespace())
     return _ServerRuntime(**dependencies)
@@ -103,7 +100,6 @@ def test_server_registers_camera_capture_tool() -> None:
         hardware_system=HardwareSystem(cameras=[camera]),
         board_runtime=object(),
         event_bus=EventBus(),
-        stream_controller=StreamController(EventBus()),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=camera_runtime,
@@ -136,7 +132,6 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
         hardware_system=HardwareSystem(cameras=[camera]),
         board_runtime=object(),
         event_bus=EventBus(),
-        stream_controller=StreamController(EventBus()),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(capture_frames=lambda **kwargs: []),
@@ -192,7 +187,6 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
         hardware_system=HardwareSystem(models=[SimpleNamespace()]),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -271,7 +265,6 @@ def test_server_registers_single_object_detection_as_a_tool() -> None:
         hardware_system=HardwareSystem(models=[SimpleNamespace()]),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -339,7 +332,6 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
         hardware_system=HardwareSystem(models=[SimpleNamespace()]),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -397,7 +389,6 @@ def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
         hardware_system=hardware_system,
         board_runtime=object(),
         event_bus=EventBus(),
-        stream_controller=StreamController(EventBus()),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -443,7 +434,6 @@ def test_server_does_not_register_camera_lifecycle_tools() -> None:
         hardware_system=HardwareSystem(),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -477,7 +467,6 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         hardware_system=hardware_system,
         board_runtime=board_runtime,
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -538,7 +527,6 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
         hardware_system=HardwareSystem(microcontrollers=[board]),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -577,7 +565,6 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
         hardware_system=object(),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -638,7 +625,6 @@ def test_server_preserves_required_and_optional_registry_parameters() -> None:
         hardware_system=object(),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -669,7 +655,6 @@ def test_server_registers_agent_rule_tool(tmp_path) -> None:
         hardware_system=object(),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -754,7 +739,6 @@ def test_server_exposes_registered_events_as_nested_catalog(
         hardware_system=HardwareSystem(microcontrollers=[board]),
         board_runtime=object(),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -802,7 +786,6 @@ def test_database_backed_tool_description_includes_table_name() -> None:
         hardware_system=object(),
         board_runtime=object(),
         event_bus=EventBus(),
-        stream_controller=object(),
         event_worker=_event_worker(),
         app=app,
         camera_runtime=SimpleNamespace(),
@@ -831,7 +814,6 @@ def test_server_uses_prebuilt_rule_and_listener_dependencies() -> None:
         hardware_system=HardwareSystem(),
         board_runtime=SimpleNamespace(serial_pool={}),
         event_bus=event_bus,
-        stream_controller=StreamController(event_bus),
         event_worker=_event_worker(),
         app=FakeApp(),
         camera_runtime=SimpleNamespace(),
@@ -853,9 +835,9 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
             calls.append("hardware.off") or {"status": "off"}
         )
     )
-    stream_controller = SimpleNamespace(
-        stop_stream=lambda microcontroller, stream_connection: calls.append(
-            "stream.flush"
+    event_bus = SimpleNamespace(
+        get_event=lambda event_type, microcontroller_id, event_name: SimpleNamespace(
+            flush=lambda: calls.append("stream.flush")
         )
     )
     event_worker = SimpleNamespace(
@@ -864,8 +846,7 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
     runtime = ServerRuntime(
         hardware_system=object(),
         board_runtime=object(),
-        event_bus=EventBus(),
-        stream_controller=stream_controller,
+        event_bus=event_bus,
         event_worker=event_worker,
         app=FakeApp(),
         camera_runtime=SimpleNamespace(),

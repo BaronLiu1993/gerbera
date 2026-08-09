@@ -4,11 +4,9 @@ from fastmcp import FastMCP
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
-from gerbera_sdk.events.event_store import EventStore
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.rules.rule_buffer import RuleBuffer
 from gerbera_sdk.events.rules.rule_bus import RuleBus
-from gerbera_sdk.events.stream_controller import StreamController
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -49,14 +47,11 @@ class GerberaRuntime:
         model_runtime = ModelRuntime(hardware_system)
 
         event_bus = EventBus()
-        event_store = EventStore()
-        stream_controller = StreamController(event_bus)
         rule_bus = RuleBus()
         rule_buffer = RuleBuffer(rule_bus)
         event_listener = EventListener(
             hardware_system=hardware_system,
             serial_pool=board_runtime.serial_pool,
-            threads={},
             event_bus=event_bus,
             rule_buffer=rule_buffer,
         )
@@ -73,7 +68,7 @@ class GerberaRuntime:
             event_worker=event_worker,
             model_runtime=model_runtime,
             event_listener=event_listener,
-            stream_controller=stream_controller,
+            event_bus=event_bus,
         )
         app = FastMCP(
             hardware_system.description,
@@ -83,8 +78,6 @@ class GerberaRuntime:
             hardware_system=hardware_system,
             board_runtime=board_runtime,
             event_bus=event_bus,
-            event_store=event_store,
-            stream_controller=stream_controller,
             event_worker=event_worker,
             app=app,
             camera_runtime=camera_runtime,
