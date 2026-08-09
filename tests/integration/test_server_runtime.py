@@ -24,7 +24,6 @@ from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime as _ServerRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 
@@ -70,9 +69,7 @@ def _event_worker() -> EventWorker:
 
 
 def ServerRuntime(**dependencies) -> _ServerRuntime:
-    reaction_bus = dependencies.setdefault("reaction_bus", ReactionBus())
-    dependencies.setdefault("reaction_bus", reaction_bus)
-    dependencies.setdefault("agent_runtime", SimpleNamespace())
+    dependencies.setdefault("reaction_bus", ReactionBus())
     dependencies.setdefault("event_listener", SimpleNamespace())
     return _ServerRuntime(**dependencies)
 
@@ -647,74 +644,6 @@ def test_server_preserves_required_and_optional_registry_parameters() -> None:
     ]
 
 
-def test_server_registers_agent_reaction_tool(tmp_path) -> None:
-    event_bus = EventBus()
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=object(),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-    runtime.agent_runtime = AgentRuntime(
-        mcp_url="https://hardware.example.com/mcp",
-        reaction_bus=runtime.reaction_bus,
-        reaction_bus=runtime.reaction_bus,
-        reactions_path=tmp_path / ".gerbera" / "reactions",
-    )
-
-    runtime._register_reaction_tools()
-
-    tool = asyncio.run(app.get_tool("insert_reaction"))
-    assert tool.annotations == ToolAnnotations(
-        title="Create an event reaction",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=False,
-        openWorldHint=False,
-    )
-    asyncio.run(
-        tool.run(
-            {
-                "event_type": "STREAM",
-                "microcontroller_id": "board-1",
-                "event_name": "temperature",
-                "expected_value": 20,
-                "operator": "greater_than",
-                "callback_body": "return value",
-            }
-        )
-    )
-
-    event_key = ("STREAM", "board-1", "temperature")
-    reaction = runtime.reaction_bus.get_reaction(event_key)
-    assert reaction is not None
-    assert reaction.condition.expected == 20.0
-    assert type(reaction.condition.expected) is float
-    assert reaction.trigger_mode.value == "repeat"
-    assert event_key in runtime.reaction_bus.latest_values
-    assert len(list(runtime.agent_runtime.reactions_path.glob("*.py"))) == 1
-
-    delete_tool = asyncio.run(app.get_tool("delete_reaction"))
-    assert delete_tool.annotations.destructiveHint is True
-    asyncio.run(
-        delete_tool.run(
-            {
-                "event_type": "STREAM",
-                "microcontroller_id": "board-1",
-                "event_name": "temperature",
-            }
-        )
-    )
-
-    assert runtime.reaction_bus.get_reaction(event_key) is None
-    assert event_key not in runtime.reaction_bus.latest_values
-    assert list(runtime.agent_runtime.reactions_path.glob("*.py")) == []
-
-
 def test_server_exposes_registered_events_as_nested_catalog(
     device_registry,
 ) -> None:
@@ -817,11 +746,9 @@ def test_server_uses_prebuilt_reaction_and_listener_dependencies() -> None:
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
         reaction_bus=reaction_bus,
-        reaction_bus=reaction_bus,
         event_listener=event_listener,
     )
 
-    assert runtime.reaction_bus is reaction_bus
     assert runtime.reaction_bus is reaction_bus
     assert runtime.event_listener is event_listener
 

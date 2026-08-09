@@ -22,6 +22,28 @@ class FakeDatabase:
         pass
 
 
+async def return_value(mcp_url: str, value: float) -> float:
+    return value
+
+
+def register_test_reaction(reaction_bus: ReactionBus) -> None:
+    reaction_bus.register_reaction(
+        "STREAM",
+        "board-1",
+        "sensor",
+        Reaction(
+            condition=ReactionCondition(
+                expected=1.0,
+                operator=OperatorEnum.EQUAL,
+            ),
+            callback=ReactionCallback(
+                callback=return_value,
+                mcp_url="https://hardware.example.com/mcp",
+            ),
+        ),
+    )
+
+
 def test_event_bus_rejects_duplicate_and_missing_events() -> None:
     event_bus = EventBus()
     event = Event(
@@ -77,7 +99,7 @@ def test_listener_rejects_duplicate_payload_keys() -> None:
 
 def test_listener_updates_registered_reaction_bus_value() -> None:
     reaction_bus = ReactionBus()
-    reaction_bus.register_reaction_placeholder("STREAM", "board-1", "sensor")
+    register_test_reaction(reaction_bus)
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
@@ -127,8 +149,6 @@ def test_listener_does_not_wait_for_async_reaction_callback() -> None:
             ),
         ),
     )
-    reaction_bus = reaction_bus
-    reaction_bus.register_reaction_placeholder("STREAM", "board-1", "sensor")
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
@@ -172,8 +192,6 @@ def test_listener_logs_async_reaction_callback_failure(caplog) -> None:
             ),
         ),
     )
-    reaction_bus = reaction_bus
-    reaction_bus.register_reaction_placeholder("STREAM", "board-1", "sensor")
     listener = EventListener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},

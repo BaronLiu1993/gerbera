@@ -7,7 +7,6 @@ import pytest
 from gerbera_sdk.events.reactions import (
     OperatorEnum,
     Reaction,
-    ReactionBuffer,
     ReactionBus,
     ReactionCallback,
     ReactionCondition,
@@ -293,8 +292,6 @@ def test_reaction_bus_stores_value_and_emits_reaction_evaluation() -> None:
             ),
         ),
     )
-    reaction_bus = reaction_bus
-    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
 
     result = asyncio.run(
         reaction_bus.update_reaction_value(*EVENT_KEY, {"value": "30"})
@@ -304,13 +301,24 @@ def test_reaction_bus_stores_value_and_emits_reaction_evaluation() -> None:
     assert reaction_bus.latest_values[EVENT_KEY] == 30.0
 
 
-def test_reaction_bus_does_not_replace_value_when_reregistered() -> None:
+def test_reaction_bus_does_not_replace_value_when_duplicate_register_fails() -> None:
     reaction_bus = ReactionBus()
-    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
+    reaction = Reaction(
+        condition=ReactionCondition(
+            expected=1.0,
+            operator=OperatorEnum.EQUAL,
+        ),
+        callback=ReactionCallback(
+            callback=async_callback(lambda value: value),
+            mcp_url=MCP_URL,
+        ),
+    )
+    reaction_bus.register_reaction(*EVENT_KEY, reaction)
     asyncio.run(
         reaction_bus.update_reaction_value(*EVENT_KEY, {"value": 10})
     )
-    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
+    with pytest.raises(ValueError, match="already registered"):
+        reaction_bus.register_reaction(*EVENT_KEY, reaction)
 
     assert reaction_bus.latest_values[EVENT_KEY] == 10.0
 
@@ -328,7 +336,19 @@ def test_reaction_bus_ignores_unknown_event() -> None:
 
 def test_reaction_bus_rejects_non_numeric_sensor_value() -> None:
     reaction_bus = ReactionBus()
-    reaction_bus.register_reaction_placeholder(*EVENT_KEY)
+    reaction_bus.register_reaction(
+        *EVENT_KEY,
+        Reaction(
+            condition=ReactionCondition(
+                expected=1.0,
+                operator=OperatorEnum.EQUAL,
+            ),
+            callback=ReactionCallback(
+                callback=async_callback(lambda value: value),
+                mcp_url=MCP_URL,
+            ),
+        ),
+    )
 
     with pytest.raises(ValueError, match="finite numbers"):
         asyncio.run(

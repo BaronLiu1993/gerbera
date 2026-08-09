@@ -2,13 +2,13 @@ from collections.abc import Mapping
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+import logging
 import threading
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
-
 
 
 # Runs at runtime
@@ -161,3 +161,4 @@ class EventListener:
             ),
         )
         return future
+

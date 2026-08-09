@@ -146,58 +146,25 @@ callback = ReactionCallback(
 The generated script controls which tool to call, how to build arguments, and
 what result to return.
 
-## Optional latest-value buffer
+## Latest Values
 
-`ReactionBus` can evaluate incoming values directly. Use `ReactionBuffer` when the
-latest value must also be retained for future stateful or cross-event reactions:
+`ReactionBus` owns registered reactions and their latest numeric values:
 
 ```python
-from gerbera_sdk.events.reactions import ReactionBuffer
-
-buffer = ReactionBuffer(reaction_bus)
-buffer.register_event_in_buffer(*event_key)
-
 result = asyncio.run(
-    buffer.update_buffer_value(*event_key, {"value": 32})
+    reaction_bus.update_reaction_value(*event_key, {"value": 32})
 )
 ```
 
-Registering an event again does not overwrite its current value. Updates for
-unregistered events are ignored.
+Updates for unregistered events are ignored.
 
 ## Runtime ownership
 
-Each `ServerRuntime` starts with one empty `ReactionBus` and one connected
-`ReactionBuffer`. The runtime injects that buffer into `EventListener`.
+Each `ServerRuntime` starts with one empty `ReactionBus`. The runtime injects
+that bus into `EventListener`.
 
-`GerberaRuntime` also registers an `insert_reaction` MCP tool. Agents can pass the
-event key, condition, operator, and Python callback body to this tool. The
-runtime places that body inside:
-
-```python
-async def callback(mcp_url, value):
-    return value
-```
-
-The tool hashes the three-part event key with SHA-256, stores the source under
-`.gerbera/reactions/<event-key-hash>.py`, loads the callback, and registers the reaction
-against the same live bus and buffer.
-
-The callback source is transported as text, not as a file upload. A plan places
-the Python source in a JSON string, the MCP client sends that string as the
-`callback_body` argument, and `AgentRuntime.insert_reaction` validates and places
-it inside a fixed `async def callback(mcp_url, value):` template. Generated
-scripts always import `httpx` and `Client` from `fastmcp`. The configured MCP
-URL and normalized finite-float sensor value are injected when the callback
-runs.
-The completed source is then written into the runtime's local
-`.gerbera/reactions/` directory. This keeps imports, function signature, and
-filesystem ownership under runtime control and does not require the model to
-know or access a local path.
-
-The `delete_reaction` MCP tool accepts the same three-part event key. It unregisters
-the reaction and removes its generated callback file. Workflow-scoped reaction actions
-use it for cleanup after execution.
+Local reaction create/delete MCP tools are intentionally disabled while callback
+execution moves to harness.
 
 Agents can call `list_reaction_events` first to retrieve the registered event keys
 as a nested `event_type → microcontroller_id → event_name` dictionary. Each

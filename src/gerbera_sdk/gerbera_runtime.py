@@ -9,7 +9,6 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
@@ -53,12 +52,6 @@ class GerberaRuntime:
             event_bus=event_bus,
             reaction_bus=reaction_bus,
         )
-        agent_runtime = AgentRuntime(
-            mcp_url=mcp_url,
-            reaction_bus=reaction_bus,
-            valid_event_keys=event_bus.events,
-        )
-
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,
             camera_runtime=camera_runtime,
@@ -79,7 +72,6 @@ class GerberaRuntime:
             app=app,
             camera_runtime=camera_runtime,
             model_runtime=model_runtime,
-            agent_runtime=agent_runtime,
             event_listener=event_listener,
             reaction_bus=reaction_bus,
         )

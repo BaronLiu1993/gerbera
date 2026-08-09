@@ -7,7 +7,7 @@ from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
-from pydantic import Field, StrictFloat
+from pydantic import Field
 
 from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
 from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
@@ -22,9 +22,7 @@ from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.agent_runtime import AgentRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.events.reactions import OperatorEnum, ReactionTriggerModeEnum
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
@@ -66,7 +64,6 @@ class ServerRuntime:
     app: FastMCP
     camera_runtime: CameraRuntime
     model_runtime: ModelRuntime
-    agent_runtime: AgentRuntime
     event_listener: EventListener
     reaction_bus: ReactionBus
     event_read_timeout_seconds: float = 1.0
@@ -74,7 +71,8 @@ class ServerRuntime:
 
     def register_tools(self) -> None:
         self._register_hardware_tools()
-        self._register_reaction_tools()
+        # Reaction MCP tools are disabled until reaction execution moves to harness.
+        # self._register_reaction_tools()
         self._register_event_catalog_tool()
 
     # Event registration and catalog helpers.
@@ -766,77 +764,6 @@ class ServerRuntime:
         )
 
     # Reaction and event catalog tools.
-
-    def _register_reaction_tools(self) -> None:
-        def insert_reaction(
-            event_type: str,
-            microcontroller_id: str,
-            event_name: str,
-            expected_value: Annotated[
-                StrictFloat,
-                Field(allow_inf_nan=False),
-            ],
-            operator: OperatorEnum,
-            callback_body: str,
-            trigger_mode: ReactionTriggerModeEnum = ReactionTriggerModeEnum.REPEAT,
-        ) -> dict[str, str]:
-            return self.agent_runtime.insert_reaction(
-                event_type=event_type,
-                microcontroller_id=microcontroller_id,
-                event_name=event_name,
-                expected_value=expected_value,
-                operator=operator,
-                callback_body=callback_body,
-                trigger_mode=trigger_mode,
-            )
-
-        self._register_tool(
-            name="insert_reaction",
-            description=(
-                "Create and register a reaction for a hardware event. "
-                "callback_body must contain only the Python statements for "
-                "async callback(mcp_url, value). The runtime imports httpx "
-                "and fastmcp.Client, adds the fixed function definition, and "
-                "binds the configured MCP URL and finite-float sensor value. "
-                "The agent must use the mcp_url parameter and must not provide "
-                "or hardcode an endpoint."
-            ),
-            tool_function=insert_reaction,
-            annotations=ToolAnnotations(
-                title="Create an event reaction",
-                readOnlyHint=False,
-                destructiveHint=False,
-                idempotentHint=False,
-                openWorldHint=False,
-            ),
-        )
-
-        def delete_reaction(
-            event_type: str,
-            microcontroller_id: str,
-            event_name: str,
-        ) -> dict[str, str]:
-            return self.agent_runtime.delete_reaction(
-                event_type=event_type,
-                microcontroller_id=microcontroller_id,
-                event_name=event_name,
-            )
-
-        self._register_tool(
-            name="delete_reaction",
-            description=(
-                "Delete the reaction registered for a hardware event and remove "
-                "its local callback script."
-            ),
-            tool_function=delete_reaction,
-            annotations=ToolAnnotations(
-                title="Delete an event reaction",
-                readOnlyHint=False,
-                destructiveHint=True,
-                idempotentHint=False,
-                openWorldHint=False,
-            ),
-        )
 
     def _register_event_catalog_tool(self) -> None:
         def list_reaction_events() -> EventCatalog:
