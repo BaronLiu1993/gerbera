@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec
-from gerbera_sdk.contracts.firmware_contract import (
+from gerbera_sdk.firmware.firmware_schema import CommandSpec
+from gerbera_sdk.firmware.firmware_schema import (
     ColumnSpec,
     LibrarySpec,
     PinModeSpec,

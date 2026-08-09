@@ -1,6 +1,7 @@
 import json
 import subprocess
 import uuid
+from pathlib import Path
 from typing import Any
 from dataclasses import dataclass, field
 
@@ -16,16 +17,17 @@ class SandboxResult:
 class SandboxGateway:
     @staticmethod
     def build_image(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
         try:
             subprocess.run(
                 [
                     "docker",
                     "build",
                     "-f",
-                    "src/gerbera_harness/sandbox.Dockerfile",
+                    str(repo_root / ".docker" / "sandbox" / "Dockerfile"),
                     "-t",
                     "sandbox:latest",
-                    "src/gerbera_harness",
+                    str(repo_root),
                 ],
                 check=True,
                 timeout=60.0,

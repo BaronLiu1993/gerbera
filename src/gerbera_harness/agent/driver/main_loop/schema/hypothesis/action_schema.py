@@ -3,12 +3,6 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StrictFloat, field_validator
 
-from gerbera_sdk.events.reactions import (
-    OperatorEnum,
-    ReactionTriggerModeEnum,
-    normalize_reaction_callback_body,
-)
-
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
     SnakeCaseVariable,
     StrictSchema,
@@ -43,35 +37,35 @@ class ExecuteActionParameterSchema(StrictSchema):
     type: ParameterTypeSchema
 
 
-class ReactionCreationSchema(StrictSchema):
-    description: str
-    action_type: Literal["execute"]
-    execution_type: Literal["reaction"]
-    create_tool_call: str = Field(min_length=1)
-    delete_tool_call: str = Field(min_length=1)
-    event_key: tuple[str, str, str]
-    callable: str = Field(
-        min_length=1,
-        description=(
-            "Python statements for the body of "
-            "async callback(mcp_url, value). The runtime imports httpx and "
-            "fastmcp.Client, injects the configured MCP URL, and passes the "
-            "watched sensor value as a finite float. Do not include imports, "
-            "the function definition, outer indentation, or assignments to "
-            "mcp_url or value."
-        ),
-    )
-    operator: OperatorEnum
-    expected: Annotated[
-        StrictFloat,
-        Field(allow_inf_nan=False),
-    ]
-    trigger_mode: ReactionTriggerModeEnum
+# class ReactionCreationSchema(StrictSchema):
+#     description: str
+#     action_type: Literal["execute"]
+#     execution_type: Literal["reaction"]
+#     create_tool_call: str = Field(min_length=1)
+#     delete_tool_call: str = Field(min_length=1)
+#     event_key: tuple[str, str, str]
+#     callable: str = Field(
+#         min_length=1,
+#         description=(
+#             "Python statements for the body of "
+#             "async callback(mcp_url, value). The runtime imports httpx and "
+#             "fastmcp.Client, injects the configured MCP URL, and passes the "
+#             "watched sensor value as a finite float. Do not include imports, "
+#             "the function definition, outer indentation, or assignments to "
+#             "mcp_url or value."
+#         ),
+#     )
+#     operator: OperatorEnum
+#     expected: Annotated[
+#         StrictFloat,
+#         Field(allow_inf_nan=False),
+#     ]
+#     trigger_mode: ReactionTriggerModeEnum
 
-    @field_validator("callable")
-    @classmethod
-    def validate_callable_body(cls, value: str) -> str:
-        return normalize_reaction_callback_body(value)
+#     @field_validator("callable")
+#     @classmethod
+#     def validate_callable_body(cls, value: str) -> str:
+#         return normalize_reaction_callback_body(value)
 
 
 class AgentExecuteSchema(StrictSchema):
@@ -158,15 +152,15 @@ class ReviewSchema(StrictSchema):
 
 # Union Schemas
 ExecuteSchema = (
-    ReactionCreationSchema
-    | ContinuousExecuteSchema
+    #ReactionCreationSchema
+    ContinuousExecuteSchema
     | DiscreteExecuteSchema
     | AgentExecuteSchema
 )
 
 DeterministicExecuteSchema = (
-    ReactionCreationSchema
-    | ContinuousExecuteSchema
+    # ReactionCreationSchema
+    ContinuousExecuteSchema
     | DiscreteExecuteSchema
 )
 

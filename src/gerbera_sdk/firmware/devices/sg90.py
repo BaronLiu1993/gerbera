@@ -1,8 +1,8 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
+from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
-from gerbera_sdk.contracts.firmware_contract import LibrarySpec, PinModeSpec
+from gerbera_sdk.firmware.firmware_schema import LibrarySpec, PinModeSpec
 from gerbera_sdk.models.hardware.connection import Connection
 
 

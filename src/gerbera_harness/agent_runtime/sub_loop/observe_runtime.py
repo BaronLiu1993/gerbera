@@ -16,10 +16,6 @@ from gerbera_harness.agent_runtime.subagent_context import (
 )
 from gerbera_harness.memory import WorldStateSchema
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
-from gerbera_sdk.contracts.tool_contract import (
-    ToolStage,
-    tool_is_available_during,
-)
 
 OBSERVATION_PROMPT = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
 OBSERVATION_REVIEW_PROMPT = load_prompt(
@@ -45,7 +41,6 @@ class ObservationRuntime:
             allowed_tool_names = frozenset(
                 tool.name
                 for tool in tools
-                if tool_is_available_during(tool, ToolStage.OBSERVATION)
             )
 
             raw_response = await client.send(

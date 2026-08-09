@@ -1,7 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Annotated
-import uuid
+import math
 
 
 class OperatorEnum(str, Enum):
@@ -41,3 +40,18 @@ class ReactionCondition:
             return actual >= self.expected
 
         raise ValueError(f"Unsupported operator: {self.operator}")
+
+
+def parse_reaction_value(value: object) -> float:
+    if isinstance(value, bool):
+        raise ValueError("Reaction values must be finite numbers")
+
+    try:
+        parsed_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Reaction values must be finite numbers") from exc
+
+    if not math.isfinite(parsed_value):
+        raise ValueError("Reaction values must be finite numbers")
+
+    return parsed_value

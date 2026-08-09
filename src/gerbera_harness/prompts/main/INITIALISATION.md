@@ -131,8 +131,7 @@ Action roles:
   evidence with the expected result. It does not collect new hardware data.
 
 Put `expected` inside each `review` action. Ordinary execute actions do not
-have an `expected` field. `ReactionCreationSchema.expected` is the reaction's numeric
-comparison value and is the only exception.
+have an `expected` field.
 
 Create separate execute groups when testing different independent-variable
 values.
@@ -150,7 +149,7 @@ Choose the execution type from the operation's actual semantics:
   collect a time series.
 - Use `agent` only when execution must repeatedly observe changing physical
   state and choose the next action from those observations.
-- Use `reaction` only for a deterministic condition-triggered response.
+<!-- - Use `reaction` only for a deterministic condition-triggered response. -->
 
 PREFER DETERMINISTIC ACTIONS WHEN THE REQUIRED BEHAVIOR IS KNOWN. If the tool
 name, arguments, ordering, or duration can be determined during initialisation,
@@ -247,6 +246,7 @@ action when the approved method already determines the next tool call.
 An agent action must be the only action in its execute group. Put deterministic
 actions in separate execute groups.
 
+<!--
 ## Reaction Planning
 
 A reaction is a deterministic runtime check:
@@ -297,6 +297,7 @@ not replace the final review.
 
 If no deterministic condition-triggered response is necessary, do not create a
 reaction.
+-->
 
 ## Review Contract
 

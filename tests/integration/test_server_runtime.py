@@ -7,7 +7,7 @@ from mcp.types import ToolAnnotations
 import numpy as np
 import pytest
 
-from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
+from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus

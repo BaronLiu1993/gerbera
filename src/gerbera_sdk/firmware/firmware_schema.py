@@ -1,16 +1,26 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from gerbera_sdk.models.hardware.connection import Connection
 from enum import Enum
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from gerbera_sdk.models.hardware.connection import Connection
+@dataclass(frozen=True)
+class ParameterSpec:
+    required: bool = True
+    description: str = ""
+    min: int | float | None = None
+    max: int | float | None = None
+
+
+@dataclass(frozen=True)
+class CommandSpec:
+    method: str
+    params: dict[str, ParameterSpec] = field(default_factory=dict)
+    description: str = ""
 
 
 class PinMode(str, Enum):
     INPUT = "INPUT"
     OUTPUT = "OUTPUT"
+
 
 class ColumnType(str, Enum):
     INTEGER = "INTEGER"
@@ -48,3 +58,4 @@ class StreamContract:
     table_name: str
     schema: dict[str, ColumnSpec]
     connection: "Connection"
+

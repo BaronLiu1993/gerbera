@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import psycopg
+from psycopg import sql
 
 
 @dataclass
@@ -16,9 +18,6 @@ class Database:
     ) -> None:
         if not payload:
             raise ValueError(f"Database write payload is empty: {table_name}")
-
-        import psycopg
-        from psycopg import sql
 
         keys = payload[0].keys()
         query = sql.SQL(

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from gerbera_sdk.firmware.configurations import get_device_builder
-from gerbera_sdk.contracts.firmware_contract import LibrarySpec
+from gerbera_sdk.firmware.firmware_schema import LibrarySpec
 from gerbera_sdk.models.hardware.connection import Connection
 
 

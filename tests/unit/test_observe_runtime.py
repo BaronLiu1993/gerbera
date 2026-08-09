@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
+from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
 
 from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationStatusEnum,

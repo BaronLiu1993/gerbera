@@ -9,8 +9,8 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from gerbera_sdk.contracts.command_contract import CommandSpec, ParameterSpec
-from gerbera_sdk.contracts.tool_contract import ToolStage, stage_metadata
+from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
+from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener

@@ -10,19 +10,17 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
-    ReactionCreationSchema,
+    # ReactionCreationSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
 from gerbera_harness.agent.model.mcp_client import MCPClient
 
-DeterministicActionSchema = (
-    ReactionCreationSchema | ContinuousExecuteSchema | DiscreteExecuteSchema
-)
+DeterministicActionSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
 ExecutableActionSchema = DeterministicActionSchema | AgentExecuteSchema
 ScheduledActionSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
-ActiveReaction = tuple[int, ReactionCreationSchema]
+# ActiveReaction = tuple[int, ReactionCreationSchema]
 AgentExecutor = Callable[
     [int, AgentExecuteSchema],
     Awaitable[ExecuteDecisionEnum],
@@ -59,7 +57,7 @@ class ExecutionProcess:
         client: MCPClient,
         allowed_tool_names: frozenset[str],
     ) -> ExecuteDecisionEnum:
-        active_reactions: list[ActiveReaction] = []
+        # active_reactions: list[ActiveReaction] = []
 
         try:
             for group_index, group in enumerate(self.actions_list):
@@ -73,7 +71,7 @@ class ExecutionProcess:
                             allowed_tool_names=allowed_tool_names,
                             group_index=group_index,
                             group=group,
-                            active_reactions=active_reactions,
+                            # active_reactions=active_reactions,
                         )
 
                         print(decision)
@@ -88,11 +86,12 @@ class ExecutionProcess:
 
                 self.on_group_completed(group_index)
         finally:
-            await self._delete_active_reactions(
-                client,
-                allowed_tool_names,
-                active_reactions,
-            )
+            pass
+            # await self._delete_active_reactions(
+            #     client,
+            #     allowed_tool_names,
+            #     active_reactions,
+            # )
 
         return ExecuteDecisionEnum.ACCEPTED
 
@@ -102,7 +101,7 @@ class ExecutionProcess:
         allowed_tool_names: frozenset[str],
         group_index: int,
         group: ExecuteActionGroupSchema,
-        active_reactions: list[ActiveReaction],
+        # active_reactions: list[ActiveReaction],
     ) -> ExecuteDecisionEnum:
         first_action = group.actions[0]
         if isinstance(first_action, AgentExecuteSchema):
@@ -116,7 +115,7 @@ class ExecutionProcess:
             allowed_tool_names=allowed_tool_names,
             group_index=group_index,
             group=group,
-            active_reactions=active_reactions,
+            # active_reactions=active_reactions,
         )
         return ExecuteDecisionEnum.ACCEPTED
 
@@ -126,28 +125,26 @@ class ExecutionProcess:
         allowed_tool_names: frozenset[str],
         group_index: int,
         group: ExecuteActionGroupSchema,
-        active_reactions: list[ActiveReaction],
+        # active_reactions: list[ActiveReaction],
     ) -> None:
-        reactions: list[ReactionCreationSchema] = []
+        # reactions: list[ReactionCreationSchema] = []
         scheduled_actions: list[ScheduledActionSchema] = []
 
         for action in group.actions:
-            if isinstance(action, ReactionCreationSchema):
-                reactions.append(action)
-            elif isinstance(
+            if isinstance(
                 action,
                 (ContinuousExecuteSchema, DiscreteExecuteSchema),
             ):
                 scheduled_actions.append(action)
 
-        for reaction in reactions:
-            await self._create_reaction(
-                client,
-                allowed_tool_names,
-                group_index,
-                reaction,
-                active_reactions,
-            )
+        # for reaction in reactions:
+        #     await self._create_reaction(
+        #         client,
+        #         allowed_tool_names,
+        #         group_index,
+        #         reaction,
+        #         active_reactions,
+        #     )
 
         group_start = asyncio.get_running_loop().time()
 
@@ -163,59 +160,59 @@ class ExecutionProcess:
                     )
                 )
 
-    async def _delete_active_reactions(
-        self,
-        client: MCPClient,
-        allowed_tool_names: frozenset[str],
-        active_reactions: list[ActiveReaction],
-    ) -> None:
-        for group_index, reaction in reversed(active_reactions):
-            await self._call_cleanup_tool(
-                client,
-                allowed_tool_names,
-                group_index,
-                reaction,
-                "delete_reaction",
-                reaction.delete_tool_call,
-                self._event_key_arguments(reaction.event_key),
-            )
-
-    async def _create_reaction(
-        self,
-        client: MCPClient,
-        allowed_tool_names: frozenset[str],
-        group_index: int,
-        reaction: ReactionCreationSchema,
-        active_reactions: list[ActiveReaction],
-    ) -> None:
-        arguments = {
-            **self._event_key_arguments(reaction.event_key),
-            "expected_value": reaction.expected,
-            "operator": reaction.operator.value,
-            "callback_body": reaction.callable,
-            "trigger_mode": reaction.trigger_mode.value,
-        }
-
-        await self._call_tool(
-            client=client,
-            allowed_tool_names=allowed_tool_names,
-            group_index=group_index,
-            action=reaction,
-            call_type="create_reaction",
-            tool_name=reaction.create_tool_call,
-            arguments=arguments,
-        )
-
-        active_reactions.append((group_index, reaction))
-
-    @staticmethod
-    def _event_key_arguments(event_key: tuple[str, str, str]) -> dict[str, str]:
-        event_type, microcontroller_id, event_name = event_key
-        return {
-            "event_type": event_type,
-            "microcontroller_id": microcontroller_id,
-            "event_name": event_name,
-        }
+    # async def _delete_active_reactions(
+    #     self,
+    #     client: MCPClient,
+    #     allowed_tool_names: frozenset[str],
+    #     active_reactions: list[ActiveReaction],
+    # ) -> None:
+    #     for group_index, reaction in reversed(active_reactions):
+    #         await self._call_cleanup_tool(
+    #             client,
+    #             allowed_tool_names,
+    #             group_index,
+    #             reaction,
+    #             "delete_reaction",
+    #             reaction.delete_tool_call,
+    #             self._event_key_arguments(reaction.event_key),
+    #         )
+    #
+    # async def _create_reaction(
+    #     self,
+    #     client: MCPClient,
+    #     allowed_tool_names: frozenset[str],
+    #     group_index: int,
+    #     reaction: ReactionCreationSchema,
+    #     active_reactions: list[ActiveReaction],
+    # ) -> None:
+    #     arguments = {
+    #         **self._event_key_arguments(reaction.event_key),
+    #         "expected_value": reaction.expected,
+    #         "operator": reaction.operator.value,
+    #         "callback_body": reaction.callable,
+    #         "trigger_mode": reaction.trigger_mode.value,
+    #     }
+    #
+    #     await self._call_tool(
+    #         client=client,
+    #         allowed_tool_names=allowed_tool_names,
+    #         group_index=group_index,
+    #         action=reaction,
+    #         call_type="create_reaction",
+    #         tool_name=reaction.create_tool_call,
+    #         arguments=arguments,
+    #     )
+    #
+    #     active_reactions.append((group_index, reaction))
+    #
+    # @staticmethod
+    # def _event_key_arguments(event_key: tuple[str, str, str]) -> dict[str, str]:
+    #     event_type, microcontroller_id, event_name = event_key
+    #     return {
+    #         "event_type": event_type,
+    #         "microcontroller_id": microcontroller_id,
+    #         "event_name": event_name,
+    #     }
 
     async def _execute_scheduled_action(
         self,

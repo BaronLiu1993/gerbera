@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.contracts.command_contract import CommandSpec
+from gerbera_sdk.firmware.firmware_schema import CommandSpec
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.connection import Connection
 
