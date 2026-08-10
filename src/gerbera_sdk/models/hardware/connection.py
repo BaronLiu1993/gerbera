@@ -17,7 +17,7 @@ class Connection:
     database: Optional[Database] = None
     actions: dict[
         str,
-        Callable[[dict[str, object]], dict[str, str]],
+        Callable[[dict[str, object]], dict[str, object]],
     ] = field(default_factory=dict, repr=False)
 
     @property
@@ -37,7 +37,7 @@ class Connection:
     def register_action(
         self,
         action: str,
-        callback: Callable[[dict[str, object]], dict[str, str]],
+        callback: Callable[[dict[str, object]], dict[str, object]],
     ) -> None:
         self.actions[action.strip().upper()] = callback
 
@@ -45,7 +45,7 @@ class Connection:
         self,
         action: str,
         params: dict[str, object],
-    ) -> dict[str, str]:
+    ) -> dict[str, object]:
         normalized_action = action.strip().upper()
         if normalized_action not in self.actions:
             raise RuntimeError(

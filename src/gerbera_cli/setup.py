@@ -16,7 +16,6 @@ from gerbera_sdk.gerbera_runtime import GerberaRuntime
 GERBERA_IMAGE = "ghcr.io/baronliu1993/gerbera:latest"
 POSTGRES_IMAGE = "ghcr.io/baronliu1993/gerbera-postgres:latest"
 SANDBOX_IMAGE = "ghcr.io/baronliu1993/gerbera-sandbox:latest"
-LOCAL_SANDBOX_IMAGE = "gerbera-sandbox:latest"
 NETWORK = "gerbera"
 POSTGRES_CONTAINER = "gerbera-postgres"
 HARNESS_CONTAINER = "gerbera-harness"
@@ -32,19 +31,23 @@ def run_local_server(
     database_host: str,
     database_port: int,
     hardware_system: HardwareSystem,
-):
-    local_url = "http://127.0.0.1:8000/mcp"
+) -> None:
     GerberaRuntime.run(
         hardware_system,
         transport="http",
         host="127.0.0.1",
-        port=8000,
+        port=8001,
         database_host=database_host,
         database_port=database_port,
         database_password=gerbera_writer_password,
     )
-    return local_url
 
+def run_firmware_setup(hardware_system: HardwareSystem) -> None: 
+    GerberaRuntime.setup(
+        hardware_system,
+        install_dependencies=True,
+        flash_firmware=True,
+    )
 
 def setup_local_container(
     gerbera_admin_password: str,
@@ -98,7 +101,6 @@ def setup_local_container(
 
 def pull_sandbox_image() -> None:
     subprocess.run(["docker", "pull", SANDBOX_IMAGE], check=True)
-    subprocess.run(["docker", "tag", SANDBOX_IMAGE, LOCAL_SANDBOX_IMAGE], check=True)
 
 
 def run_harness_container(

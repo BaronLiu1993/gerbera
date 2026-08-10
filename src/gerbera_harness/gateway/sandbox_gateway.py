@@ -5,7 +5,6 @@ from typing import Any
 from dataclasses import dataclass, field
 
 SANDBOX_IMAGE = "ghcr.io/baronliu1993/gerbera-sandbox:latest"
-LOCAL_SANDBOX_IMAGE = "gerbera-sandbox:latest"
 
 
 @dataclass
@@ -17,30 +16,6 @@ class SandboxResult:
 
 @dataclass
 class SandboxGateway:
-    @staticmethod
-    def pull_image() -> None:
-        try:
-            subprocess.run(
-                ["docker", "pull", SANDBOX_IMAGE],
-                check=True,
-                timeout=60.0,
-            )
-            subprocess.run(
-                ["docker", "tag", SANDBOX_IMAGE, LOCAL_SANDBOX_IMAGE],
-                check=True,
-                timeout=60.0,
-            )
-
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError("Sandbox image pull timed out") from exc
-
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError("Failed to pull sandbox image") from exc
-
-    @staticmethod
-    def build_image() -> None:
-        SandboxGateway.pull_image()
-
     @staticmethod
     def run_sandbox(
         session_id: str,
@@ -72,7 +47,7 @@ class Sandbox:
     session_id: str
     run_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timeout: float = 30.0
-    container_image: str = LOCAL_SANDBOX_IMAGE
+    container_image: str = SANDBOX_IMAGE
 
     def run_container(self, code: str) -> object:
         container_name = f"gerbera-{uuid.uuid4()}"

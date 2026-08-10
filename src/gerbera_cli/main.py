@@ -13,6 +13,7 @@ from gerbera_cli.setup import (
     run_local_server,
     setup_local_container,
     pull_sandbox_image,
+    run_firmware_setup,
 )
 
 app = typer.Typer()
@@ -99,11 +100,9 @@ def init():
     Path(".gerbera/firmware").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/models").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/reactions").mkdir(parents=True, exist_ok=True)
-
     Path(".gerbera/secrets").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/secrets/secrets.json").write_text(json.dumps(secrets_json, indent=4))
     Path("config.json").write_text(json.dumps(config, indent=4))
-    pull_sandbox_image()
     typer.secho(
         "Successfully updated config and .gerbera workspace. "
         f"Currently managing {len(device_json)} device(s) in config.json.",
@@ -124,12 +123,12 @@ def up():
     config = json.loads(Path("config.json").read_text())
     secrets = json.loads(Path(".gerbera/secrets/secrets.json").read_text())
     hardware = load_hardware_system(config)
+    gerbera_admin_password = secrets["gerbera_admin_password"]
+    gerbera_schema_password = secrets["gerbera_schema_password"]
+    gerbera_writer_password = secrets["gerbera_writer_password"]
+    gerbera_reader_password = secrets["gerbera_reader_password"]
 
     if selection == "local":
-        gerbera_admin_password = secrets["gerbera_admin_password"]
-        gerbera_schema_password = secrets["gerbera_schema_password"]
-        gerbera_writer_password = secrets["gerbera_writer_password"]
-        gerbera_reader_password = secrets["gerbera_reader_password"]
 
         setup_local_container(
             gerbera_admin_password=gerbera_admin_password,
@@ -154,18 +153,28 @@ def up():
             gerbera_writer_password=gerbera_writer_password,
             gerbera_reader_password=gerbera_reader_password,
             provider=secrets["provider"],
-            mcp_url="http://127.0.0.1:8000/mcp",
+            mcp_url="http://127.0.0.1:8001/mcp",
             api_key=secrets["api_key"],
         )
 
-        run_local_server(
-            gerbera_writer_password=gerbera_writer_password,
-            database_port=6432,
-            database_host="127.0.0.1",
-            hardware_system=hardware,
-        )
+        run_firmware_setup(hardware_system=hardware)
     else:
         pass
+
+
+@app.command(name="server")
+def server():
+    config = json.loads(Path("config.json").read_text())
+    secrets = json.loads(Path(".gerbera/secrets/secrets.json").read_text())
+    hardware = load_hardware_system(config)
+    gerbera_writer_password = secrets["gerbera_writer_password"]
+
+    run_local_server(
+        gerbera_writer_password=gerbera_writer_password,
+        database_port=6432,
+        database_host="127.0.0.1",
+        hardware_system=hardware,
+    )
 
 
 @app.command(name="down")

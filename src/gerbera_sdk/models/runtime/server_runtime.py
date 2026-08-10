@@ -183,7 +183,7 @@ class ServerRuntime:
         connection: Connection,
         action: str,
         params: dict[str, object],
-    ) -> dict[str, str] | None:
+    ) -> dict[str, object]:
         serial_connection = self.board_runtime.get_serial_connection(
             microcontroller
         )
@@ -197,7 +197,7 @@ class ServerRuntime:
         # TODO: Rework command response matching before returning MCP responses.
         # The old latest-value polling can misattribute responses under
         # concurrent calls to the same connection.
-        return None
+        return {"status": "sent"}
 
     def register_connection_action(
         self,
@@ -209,7 +209,7 @@ class ServerRuntime:
 
         def action_function(
             params: dict[str, object],
-        ) -> dict[str, str] | None:
+        ) -> dict[str, object]:
             return self.send_connection_command(
                 microcontroller=microcontroller,
                 connection=connection,
@@ -223,20 +223,25 @@ class ServerRuntime:
         self,
         connection: Connection,
         command: CommandSpec,
-    ) -> Callable[..., dict[str, str] | None]:
+    ) -> Callable[..., dict[str, object]]:
         action = command.method.strip().upper()
         if not command.params:
 
-            def tool_function() -> dict[str, str] | None:
+            def tool_function() -> dict[str, object]:
                 return connection.perform_action(action, {})
 
             return tool_function
 
-        def tool_function(**values: Any) -> dict[str, str] | None:
-            return connection.perform_action(action, values)
+        def tool_function(**values: Any) -> dict[str, object]:
+            params = {
+                name: value
+                for name, value in values.items()
+                if value is not None
+            }
+            return connection.perform_action(action, params)
 
         parameters: list[Parameter] = []
-        annotations: dict[str, Any] = {"return": dict[str, str] | None}
+        annotations: dict[str, Any] = {"return": dict[str, object]}
         for name, parameter in command.params.items():
             annotation = self.build_parameter_annotation(parameter)
             default = Parameter.empty if parameter.required else None
@@ -255,7 +260,7 @@ class ServerRuntime:
         tool_function.__annotations__ = annotations
         tool_function.__signature__ = Signature(
             parameters=parameters,
-            return_annotation=dict[str, str] | None,
+            return_annotation=dict[str, object],
         )
         return tool_function
 
@@ -277,8 +282,8 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
         state: int,
-    ) -> Callable[[], dict[str, str]]:
-        def tool_function() -> dict[str, str]:
+    ) -> Callable[[], dict[str, object]]:
+        def tool_function() -> dict[str, object]:
             response = connection.perform_action("WRITE", {"state": state})
 
             if state == 0:
@@ -298,8 +303,8 @@ class ServerRuntime:
         self,
         connection: Connection,
         state: int,
-    ) -> Callable[[], dict[str, str]]:
-        def tool_function() -> dict[str, str]:
+    ) -> Callable[[], dict[str, object]]:
+        def tool_function() -> dict[str, object]:
             return connection.perform_action("WRITE", {"state": state})
 
         return tool_function
