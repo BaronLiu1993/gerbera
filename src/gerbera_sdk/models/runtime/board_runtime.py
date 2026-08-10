@@ -10,6 +10,11 @@ import serial
 @dataclass
 class SerialConnection:
     _conn: serial = None
+    _lock: threading.RLock = field(
+        default_factory=threading.RLock,
+        init=False,
+        repr=False,
+    )
 
     def connect(self, port: str, baud: int = 115200) -> None:
         self._conn = serial.Serial(port, baud, timeout=2)
@@ -17,15 +22,17 @@ class SerialConnection:
         self._conn.reset_input_buffer()
 
     def write(self, command: str) -> None:
-        self._conn.write(f"{command}\n".encode())
-        self._conn.flush()
+        with self._lock:
+            self._conn.write(f"{command}\n".encode())
+            self._conn.flush()
 
     def readline(self) -> bytes:
         return self._conn.readline()
 
     def destroy(self) -> None:
-        if self._conn and self._conn.is_open:
-            self._conn.close()
+        with self._lock:
+            if self._conn and self._conn.is_open:
+                self._conn.close()
 
 
 @dataclass

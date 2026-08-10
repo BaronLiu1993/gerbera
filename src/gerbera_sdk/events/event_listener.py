@@ -4,6 +4,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 import threading
 
+from serial import SerialException
+
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -15,20 +17,23 @@ from gerbera_sdk.models.runtime.board_runtime import SerialConnection
 class EventListener:
     hardware_system: HardwareSystem
     serial_pool: Mapping[str, SerialConnection]
-    threads: dict[str, threading.Thread]  # Multiple threads to run the loop
 
     # Where events are stored
     event_bus: EventBus
 
     # Reaction code
+    
     reaction_bus: ReactionBus
+    
     reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="gerbera-reaction-callback",
         )
     )
-
+    threads: dict[str, threading.Thread] = field(
+            default_factory=dict
+        )  # Multiple threads to run the loop
     # Stops every single thread
     stop_event: threading.Event = field(default_factory=threading.Event)
     lifecycle_lock: threading.RLock = field(
@@ -79,7 +84,12 @@ class EventListener:
     def listen_loop(self, microcontroller_id) -> None:
         serial_connection = self.serial_pool[microcontroller_id]
         while not self.stop_event.is_set():
-            line = serial_connection.readline()
+            try:
+                line = serial_connection.readline()
+            except (OSError, SerialException):
+                if self.stop_event.is_set():
+                    return
+                raise
 
             if isinstance(line, bytes):
                 line = line.decode(errors="ignore")
@@ -160,4 +170,3 @@ class EventListener:
             ),
         )
         return future
-

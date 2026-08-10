@@ -193,11 +193,11 @@ class ServerRuntime:
             params=params,
         )
 
-        event_key = ("MCP", microcontroller.id, connection.event_name)
-        previous_value = self.event_bus.get_event(*event_key).read_latest()
-
         serial_connection.write(built_command)
-        return self.read_latest_event_value(event_key, previous_value)
+        # TODO: Rework command response matching before returning MCP responses.
+        # The old latest-value polling can misattribute responses under
+        # concurrent calls to the same connection.
+        return None
 
     def register_connection_action(
         self,
