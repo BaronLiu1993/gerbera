@@ -32,7 +32,7 @@ def init():
 
     # Select Microcontrollers
     microcontroller_choices = load_board_data(result)
-
+    print(microcontroller_choices)
     selected_choices = questionary.checkbox(
         "Select microcontrollers to configure (Space to select, Enter to confirm):",
         choices=[choice for choice in microcontroller_choices.keys()],
@@ -86,7 +86,7 @@ def init():
     Path(".gerbera/models").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/reactions").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/secrets").mkdir(parents=True, exist_ok=True)
-    Path(".gerbera/secrets.json").write_text(json.dumps(secrets_json, indent=4))
+    Path(".gerbera/secrets/secrets.json").write_text(json.dumps(secrets_json, indent=4))
     Path("config.json").write_text(json.dumps(config, indent=4))
     typer.secho(
         "Successfully updated config and .gerbera workspace. "

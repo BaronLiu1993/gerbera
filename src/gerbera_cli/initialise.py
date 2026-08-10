@@ -15,5 +15,5 @@ def load_board_data(raw_arduino_result):
             "address": address,
             "protocol": protocol,
         }
-        board_data["port"] = payload
+        board_data[address] = payload
     return board_data
