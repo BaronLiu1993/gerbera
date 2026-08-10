@@ -10,7 +10,6 @@ from gerbera_cli.setup import (
     generate_secret,
     load_hardware_system,
     run_local_harness,
-    run_local_server,
 )
 
 app = typer.Typer()
@@ -72,7 +71,19 @@ def init():
         typer.echo("Operation cancelled.")
         raise typer.Exit()
 
-    secrets_json = {"provider": selection, "api_key": api_key}
+    gerbera_admin_password = generate_secret()
+    gerbera_schema_password = generate_secret()
+    gerbera_writer_password = generate_secret()
+    gerbera_reader_password = generate_secret()
+
+    secrets_json = {
+        "provider": selection,
+        "api_key": api_key,
+        "gerbera_admin_password": gerbera_admin_password,
+        "gerbera_schema_password": gerbera_schema_password,
+        "gerbera_writer_password": gerbera_writer_password,
+        "gerbera_reader_password": gerbera_reader_password,
+    }
 
     device_json = {}
     for key, val in microcontroller_choices.items():
@@ -85,6 +96,9 @@ def init():
     Path(".gerbera/firmware").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/models").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/reactions").mkdir(parents=True, exist_ok=True)
+
+    
+
     Path(".gerbera/secrets").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/secrets/secrets.json").write_text(json.dumps(secrets_json, indent=4))
     Path("config.json").write_text(json.dumps(config, indent=4))
@@ -106,14 +120,14 @@ def up():
         raise typer.Exit()
 
     config = json.loads(Path("config.json").read_text())
-    secrets = json.loads(Path(".gerbera/secrets.json").read_text())
+    secrets = json.loads(Path(".gerbera/secrets/secrets.json").read_text())
     hardware = load_hardware_system(config)
 
     if selection == "local":
-        gerbera_admin_password = generate_secret()
-        gerbera_schema_password = generate_secret()
-        gerbera_writer_password = generate_secret()
-        gerbera_reader_password = generate_secret()
+        gerbera_admin_password = secrets["gerbera_admin_password"]
+        gerbera_schema_password = secrets["gerbera_schema_password"]
+        gerbera_writer_password = secrets["gerbera_writer_password"]
+        gerbera_reader_password = secrets["gerbera_reader_password"]
 
         run_local_harness(
             gerbera_admin_password=gerbera_admin_password,
@@ -134,11 +148,6 @@ def up():
             password=gerbera_schema_password,
         )
 
-        run_local_server(
-            gerbera_writer_password=gerbera_writer_password,
-            database_host="127.0.0.1",
-            database_port=8000,
-        )
     else:
         pass
 

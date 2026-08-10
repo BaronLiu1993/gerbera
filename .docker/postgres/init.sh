@@ -1,26 +1,28 @@
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL
 REVOKE TEMPORARY ON DATABASE gerbera FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 
 CREATE USER gerbera_schema_owner
 WITH
-    PASSWORD 'schema_password'
+    PASSWORD '${GERBERA_SCHEMA_PASSWORD}'
     NOSUPERUSER
     NOCREATEDB
     NOCREATEROLE;
-
 
 CREATE USER gerbera_writer
 WITH
-    PASSWORD 'writer_password'
+    PASSWORD '${GERBERA_WRITER_PASSWORD}'
     NOSUPERUSER
     NOCREATEDB
     NOCREATEROLE;
 
-
 CREATE USER gerbera_reader
 WITH
-    PASSWORD 'reader_password'
+    PASSWORD '${GERBERA_READER_PASSWORD}'
     NOSUPERUSER
     NOCREATEDB
     NOCREATEROLE;
@@ -63,3 +65,4 @@ FOR ROLE gerbera_schema_owner
 IN SCHEMA public
 GRANT USAGE ON SEQUENCES
 TO gerbera_writer;
+SQL
