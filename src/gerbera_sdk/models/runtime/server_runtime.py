@@ -184,20 +184,24 @@ class ServerRuntime:
         action: str,
         params: dict[str, object],
     ) -> dict[str, object]:
-        serial_connection = self.board_runtime.get_serial_connection(
-            microcontroller
-        )
-        built_command = CommandCompiler.build_command(
-            connection,
-            action=action,
-            params=params,
-        )
+        try:
+            serial_connection = self.board_runtime.get_serial_connection(
+                microcontroller
+            )
+            built_command = CommandCompiler.build_command(
+                connection,
+                action=action,
+                params=params,
+            )
 
-        serial_connection.write(built_command)
+            serial_connection.write(built_command)
+        except Exception as exc:
+            return {"status": 500, "error": str(exc)}
+
         # TODO: Rework command response matching before returning MCP responses.
         # The old latest-value polling can misattribute responses under
         # concurrent calls to the same connection.
-        return {"status": "sent"}
+        return {"status": 201}
 
     def register_connection_action(
         self,
@@ -234,9 +238,7 @@ class ServerRuntime:
 
         def tool_function(**values: Any) -> dict[str, object]:
             params = {
-                name: value
-                for name, value in values.items()
-                if value is not None
+                name: value for name, value in values.items() if value is not None
             }
             return connection.perform_action(action, params)
 
@@ -323,8 +325,7 @@ class ServerRuntime:
             )
         if connection.stream_enabled:
             description += (
-                f" Collected data is stored in table "
-                f"`{connection.event_name}`."
+                f" Collected data is stored in table " f"`{connection.event_name}`."
             )
 
         action = command.method.strip().lower()
@@ -475,9 +476,8 @@ class ServerRuntime:
 
     @classmethod
     def connection_supports_stream_toggle(cls, connection: Connection) -> bool:
-        return (
-            connection.stream_enabled
-            and cls.connection_supports_state_toggle(connection)
+        return connection.stream_enabled and cls.connection_supports_state_toggle(
+            connection
         )
 
     def register_connection_tools(
