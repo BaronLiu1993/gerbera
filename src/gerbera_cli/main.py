@@ -10,7 +10,9 @@ from gerbera_cli.setup import (
     generate_secret,
     load_hardware_system,
     run_harness_container,
+    run_local_server,
     setup_local_container,
+    pull_sandbox_image,
 )
 
 app = typer.Typer()
@@ -98,11 +100,10 @@ def init():
     Path(".gerbera/models").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/reactions").mkdir(parents=True, exist_ok=True)
 
-    
-
     Path(".gerbera/secrets").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/secrets/secrets.json").write_text(json.dumps(secrets_json, indent=4))
     Path("config.json").write_text(json.dumps(config, indent=4))
+    pull_sandbox_image()
     typer.secho(
         "Successfully updated config and .gerbera workspace. "
         f"Currently managing {len(device_json)} device(s) in config.json.",
@@ -137,6 +138,8 @@ def up():
             gerbera_reader_password=gerbera_reader_password,
         )
 
+        pull_sandbox_image()
+
         create_stream_tables(
             hardware_system=hardware,
             host="127.0.0.1",
@@ -155,8 +158,15 @@ def up():
             api_key=secrets["api_key"],
         )
 
+        run_local_server(
+            gerbera_writer_password=gerbera_writer_password,
+            database_port=6432,
+            database_host="127.0.0.1",
+            hardware_system=hardware,
+        )
     else:
         pass
+
 
 @app.command(name="down")
 def down():

@@ -15,6 +15,8 @@ from gerbera_sdk.gerbera_runtime import GerberaRuntime
 # Docker config values from Github registry
 GERBERA_IMAGE = "ghcr.io/baronliu1993/gerbera:latest"
 POSTGRES_IMAGE = "ghcr.io/baronliu1993/gerbera-postgres:latest"
+SANDBOX_IMAGE = "ghcr.io/baronliu1993/gerbera-sandbox:latest"
+LOCAL_SANDBOX_IMAGE = "gerbera-sandbox:latest"
 NETWORK = "gerbera"
 POSTGRES_CONTAINER = "gerbera-postgres"
 HARNESS_CONTAINER = "gerbera-harness"
@@ -28,7 +30,7 @@ def generate_secret(length: int = 32) -> str:
 def run_local_server(
     gerbera_writer_password: str,
     database_host: str,
-    database_port: str,
+    database_port: int,
     hardware_system: HardwareSystem,
 ):
     local_url = "http://127.0.0.1:8000/mcp"
@@ -93,6 +95,10 @@ def setup_local_container(
         user="gerbera_admin",
         password=gerbera_admin_password,
     )
+
+def pull_sandbox_image() -> None:
+    subprocess.run(["docker", "pull", SANDBOX_IMAGE], check=True)
+    subprocess.run(["docker", "tag", SANDBOX_IMAGE, LOCAL_SANDBOX_IMAGE], check=True)
 
 
 def run_harness_container(
@@ -175,7 +181,6 @@ def load_hardware_system(config: dict):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return getattr(module, hardware_name)
-
 
 def create_stream_tables(
     hardware_system: HardwareSystem,
