@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import time
 
 import psycopg
 from psycopg import sql
@@ -43,14 +44,11 @@ def run_local_server(
     return local_url
 
 
-def run_local_harness(
+def setup_local_container(
     gerbera_admin_password: str,
     gerbera_schema_password: str,
     gerbera_writer_password: str,
     gerbera_reader_password: str,
-    provider: str,
-    mcp_url: str,
-    api_key: str,
 ):
     subprocess.run(["docker", "pull", GERBERA_IMAGE], check=True)
     subprocess.run(["docker", "pull", POSTGRES_IMAGE], check=True)
@@ -87,6 +85,24 @@ def run_local_harness(
         ],
         check=True,
     )
+
+    wait_for_database(
+        host="127.0.0.1",
+        port=6432,
+        dbname="gerbera",
+        user="gerbera_admin",
+        password=gerbera_admin_password,
+    )
+
+
+def run_harness_container(
+    gerbera_schema_password: str,
+    gerbera_writer_password: str,
+    gerbera_reader_password: str,
+    provider: str,
+    mcp_url: str,
+    api_key: str,
+):
     subprocess.run(
         [
             "docker",
@@ -127,6 +143,29 @@ def run_local_harness(
         ],
         check=True,
     )
+
+
+def wait_for_database(
+    host: str,
+    port: int,
+    dbname: str,
+    user: str,
+    password: str,
+) -> None:
+    for _ in range(30):
+        try:
+            with psycopg.connect(
+                host=host,
+                port=port,
+                dbname=dbname,
+                user=user,
+                password=password,
+            ):
+                return
+        except psycopg.OperationalError:
+            time.sleep(1)
+
+    raise RuntimeError("Postgres did not start")
 
 
 def load_hardware_system(config: dict):

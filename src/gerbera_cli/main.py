@@ -9,7 +9,8 @@ from gerbera_cli.setup import (
     create_stream_tables,
     generate_secret,
     load_hardware_system,
-    run_local_harness,
+    run_harness_container,
+    setup_local_container,
 )
 
 app = typer.Typer()
@@ -129,14 +130,11 @@ def up():
         gerbera_writer_password = secrets["gerbera_writer_password"]
         gerbera_reader_password = secrets["gerbera_reader_password"]
 
-        run_local_harness(
+        setup_local_container(
             gerbera_admin_password=gerbera_admin_password,
             gerbera_schema_password=gerbera_schema_password,
             gerbera_writer_password=gerbera_writer_password,
             gerbera_reader_password=gerbera_reader_password,
-            provider=secrets["provider"],
-            mcp_url="http://127.0.0.1:8000/mcp",
-            api_key=secrets["api_key"],
         )
 
         create_stream_tables(
@@ -146,6 +144,15 @@ def up():
             dbname="gerbera",
             user="gerbera_schema_owner",
             password=gerbera_schema_password,
+        )
+
+        run_harness_container(
+            gerbera_schema_password=gerbera_schema_password,
+            gerbera_writer_password=gerbera_writer_password,
+            gerbera_reader_password=gerbera_reader_password,
+            provider=secrets["provider"],
+            mcp_url="http://127.0.0.1:8000/mcp",
+            api_key=secrets["api_key"],
         )
 
     else:
