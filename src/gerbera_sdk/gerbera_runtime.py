@@ -33,13 +33,19 @@ class GerberaRuntime:
     @staticmethod
     def run(
         hardware_system: HardwareSystem,
-        transport: str = "stdio",
-        mcp_url: str = "",
+        transport: str,
+        database_host: str,
+        database_port: int ,
+        database_password: str,
         **transport_kwargs,
     ) -> None:
         GerberaRuntime.validate_unique_connection_names(hardware_system)
 
-        database = GerberaRuntime.runtime_database()
+        database = GerberaRuntime.runtime_database(
+            host=database_host,
+            port=database_port,
+            password=database_password,
+        )
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker(database=database)
@@ -105,13 +111,17 @@ class GerberaRuntime:
 
     # Change the database layer after
     @staticmethod
-    def runtime_database() -> Database:
+    def runtime_database(
+        host: str,
+        port: int,
+        password: str,
+    ) -> Database:
         return Database(
-            host=os.environ.get("GERBERA_DATABASE_HOST", "127.0.0.1"),
-            port=int(os.environ.get("GERBERA_DATABASE_PORT", "6432")),
-            user=os.environ.get("GERBERA_WRITER_USER", "gerbera_writer"),
-            password=os.environ.get("GERBERA_WRITER_PASSWORD", "writer_password"),
-            databaseName=os.environ.get("GERBERA_DATABASE_NAME", "gerbera"),
+            host=host, 
+            port=port,
+            password=password,
+            user="gerbera_writer",
+            database_name="gerbera"
         )
 
     @staticmethod

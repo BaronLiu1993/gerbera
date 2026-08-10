@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property
+import threading
 
 from gerbera_sdk.events.buffer import Buffer
 from gerbera_sdk.events.event_worker import EventWorker
@@ -17,6 +18,11 @@ class Event:
     table_name: str
     event_worker: EventWorker
     latest_val: dict[str, str] | None = None
+    lock: threading.RLock = field(
+        default_factory=threading.RLock,
+        init=False,
+        repr=False,
+    )
 
     @cached_property
     def buffer(self) -> Buffer:
@@ -35,7 +41,9 @@ class Event:
 
     def perform_work(self, payload: dict[str, str]) -> None:
         normalized_payload = dict(payload)
-        self.latest_val = normalized_payload
+
+        with self.lock:
+            self.latest_val = normalized_payload
 
         if self.streamable:
             stream_payload = dict(normalized_payload)
@@ -44,7 +52,8 @@ class Event:
             return
         
     def read_latest(self) -> dict[str, str] | None:
-        return self.latest_val
+        with self.lock:
+            return self.latest_val
 
     def flush(self) -> list[dict[str, str]]:
         return self.buffer.flush()

@@ -9,7 +9,7 @@ class Database:
     port: int
     user: str
     password: str
-    databaseName: str
+    database_name: str
 
     def write_database_table(
         self,
@@ -36,7 +36,7 @@ class Database:
         return (
             f"host={self.host} "
             f"port={self.port} "
-            f"dbname={self.databaseName} "
+            f"dbname={self.database_name} "
             f"user={self.user} "
             f"password={self.password}"
         )

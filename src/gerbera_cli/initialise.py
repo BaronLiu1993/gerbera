@@ -1,27 +1,19 @@
 import uuid
-from pathlib import Path
+import json
 
-CONFIG_PATH = Path("config.json")
+def load_board_data(raw_arduino_result):
+    data = json.loads(raw_arduino_result.stdout)["detected_ports"]
 
-def default_config() -> dict:
-    return {
-        "devices": {},
-        "entry_point": "index.py",
-        "hardware_name": "hardware",
-    }
-
-def load_board_data(devices, existing_devices):
-    board_data = []
-    for device in devices:
+    board_data = {}
+    for device in data:
         port = device["port"]
         address = port["address"]
-        existing_device = existing_devices.get(address, {})
-        device_id = existing_device.get("id") or str(uuid.uuid4())
+        protocol = port["protocol"]
 
         payload = {
-            "id": device_id,
+            "id": str(uuid.uuid4()),
             "address": address,
-            "protocol": port["protocol"],
+            "protocol": protocol,
         }
-        board_data.append(payload)
+        board_data["port"] = payload
     return board_data

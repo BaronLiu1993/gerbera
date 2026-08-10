@@ -1,24 +1,25 @@
-import importlib.util
 import json
 from pathlib import Path
 import subprocess
 import questionary
 import typer
 
-from gerbera_cli.harness import run_local_harness
-from gerbera_cli.initialise import default_config, load_board_data, CONFIG_PATH
-from gerbera_cli.server import create_stream_tables, local_server_config
+from gerbera_cli.initialise import load_board_data
+from gerbera_cli.setup import (
+    create_stream_tables,
+    generate_secret,
+    load_hardware_system,
+    run_local_harness,
+    run_local_server,
+)
 
 app = typer.Typer()
 
 
 @app.command(name="init")
 def init():
-    if CONFIG_PATH.exists():
-        config = json.loads(CONFIG_PATH.read_text())
-    else:
-        config = default_config()
-    device_json = config["devices"]
+    # New Config File Each Time
+    config = {}
 
     typer.echo("Fetching supported microcontrollers from arduino-cli...")
 
@@ -29,53 +30,64 @@ def init():
         check=True,
     )
 
-    data = json.loads(result.stdout)
-    detected_ports = load_board_data(
-        data["detected_ports"],
-        device_json,
-    )
-    choices = [board["address"] for board in detected_ports]
+    # Select Microcontrollers
+    microcontroller_choices = load_board_data(result)
 
     selected_choices = questionary.checkbox(
         "Select microcontrollers to configure (Space to select, Enter to confirm):",
-        choices=choices,
+        choices=[choice for choice in microcontroller_choices.keys()],
     ).ask()
 
     if not selected_choices:
         typer.echo("Operation cancelled.")
         raise typer.Exit()
 
+    # Define which file in root the CLI should read from
     entry_point = questionary.text(
         "Define the app entry point:",
-        default=config["entry_point"],
+        default="index.py",
     ).ask()
 
     if not entry_point:
         typer.echo("Operation cancelled.")
         raise typer.Exit()
 
+    # Define within the entry point, where the hardware system variable is
     hardware_name = questionary.text(
         "Define the hardware variable name:",
-        default=config["hardware_name"],
+        default="hardware_system",
     ).ask()
 
-    if not hardware_name:
+    # Define which provider you want to use for reasoning
+
+    providers = ["openai", "anthropic", "google"]  # For now
+    selection = questionary.select("Select AI Provider", providers).ask()
+    if not selection:
         typer.echo("Operation cancelled.")
         raise typer.Exit()
 
-    for choice in selected_choices:
-        for port in detected_ports:
-            if port["address"] == choice:
-                device_json[choice] = port
+    api_key = questionary.text("Add Your API Key").ask()
+
+    if not api_key:
+        typer.echo("Operation cancelled.")
+        raise typer.Exit()
+
+    secrets_json = {"provider": selection, "api_key": api_key}
+
+    device_json = {}
+    for key, val in microcontroller_choices.items():
+        if key not in device_json and key in selected_choices:
+            device_json[key] = val
 
     config["devices"] = device_json
-    config["entry_point"] = entry_point.strip()
-    config["hardware_name"] = hardware_name.strip()
-
+    config["entry_point"] = entry_point
+    config["hardware_name"] = hardware_name
     Path(".gerbera/firmware").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/models").mkdir(parents=True, exist_ok=True)
     Path(".gerbera/reactions").mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(config, indent=4))
+    Path(".gerbera/secrets").mkdir(parents=True, exist_ok=True)
+    Path(".gerbera/secrets.json").write_text(json.dumps(secrets_json, indent=4))
+    Path("config.json").write_text(json.dumps(config, indent=4))
     typer.secho(
         "Successfully updated config and .gerbera workspace. "
         f"Currently managing {len(device_json)} device(s) in config.json.",
@@ -85,35 +97,54 @@ def init():
 
 
 # Perform a check for a config file first before doing this
-@app.command(name="harness")
-def harness():
+@app.command(name="up")
+def up():
     choices = ["local", "cloud"]
-
     selection = questionary.select("Select Harness Deployment", choices).ask()
+    if not selection:
+        typer.echo("Operation cancelled.")
+        raise typer.Exit()
+
+    config = json.loads(Path("config.json").read_text())
+    secrets = json.loads(Path(".gerbera/secrets.json").read_text())
+    hardware = load_hardware_system(config)
 
     if selection == "local":
-        config = json.loads(CONFIG_PATH.read_text())
-        hardware = load_hardware(config)
-        run_local_harness()
-        create_stream_tables(hardware)
-        config["server"] = local_server_config()
-        CONFIG_PATH.write_text(json.dumps(config, indent=4))
+        gerbera_admin_password = generate_secret()
+        gerbera_schema_password = generate_secret()
+        gerbera_writer_password = generate_secret()
+        gerbera_reader_password = generate_secret()
+
+        run_local_harness(
+            gerbera_admin_password=gerbera_admin_password,
+            gerbera_schema_password=gerbera_schema_password,
+            gerbera_writer_password=gerbera_writer_password,
+            gerbera_reader_password=gerbera_reader_password,
+            provider=secrets["provider"],
+            mcp_url="http://127.0.0.1:8000/mcp",
+            api_key=secrets["api_key"],
+        )
+
+        create_stream_tables(
+            hardware_system=hardware,
+            host="127.0.0.1",
+            port=6432,
+            dbname="gerbera",
+            user="gerbera_schema_owner",
+            password=gerbera_schema_password,
+        )
+
+        run_local_server(
+            gerbera_writer_password=gerbera_writer_password,
+            database_host="127.0.0.1",
+            database_port=8000,
+        )
     else:
         pass
 
-
-def load_hardware(config: dict):
-    entry_point = Path(config["entry_point"])
-    hardware_name = config["hardware_name"]
-
-    if not entry_point.is_absolute():
-        entry_point = CONFIG_PATH.parent / entry_point
-
-    spec = importlib.util.spec_from_file_location("gerbera_user_app", entry_point)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    return getattr(module, hardware_name)
+@app.command(name="down")
+def down():
+    pass
 
 
 def main():
