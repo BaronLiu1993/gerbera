@@ -73,11 +73,11 @@ class InitialisationRuntime:
                 INITIALISATION_PROMPT,
                 HypothesisSchema.model_json_schema(),
             )
-            
+
             self.memory.append_message("assistant", raw_hypothesis)
 
             raw_evaluation = await client.send(
-                self.context_builder.build(),
+                self.review_context(raw_hypothesis),
                 INITIALISATION_REVIEW_PROMPT,
                 InitialisationResponseSchema.model_json_schema(),
             )
@@ -127,6 +127,17 @@ class InitialisationRuntime:
 
     def get_questions(self) -> list[Question]:
         return list(self.clarifying_questions)
+
+    def review_context(self, raw_hypothesis: str) -> list[dict[str, object]]:
+        return [
+            *self.context_builder.build(),
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {"candidate_hypothesis": json.loads(raw_hypothesis)}
+                ),
+            },
+        ]
 
     async def submit_answers(self, answers: list[Answer]):
         answer_ids = [answer.question_id for answer in answers]
