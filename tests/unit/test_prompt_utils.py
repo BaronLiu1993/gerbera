@@ -30,3 +30,13 @@ def test_initialisation_prompt_requires_parameter_lists() -> None:
     assert "both `forward_tool_call_params` and" in prompt
     assert "`reverse_tool_call_params`" in prompt
     assert "Never omit a parameter-list field" in prompt
+
+
+def test_observation_prompt_requires_sql_for_analysis_tasks() -> None:
+    prompt = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
+
+    assert "post-collection data-analysis tasks" in prompt
+    assert "must call `query_database`" in prompt
+    assert "PostgreSQL" in prompt
+    assert "`get_table_schema`" in prompt
+    assert "Do not return null evidence fields" in prompt

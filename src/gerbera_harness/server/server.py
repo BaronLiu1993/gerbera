@@ -7,7 +7,10 @@ from starlette.routing import Route
 from gerbera_harness.gateway.database_gateway import DatabaseGateway
 from gerbera_harness.server.orchestrator import Orchestrator
 from gerbera_harness.gateway.sandbox_gateway import SandboxGateway
-from gerbera_harness.tools.database import QueryDatabaseTool
+from gerbera_harness.tools.database import (
+    GetTableSchemaTool,
+    QueryDatabaseTool,
+)
 from gerbera_harness.tools.registry import LocalToolRegistry
 from gerbera_harness.tools.sandbox import RunSandboxTool
 load_dotenv()
@@ -31,6 +34,7 @@ database = DatabaseGateway(
 sandbox = SandboxGateway()
 
 local_tool_registry = LocalToolRegistry()
+local_tool_registry.register(GetTableSchemaTool(database=database))
 local_tool_registry.register(QueryDatabaseTool(database=database))
 local_tool_registry.register(RunSandboxTool(sandbox=sandbox))
 orchestrator = Orchestrator(local_tool_registry=local_tool_registry)

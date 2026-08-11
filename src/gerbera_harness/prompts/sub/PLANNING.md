@@ -14,9 +14,11 @@ and physical constraints. Do not invent capabilities or assume an unobserved
 physical condition.
 
 If this subagent's goal is post-collection data analysis, use available local
-analysis tools such as `query_database` to produce the evidence requested by
-the completion criteria. Query only the exact table names and columns available
-in context. Prefer one read-only SQL query that returns the records, counts,
+analysis tools such as `get_table_schema` and `query_database` to produce the
+evidence requested by the completion criteria. The database is PostgreSQL; use
+psql/PostgreSQL SQL syntax. Query only the exact table names and columns
+available in context, and plan a schema lookup first when the columns are not
+already known. Prefer one read-only SQL query that returns the records, counts,
 ordering, transitions, aggregates, or summary needed by the final review. Do
 not call hardware tools or collect new measurements for an analysis-only goal.
 

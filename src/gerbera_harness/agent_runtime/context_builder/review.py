@@ -17,7 +17,7 @@ class ReviewContextBuilder(ContextBuilder):
             "phase": "review",
             "goal": self.memory.goal,
             "hypothesis": (
-                hypothesis.model_dump(mode="json") if hypothesis else None
+                hypothesis.model_dump(mode="json")
             ),
             "current_step": (
                 current_task.model_dump(mode="json")
