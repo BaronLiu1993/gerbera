@@ -142,7 +142,7 @@ def run_harness_container(
             "-e",
             f"GERBERA_READER_PASSWORD={gerbera_reader_password}",
             "-e",
-            f"GERBERA_MCP_URL={mcp_url}",
+            f"MCP_URL={mcp_url}",
             "-e",
             f"PROVIDER={provider}",
             "-e",
