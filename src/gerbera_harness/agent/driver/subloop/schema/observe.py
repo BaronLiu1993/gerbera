@@ -1,16 +1,12 @@
 from enum import Enum
-from typing import Annotated, Literal, TypeAlias
+from typing import Literal, TypeAlias
 
-from pydantic import Field, TypeAdapter
+from pydantic import TypeAdapter
 
 from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 
 
 JsonScalar: TypeAlias = str | int | float | bool | None
-ObservationPayload: TypeAlias = Annotated[
-    "ObservationToolCallSchema | ObservationResultSchema",
-    Field(discriminator="content_type"),
-]
 
 
 class ObservationStatusEnum(str, Enum):
@@ -18,6 +14,11 @@ class ObservationStatusEnum(str, Enum):
     BLOCKED = "blocked"
     CONTINUE = "continue"
     COMPLETE = "complete"
+
+
+class ObservationValueSchema(StrictSchema):
+    key: str
+    value: JsonScalar
 
 
 class ObservationToolCallSchema(StrictSchema):
@@ -34,7 +35,12 @@ class ObservationResultSchema(StrictSchema):
 
 
 class ObservationResponseSchema(StrictSchema):
-    observation: ObservationPayload
+    content_type: Literal["tool_call", "finish"]
+    tool_name: str | None
+    arguments: list[ObservationValueSchema]
+    reason: str | None
+    summary: str | None
+    result: list[ObservationValueSchema]
 
 
 class ObservationReviewSchema(StrictSchema):

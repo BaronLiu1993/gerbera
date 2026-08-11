@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Annotated
+from typing import TypeAlias
 
-from pydantic import Field, TypeAdapter
+from pydantic import TypeAdapter
 
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
     ContinuousExecuteSchema,
@@ -10,10 +10,9 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
 from gerbera_harness.agent.driver.subloop.schema.base import StrictSchema
 
 
-PlanningExecuteActionSchema = Annotated[
-    ContinuousExecuteSchema | DiscreteExecuteSchema,
-    Field(discriminator="execution_type"),
-]
+PlanningExecuteActionSchema: TypeAlias = (
+    ContinuousExecuteSchema | DiscreteExecuteSchema
+)
 
 
 class PlanningStatusEnum(str, Enum):

@@ -107,24 +107,25 @@ class FakeClient:
         self.responses = [
             json.dumps(
                 {
-                    "observation": {
-                        "content_type": "tool_call",
-                        "tool_name": "read_temperature",
-                        "arguments": {},
-                    }
+                    "content_type": "tool_call",
+                    "tool_name": "read_temperature",
+                    "arguments": [],
+                    "reason": None,
+                    "summary": None,
+                    "result": [],
                 }
             ),
             json.dumps(
                 {
-                    "observation": {
-                        "content_type": "finish",
-                        "reason": "Temperature was observed.",
-                        "summary": "Temperature was observed.",
-                        "result": {
-                            "temperature": 22.5,
-                            "unit": "celsius",
-                        },
-                    }
+                    "content_type": "finish",
+                    "tool_name": None,
+                    "arguments": [],
+                    "reason": "Temperature was observed.",
+                    "summary": "Temperature was observed.",
+                    "result": [
+                        {"key": "temperature", "value": 22.5},
+                        {"key": "unit", "value": "celsius"},
+                    ],
                 }
             ),
             json.dumps(

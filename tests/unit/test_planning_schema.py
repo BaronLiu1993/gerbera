@@ -6,6 +6,9 @@ from gerbera_harness.agent.driver.subloop.schema.plan import (
     PlanningReviewSchema,
     PlanningStatusEnum,
 )
+from gerbera_harness.agent.driver.subloop.schema.observe import (
+    ObservationResponseSchema,
+)
 
 
 def action_parameter(
@@ -116,3 +119,43 @@ def test_planning_review_rejects_boolean_approval() -> None:
         PlanningReviewSchema.model_validate(
             {"approved": True, "feedback": ""}
         )
+
+
+def test_model_output_schemas_use_supported_object_shapes() -> None:
+    for schema in (
+        PlanningResponseSchema.model_json_schema(),
+        ObservationResponseSchema.model_json_schema(),
+    ):
+        assert_schema_uses_supported_object_shapes(schema)
+
+
+def assert_schema_uses_supported_object_shapes(schema: dict) -> None:
+    unsupported = {
+        "oneOf",
+        "allOf",
+        "not",
+        "if",
+        "then",
+        "else",
+        "dependentRequired",
+        "dependentSchemas",
+        "discriminator",
+    }
+
+    def visit(node: object) -> None:
+        if isinstance(node, dict):
+            assert not unsupported.intersection(node)
+            if node.get("type") == "array":
+                assert "items" in node
+            if "properties" in node:
+                assert set(node["properties"]) == set(node.get("required", []))
+                assert node.get("additionalProperties") is False
+            assert node != {}
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    assert schema.get("type") == "object"
+    visit(schema)
