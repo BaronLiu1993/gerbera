@@ -9,47 +9,31 @@ SANDBOX_IMAGE = "ghcr.io/baronliu1993/gerbera-sandbox:latest"
 
 @dataclass
 class SandboxResult:
-    session_id: str
     run_id: str
     result: Any
 
-
+# In the future if we ever want to add additional protection
 @dataclass
 class SandboxGateway:
     @staticmethod
     def run_sandbox(
-        session_id: str,
         code: str,
     ) -> SandboxResult:
-
-        run_id = str(uuid.uuid4())
-
-        sandbox = Sandbox(
-            session_id=session_id,
-            run_id=run_id,
-        )
-
+        sandbox = Sandbox()
         try:
             result = sandbox.run_container(code)
-
-            return SandboxResult(
-                session_id=session_id,
-                run_id=run_id,
-                result=result,
-            )
-
+            return result
         except Exception as exc:
             raise ValueError("Failed To Run Container") from exc
 
 
 @dataclass
 class Sandbox:
-    session_id: str
     run_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timeout: float = 30.0
     container_image: str = SANDBOX_IMAGE
 
-    def run_container(self, code: str) -> object:
+    def run_container(self, code: str) -> SandboxResult:
         container_name = f"gerbera-{uuid.uuid4()}"
         command = [
             "docker",
@@ -91,7 +75,7 @@ class Sandbox:
                 timeout=self.timeout,
             )
 
-            return json.loads(result.stdout)
+            return SandboxResult(run_id=self.run_id, result=json.loads(result.stdout))
 
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("Sandbox execution timed out") from exc

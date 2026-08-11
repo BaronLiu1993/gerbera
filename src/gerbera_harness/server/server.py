@@ -1,5 +1,4 @@
 import os
-import json
 from dotenv import load_dotenv
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
@@ -7,7 +6,10 @@ from starlette.routing import Route
 
 from gerbera_harness.gateway.database_gateway import DatabaseGateway
 from gerbera_harness.server.orchestrator import Orchestrator
-
+from gerbera_harness.gateway.sandbox_gateway import SandboxGateway
+from gerbera_harness.tools.database import QueryDatabaseTool
+from gerbera_harness.tools.registry import LocalToolRegistry
+from gerbera_harness.tools.sandbox import RunSandboxTool
 load_dotenv()
 
 
@@ -25,7 +27,14 @@ mcp_url = os.environ["MCP_URL"]
 database = DatabaseGateway(
     host=host, port=port, db_name=db_name, user=user, password=password
 )
-orchestrator = Orchestrator()
+
+sandbox = SandboxGateway()
+
+local_tool_registry = LocalToolRegistry()
+local_tool_registry.register(QueryDatabaseTool(database=database))
+local_tool_registry.register(RunSandboxTool(sandbox=sandbox))
+
+orchestrator = Orchestrator(local_tool_registry=local_tool_registry)
 
 async def inference(request):
     try:
@@ -34,16 +43,20 @@ async def inference(request):
         model = body["model"]
         user_prompt = body["user_prompt"]
 
+        # In the future 
         agent_runtime = orchestrator.initialise_agent_runtimes(
             user_prompt=user_prompt,
             mcp_url=mcp_url,
             provider=provider,
             api_key=api_key,
             model=model,
-            database=database
         )
 
         await agent_runtime.run_agent(initial_user_prompt=user_prompt)
+        return JSONResponse(
+            {"session_id": agent_runtime.session.session_id},
+            status_code=200,
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 

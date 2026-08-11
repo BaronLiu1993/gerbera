@@ -20,15 +20,14 @@ class FakeDatabaseGateway:
 
 
 class FakeSandboxGateway:
-    calls: list[tuple[str, str]]
+    calls: list[str]
 
     def __init__(self) -> None:
         self.calls = []
 
-    def run_sandbox(self, session_id: str, code: str) -> SandboxResult:
-        self.calls.append((session_id, code))
+    def run_sandbox(self, code: str) -> SandboxResult:
+        self.calls.append(code)
         return SandboxResult(
-            session_id=session_id,
             run_id="run-1",
             result={"ok": True},
         )
@@ -59,11 +58,14 @@ def test_local_tool_registry_rejects_missing_tool() -> None:
 
 def test_run_sandbox_tool_delegates_to_gateway() -> None:
     sandbox = FakeSandboxGateway()
-    tool = RunSandboxTool(session_id="session-1", sandbox=sandbox)
+    tool = RunSandboxTool(sandbox=sandbox)
 
     result = asyncio.run(
         tool.call({"code": "print({'ok': True})"})
     )
 
-    assert result == {"ok": True}
-    assert sandbox.calls == [("session-1", "print({'ok': True})")]
+    assert result == {
+        "run_id": "run-1",
+        "result": {"ok": True},
+    }
+    assert sandbox.calls == ["print({'ok': True})"]

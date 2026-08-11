@@ -7,7 +7,6 @@ from gerbera_harness.tools.base import ToolSpec
 
 @dataclass
 class RunSandboxTool:
-    session_id: str
     sandbox: SandboxGateway
 
     @property
@@ -30,7 +29,8 @@ class RunSandboxTool:
         )
 
     async def call(self, arguments: dict[str, Any]) -> object:
-        return self.sandbox.run_sandbox(
-            session_id=self.session_id,
-            code=arguments["code"],
-        ).result
+        sandbox_result = self.sandbox.run_sandbox(code=arguments["code"])
+        return {
+            "run_id": sandbox_result.run_id,
+            "result": sandbox_result.result,
+        }

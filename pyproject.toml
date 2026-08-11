@@ -14,9 +14,11 @@ dependencies = [
     "opencv-python-headless",
     "pydantic>=2.0,<3.0",
     "psycopg[binary,pool]>=3.3,<4.0",
+    "python-dotenv>=1.0,<2.0",
     "PyYAML>=6.0,<7.0",
     "pyserial>=3.5,<4.0",
     "questionary>=2.0,<3.0",
+    "starlette>=0.37,<1.0",
     "typer>=0.12,<1.0",
 ]
 

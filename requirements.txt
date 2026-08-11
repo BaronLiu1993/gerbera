@@ -1,7 +1,9 @@
 fastmcp==3.0.0
-psycopg[binary]==3.3.4
+psycopg[binary,pool]==3.3.4
+python-dotenv>=1.0,<2.0
 pyserial==3.5
 pytest==9.1.1
+starlette>=0.37,<1.0
 typer==0.26.8
 ngrok
 pydo
