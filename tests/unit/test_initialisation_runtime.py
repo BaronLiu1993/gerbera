@@ -199,8 +199,29 @@ def test_initialisation_review_receives_explicit_candidate_hypothesis() -> None:
 
     result = asyncio.run(runtime.run_initial("Test the heater", []))
 
-    review_messages = model.client.messages[1]
-    candidate = json.loads(review_messages[-1]["content"])
-    assert candidate == {"candidate_hypothesis": hypothesis}
+    review_context = json.loads(model.client.messages[1][0]["content"])
+    assert review_context["runtime_context"]["candidate_hypothesis"] == (
+        hypothesis
+    )
     assert result.decision is InitialisationDecisionEnum.ACCEPTED
     assert result.requested_next_state is LoopStateEnum.EXECUTION
+
+
+def test_initialisation_raises_when_hypothesis_generation_is_invalid() -> None:
+    model = FakeModel([""])
+    memory = Memory(goal="Test the heater")
+    runtime = InitialisationRuntime(
+        model=model,
+        memory=memory,
+        context_builder=InitialisationContextBuilder(
+            memory=memory,
+            context_window_size=20,
+        ),
+        process=FakeInitialisationProcess(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Initialisation did not produce a valid hypothesis",
+    ):
+        asyncio.run(runtime.run_initial("Test the heater", []))

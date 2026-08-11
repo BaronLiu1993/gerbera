@@ -86,6 +86,23 @@ def test_initialisation_context_contains_goal_and_bounded_history() -> None:
     assert context[1:] == [{"role": "assistant", "content": "second"}]
 
 
+def test_initialisation_context_builds_review_context() -> None:
+    memory = Memory(goal="Measure the temperature")
+    hypothesis = FakeHypothesis()
+
+    context = context_from(
+        InitialisationContextBuilder(
+            memory=memory,
+            context_window_size=20,
+        ).build_review_context(hypothesis)
+    )
+
+    assert context["phase"] == "initialisation_review"
+    assert context["candidate_hypothesis"] == {
+        "hypothesis": "Heating raises temperature"
+    }
+
+
 def test_review_context_allows_completed_workflow_state() -> None:
     memory = Memory(goal="Validate the completed workflow")
     memory.current_hypothesis = FakeHypothesis()
@@ -221,15 +238,16 @@ def test_planning_context_includes_previous_act_error() -> None:
     )
 
 
-def test_planning_context_requires_an_observed_world_state() -> None:
+def test_planning_context_allows_missing_world_state() -> None:
     memory = Memory(goal="Plan heater action")
     memory.current_hypothesis = FakeHypothesis()
     memory.tasks.append(
         task("in_progress", "Heat the sample", "start_heater")
     )
 
-    with pytest.raises(IndexError):
-        PlanningContextBuilder(memory, 20).build()
+    context = context_from(PlanningContextBuilder(memory, 20).build())
+
+    assert context["current_world_state"] is None
 
 
 def test_context_build_does_not_mutate_memory() -> None:

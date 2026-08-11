@@ -88,7 +88,21 @@ class OpenAIAdapter:
                 request=exc.request,
                 response=exc.response,
             ) from exc
-        return resp.json()["choices"][0]["message"]["content"]
+        return self.response_content(resp.json())
+
+    @staticmethod
+    def response_content(payload: dict) -> str:
+        choice = payload["choices"][0]
+        content = choice["message"].get("content") or ""
+
+        if not content:
+            raise RuntimeError(
+                "OpenAI returned empty content: "
+                f"finish_reason={choice.get('finish_reason')!r}, "
+                f"usage={payload.get('usage')!r}"
+            )
+
+        return content
 
 
 @dataclass

@@ -2,9 +2,8 @@
 
 Return the review outcome inside the required top-level `response` object.
 
-Evaluate the latest assistant-generated candidate experiment plan against the
-user's objective, supplied context, available tools, event schemas, and output
-schema.
+Evaluate the `candidate_hypothesis` object against the user's objective,
+supplied context, available tools, event schemas, and output schema.
 
 Do not execute tools or gather observations. Do not replace the user's goal or
 invent capabilities.
@@ -42,10 +41,8 @@ not an agent action. A later database stability analysis over the collected IR
 records may be an agent action if it uses available local analysis tools and
 produces the evidence needed by review.
 
-Do not ask the user to provide a candidate plan or hypothesis; the candidate is
-the latest assistant-generated hypothesis in the conversation. If the candidate
-is missing from context, return `rejected` with feedback that initialisation did
-not produce a hypothesis.
+Do not ask the user to provide a candidate plan or hypothesis. The runtime
+supplies the candidate in `candidate_hypothesis`.
 
 Clarify only when missing user information blocks a meaningful, safe,
 executable experiment. Prefer accepting with small corrections when reasonable

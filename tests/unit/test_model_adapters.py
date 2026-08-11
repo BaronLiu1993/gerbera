@@ -132,6 +132,27 @@ def test_openai_adapter_includes_response_body_in_http_errors(
         asyncio.run(adapter.send([], "state prompt", schema))
 
 
+def test_openai_adapter_rejects_empty_content_with_response_details() -> None:
+    payload = {
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {"content": ""},
+            }
+        ],
+        "usage": {
+            "completion_tokens": 1000,
+            "prompt_tokens": 2000,
+        },
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="OpenAI returned empty content.*finish_reason='length'",
+    ):
+        OpenAIAdapter.response_content(payload)
+
+
 def test_adapter_request_can_be_cancelled(monkeypatch) -> None:
     request_started = asyncio.Event()
     request_cancelled = asyncio.Event()

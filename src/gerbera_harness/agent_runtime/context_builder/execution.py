@@ -9,11 +9,7 @@ class ExecutionContextBuilder(ContextBuilder):
         hypothesis = self.memory.current_hypothesis
         current_task = self.memory.get_current_task()
 
-        latest_world_state = (
-            self.memory.world_state_ledger[-1]
-            if self.memory.world_state_ledger
-            else None
-        )
+        latest_world_state = self.memory.latest_world_state()
         return {
             "phase": "execution",
             "goal": self.memory.goal,

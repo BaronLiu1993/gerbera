@@ -15,7 +15,9 @@ from gerbera_harness.agent.driver.main_loop.schema.initialisation.initialisation
     InitialisationResponseSchema,
 )
 from gerbera_harness.agent.model.model import Model
-from gerbera_harness.agent_runtime.context_builder import ContextBuilder
+from gerbera_harness.agent_runtime.context_builder import (
+    InitialisationContextBuilder,
+)
 from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
     Answer,
     Question,
@@ -47,7 +49,7 @@ class InitialisationResult:
 class InitialisationRuntime:
     model: Model
     memory: Memory
-    context_builder: ContextBuilder
+    context_builder: InitialisationContextBuilder
     process: InitialisationProcess
     max_attempts: int = 3
     clarifying_questions: list[Question] = field(default_factory=list)
@@ -74,10 +76,15 @@ class InitialisationRuntime:
                 HypothesisSchema.model_json_schema(),
             )
 
+            print(raw_hypothesis)
+
             self.memory.append_message("assistant", raw_hypothesis)
+            candidate_hypothesis = self.candidate_hypothesis(raw_hypothesis)
 
             raw_evaluation = await client.send(
-                self.review_context(raw_hypothesis),
+                self.context_builder.build_review_context(
+                    candidate_hypothesis
+                ),
                 INITIALISATION_REVIEW_PROMPT,
                 InitialisationResponseSchema.model_json_schema(),
             )
@@ -128,16 +135,15 @@ class InitialisationRuntime:
     def get_questions(self) -> list[Question]:
         return list(self.clarifying_questions)
 
-    def review_context(self, raw_hypothesis: str) -> list[dict[str, object]]:
-        return [
-            *self.context_builder.build(),
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {"candidate_hypothesis": json.loads(raw_hypothesis)}
-                ),
-            },
-        ]
+    def candidate_hypothesis(self, raw_hypothesis: str) -> HypothesisSchema:
+        try:
+            return HypothesisSchema.model_validate_json(raw_hypothesis)
+        except ValueError as exc:
+            preview = raw_hypothesis[:500]
+            raise RuntimeError(
+                "Initialisation did not produce a valid hypothesis: "
+                f"{preview}"
+            ) from exc
 
     async def submit_answers(self, answers: list[Answer]):
         answer_ids = [answer.question_id for answer in answers]

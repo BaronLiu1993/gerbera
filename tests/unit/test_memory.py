@@ -138,6 +138,7 @@ def test_memory_stores_events_and_world_states() -> None:
 
     assert event.session_id == memory.session_id
     assert world_state is memory.world_state_ledger[-1]
+    assert memory.latest_world_state() is world_state
     assert memory.event_ledger[-1].payload["tool_name"] == (
         "read_temperature"
     )

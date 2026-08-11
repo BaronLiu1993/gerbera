@@ -49,6 +49,7 @@ class InitialisationProcess:
             sections.append(f"### {url}")
             sections.append(content.strip())
 
+        print(sections)
         return "\n\n".join(sections)
 
     async def fetch_url(self, fetch_url: str) -> str:

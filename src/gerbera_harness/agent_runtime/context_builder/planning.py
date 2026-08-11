@@ -15,7 +15,7 @@ class PlanningContextBuilder(ContextBuilder):
         hypothesis = self.memory.current_hypothesis
         current_task = self.memory.get_current_task()
         completed_tasks = self.memory.completed_tasks
-        current_world_state = self.memory.world_state_ledger[-1]
+        current_world_state = self.memory.latest_world_state()
 
         return {
             "phase": "planning",
@@ -24,8 +24,10 @@ class PlanningContextBuilder(ContextBuilder):
             "current_step": current_task.model_dump(mode="json"),
             "current_step_goal": current_task.task.goal,
             "current_step_number": self.memory.tasks.index(current_task),
-            "current_world_state": current_world_state.model_dump(
-                mode="json"
+            "current_world_state": (
+                current_world_state.model_dump(mode="json")
+                if current_world_state
+                else None
             ),
             "previous_act_error": (
                 self.previous_act_error.model_dump(mode="json")

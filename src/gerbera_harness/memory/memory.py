@@ -44,6 +44,12 @@ class Memory:
             if task.status == "in_progress":
                 return task
 
+    def latest_world_state(self) -> WorldStateSchema | None:
+        if not self.world_state_ledger:
+            return None
+
+        return self.world_state_ledger[-1]
+
     def initialize_tasks(self, hypothesis: HypothesisSchema) -> None:
         if self.tasks:
             raise RuntimeError("Tasks are already initialized")
