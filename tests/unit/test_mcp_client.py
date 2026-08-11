@@ -24,7 +24,6 @@ class FakeFastMCPClient:
             is_error=False,
             content=[],
             data={"value": "21.5"},
-            structured_content={"value": "21.5", "unit": "celsius"},
         )
 
 
@@ -49,31 +48,15 @@ def test_mcp_client_lists_and_calls_hardware_tools(monkeypatch) -> None:
     asyncio.run(use_client())
 
 
-def test_mcp_client_can_return_structured_content(monkeypatch) -> None:
+def test_mcp_client_allows_http_urls(monkeypatch) -> None:
     monkeypatch.setattr(
         "gerbera_harness.agent.model.mcp_client.Client",
         FakeFastMCPClient,
     )
 
-    async def use_client() -> None:
-        async with MCPClient("https://hardware.example.com/mcp") as client:
-            result = await client.call_tool(
-                "read_temperature",
-                {},
-                frozenset({"read_temperature"}),
-                structured=True,
-            )
+    client = MCPClient("http://127.0.0.1:8001/mcp")
 
-            assert result == {"value": "21.5", "unit": "celsius"}
-
-    asyncio.run(use_client())
-
-
-def test_mcp_client_requires_an_active_connection() -> None:
-    client = MCPClient("https://hardware.example.com/mcp")
-
-    with pytest.raises(RuntimeError, match="not connected"):
-        asyncio.run(client.list_tools())
+    assert client.client.url == "http://127.0.0.1:8001/mcp"
 
 
 def test_mcp_client_builds_tool_arguments() -> None:
@@ -148,11 +131,11 @@ def test_mcp_client_raises_when_tool_call_fails(monkeypatch) -> None:
 @pytest.mark.parametrize(
     "url",
     [
-        "http://hardware.example.com/mcp",
         "hardware.example.com/mcp",
         "https:///mcp",
+        "ftp://hardware.example.com/mcp",
     ],
 )
-def test_mcp_client_rejects_non_https_urls(url: str) -> None:
-    with pytest.raises(ValueError, match="must use HTTPS"):
+def test_mcp_client_rejects_invalid_urls(url: str) -> None:
+    with pytest.raises(ValueError, match="must use HTTP or HTTPS"):
         MCPClient(url)

@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Iterable, Protocol
 from urllib.parse import urlsplit
 
@@ -14,27 +15,26 @@ class _MCPToolParameter(Protocol):
 @dataclass
 class MCPClient:
     mcp_url: str
-    _client: Client | None = field(default=None, init=False, repr=False)
 
-    def __post_init__(self) -> None:
+    @cached_property
+    def client(self) -> Client:
         parsed_url = urlsplit(self.mcp_url)
-        if parsed_url.scheme != "https" or not parsed_url.hostname:
-            raise ValueError("MCP URL must use HTTPS")
+        if (
+            parsed_url.scheme not in {"http", "https"}
+            or not parsed_url.hostname
+        ):
+            raise ValueError("MCP URL must use HTTP or HTTPS")
+        return Client(self.mcp_url)
 
     async def __aenter__(self) -> "MCPClient":
-        self._client = Client(self.mcp_url)
-        await self._client.__aenter__()
+        await self.client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc, traceback) -> None:
-        client = self._require_client()
-        try:
-            await client.__aexit__(exc_type, exc, traceback)
-        finally:
-            self._client = None
+        await self.client.__aexit__(exc_type, exc, traceback)
 
     async def list_tools(self) -> list[Tool]:
-        return await self._require_client().list_tools()
+        return await self.client.list_tools()
 
     @staticmethod
     def build_arguments(
@@ -58,23 +58,13 @@ class MCPClient:
         name: str,
         arguments: dict[str, Any],
         allowed_tool_names: frozenset[str],
-        *,
-        structured: bool = False,
     ) -> Any:
         if name not in allowed_tool_names:
             raise ValueError(f"MCP tool is not allowed: {name}")
 
-        result = await self._require_client().call_tool(name, arguments)
+        result = await self.client.call_tool(name, arguments)
 
         if result.is_error:
             raise RuntimeError(f"MCP tool {name!r} failed: {result.content}")
 
-        if structured:
-            return result.structured_content
-
         return result.data
-
-    def _require_client(self) -> Client:
-        if self._client is None:
-            raise RuntimeError("MCP client is not connected")
-        return self._client
