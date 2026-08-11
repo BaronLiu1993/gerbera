@@ -51,9 +51,8 @@ def current_task() -> TaskSchema:
     )
 
 
-def test_execution_type_uses_one_enum_with_reaction_support() -> None:
+def test_execution_type_uses_one_enum() -> None:
     assert ExecutionTypeEnum is ActionExecutionTypeEnum
-    assert ExecutionTypeEnum.REACTION.value == "reaction"
 
 
 @pytest.mark.parametrize(
@@ -177,6 +176,7 @@ class FakeSubAgentRuntime:
         context,
         mcp_url: str,
         timeout_seconds: float,
+        local_tool_registry: LocalToolRegistry,
         max_turns: int,
     ) -> None:
         self.session = session
@@ -184,6 +184,7 @@ class FakeSubAgentRuntime:
         self.context = context
         self.mcp_url = mcp_url
         self.timeout_seconds = timeout_seconds
+        self.local_tool_registry = local_tool_registry
         self.max_turns = max_turns
         self.observations = []
         self.tool_events = []

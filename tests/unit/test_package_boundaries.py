@@ -4,10 +4,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
-ALLOWED_SDK_IMPORTS_FOR_HARNESS = (
-    "gerbera_sdk.events.event_key",
-    "gerbera_sdk.events.reactions",
-)
+ALLOWED_SDK_IMPORTS_FOR_HARNESS = ()
 IMPORT_PATTERN = re.compile(
     r"^\s*(?:from|import)\s+([A-Za-z_][A-Za-z0-9_.]*)",
     re.MULTILINE,

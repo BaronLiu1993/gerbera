@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeAlias
 
 from gerbera_harness.agent.driver.main_loop.states.base import (
     ExecuteDecisionEnum,
@@ -10,17 +10,22 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema impo
     AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
-    # ReactionCreationSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
     ExecuteActionGroupSchema,
 )
 from gerbera_harness.agent.model.mcp_client import MCPClient
 
-DeterministicActionSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
-ExecutableActionSchema = DeterministicActionSchema | AgentExecuteSchema
-ScheduledActionSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
+# Action type aliases are grouped by execution semantics.
+DeterministicActionSchema: TypeAlias = (
+    ContinuousExecuteSchema | DiscreteExecuteSchema
+)
+ProbabilisticActionSchema: TypeAlias = AgentExecuteSchema
+WorkflowActionSchema: TypeAlias = (
+    DeterministicActionSchema | ProbabilisticActionSchema
+)
 # ActiveReaction = tuple[int, ReactionCreationSchema]
+
 AgentExecutor = Callable[
     [int, AgentExecuteSchema],
     Awaitable[ExecuteDecisionEnum],
@@ -47,55 +52,52 @@ class ExecutionProcess:
             for tool in tools:
                 tool_names.add(tool.name)
 
-            return await self._execute_workflow(
+            return await self.execute_workflow(
                 client,
                 frozenset(tool_names),
             )
 
-    async def _execute_workflow(
+    async def execute_workflow(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
     ) -> ExecuteDecisionEnum:
         # active_reactions: list[ActiveReaction] = []
 
-        try:
-            for group_index, group in enumerate(self.actions_list):
-                self.on_group_started(group_index)
+        for group_index, group in enumerate(self.actions_list):
+            self.on_group_started(group_index)
 
-                decision = ExecuteDecisionEnum.REJECTED
-                for _ in range(self.max_task_attempts):
-                    try:
-                        decision = await self._execute_action_group(
-                            client=client,
-                            allowed_tool_names=allowed_tool_names,
-                            group_index=group_index,
-                            group=group,
-                            # active_reactions=active_reactions,
-                        )
+            decision = ExecuteDecisionEnum.REJECTED
+            for attempt_number in range(self.max_task_attempts):
+                try:
+                    decision = await self.execute_action_group(
+                        client=client,
+                        allowed_tool_names=allowed_tool_names,
+                        group_index=group_index,
+                        group=group,
+                        # active_reactions=active_reactions,
+                    )
 
-                        print(decision)
-                    except Exception:
-                        decision = ExecuteDecisionEnum.REJECTED
+                    print(decision)
+                except Exception:
+                    decision = ExecuteDecisionEnum.REJECTED
 
-                    if decision is ExecuteDecisionEnum.ACCEPTED:
-                        break
+                if decision is ExecuteDecisionEnum.ACCEPTED:
+                    break
 
-                if decision is ExecuteDecisionEnum.REJECTED:
-                    return ExecuteDecisionEnum.REJECTED
+            if decision is ExecuteDecisionEnum.REJECTED:
+                return ExecuteDecisionEnum.REJECTED
 
-                self.on_group_completed(group_index)
-        finally:
-            pass
-            # await self._delete_active_reactions(
-            #     client,
-            #     allowed_tool_names,
-            #     active_reactions,
-            # )
+            self.on_group_completed(group_index)
 
+        # await self.delete_active_reactions(
+        #     client,
+        #     allowed_tool_names,
+        #     active_reactions,
+        # )
         return ExecuteDecisionEnum.ACCEPTED
 
-    async def _execute_action_group(
+    async def execute_action_group(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
@@ -110,7 +112,7 @@ class ExecutionProcess:
                 first_action,
             )
 
-        await self._execute_deterministic_group(
+        await self.execute_deterministic_action_group(
             client=client,
             allowed_tool_names=allowed_tool_names,
             group_index=group_index,
@@ -119,7 +121,7 @@ class ExecutionProcess:
         )
         return ExecuteDecisionEnum.ACCEPTED
 
-    async def _execute_deterministic_group(
+    async def execute_deterministic_action_group(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
@@ -128,17 +130,20 @@ class ExecutionProcess:
         # active_reactions: list[ActiveReaction],
     ) -> None:
         # reactions: list[ReactionCreationSchema] = []
-        scheduled_actions: list[ScheduledActionSchema] = []
+        deterministic_actions: list[DeterministicActionSchema] = []
 
         for action in group.actions:
             if isinstance(
                 action,
                 (ContinuousExecuteSchema, DiscreteExecuteSchema),
             ):
-                scheduled_actions.append(action)
+                deterministic_actions.append(action)
+
+            # if isinstance(action, ReactionCreationSchema):
+            #     reactions.append(action)
 
         # for reaction in reactions:
-        #     await self._create_reaction(
+        #     await self.create_reaction(
         #         client,
         #         allowed_tool_names,
         #         group_index,
@@ -149,9 +154,9 @@ class ExecutionProcess:
         group_start = asyncio.get_running_loop().time()
 
         async with asyncio.TaskGroup() as task_group:
-            for action in scheduled_actions:
+            for action in deterministic_actions:
                 task_group.create_task(
-                    self._execute_scheduled_action(
+                    self.execute_deterministic_action(
                         client,
                         allowed_tool_names,
                         group_index,
@@ -160,24 +165,24 @@ class ExecutionProcess:
                     )
                 )
 
-    # async def _delete_active_reactions(
+    # async def delete_active_reactions(
     #     self,
     #     client: MCPClient,
     #     allowed_tool_names: frozenset[str],
     #     active_reactions: list[ActiveReaction],
     # ) -> None:
     #     for group_index, reaction in reversed(active_reactions):
-    #         await self._call_cleanup_tool(
+    #         await self.call_cleanup_tool(
     #             client,
     #             allowed_tool_names,
     #             group_index,
     #             reaction,
     #             "delete_reaction",
     #             reaction.delete_tool_call,
-    #             self._event_key_arguments(reaction.event_key),
+    #             self.event_key_arguments(reaction.event_key),
     #         )
     #
-    # async def _create_reaction(
+    # async def create_reaction(
     #     self,
     #     client: MCPClient,
     #     allowed_tool_names: frozenset[str],
@@ -186,14 +191,14 @@ class ExecutionProcess:
     #     active_reactions: list[ActiveReaction],
     # ) -> None:
     #     arguments = {
-    #         **self._event_key_arguments(reaction.event_key),
+    #         **self.event_key_arguments(reaction.event_key),
     #         "expected_value": reaction.expected,
     #         "operator": reaction.operator.value,
     #         "callback_body": reaction.callable,
     #         "trigger_mode": reaction.trigger_mode.value,
     #     }
     #
-    #     await self._call_tool(
+    #     await self.call_tool(
     #         client=client,
     #         allowed_tool_names=allowed_tool_names,
     #         group_index=group_index,
@@ -206,20 +211,19 @@ class ExecutionProcess:
     #     active_reactions.append((group_index, reaction))
     #
     # @staticmethod
-    # def _event_key_arguments(event_key: tuple[str, str, str]) -> dict[str, str]:
-    #     event_type, microcontroller_id, event_name = event_key
+    # def event_key_arguments(event_key: EventKeySchema) -> dict[str, str]:
     #     return {
-    #         "event_type": event_type,
-    #         "microcontroller_id": microcontroller_id,
-    #         "event_name": event_name,
+    #         "event_type": event_key.event_type,
+    #         "microcontroller_id": event_key.microcontroller_id,
+    #         "event_name": event_key.event_name,
     #     }
 
-    async def _execute_scheduled_action(
+    async def execute_deterministic_action(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
         group_index: int,
-        action: ScheduledActionSchema,
+        action: DeterministicActionSchema,
         group_start: float,
     ) -> None:
         start_at = group_start + action.start_offset_seconds
@@ -228,7 +232,7 @@ class ExecutionProcess:
 
         if isinstance(action, DiscreteExecuteSchema):
             arguments = client.build_arguments(action.params)
-            await self._call_tool(
+            await self.call_tool(
                 client=client,
                 allowed_tool_names=allowed_tool_names,
                 group_index=group_index,
@@ -239,14 +243,14 @@ class ExecutionProcess:
             )
             return
 
-        await self._execute_continuous_action(
+        await self.execute_continuous_action(
             client,
             allowed_tool_names,
             group_index,
             action,
         )
 
-    async def _execute_continuous_action(
+    async def execute_continuous_action(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
@@ -254,7 +258,7 @@ class ExecutionProcess:
         action: ContinuousExecuteSchema,
     ) -> None:
         forward_arguments = client.build_arguments(action.forward_tool_call_params)
-        await self._call_tool(
+        await self.call_tool(
             client=client,
             allowed_tool_names=allowed_tool_names,
             group_index=group_index,
@@ -268,7 +272,7 @@ class ExecutionProcess:
             await asyncio.sleep(action.duration_seconds)
         finally:
             reverse_arguments = client.build_arguments(action.reverse_tool_call_params)
-            await self._call_cleanup_tool(
+            await self.call_cleanup_tool(
                 client,
                 allowed_tool_names,
                 group_index,
@@ -278,18 +282,18 @@ class ExecutionProcess:
                 reverse_arguments,
             )
 
-    async def _call_cleanup_tool(
+    async def call_cleanup_tool(
         self,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
         group_index: int,
-        action: ExecutableActionSchema,
+        action: WorkflowActionSchema,
         call_type: str,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> Any:
         cleanup_task = asyncio.create_task(
-            self._call_tool(
+            self.call_tool(
                 client=client,
                 allowed_tool_names=allowed_tool_names,
                 group_index=group_index,
@@ -306,13 +310,13 @@ class ExecutionProcess:
             await cleanup_task
             raise
 
-    async def _call_tool(
+    async def call_tool(
         self,
         *,
         client: MCPClient,
         allowed_tool_names: frozenset[str],
         group_index: int,
-        action: ExecutableActionSchema,
+        action: WorkflowActionSchema,
         call_type: str,
         tool_name: str,
         arguments: dict[str, Any],

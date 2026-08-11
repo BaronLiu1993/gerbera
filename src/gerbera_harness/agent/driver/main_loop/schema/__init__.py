@@ -16,7 +16,6 @@ from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
     ReviewActionGroupSchema,
     ReviewSchema,
     ReviewVariableSchema,
-    # ReactionCreationSchema,
 )
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
     SnakeCaseVariable,
@@ -39,7 +38,6 @@ __all__ = [
     "ReviewActionGroupSchema",
     "ReviewSchema",
     "ReviewVariableSchema",
-    # "ReactionCreationSchema",
     "SnakeCaseVariable",
     "StrictSchema",
 ]

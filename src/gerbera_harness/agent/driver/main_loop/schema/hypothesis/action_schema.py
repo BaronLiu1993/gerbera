@@ -1,12 +1,13 @@
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import Field, StrictFloat, field_validator
+from pydantic import Field
 
 from gerbera_harness.agent.driver.main_loop.schema.utils import (
     SnakeCaseVariable,
     StrictSchema,
 )
+
 
 # Type Schemas
 class ActionTypeEnum(str, Enum):
@@ -26,7 +27,13 @@ class ExecutionTypeEnum(str, Enum):
     AGENT = "agent"
     CONTINUOUS = "continuous"
     DISCRETE = "discrete"
-    REACTION = "reaction"
+
+
+class EventKeySchema(StrictSchema):
+    event_type: str
+    microcontroller_id: str
+    event_name: str
+
 
 class ExecuteActionParameterSchema(StrictSchema):
     tool_parameter: SnakeCaseVariable = Field(
@@ -35,37 +42,6 @@ class ExecuteActionParameterSchema(StrictSchema):
     value: bool | int | float | str
     unit: str | None
     type: ParameterTypeSchema
-
-
-# class ReactionCreationSchema(StrictSchema):
-#     description: str
-#     action_type: Literal["execute"]
-#     execution_type: Literal["reaction"]
-#     create_tool_call: str = Field(min_length=1)
-#     delete_tool_call: str = Field(min_length=1)
-#     event_key: tuple[str, str, str]
-#     callable: str = Field(
-#         min_length=1,
-#         description=(
-#             "Python statements for the body of "
-#             "async callback(mcp_url, value). The runtime imports httpx and "
-#             "fastmcp.Client, injects the configured MCP URL, and passes the "
-#             "watched sensor value as a finite float. Do not include imports, "
-#             "the function definition, outer indentation, or assignments to "
-#             "mcp_url or value."
-#         ),
-#     )
-#     operator: OperatorEnum
-#     expected: Annotated[
-#         StrictFloat,
-#         Field(allow_inf_nan=False),
-#     ]
-#     trigger_mode: ReactionTriggerModeEnum
-
-#     @field_validator("callable")
-#     @classmethod
-#     def validate_callable_body(cls, value: str) -> str:
-#         return normalize_reaction_callback_body(value)
 
 
 class AgentExecuteSchema(StrictSchema):
@@ -98,7 +74,7 @@ class ContinuousExecuteSchema(StrictSchema):
     reverse_tool_call: str = Field(min_length=1)
     forward_tool_call_params: list[ExecuteActionParameterSchema]
     reverse_tool_call_params: list[ExecuteActionParameterSchema]
-    emitted_event_keys: list[tuple[str, str, str]] = Field(
+    emitted_event_keys: list[EventKeySchema] = Field(
         description=(
             "Event channels that emit observations while this action runs."
         ),
@@ -151,17 +127,8 @@ class ReviewSchema(StrictSchema):
 
 
 # Union Schemas
-ExecuteSchema = (
-    #ReactionCreationSchema
-    ContinuousExecuteSchema
-    | DiscreteExecuteSchema
-    | AgentExecuteSchema
-)
+ExecuteSchema = ContinuousExecuteSchema | DiscreteExecuteSchema | AgentExecuteSchema
 
-DeterministicExecuteSchema = (
-    # ReactionCreationSchema
-    ContinuousExecuteSchema
-    | DiscreteExecuteSchema
-)
+DeterministicExecuteSchema = ContinuousExecuteSchema | DiscreteExecuteSchema
 
 ActionSchema = ExecuteSchema | ReviewSchema

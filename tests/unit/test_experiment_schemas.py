@@ -1,14 +1,12 @@
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from gerbera_sdk.events.event_key import EventKey
-from gerbera_sdk.events.reactions import ReactionTriggerModeEnum
 from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
     ActionSchema,
     AgentExecuteSchema,
+    EventKeySchema,
     HypothesisSchema,
     ReviewSchema,
-    ReactionCreationSchema,
 )
 
 
@@ -83,25 +81,6 @@ def agent_execute_action() -> dict:
         "completion_criteria": "The block is centered and within reach.",
         "max_turns": 10,
         "timeout_seconds": 30,
-    }
-
-
-def reaction_creation_action() -> dict:
-    return {
-        "description": "Watch for excessive temperature.",
-        "action_type": "execute",
-        "execution_type": "reaction",
-        "create_tool_call": "insert_reaction",
-        "delete_tool_call": "delete_reaction",
-        "event_key": {
-            "event_type": "STREAM",
-            "microcontroller_id": "board-1",
-            "event_name": "temperature",
-        },
-        "callable": "return None",
-        "operator": "greater_than",
-        "expected": 20,
-        "trigger_mode": "repeat",
     }
 
 
@@ -191,109 +170,6 @@ def test_hypothesis_schema_models_an_execute_step() -> None:
     assert action.forward_tool_call == "write_motor"
     assert action.params[0].tool_parameter == "angle"
     assert action.params[0].value == 90
-
-
-def test_hypothesis_schema_models_a_reaction_creation_step() -> None:
-    hypothesis = HypothesisSchema.model_validate(
-        hypothesis_data(reaction_creation_action())
-    )
-
-    action = hypothesis.method.execute_steps[0].actions[0]
-    assert isinstance(action, ReactionCreationSchema)
-    assert isinstance(action.event_key, EventKey)
-    assert action.event_key.event_name == "temperature"
-    assert action.callable == "return None"
-    assert action.expected == 20.0
-    assert type(action.expected) is float
-    assert action.trigger_mode == ReactionTriggerModeEnum.REPEAT
-
-
-def test_reaction_creation_accepts_once_trigger_mode() -> None:
-    action = reaction_creation_action()
-    action["trigger_mode"] = "once"
-
-    reaction = ReactionCreationSchema.model_validate(action)
-
-    assert reaction.trigger_mode == ReactionTriggerModeEnum.ONCE
-
-
-@pytest.mark.parametrize(
-    "expected",
-    ["on", "1", True, False, float("inf"), float("nan")],
-)
-def test_reaction_creation_requires_a_finite_numeric_expected(
-    expected: object,
-) -> None:
-    action = reaction_creation_action()
-    action["expected"] = expected
-
-    with pytest.raises(ValidationError):
-        ReactionCreationSchema.model_validate(action)
-
-
-def test_reaction_creation_rejects_a_complete_function() -> None:
-    action = reaction_creation_action()
-    action["callable"] = (
-        "async def callback(mcp_url, value):\n"
-        "    return value\n"
-    )
-
-    with pytest.raises(ValidationError, match="cannot define functions"):
-        ReactionCreationSchema.model_validate(action)
-
-
-def test_reaction_creation_rejects_callback_imports() -> None:
-    action = reaction_creation_action()
-    action["callable"] = "import httpx\nreturn None"
-
-    with pytest.raises(ValidationError, match="contain imports"):
-        ReactionCreationSchema.model_validate(action)
-
-
-@pytest.mark.parametrize("parameter", ["mcp_url", "value"])
-def test_reaction_creation_rejects_reassigned_callback_parameters(
-    parameter: str,
-) -> None:
-    action = reaction_creation_action()
-    action["callable"] = f"{parameter} = None\nreturn None"
-
-    with pytest.raises(ValidationError, match="cannot reassign"):
-        ReactionCreationSchema.model_validate(action)
-
-
-def test_reaction_creation_normalizes_a_multiline_callback_body() -> None:
-    action = reaction_creation_action()
-    action["callable"] = "  if value:\n      return value\n  return None"
-
-    reaction = ReactionCreationSchema.model_validate(action)
-
-    assert reaction.callable == "if value:\n    return value\nreturn None"
-
-
-def test_reaction_creation_must_be_in_first_execute_group() -> None:
-    data = hypothesis_data(discrete_execute_action())
-    data["method"]["execute_steps"].insert(
-        1,
-        {
-            "goal": "Create the temperature safety reaction.",
-            "action_type": "execute",
-            "actions": [reaction_creation_action()],
-        },
-    )
-
-    with pytest.raises(ValidationError, match="first execute group"):
-        HypothesisSchema.model_validate(data)
-
-
-def test_reaction_creation_can_share_the_first_execute_group() -> None:
-    data = hypothesis_data(reaction_creation_action())
-    data["method"]["execute_steps"][0]["actions"].append(
-        discrete_execute_action()
-    )
-
-    hypothesis = HypothesisSchema.model_validate(data)
-
-    assert len(hypothesis.method.execute_steps[0].actions) == 2
 
 
 def test_hypothesis_schema_models_a_review_step() -> None:
@@ -390,7 +266,7 @@ def test_continuous_execute_action_declares_emitted_event_keys() -> None:
 
     action = hypothesis.method.execute_steps[0].actions[0]
     assert action.emitted_event_keys == [
-        EventKey(
+        EventKeySchema(
             event_type="STREAM",
             microcontroller_id="board-1",
             event_name="temperature",
@@ -414,18 +290,7 @@ def test_hypothesis_output_schema_uses_current_action_schemas() -> None:
     assert "ContinuousExecuteSchema" in schema["$defs"]
     assert "DiscreteExecuteSchema" in schema["$defs"]
     assert "AgentExecuteSchema" in schema["$defs"]
-    assert "ReactionCreationSchema" in schema["$defs"]
     assert "ReviewSchema" in schema["$defs"]
-
-
-def test_trigger_mode_schema_is_a_plain_enum_reference() -> None:
-    trigger_mode_schema = HypothesisSchema.model_json_schema()["$defs"][
-        "ReactionCreationSchema"
-    ]["properties"]["trigger_mode"]
-
-    assert trigger_mode_schema == {
-        "$ref": "#/$defs/ReactionTriggerModeEnum",
-    }
 
 
 def test_hypothesis_output_schema_is_strict() -> None:
