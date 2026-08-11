@@ -1,8 +1,8 @@
 """Observe-plan-act execution subloop."""
 
 from gerbera_harness.agent.driver.subloop.schema import (
-    ObservationFinishSchema,
     ObservationResponseSchema,
+    ObservationResultSchema,
     ObservationReviewSchema,
     ObservationStatusEnum,
     ObservationToolCallSchema,
@@ -27,8 +27,8 @@ __all__ = [
     "ActState",
     "ExecuteLoopState",
     "ExecuteLoopStateEnum",
-    "ObservationFinishSchema",
     "ObservationResponseSchema",
+    "ObservationResultSchema",
     "ObservationReviewSchema",
     "ObservationStatusEnum",
     "ObservationToolCallSchema",

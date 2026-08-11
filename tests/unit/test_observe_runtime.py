@@ -91,7 +91,12 @@ class FakeMCPClient:
         allowed_tool_names: frozenset[str],
     ) -> dict[str, object]:
         assert allowed_tool_names == frozenset(
-            {"read_temperature", "turn_on_temperature_stream"}
+            {
+                "read_temperature",
+                "set_heater",
+                "turn_on_temperature_stream",
+                "unclassified_tool",
+            }
         )
         assert name in allowed_tool_names
         return {"value": 22.5, "unit": "celsius"}
@@ -114,11 +119,10 @@ class FakeClient:
                     "observation": {
                         "content_type": "finish",
                         "reason": "Temperature was observed.",
-                        "world_state": {
-                            "temperature": {
-                                "value": 22.5,
-                                "unit": "celsius",
-                            }
+                        "summary": "Temperature was observed.",
+                        "result": {
+                            "temperature": 22.5,
+                            "unit": "celsius",
                         },
                     }
                 }
@@ -177,7 +181,9 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
     assert first_status is ObservationStatusEnum.CONTINUE
     assert status is ObservationStatusEnum.COMPLETE
     assert observations[-1].state == {
-        "temperature": {"value": 22.5, "unit": "celsius"}
+        "summary": "Temperature was observed.",
+        "temperature": 22.5,
+        "unit": "celsius",
     }
     assert len(tool_events) == 1
     assert tool_events[0]["tool_name"] == "read_temperature"

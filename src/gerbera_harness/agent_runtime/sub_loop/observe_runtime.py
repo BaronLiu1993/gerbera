@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from gerbera_harness.agent.driver.subloop.schema.observe import (
-    ObservationFinishSchema,
     ObservationResponseSchema,
+    ObservationResultSchema,
     ObservationReviewSchema,
     ObservationStatusEnum,
     ObservationToolCallSchema,
@@ -60,8 +60,8 @@ class ObservationRuntime:
                     observation.arguments,
                 )
             else:
-                result = await self._call_mcp_tool(observation)
-            self._record_tool_result(observation, result)
+                result = await self.call_mcp_tool(observation)
+            self.record_tool_result(observation, result)
             return ObservationStatusEnum.CONTINUE
 
         review_response = await client.send(
@@ -85,7 +85,7 @@ class ObservationRuntime:
                     ),
                 }
             )
-            self._record_world_state(observation)
+            self.record_world_state(observation)
             return review.status
 
         self.messages.append(
@@ -99,7 +99,7 @@ class ObservationRuntime:
 
         return ObservationStatusEnum.CONTINUE
 
-    async def _call_mcp_tool(
+    async def call_mcp_tool(
         self,
         observation: ObservationToolCallSchema,
     ) -> object:
@@ -112,7 +112,7 @@ class ObservationRuntime:
                 allowed_tool_names=allowed_tool_names,
             )
 
-    def _record_tool_result(
+    def record_tool_result(
         self,
         observation: ObservationToolCallSchema,
         result: object,
@@ -137,13 +137,16 @@ class ObservationRuntime:
             }
         )
 
-    def _record_world_state(
+    def record_world_state(
         self,
-        observation: ObservationFinishSchema,
+        observation: ObservationResultSchema,
     ) -> None:
         self.observations.append(
             WorldStateSchema(
                 observed_at=datetime.now(timezone.utc),
-                state=observation.world_state,
+                state={
+                    "summary": observation.summary,
+                    **observation.result,
+                },
             )
         )
