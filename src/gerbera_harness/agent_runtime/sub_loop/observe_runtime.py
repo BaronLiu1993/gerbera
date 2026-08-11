@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from gerbera_harness.agent.driver.subloop.schema.observe import (
     ObservationFinishSchema,
+    ObservationResponseSchema,
+    ObservationReviewSchema,
     ObservationStatusEnum,
     ObservationToolCallSchema,
     observation_adapter,
@@ -42,7 +44,7 @@ class ObservationRuntime:
         raw_response = await client.send(
             self.context_builder.build(),
             OBSERVATION_PROMPT,
-            observation_adapter.json_schema(),
+            ObservationResponseSchema.model_json_schema(),
         )
         response = observation_adapter.validate_json(raw_response)
         observation = response.observation
@@ -65,7 +67,7 @@ class ObservationRuntime:
         review_response = await client.send(
             self.context_builder.build(),
             OBSERVATION_REVIEW_PROMPT,
-            observation_review_adapter.json_schema(),
+            ObservationReviewSchema.model_json_schema(),
         )
 
         review = observation_review_adapter.validate_json(review_response)

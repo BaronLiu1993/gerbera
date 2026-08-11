@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 from gerbera_harness.agent.driver.subloop.schema.plan import (
     PlanningExecuteActionSchema,
+    PlanningResponseSchema,
+    PlanningReviewSchema,
     PlanningStatusEnum,
     planning_adapter,
     planning_review_adapter,
@@ -33,7 +35,7 @@ class PlanningRuntime:
         raw_response = await client.send(
             self.context_builder.build(),
             PLANNING_PROMPT,
-            planning_adapter.json_schema(),
+            PlanningResponseSchema.model_json_schema(),
         )
         response = planning_adapter.validate_json(raw_response)
         self.on_action_planned(response.action)
@@ -45,7 +47,7 @@ class PlanningRuntime:
         raw_review = await client.send(
             self.context_builder.build(),
             PLANNING_REVIEW_PROMPT,
-            planning_review_adapter.json_schema(),
+            PlanningReviewSchema.model_json_schema(),
         )
         review = planning_review_adapter.validate_json(raw_review)
 
