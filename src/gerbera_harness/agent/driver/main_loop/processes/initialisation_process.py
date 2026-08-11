@@ -4,11 +4,13 @@ from dataclasses import dataclass, field
 import httpx
 
 from gerbera_harness.agent.model.mcp_client import MCPClient
+from gerbera_harness.tools.base import ToolSpec
 
 
 @dataclass
 class InitialisationProcess:
     mcp_url: str
+    local_tools: tuple[ToolSpec, ...]
     urls: list[str] = field(default_factory=list)
 
     def generate_agent_context(
@@ -29,6 +31,14 @@ class InitialisationProcess:
             sections.append(tool["description"])
             sections.append("```json")
             sections.append(json.dumps(tool["schema"], indent=2))
+            sections.append("```")
+
+        sections.append("## Available Local Tools")
+        for tool in self.local_tools:
+            sections.append(f"### {tool.name}")
+            sections.append(tool.description)
+            sections.append("```json")
+            sections.append(json.dumps(tool.input_schema, indent=2))
             sections.append("```")
 
         sections.append("## Research Sources")

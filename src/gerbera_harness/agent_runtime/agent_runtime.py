@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gerbera_harness.agent.driver.main_loop import (
     InitialisationDecisionEnum,
@@ -25,6 +25,7 @@ from gerbera_harness.agent_runtime.main_loop.review_runtime import (
     ReviewRuntime,
 )
 from gerbera_harness.memory import Memory
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 @dataclass
@@ -33,7 +34,8 @@ class AgentRuntime:
     model: Model
     memory: Memory
     mcp_url: str
-    feedback: list[str]
+    local_tool_registry: LocalToolRegistry
+    feedback: list[str] = field(default_factory=list)
     context_window_size: int = 20
 
     @property
@@ -45,7 +47,10 @@ class AgentRuntime:
                 memory=self.memory,
                 context_window_size=self.context_window_size,
             ),
-            process=InitialisationProcess(mcp_url=self.mcp_url),
+            process=InitialisationProcess(
+                mcp_url=self.mcp_url,
+                local_tools=tuple(self.local_tool_registry.list_tools()),
+            ),
         )
         return self._initialisation_runtime
 
@@ -55,6 +60,7 @@ class AgentRuntime:
             model=self.model,
             memory=self.memory,
             mcp_url=self.mcp_url,
+            local_tool_registry=self.local_tool_registry,
         )
 
     @property

@@ -24,6 +24,7 @@ from gerbera_harness.agent_runtime.main_loop.execution_runtime import (
 )
 from gerbera_harness.agent_runtime.subagent_result import SubAgentResult
 from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 def current_task() -> TaskSchema:
@@ -233,6 +234,7 @@ def test_execution_runtime_runs_one_task_and_requests_review() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -265,6 +267,7 @@ def test_execution_runtime_commits_deterministic_tool_evidence() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     asyncio.run(runtime.run_execution())
@@ -285,6 +288,7 @@ def test_execution_runtime_records_failure_and_requests_review() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -312,6 +316,7 @@ def test_execution_runtime_rejects_incomplete_deterministic_actions() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -327,6 +332,7 @@ def test_execution_runtime_propagates_process_exceptions() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     with pytest.raises(RuntimeError, match="invalid execution wiring"):
@@ -343,6 +349,7 @@ def test_execution_runtime_fails_before_mutating_missing_task() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     with pytest.raises(IndexError):
@@ -359,6 +366,7 @@ def test_execution_runtime_dispatches_agent_action_to_subagent() -> None:
         model=model,
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -397,6 +405,7 @@ def test_execution_runtime_commits_subagent_result_evidence() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -429,6 +438,7 @@ def test_execution_runtime_drops_errors_from_accepted_subagent() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -454,6 +464,7 @@ def test_execution_runtime_records_failed_subagent_result() -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())
@@ -477,6 +488,7 @@ def test_execution_runtime_runs_all_initialisation_tasks_before_review() -> None
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
     )
 
     result = asyncio.run(runtime.run_execution())

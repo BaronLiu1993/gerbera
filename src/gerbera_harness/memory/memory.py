@@ -55,19 +55,19 @@ class Memory:
         current_task = self.get_current_task()
         if current_task is not None and current_task is not task:
             raise RuntimeError("Another task is already in progress")
-        self._set_task_status(task, "in_progress")
+        self.set_task_status(task, "in_progress")
 
     def complete_task(self, task: TaskSchema) -> None:
-        self._set_task_status(task, "completed")
+        self.set_task_status(task, "completed")
         if task not in self.completed_tasks:
             self.completed_tasks.append(task)
 
     def fail_task(self, task: TaskSchema) -> None:
-        self._set_task_status(task, "failed")
+        self.set_task_status(task, "failed")
         if task in self.completed_tasks:
             self.completed_tasks.remove(task)
 
-    def _set_task_status(
+    def set_task_status(
         self,
         task: TaskSchema,
         status: Literal["in_progress", "completed", "failed"],

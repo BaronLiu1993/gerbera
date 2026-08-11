@@ -37,6 +37,7 @@ from gerbera_harness.agent_runtime.sub_loop.planning_runtime import (
 )
 from gerbera_harness.agent_runtime.subagent_result import SubAgentResult
 from gerbera_harness.memory import WorldStateSchema
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 @dataclass
@@ -46,6 +47,7 @@ class SubAgentRuntime:
     context: SubAgentContext
     mcp_url: str
     timeout_seconds: float
+    local_tool_registry: LocalToolRegistry 
     context_window_size: int = 20
     max_turns: int = 20
     turns_completed: int = 0
@@ -68,10 +70,12 @@ class SubAgentRuntime:
                 observations=self.observations,
                 tool_events=self.tool_events,
                 context_window_size=self.context_window_size,
+                available_tools=tuple(self.local_tool_registry.list_tools()),
             ),
             messages=self.messages,
             observations=self.observations,
             tool_events=self.tool_events,
+            local_tool_registry=self.local_tool_registry,
         )
 
     @property
@@ -86,6 +90,7 @@ class SubAgentRuntime:
                 tool_events=self.tool_events,
                 context_window_size=self.context_window_size,
                 previous_act_error=self.previous_act_error,
+                available_tools=tuple(self.local_tool_registry.list_tools()),
             ),
             messages=self.messages,
             on_action_planned=lambda action_plan: setattr(
@@ -100,6 +105,7 @@ class SubAgentRuntime:
             timeout_seconds=self.timeout_seconds,
             messages=self.messages,
             tool_events=self.tool_events,
+            local_tool_registry=self.local_tool_registry,
         )
 
     async def run_agent(self) -> SubAgentResult:

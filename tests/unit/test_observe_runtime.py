@@ -18,6 +18,7 @@ from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
     ObservationRuntime,
 )
 from gerbera_harness.memory import Memory, TaskSchema
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 class FakeHypothesis:
@@ -157,6 +158,7 @@ def test_observation_updates_shared_memory(monkeypatch) -> None:
     runtime = ObservationRuntime(
         model=FakeModel(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         context_builder=SubAgentPromptContextBuilder(
             context=context,
             phase="observation",

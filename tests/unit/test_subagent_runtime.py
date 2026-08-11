@@ -31,6 +31,7 @@ from gerbera_harness.agent_runtime.subagent_context import (
     SubAgentContextBuilder,
 )
 from gerbera_harness.memory import Memory, TaskSchema
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 class FakeHypothesis:
@@ -178,6 +179,7 @@ def test_act_status_returns_control_to_observation(
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
         action_plan=planned_action(),
     )
@@ -225,6 +227,7 @@ def test_successful_adjustment_clears_previous_act_error(
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
         action_plan=planned_action(),
         errors=[previous_error],
@@ -261,6 +264,7 @@ def test_subagent_stops_after_maximum_completed_turns(monkeypatch) -> None:
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
         max_turns=3,
         action_plan=planned_action(),
@@ -300,6 +304,7 @@ def test_subagent_runs_observe_plan_act_observe_end_to_end(
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
         action_plan=planned_action(),
     )
@@ -318,6 +323,7 @@ def test_subagent_rejects_invalid_maximum_turns() -> None:
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
         max_turns=0,
     )
@@ -341,6 +347,7 @@ def test_subagent_times_out_an_unfinished_task(monkeypatch) -> None:
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=0.001,
     )
 
@@ -361,6 +368,7 @@ def test_external_cancellation_propagates(monkeypatch) -> None:
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=10,
     )
 
@@ -382,6 +390,7 @@ def test_subagent_rejects_invalid_timeout() -> None:
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=0,
     )
 
@@ -406,6 +415,7 @@ def test_subagent_stops_when_planning_completes(monkeypatch) -> None:
         model=SimpleNamespace(),
         context=subagent_context(memory),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
     )
 
@@ -427,6 +437,7 @@ def test_subagent_propagates_blocked_observation(monkeypatch) -> None:
         model=SimpleNamespace(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
     )
 
@@ -461,6 +472,7 @@ def test_subagent_runtimes_share_local_runtime_fields() -> None:
         model=FakePlanningModel(),
         context=subagent_context(memory),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
     )
 
@@ -491,6 +503,7 @@ def test_planning_runtime_updates_action_plan() -> None:
         model=FakePlanningModel(),
         context=subagent_context(),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
     )
 

@@ -16,6 +16,7 @@ from gerbera_harness.agent_runtime.subagent_context import (
 )
 from gerbera_harness.memory import WorldStateSchema
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 OBSERVATION_PROMPT = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
 OBSERVATION_REVIEW_PROMPT = load_prompt(
@@ -33,71 +34,81 @@ class ObservationRuntime:
     messages: list[dict[str, object]]
     observations: list[WorldStateSchema]
     tool_events: list[dict[str, object]]
+    local_tool_registry: LocalToolRegistry
 
     async def run_observation(self) -> ObservationStatusEnum:
-        async with MCPClient(self.mcp_url) as mcp_client:
-            client = self.model.get_agent_client()
-            tools = await mcp_client.list_tools()
-            allowed_tool_names = frozenset(
-                tool.name
-                for tool in tools
-            )
+        client = self.model.get_agent_client()
 
-            raw_response = await client.send(
-                self.context_builder.build(),
-                OBSERVATION_PROMPT,
-                observation_adapter.json_schema(),
-            )
-            response = observation_adapter.validate_json(raw_response)
-            observation = response.observation
+        raw_response = await client.send(
+            self.context_builder.build(),
+            OBSERVATION_PROMPT,
+            observation_adapter.json_schema(),
+        )
+        response = observation_adapter.validate_json(raw_response)
+        observation = response.observation
 
-            self.messages.append(
-                {"role": "assistant", "content": response.model_dump_json()}
-            )
+        self.messages.append(
+            {"role": "assistant", "content": response.model_dump_json()}
+        )
 
-            if isinstance(observation, ObservationToolCallSchema):
-                result = await mcp_client.call_tool(
-                    name=observation.tool_name,
-                    arguments=observation.arguments,
-                    allowed_tool_names=allowed_tool_names,
+        if isinstance(observation, ObservationToolCallSchema):
+            if self.local_tool_registry.has(observation.tool_name):
+                result = await self.local_tool_registry.call_tool(
+                    observation.tool_name,
+                    observation.arguments,
                 )
-                self._record_tool_result(observation, result)
-                return ObservationStatusEnum.CONTINUE
+            else:
+                result = await self._call_mcp_tool(observation)
+            self._record_tool_result(observation, result)
+            return ObservationStatusEnum.CONTINUE
 
-            review_response = await client.send(
-                self.context_builder.build(),
-                OBSERVATION_REVIEW_PROMPT,
-                observation_review_adapter.json_schema(),
-            )
+        review_response = await client.send(
+            self.context_builder.build(),
+            OBSERVATION_REVIEW_PROMPT,
+            observation_review_adapter.json_schema(),
+        )
 
-            review = observation_review_adapter.validate_json(review_response)
+        review = observation_review_adapter.validate_json(review_response)
 
-            if review.status in {
-                ObservationStatusEnum.READY,
-                ObservationStatusEnum.BLOCKED,
-                ObservationStatusEnum.COMPLETE,
-            }:
-                self.messages.append(
-                    {
-                        "role": "user",
-                        "content": json.dumps(
-                            {"observation_status": review.status.value}
-                        ),
-                    }
-                )
-                self._record_world_state(observation)
-                return review.status
-
+        if review.status in {
+            ObservationStatusEnum.READY,
+            ObservationStatusEnum.BLOCKED,
+            ObservationStatusEnum.COMPLETE,
+        }:
             self.messages.append(
                 {
                     "role": "user",
                     "content": json.dumps(
-                        {"observation_review_feedback": review.feedback}
+                        {"observation_status": review.status.value}
                     ),
                 }
             )
+            self._record_world_state(observation)
+            return review.status
 
-            return ObservationStatusEnum.CONTINUE
+        self.messages.append(
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {"observation_review_feedback": review.feedback}
+                ),
+            }
+        )
+
+        return ObservationStatusEnum.CONTINUE
+
+    async def _call_mcp_tool(
+        self,
+        observation: ObservationToolCallSchema,
+    ) -> object:
+        async with MCPClient(self.mcp_url) as mcp_client:
+            tools = await mcp_client.list_tools()
+            allowed_tool_names = frozenset(tool.name for tool in tools)
+            return await mcp_client.call_tool(
+                name=observation.tool_name,
+                arguments=observation.arguments,
+                allowed_tool_names=allowed_tool_names,
+            )
 
     def _record_tool_result(
         self,

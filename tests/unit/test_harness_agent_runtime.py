@@ -14,6 +14,7 @@ from gerbera_harness.agent_runtime import agent_runtime
 from gerbera_harness.agent_runtime.agent_runtime import AgentRuntime
 from gerbera_harness.memory import Memory
 from gerbera_harness.memory import TaskSchema
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 def execution_group():
@@ -83,6 +84,7 @@ def test_agent_runtime_moves_accepted_execution_to_review(
         model=model,
         memory=Memory(goal="Move the motor"),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         feedback=[],
     )
 
@@ -129,6 +131,7 @@ def test_agent_runtime_stops_after_rejected_execution(monkeypatch) -> None:
         model=object(),
         memory=Memory(goal="Move the motor"),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         feedback=[],
     )
 
@@ -163,6 +166,7 @@ def test_agent_runtime_pauses_replan_in_review(monkeypatch) -> None:
         model=object(),
         memory=Memory(goal="Move the motor"),
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         feedback=[],
     )
 
@@ -227,6 +231,7 @@ def test_accepted_initialisation_creates_pending_tasks(monkeypatch) -> None:
         model=object(),
         memory=memory,
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         feedback=[],
     )
 

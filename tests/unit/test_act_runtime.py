@@ -13,6 +13,8 @@ from gerbera_harness.agent.driver.subloop.schema.act import (
 )
 from gerbera_harness.agent_runtime.sub_loop import act_runtime
 from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
+from gerbera_harness.tools.base import ToolSpec
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 def parameter(tool_parameter: str, value: object, parameter_type: str) -> dict:
@@ -71,7 +73,6 @@ class FakeMCPClient:
         assert mcp_url == "https://hardware.example.com/mcp"
 
     async def __aenter__(self):
-        type(self).calls = []
         return self
 
     async def __aexit__(self, exc_type, exc, traceback) -> None:
@@ -109,8 +110,21 @@ class FakeMCPClient:
         return {"tool": name}
 
 
+class FakeLocalTool:
+    @property
+    def spec(self) -> ToolSpec:
+        return ToolSpec(
+            name="set_motor",
+            description="Set the motor locally.",
+        )
+
+    async def call(self, arguments: dict) -> dict:
+        return {"local": arguments}
+
+
 @pytest.fixture(autouse=True)
 def fake_mcp_client(monkeypatch) -> None:
+    FakeMCPClient.calls = []
     FakeMCPClient.failing_tools = set()
     FakeMCPClient.slow_tools = set()
     monkeypatch.setattr(act_runtime, "MCPClient", FakeMCPClient)
@@ -121,6 +135,7 @@ def run_action(action, timeout_seconds: float = 1) -> tuple:
     tool_events = []
     runtime = ActRuntime(
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=timeout_seconds,
         messages=messages,
         tool_events=tool_events,
@@ -152,16 +167,31 @@ def test_act_runtime_records_success() -> None:
     assert tool_events[-1]["status"] == "success"
 
 
-def test_act_runtime_records_failure_without_raising() -> None:
+def test_act_runtime_routes_local_tool_before_mcp() -> None:
+    messages = []
+    tool_events = []
+    registry = LocalToolRegistry()
+    registry.register(FakeLocalTool())
+    runtime = ActRuntime(
+        mcp_url="https://hardware.example.com/mcp",
+        timeout_seconds=1,
+        messages=messages,
+        tool_events=tool_events,
+        local_tool_registry=registry,
+    )
+
+    status = asyncio.run(runtime.run_action(discrete_action()))
+
+    assert status is ToolCallStatusEnum.SUCCESS
+    assert FakeMCPClient.calls == []
+    assert tool_events[-1]["result"] == {"local": {"speed": 10}}
+
+
+def test_act_runtime_raises_tool_call_failure() -> None:
     FakeMCPClient.failing_tools = {"set_motor"}
 
-    status, events, _, _ = run_action(discrete_action())
-
-    assert status is ToolCallStatusEnum.FAILED
-    assert events[0]["status"] == "failed"
-    assert events[0]["call_type"] == "forward"
-    assert events[0]["arguments"] == {"speed": 10}
-    assert "set_motor" in events[0]["error_message"]
+    with pytest.raises(RuntimeError, match="set_motor"):
+        run_action(discrete_action())
 
 
 def test_act_runtime_records_forward_and_reverse_calls() -> None:
@@ -182,16 +212,11 @@ def test_act_runtime_records_forward_and_reverse_calls() -> None:
     ]
 
 
-def test_act_runtime_records_tool_call_timeout() -> None:
+def test_act_runtime_raises_tool_call_timeout() -> None:
     FakeMCPClient.slow_tools = {"set_motor"}
 
-    status, events, _, _ = run_action(
-        discrete_action(), timeout_seconds=0.01
-    )
-
-    assert status is ToolCallStatusEnum.TIMED_OUT
-    assert events[0]["status"] == "timed_out"
-    assert events[0]["tool_name"] == "set_motor"
+    with pytest.raises(TimeoutError):
+        run_action(discrete_action(), timeout_seconds=0.01)
 
 
 def test_act_runtime_stops_continuous_action_when_cancelled() -> None:
@@ -199,6 +224,7 @@ def test_act_runtime_stops_continuous_action_when_cancelled() -> None:
     tool_events = []
     runtime = ActRuntime(
         mcp_url="https://hardware.example.com/mcp",
+        local_tool_registry=LocalToolRegistry(),
         timeout_seconds=1,
         messages=messages,
         tool_events=tool_events,

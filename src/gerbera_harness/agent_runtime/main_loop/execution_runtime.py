@@ -30,6 +30,7 @@ from gerbera_harness.memory import (
     Memory,
     WorldStateSchema,
 )
+from gerbera_harness.tools.registry import LocalToolRegistry
 
 
 @dataclass
@@ -52,6 +53,7 @@ class ExecutionRuntime:
     model: Model
     memory: Memory
     mcp_url: str
+    local_tool_registry: LocalToolRegistry
 
     async def run_execution(self) -> ExecutionResult:
         action_groups = self._execution_groups()
@@ -127,6 +129,7 @@ class ExecutionRuntime:
             ),
             mcp_url=self.mcp_url,
             timeout_seconds=action.timeout_seconds,
+            local_tool_registry=self.local_tool_registry,
             max_turns=action.max_turns,
         )
         subagent_result = await subagent.run_agent()

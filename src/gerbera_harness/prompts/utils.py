@@ -1,9 +1,8 @@
 from enum import Enum
 from pathlib import Path
 
-
+# Helpers for loading system prompts
 PROMPT_DIRECTORY = Path(__file__).resolve().parent
-
 
 class PromptTypeEnum(str, Enum):
     MAIN = "main"

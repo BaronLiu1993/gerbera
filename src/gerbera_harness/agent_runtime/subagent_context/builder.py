@@ -9,6 +9,7 @@ from gerbera_harness.agent_runtime.subagent_context.context import (
     SubAgentContext,
 )
 from gerbera_harness.memory import Memory, TaskSchema, WorldStateSchema
+from gerbera_harness.tools.base import ToolSpec
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class SubAgentPromptContextBuilder:
     tool_events: list[dict[str, object]]
     context_window_size: int = 20
     previous_act_error: ExecuteErrorSchema | None = None
+    available_tools: tuple[ToolSpec, ...] = ()
 
     def build(self) -> list[dict[str, object]]:
         runtime_context = {
@@ -89,6 +91,9 @@ class SubAgentPromptContextBuilder:
             ],
             "tool_events": [
                 dict(event) for event in self.tool_events
+            ],
+            "available_tools": [
+                tool.model_dump() for tool in self.available_tools
             ],
             "previous_act_error": (
                 self.previous_act_error.model_dump(mode="json")
