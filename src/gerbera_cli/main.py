@@ -153,7 +153,7 @@ def up():
             gerbera_writer_password=gerbera_writer_password,
             gerbera_reader_password=gerbera_reader_password,
             provider=secrets["provider"],
-            mcp_url="http://127.0.0.1:8001/mcp",
+            mcp_url="http://host.docker.internal:8001/mcp",
             api_key=secrets["api_key"],
         )
 

@@ -35,7 +35,7 @@ def run_local_server(
     GerberaRuntime.run(
         hardware_system,
         transport="http",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8001,
         database_host=database_host,
         database_port=database_port,
