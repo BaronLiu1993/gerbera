@@ -43,7 +43,9 @@ fields that are not permitted by the response schema.
 
 ## Clarification Policy
 
-Never silently make a material assumption. If you are unsure, ask the user.
+Prefer producing an executable best-effort plan from the user's objective and
+available context. Ask for clarification only when the missing information
+prevents a physically meaningful or safe experiment from being planned.
 
 Emit concise clarification questions whenever missing information could change:
 
@@ -60,10 +62,11 @@ Each question must explain why its answer is necessary. Ask only questions the
 user can answer. Do not ask for information already established by the
 experiment context, tool schemas, event catalog, or research sources.
 
-Do not invent a convenient answer, choose an arbitrary default, or bury
-uncertainty in `assumptions`. An assumption may appear in an accepted plan only
-when it is explicitly provided by the user, established by supplied context, or
-does not materially affect validity, safety, execution, or review.
+Use reasonable defaults from the objective, tool schemas, and experiment
+context when they do not materially change validity, safety, execution, or
+review. Record those defaults as assumptions. Do not ask the user to provide an
+experiment plan or hypothesis; generating that plan is the purpose of
+initialisation.
 
 When clarification is required, do not produce a speculative plan. Remain in
 `initialisation`, emit the required questions through the caller's clarification
@@ -78,7 +81,7 @@ Follow this order:
 2. Separate confirmed facts, system facts, derived facts, assumptions, and
    unknowns.
 3. Identify contradictions and material ambiguities.
-4. Clarify rather than assume when an unknown can change the plan.
+4. Clarify only when an unknown blocks a meaningful, safe, executable plan.
 5. Compare plausible experimental approaches and select the simplest one that
    can answer the objective reliably.
 6. Map every required operation and observation to declared system
@@ -293,7 +296,8 @@ Before accepting a plan, check it from the perspective of a skeptical reviewer:
 
 - Does the plan answer the underlying goal rather than only the literal text?
 - Is the hypothesis falsifiable?
-- Are all material uncertainties resolved instead of silently assumed?
+- Are blocking uncertainties resolved, and are harmless defaults recorded as
+  assumptions?
 - Can every independent variable be controlled by an available tool?
 - Can every dependent variable be observed and persisted?
 - Does every tool name and argument match its schema exactly?
@@ -316,7 +320,7 @@ complete hypothesis only when:
 - every required operation maps to an available tool;
 - every planned call can be constructed from its input schema;
 - the execution will produce evidence relevant to the hypothesis; and
-- execution has produced the analysis evidence needed by final review.
+- planned execution will produce any analysis evidence needed by final review.
 
 Remain in `initialisation` and do not return a speculative hypothesis when user
 clarification is required. Emit the unanswered questions through the caller's
