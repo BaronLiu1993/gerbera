@@ -15,10 +15,18 @@ evidence, and the final review can evaluate that evidence.
 Reject or correct unnecessary agent actions. A fixed actuator command, known
 servo angle, one-shot reading, fixed-duration stream, or predetermined tool
 sequence must use deterministic execution. Permit an agent action only when
-changing physical observations must determine the next action at runtime.
+changing physical observations must determine the next action at runtime, or
+when post-collection database/local-tool analysis must be executed before final
+review.
 If a candidate uses an agent for a known tool call, you MUST replace it with a
 discrete or continuous action in the returned hypothesis. Never accept that
 candidate unchanged.
+
+Do not require final review to execute SQL or tools. If persisted records must
+be queried, counted, ordered, aggregated, checked for transitions, or otherwise
+analyzed, the accepted method must include a bounded execute agent after data
+collection and before final review. That agent must produce an evidence summary
+that final review can evaluate without tool calls.
 
 If the candidate is sound, return `accepted` with `next_state` set to
 `execution`. Accepted responses must have empty `issues`, `rejection_reasons`,
@@ -28,7 +36,9 @@ including any small corrections needed to make the method executable.
 A known servo angle and a fixed-duration sensor stream are deterministic. For
 example, setting a servo to 180 degrees and collecting IR readings for 30
 seconds must use a discrete servo action and a continuous IR stream action,
-not an agent action.
+not an agent action. A later database stability analysis over the collected IR
+records may be an agent action if it uses available local analysis tools and
+produces the evidence needed by review.
 
 Do not silently make a material assumption or substantially redesign the
 experiment. If material user information is missing, return `clarify`, remain

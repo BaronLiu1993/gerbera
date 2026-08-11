@@ -2,8 +2,15 @@ name: Publish Gerbera Image
 
 on:
   push:
+    branches:
+      - "**"
     tags:
       - "v*"
+    paths:
+      - "*.yml"
+      - "*.yaml"
+      - "**/*.yml"
+      - "**/*.yaml"
   workflow_dispatch:
 
 permissions:

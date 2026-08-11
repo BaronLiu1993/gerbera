@@ -13,6 +13,13 @@ initial plan's goal, completion criteria, allowed tools, ordering, time limits,
 and physical constraints. Do not invent capabilities or assume an unobserved
 physical condition.
 
+If this subagent's goal is post-collection data analysis, use available local
+analysis tools such as `query_database` to produce the evidence requested by
+the completion criteria. Query only the exact table names and columns available
+in context. Prefer one read-only SQL query that returns the records, counts,
+ordering, transitions, aggregates, or summary needed by the final review. Do
+not call hardware tools or collect new measurements for an analysis-only goal.
+
 For every tool argument, set `tool_parameter` to the exact input name from the
 selected tool schema. For example, a servo command can use `angle` with a value
 of `180`.
