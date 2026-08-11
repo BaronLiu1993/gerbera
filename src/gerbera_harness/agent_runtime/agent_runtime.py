@@ -77,13 +77,21 @@ class AgentRuntime:
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
             current_state = self.session.state
+            print(
+                "run_agent state",
+                {
+                    "session_id": self.session.session_id,
+                    "memory_session_id": self.memory.session_id,
+                    "state": current_state.state.value,
+                },
+            )
             if current_state.state is LoopStateEnum.INITIALISATION:
                 result = await self.initialisation_runtime.run_initial(
                     initial_user_prompt,
                     self.feedback,
                 )
 
-                print(result)
+                print("initialisation result", result)
 
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
                     if result.hypothesis is None:
@@ -113,7 +121,7 @@ class AgentRuntime:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.EXECUTION:
                 result = await self.execution_runtime.run_execution()
-                print(result)
+                print("execution result", result)
                 if result.decision is ExecuteDecisionEnum.ACCEPTED:
                     self.session.perform_transition(result.requested_next_state)
                 elif result.decision is ExecuteDecisionEnum.REJECTED:
@@ -122,7 +130,7 @@ class AgentRuntime:
                     raise ValueError("Unsupported Decision")
             elif current_state.state is LoopStateEnum.REVIEW:
                 result = await self.review_runtime.run_review()
-                print(result)
+                print("review result", result)
                 if result.decision is ReviewDecisionEnum.REPLAN:
                     self.feedback = result.feedback
                     # Replanning is intentionally paused while the first

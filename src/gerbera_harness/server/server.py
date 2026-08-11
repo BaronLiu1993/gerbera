@@ -33,7 +33,6 @@ sandbox = SandboxGateway()
 local_tool_registry = LocalToolRegistry()
 local_tool_registry.register(QueryDatabaseTool(database=database))
 local_tool_registry.register(RunSandboxTool(sandbox=sandbox))
-
 orchestrator = Orchestrator(local_tool_registry=local_tool_registry)
 
 async def inference(request):
