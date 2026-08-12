@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from gerbera_harness.gateway.sandbox_gateway import SandboxResult
-from gerbera_harness.tools.database import GetTableSchemaTool, QueryDatabaseTool
+from gerbera_harness.tools.database import GetTableSchemasTool, QueryDatabaseTool
 from gerbera_harness.tools.registry import LocalToolRegistry
 from gerbera_harness.tools.sandbox import RunSandboxTool
 
@@ -19,17 +19,22 @@ class FakeDatabaseGateway:
     async def execute_query(
         self,
         query: str,
-        params: dict | None = None,
     ) -> list[dict]:
         self.queries.append(query)
         return [{"value": 1}]
 
-    async def get_table_schema(self, table_name: str) -> dict:
-        self.table_names.append(table_name)
-        return {
-            "table_name": table_name,
-            "columns": [{"name": "value", "type": "integer"}],
-        }
+    async def get_table_schemas(
+        self,
+        table_names: list[str],
+    ) -> list[dict]:
+        self.table_names.extend(table_names)
+        return [
+            {
+                "table_name": table_name,
+                "columns": [{"name": "value", "type": "integer"}],
+            }
+            for table_name in table_names
+        ]
 
 
 class FakeSandboxGateway:
@@ -69,22 +74,24 @@ def test_local_tool_registry_rejects_missing_tool() -> None:
         asyncio.run(registry.call_tool("missing", {}))
 
 
-def test_get_table_schema_tool_delegates_to_gateway() -> None:
+def test_get_table_schemas_tool_delegates_to_gateway() -> None:
     database = FakeDatabaseGateway()
     registry = LocalToolRegistry()
-    registry.register(GetTableSchemaTool(database))
+    registry.register(GetTableSchemasTool(database))
 
     result = asyncio.run(
         registry.call_tool(
-            "get_table_schema",
-            {"table_name": "hw201_736f570d_a966e8ad"},
+            "get_table_schemas",
+            {"table_names": ["hw201_736f570d_a966e8ad"]},
         )
     )
 
-    assert result == {
-        "table_name": "hw201_736f570d_a966e8ad",
-        "columns": [{"name": "value", "type": "integer"}],
-    }
+    assert result == [
+        {
+            "table_name": "hw201_736f570d_a966e8ad",
+            "columns": [{"name": "value", "type": "integer"}],
+        }
+    ]
     assert database.table_names == ["hw201_736f570d_a966e8ad"]
 
 

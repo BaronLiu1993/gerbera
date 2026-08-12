@@ -38,5 +38,5 @@ def test_observation_prompt_requires_sql_for_analysis_tasks() -> None:
     assert "post-collection data-analysis tasks" in prompt
     assert "must call `query_database`" in prompt
     assert "PostgreSQL" in prompt
-    assert "`get_table_schema`" in prompt
+    assert "`get_table_schemas`" in prompt
     assert "Do not return null evidence fields" in prompt

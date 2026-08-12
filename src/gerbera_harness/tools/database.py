@@ -33,30 +33,31 @@ class QueryDatabaseTool:
 
 
 @dataclass
-class GetTableSchemaTool:
+class GetTableSchemasTool:
     database: DatabaseGateway
 
     @property
     def spec(self) -> ToolSpec:
         return ToolSpec(
-            name="get_table_schema",
+            name="get_table_schemas",
             description=(
                 "Return PostgreSQL column names and types for a Gerbera "
-                "database table."
+                "database tables."
             ),
             input_schema={
                 "type": "object",
                 "properties": {
-                    "table_name": {
-                        "type": "string",
-                        "description": "PostgreSQL table name to inspect.",
+                    "table_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "PostgreSQL table names to inspect.",
                     }
                 },
-                "required": ["table_name"],
+                "required": ["table_names"],
             },
             read_only=True,
             destructive=False,
         )
 
-    async def call(self, arguments: dict[str, Any]) -> dict:
-        return await self.database.get_table_schema(arguments["table_name"])
+    async def call(self, arguments: dict[str, Any]) -> list[dict[str, Any]]:
+        return await self.database.get_table_schemas(arguments["table_names"])

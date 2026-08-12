@@ -12,7 +12,7 @@ the current step asks for records, counts, timestamps, ordering, transitions,
 aggregates, or dataset statistics, you must call `query_database` before
 returning `finish` unless a prior `tool_events` entry already contains the
 needed SQL result. The database is PostgreSQL; write SQL using psql/PostgreSQL
-syntax. If `get_table_schema` is available, call it before `query_database`
+syntax. If `get_table_schemas` is available, call it before `query_database`
 when table columns are not already known from prior tool results. Use the
 exact table names from the current step, completed steps, relevant events, or
 tool results. Do not return null evidence fields without first using the
