@@ -18,12 +18,6 @@ class MCPClient:
 
     @cached_property
     def client(self) -> Client:
-        parsed_url = urlsplit(self.mcp_url)
-        if (
-            parsed_url.scheme not in {"http", "https"}
-            or not parsed_url.hostname
-        ):
-            raise ValueError("MCP URL must use HTTP or HTTPS")
         return Client(self.mcp_url)
 
     async def __aenter__(self) -> "MCPClient":
