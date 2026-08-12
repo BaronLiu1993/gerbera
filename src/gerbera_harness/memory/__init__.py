@@ -7,7 +7,7 @@ from gerbera_harness.memory.event_schema import (
     SourceTypeEnum,
 )
 from gerbera_harness.memory.memory import Memory
-from gerbera_harness.memory.task_schema import TaskSchema
+from gerbera_harness.memory.task_schema import TaskSchema, TaskStatusEnum
 from gerbera_harness.memory.world_state_schema import WorldStateSchema
 
 __all__ = [
@@ -17,5 +17,6 @@ __all__ = [
     "Memory",
     "SourceTypeEnum",
     "TaskSchema",
+    "TaskStatusEnum",
     "WorldStateSchema",
 ]

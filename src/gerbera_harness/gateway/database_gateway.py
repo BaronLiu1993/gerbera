@@ -18,18 +18,20 @@ class DatabaseGateway:
     host: str
     port: str
     db_name: str
-    user: str
-    password: str
+    read_user: str
+    read_password: str
+    write_user: str
+    write_password: str
     timeout: float = 30.0
     min_size: int = 5
     max_size: int = 20
 
     @cached_property
-    def connection_pool(self):
+    def read_connection_pool(self):
         conninfo = (
             f"dbname={self.db_name} "
-            f"user={self.user} "
-            f"password={self.password} "
+            f"user={self.read_user} "
+            f"password={self.read_password} "
             f"host={self.host} "
             f"port={self.port}"
         )
@@ -42,14 +44,42 @@ class DatabaseGateway:
             open=False,
         )
 
+    @cached_property
+    def write_connection_pool(self):
+        conninfo = (
+            f"dbname={self.db_name} "
+            f"user={self.write_user} "
+            f"password={self.write_password} "
+            f"host={self.host} "
+            f"port={self.port}"
+        )
+
+        return AsyncConnectionPool(
+            conninfo=conninfo,
+            timeout=self.timeout,
+            min_size=self.min_size,
+            max_size=self.max_size,
+            open=False,
+        )
+
+    async def write_to_memory(self) -> None:
+        await self.write_connection_pool.open()
+        async with self.write_connection_pool as conn:
+            async with conn.transaction():
+                await conn.execute("SET LOCAL statement_timeout = '10s'")
+                async with conn.cursor() as cur:
+                    await cur.execute()
+
+
+
     # No need to check queries, we have DB level user permissioning with read roles
     async def execute_query(
         self,
         query: str,
     ) -> list[dict[str, Any]]:
-        await self.connection_pool.open()
+        await self.read_connection_pool.open()
 
-        async with self.connection_pool.connection() as conn:
+        async with self.read_connection_pool.connection() as conn:
             async with conn.transaction():
                 await conn.execute("SET TRANSACTION READ ONLY")
                 await conn.execute("SET LOCAL statement_timeout = '10s'")
@@ -99,10 +129,7 @@ class DatabaseGateway:
                     columns = [column.name for column in cur.description]
                     raw_rows = await cur.fetchall()
 
-        rows = [
-            dict(zip(columns, row, strict=True))
-            for row in raw_rows
-        ]
+        rows = [dict(zip(columns, row, strict=True)) for row in raw_rows]
 
         schemas_by_table = {
             table_name: {"table_name": table_name, "columns": []}
