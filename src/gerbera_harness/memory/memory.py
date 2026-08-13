@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import json
+from typing import Any
 
 from gerbera_harness.memory.memory_schema import (
     EventStateSchema,
@@ -7,7 +9,6 @@ from gerbera_harness.memory.memory_schema import (
     TemporalStateSchema,
     WorldStateSchema,
 )
-
 
 @dataclass
 class Memory:
@@ -19,16 +20,11 @@ class Memory:
     events_state: EventStateSchema
     hardware_configuration: HardwareConfigurationStateSchema
 
-    def define_world_state(self) -> WorldStateSchema:
-        
-
-        environment_state = 
-
-
-
-        hardware_state = {
-
-        }
+    # wire it all up later
+    # Defining world state
+    async def define_world_state(self) -> WorldStateSchema:
+        environment_state = await self.get_current_environment_state()
+        hardware_state = await self.get_current_hardware_state()
 
         self.world_state = WorldStateSchema(
             session_id=self.session_id,
@@ -36,9 +32,22 @@ class Memory:
             hardware_state=hardware_state,
             sources=[],
         )
+        return self.world_state
 
-    def get_world_state(self):
+    async def get_current_environment_state(self) -> dict[str, Any]:
         pass
+
+    async def get_current_hardware_state(self) -> dict[str, Any]:
+        async with self.agent_client(self.mcp_url) as client:
+            tools = await client.list_tools()
+            allowed_tool_names = frozenset(tool.name for tool in tools)
+            hardware_state = await client.call_tool(
+                "get_current_hardware_state",
+                {},
+                "get_current_hardware_state",
+            )
+
+        return json.loads(hardware_state)
 
     def define_task_state(self):
         pass
