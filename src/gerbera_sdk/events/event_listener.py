@@ -10,6 +10,7 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
+from gerbera_sdk.models.runtime.state_runtime import ConnectionState, StateRuntime
 
 
 # Runs at runtime
@@ -22,9 +23,10 @@ class EventListener:
     event_bus: EventBus
 
     # Reaction code
-    
+
     reaction_bus: ReactionBus
-    
+    state_runtime: StateRuntime
+
     reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
             max_workers=1,
@@ -32,8 +34,8 @@ class EventListener:
         )
     )
     threads: dict[str, threading.Thread] = field(
-            default_factory=dict
-        )  # Multiple threads to run the loop
+        default_factory=dict
+    )  # Multiple threads to run the loop
     # Stops every single thread
     stop_event: threading.Event = field(default_factory=threading.Event)
     lifecycle_lock: threading.RLock = field(
@@ -152,6 +154,13 @@ class EventListener:
             event_name,
         )
         handler.perform_work(payload)
+        unit, value = next(iter(payload.items()))
+
+        self.state_runtime.update_state(
+            handler.connection_name,
+            handler.component_type,
+            ConnectionState(value=value, unit=unit),
+        )
 
     def dispatch_event_to_reaction_bus(
         self,

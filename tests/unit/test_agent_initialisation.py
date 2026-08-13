@@ -5,7 +5,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.workflows.coordinator import Agent
+from gerbera_harness.workflows.agent_runtime import Agent
 from gerbera_harness.domain.responses import (
     Answer,
 )

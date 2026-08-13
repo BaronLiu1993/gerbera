@@ -10,8 +10,8 @@ from gerbera_harness.domain.session import (
     ReviewDecisionEnum,
     Session,
 )
-from gerbera_harness.workflows import coordinator as agent_runtime
-from gerbera_harness.workflows.coordinator import AgentRuntime
+from gerbera_harness.workflows import agent_runtime as agent_runtime
+from gerbera_harness.workflows.agent_runtime import AgentRuntime
 from gerbera_harness.memory import Memory
 from gerbera_harness.memory import TaskSchema
 from gerbera_harness.tools.registry import LocalToolRegistry

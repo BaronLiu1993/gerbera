@@ -14,6 +14,8 @@ class Event:
     event_type: str
     microcontroller_id: str
     event_name: str
+    connection_name: str
+    component_type: str
     streamable: bool
     table_name: str
     event_worker: EventWorker
@@ -46,7 +48,8 @@ class Event:
             self.latest_val = normalized_payload
 
         if self.streamable:
-            stream_payload = dict(normalized_payload)
+            stream_value = next(iter(normalized_payload.values()), "")
+            stream_payload = {"value": stream_value}
             stream_payload["created_at"] = datetime.now(timezone.utc)
             self.buffer.write(stream_payload)
             return

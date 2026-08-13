@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from gerbera_harness.workflows.coordinator import Agent
+from gerbera_harness.workflows.agent_runtime import Agent
 from gerbera_harness.domain.session import (
     LoopStateEnum,
     Session,

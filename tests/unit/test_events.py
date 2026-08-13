@@ -15,6 +15,8 @@ from gerbera_sdk.events.reactions.reaction_condition import (
     OperatorEnum,
     ReactionCondition,
 )
+from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.runtime.state_runtime import StateRuntime
 
 
 class FakeDatabase:
@@ -44,12 +46,24 @@ def register_test_reaction(reaction_bus: ReactionBus) -> None:
     )
 
 
+def event_listener(**dependencies) -> EventListener:
+    dependencies.setdefault("hardware_system", SimpleNamespace(microcontrollers=[]))
+    dependencies.setdefault("serial_pool", {})
+    dependencies.setdefault("threads", {})
+    dependencies.setdefault("event_bus", EventBus())
+    dependencies.setdefault("reaction_bus", ReactionBus())
+    dependencies.setdefault("state_runtime", StateRuntime())
+    return EventListener(**dependencies)
+
+
 def test_event_bus_rejects_duplicate_and_missing_events() -> None:
     event_bus = EventBus()
     event = Event(
         event_type="MCP",
         microcontroller_id="board-1",
         event_name="sensor",
+        connection_name="sensor",
+        component_type="sensor",
         streamable=False,
         table_name="sensor",
         event_worker=EventWorker(database=FakeDatabase()),
@@ -84,7 +98,7 @@ def test_event_worker_requeues_a_failed_write_until_retry_limit() -> None:
 
 
 def test_listener_rejects_duplicate_payload_keys() -> None:
-    listener = EventListener(
+    listener = event_listener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
         threads={},
@@ -100,7 +114,7 @@ def test_listener_rejects_duplicate_payload_keys() -> None:
 def test_listener_updates_registered_reaction_bus_value() -> None:
     reaction_bus = ReactionBus()
     register_test_reaction(reaction_bus)
-    listener = EventListener(
+    listener = event_listener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
         threads={},
@@ -118,6 +132,51 @@ def test_listener_updates_registered_reaction_bus_value() -> None:
 
     assert reaction_bus.latest_values[("STREAM", "board-1", "sensor")] == 1.0
     listener.stop_listeners()
+
+
+def test_listener_updates_connection_state_from_event_payload() -> None:
+    connection = Connection("distance_sensor", "hcsr04", {"trigger": "2", "echo": "3"})
+    connection.microcontroller_id = "board-1"
+    hardware_system = SimpleNamespace(
+        microcontrollers=[
+            SimpleNamespace(id="board-1", connections=[connection]),
+        ],
+    )
+    state_runtime = StateRuntime()
+    state_runtime.register_state_store(connection.name, connection.component_type)
+    event_bus = EventBus()
+    event_bus.write_event(
+        "STREAM",
+        "board-1",
+        connection.event_name,
+        Event(
+            event_type="STREAM",
+            microcontroller_id="board-1",
+            event_name=connection.event_name,
+            connection_name=connection.name,
+            component_type=connection.component_type,
+            streamable=False,
+            table_name=connection.event_name,
+            event_worker=EventWorker(database=FakeDatabase()),
+        ),
+    )
+    listener = event_listener(
+        hardware_system=hardware_system,
+        event_bus=event_bus,
+        state_runtime=state_runtime,
+    )
+
+    listener.dispatch_to_event_bus(
+        "STREAM",
+        "board-1",
+        connection.event_name,
+        {"cm": "12.5"},
+    )
+
+    state = state_runtime.state_store[(connection.name, connection.component_type)]
+    assert state is not None
+    assert state.value == "12.5"
+    assert state.unit == "cm"
 
 
 def test_listener_does_not_wait_for_async_reaction_callback() -> None:
@@ -149,7 +208,7 @@ def test_listener_does_not_wait_for_async_reaction_callback() -> None:
             ),
         ),
     )
-    listener = EventListener(
+    listener = event_listener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
         threads={},
@@ -192,7 +251,7 @@ def test_listener_logs_async_reaction_callback_failure(caplog) -> None:
             ),
         ),
     )
-    listener = EventListener(
+    listener = event_listener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
         threads={},
@@ -231,7 +290,7 @@ def test_listener_fails_when_transport_shutdown_fails() -> None:
             return False
 
     thread = Thread()
-    listener = EventListener(
+    listener = event_listener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={"board-1": FailingConnection()},
         threads={"board-1": thread},
@@ -257,7 +316,7 @@ def test_listener_keeps_a_thread_tracked_when_join_times_out() -> None:
             return True
 
     thread = Thread()
-    listener = EventListener(
+    listener = event_listener(
         hardware_system=SimpleNamespace(microcontrollers=[]),
         serial_pool={},
         threads={"board-1": thread},

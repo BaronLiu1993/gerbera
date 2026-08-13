@@ -15,6 +15,7 @@ from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.state_runtime import StateRuntime
 
 
 class GerberaRuntime:
@@ -50,6 +51,11 @@ class GerberaRuntime:
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker(database=database)
         model_runtime = ModelRuntime(hardware_system)
+        state_runtime = StateRuntime()
+        GerberaRuntime.register_connection_states(
+            hardware_system=hardware_system,
+            state_runtime=state_runtime,
+        )
 
         event_bus = EventBus()
         reaction_bus = ReactionBus()
@@ -58,6 +64,7 @@ class GerberaRuntime:
             serial_pool=board_runtime.serial_pool,
             event_bus=event_bus,
             reaction_bus=reaction_bus,
+            state_runtime=state_runtime,
         )
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,
@@ -66,6 +73,7 @@ class GerberaRuntime:
             model_runtime=model_runtime,
             event_listener=event_listener,
             event_bus=event_bus,
+            state_runtime=state_runtime,
         )
         app = FastMCP(
             hardware_system.description,
@@ -81,6 +89,7 @@ class GerberaRuntime:
             model_runtime=model_runtime,
             event_listener=event_listener,
             reaction_bus=reaction_bus,
+            state_runtime=state_runtime,
         )
 
         server_runtime.register_events()
@@ -108,6 +117,18 @@ class GerberaRuntime:
                     )
 
                 connection_owners[normalized_name] = microcontroller.id
+
+    @staticmethod
+    def register_connection_states(
+        hardware_system: HardwareSystem,
+        state_runtime: StateRuntime,
+    ) -> None:
+        for microcontroller in hardware_system.microcontrollers:
+            for connection in microcontroller.connections:
+                state_runtime.register_state_store(
+                    connection.name,
+                    connection.component_type,
+                )
 
     # Change the database layer after
     @staticmethod

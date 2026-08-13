@@ -26,13 +26,21 @@ from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.state_runtime import ConnectionState, StateRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
+    VisionLanguageModelInference,
     VisionLanguageModelFrameEnvironment,
 )
 from gerbera_sdk.utils import StrictSchema
+
+ModelCatalogType = Literal["object_detection", "vision_language_model"]
+MODEL_CATALOG_TYPE_REGISTRY: dict[type, ModelCatalogType] = {
+    ObjectDetectionModelInference: "object_detection",
+    VisionLanguageModelInference: "vision_language_model",
+}
 
 EventMetadata = dict[str, str | bool]
 EventCatalog = dict[
@@ -50,13 +58,21 @@ class ModelCatalogEntry(StrictSchema):
     model_id: str
     name: str
     description: str
-    model_type: Literal["object_detection", "vision_language_model"]
+    model_type: ModelCatalogType
     subscribed_cameras: list[SubscribedCameraCatalogEntry]
     is_running: bool
     turn_on_tool: str
     turn_off_tool: str
     read_tool: str
     single_inference_tool: str
+
+
+def model_catalog_type(model: Inference) -> ModelCatalogType:
+    for model_class, model_type in MODEL_CATALOG_TYPE_REGISTRY.items():
+        if isinstance(model, model_class):
+            return model_type
+
+    raise ValueError(f"Unsupported inference model type: {type(model).__name__}")
 
 
 @dataclass
@@ -70,6 +86,7 @@ class ServerRuntime:
     model_runtime: ModelRuntime
     event_listener: EventListener
     reaction_bus: ReactionBus
+    state_runtime: StateRuntime
     event_read_timeout_seconds: float = 1.0
     event_read_poll_seconds: float = 0.02
 
@@ -78,6 +95,7 @@ class ServerRuntime:
         # Reaction MCP tools are disabled until reaction execution moves to harness.
         # self.register_reaction_tools()
         self.register_event_catalog_tool()
+        self.register_state_memory_tool()
 
     # Event registration and catalog helpers.
 
@@ -90,6 +108,8 @@ class ServerRuntime:
             event_type="MCP",
             microcontroller_id=microcontroller.id,
             event_name=connection.event_name,
+            connection_name=connection.name,
+            component_type=connection.component_type,
             streamable=False,
             table_name=connection.event_name,
             event_worker=self.event_worker,
@@ -114,6 +134,8 @@ class ServerRuntime:
             event_type="STREAM",
             microcontroller_id=microcontroller.id,
             event_name=connection.event_name,
+            connection_name=connection.name,
+            component_type=connection.component_type,
             streamable=True,
             table_name=connection.event_name,
             event_worker=self.event_worker,
@@ -196,12 +218,9 @@ class ServerRuntime:
 
             serial_connection.write(built_command)
         except Exception as exc:
-            return {"status": 500, "error": str(exc)}
+            return {"success": False, "error": str(exc)}
 
-        # TODO: Rework command response matching before returning MCP responses.
-        # The old latest-value polling can misattribute responses under
-        # concurrent calls to the same connection.
-        return {"status": 201}
+        return {"success": True}
 
     def register_connection_action(
         self,
@@ -279,35 +298,31 @@ class ServerRuntime:
             ),
         ]
 
-    def build_stream_toggle_tool_function(
+    def build_toggle_tool_function(
         self,
-        microcontroller: Microcontroller,
         connection: Connection,
         state: int,
+        stream_microcontroller: Microcontroller | None = None,
     ) -> Callable[[], dict[str, object]]:
         def tool_function() -> dict[str, object]:
             response = connection.perform_action("WRITE", {"state": state})
 
-            if state == 0:
+            if stream_microcontroller is not None and state == 0:
                 stream_event = self.event_bus.get_event(
                     "STREAM",
-                    microcontroller.id,
+                    stream_microcontroller.id,
                     connection.event_name,
                 )
                 stream_event.flush()
                 self.event_worker.wait_until_idle()
 
+            if response["success"]:
+                self.state_runtime.update_state(
+                    connection.name,
+                    connection.component_type,
+                    ConnectionState(value=str(state), unit="BOOLEAN"),
+                )
             return response
-
-        return tool_function
-
-    def build_state_toggle_tool_function(
-        self,
-        connection: Connection,
-        state: int,
-    ) -> Callable[[], dict[str, object]]:
-        def tool_function() -> dict[str, object]:
-            return connection.perform_action("WRITE", {"state": state})
 
         return tool_function
 
@@ -368,7 +383,10 @@ class ServerRuntime:
         description: str,
         annotations: ToolAnnotations,
     ) -> None:
-        tool_function = self.build_state_toggle_tool_function(connection, state)
+        tool_function = self.build_toggle_tool_function(
+            connection=connection,
+            state=state,
+        )
         self.register_tool(
             name=tool_name,
             description=description,
@@ -408,10 +426,10 @@ class ServerRuntime:
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
-        tool_function = self.build_stream_toggle_tool_function(
-            microcontroller=microcontroller,
+        tool_function = self.build_toggle_tool_function(
             connection=connection,
             state=state,
+            stream_microcontroller=microcontroller,
         )
         self.register_tool(
             name=tool_name,
@@ -726,11 +744,6 @@ class ServerRuntime:
         def list_configured_models() -> list[ModelCatalogEntry]:
             catalog: list[ModelCatalogEntry] = []
             for model_id, model in registered_models.values():
-                model_type = (
-                    "object_detection"
-                    if isinstance(model, ObjectDetectionModelInference)
-                    else "vision_language_model"
-                )
                 cameras: list[SubscribedCameraCatalogEntry] = []
                 for camera in model.subscribed_cameras:
                     cameras.append(
@@ -744,7 +757,7 @@ class ServerRuntime:
                         model_id=model_id,
                         name=model.name,
                         description=model.description,
-                        model_type=model_type,
+                        model_type=model_catalog_type(model),
                         subscribed_cameras=cameras,
                         is_running=model.is_running,
                         turn_on_tool=f"turn_on_{model.name}",
@@ -787,6 +800,25 @@ class ServerRuntime:
             tool_function=list_reaction_events,
             annotations=ToolAnnotations(
                 title="List events available for reactions",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+        )
+
+    def register_state_memory_tool(self) -> None:
+        def get_current_hardware_state() -> str:
+            return self.state_runtime.get_state_store()
+
+        self.register_tool(
+            name="get_current_hardware_state",
+            description=(
+                "Read the current hardware state memory as serialized JSON."
+            ),
+            tool_function=get_current_hardware_state,
+            annotations=ToolAnnotations(
+                title="Get current hardware state",
                 readOnlyHint=True,
                 destructiveHint=False,
                 idempotentHint=True,

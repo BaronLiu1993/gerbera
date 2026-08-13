@@ -26,6 +26,7 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime as _ServerRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.state_runtime import StateRuntime
 
 
 class FakeApp:
@@ -71,6 +72,7 @@ def _event_worker() -> EventWorker:
 def ServerRuntime(**dependencies) -> _ServerRuntime:
     dependencies.setdefault("reaction_bus", ReactionBus())
     dependencies.setdefault("event_listener", SimpleNamespace())
+    dependencies.setdefault("state_runtime", StateRuntime())
     return _ServerRuntime(**dependencies)
 
 
@@ -479,7 +481,7 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
     serial_connection.on_write = lambda: event.perform_work({"state": "1"})
     response = app.tools["turn_on_status_led"]()
 
-    assert response == {"state": "1"}
+    assert response == {"success": True}
     assert serial_connection.commands == ["WRITE,status_led,state:1.0"]
     assert set(app.tools) == {
         "write_status_led",
@@ -493,6 +495,49 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
         idempotentHint=True,
         openWorldHint=False,
     )
+
+
+def test_mcp_tool_updates_connection_state(device_registry) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    board = Microcontroller(port="/dev/board-1", fqbn="arduino:avr:uno")
+    board.add_connections([Connection("status_led", "led", {"out": "13"})])
+    hardware_system = HardwareSystem(microcontrollers=[board])
+    serial_connection = FakeSerialConnection()
+    board_runtime = SimpleNamespace(
+        serial_pool={"board-1": serial_connection},
+        get_serial_connection=lambda microcontroller: serial_connection,
+    )
+    event_bus = EventBus()
+    state_runtime = StateRuntime()
+    connection = board.connections[0]
+    state_runtime.register_state_store(connection.name, connection.component_type)
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=hardware_system,
+        board_runtime=board_runtime,
+        event_bus=event_bus,
+        event_worker=_event_worker(),
+        app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
+        state_runtime=state_runtime,
+    )
+
+    runtime.register_events()
+    runtime.register_hardware_tools()
+    event = event_bus.get_event(
+        "MCP",
+        board.id,
+        connection.event_name,
+    )
+    serial_connection.on_write = lambda: event.perform_work({"state": "1"})
+
+    app.tools["turn_on_status_led"]()
+
+    state = state_runtime.state_store[(connection.name, connection.component_type)]
+    assert state is not None
+    assert state.value == "1"
+    assert state.unit == "BOOLEAN"
 
 
 def test_streaming_sensor_exposes_only_read_and_stream_controls(
@@ -700,6 +745,33 @@ def test_server_exposes_registered_events_as_nested_catalog(
     )
 
 
+def test_server_exposes_state_memory_tool() -> None:
+    state_runtime = StateRuntime()
+    state_runtime.register_state_store("status_led", "led")
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(),
+        board_runtime=object(),
+        event_bus=EventBus(),
+        event_worker=_event_worker(),
+        app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(model_inferences={}),
+        state_runtime=state_runtime,
+    )
+
+    runtime.register_state_memory_tool()
+
+    assert app.tools["get_current_hardware_state"]() == '{"status_led::led": null}'
+    assert app.annotations["get_current_hardware_state"] == ToolAnnotations(
+        title="Get current hardware state",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+
+
 def test_database_backed_tool_description_includes_table_name() -> None:
     database = Database("localhost", 5432, "user", "password", "gerbera")
     connection = Connection(
@@ -756,9 +828,12 @@ def test_server_uses_prebuilt_reaction_and_listener_dependencies() -> None:
 def test_stream_off_waits_for_buffered_database_writes() -> None:
     calls: list[str] = []
     connection = SimpleNamespace(
+        name="ir_sensor",
+        component_type="hw201",
+        event_name="status_stream",
         perform_action=lambda action, params: (
-            calls.append("hardware.off") or {"status": "off"}
-        )
+            calls.append("hardware.off") or {"success": True}
+        ),
     )
     event_bus = SimpleNamespace(
         get_event=lambda event_type, microcontroller_id, event_name: SimpleNamespace(
@@ -768,6 +843,8 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
     event_worker = SimpleNamespace(
         wait_until_idle=lambda: calls.append("database.wait")
     )
+    state_runtime = StateRuntime()
+    state_runtime.register_state_store(connection.name, connection.component_type)
     runtime = ServerRuntime(
         hardware_system=object(),
         board_runtime=object(),
@@ -776,16 +853,21 @@ def test_stream_off_waits_for_buffered_database_writes() -> None:
         app=FakeApp(),
         camera_runtime=SimpleNamespace(),
         model_runtime=SimpleNamespace(model_inferences={}),
+        state_runtime=state_runtime,
     )
-    tool = runtime.build_stream_toggle_tool_function(
-        microcontroller=object(),
+    tool = runtime.build_toggle_tool_function(
         connection=connection,
         state=0,
+        stream_microcontroller=SimpleNamespace(id="board-1"),
     )
 
-    assert tool() == {"status": "off"}
+    assert tool() == {"success": True}
     assert calls == [
         "hardware.off",
         "stream.flush",
         "database.wait",
     ]
+    state = state_runtime.state_store[(connection.name, connection.component_type)]
+    assert state is not None
+    assert state.value == "0"
+    assert state.unit == "BOOLEAN"

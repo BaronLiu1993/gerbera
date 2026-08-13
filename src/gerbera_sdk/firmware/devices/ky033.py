@@ -140,13 +140,13 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
     float state = stateValue.toFloat();
     if (state == 1) {{
       {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.event_name},state:1");
+      Serial.println("MCP,{connection.event_name},boolean:1");
       return;
     }}
 
     if (state == 0) {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.event_name},state:0");
+      Serial.println("MCP,{connection.event_name},boolean:0");
       return;
     }}
 

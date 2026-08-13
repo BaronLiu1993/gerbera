@@ -67,6 +67,6 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
 
   int angle = angleValue.toInt();
   {connection.name}_servo.write(angle);
-  Serial.print("MCP,{connection.event_name},angle:");
+  Serial.print("MCP,{connection.event_name},degrees:");
   Serial.println(angle);
 }}"""

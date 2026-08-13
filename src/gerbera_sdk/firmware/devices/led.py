@@ -64,13 +64,13 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
 
   if (state == 1) {{
     digitalWrite({out_pin}, HIGH);
-    Serial.println("MCP,{connection.event_name},state:1");
+    Serial.println("MCP,{connection.event_name},BOOLEAN:1");
     return;
   }}
 
   if (state == 0) {{
     digitalWrite({out_pin}, LOW);
-    Serial.println("MCP,{connection.event_name},state:0");
+    Serial.println("MCP,{connection.event_name},BOOLEAN:0");
     return;
   }}
 

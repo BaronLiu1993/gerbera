@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
+from gerbera_sdk.models.runtime.state_runtime import StateRuntime
 
 
 @pytest.mark.parametrize("server_fails", [False, True])
@@ -36,6 +37,7 @@ def test_runtime_orchestrates_startup_and_shutdown_in_order(
         event_bus=SimpleNamespace(
             flush_event_buffers=lambda: calls.append("streams.flush"),
         ),
+        state_runtime=StateRuntime(),
     )
 
     async def serve() -> None:

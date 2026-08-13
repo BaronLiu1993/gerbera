@@ -41,6 +41,8 @@ def test_stream_payload_is_buffered_and_written(device_registry) -> None:
         "STREAM",
         board.id,
         table_name,
+        board.connections[0].name,
+        board.connections[0].component_type,
         streamable=True,
         table_name=table_name,
         event_worker=worker,

@@ -10,6 +10,7 @@ from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.state_runtime import StateRuntime
 
 
 @dataclass
@@ -20,6 +21,7 @@ class RuntimeLifecycle:
     model_runtime: ModelRuntime
     event_listener: EventListener
     event_bus: EventBus
+    state_runtime: StateRuntime
 
     @asynccontextmanager
     async def __call__(
@@ -32,6 +34,7 @@ class RuntimeLifecycle:
                 "camera_runtime": self.camera_runtime,
                 "event_worker": self.event_worker,
                 "model_runtime": self.model_runtime,
+                "state_runtime": self.state_runtime,
             }
 
     def _start_resources(
@@ -50,8 +53,8 @@ class RuntimeLifecycle:
             cleanup.callback(self.event_worker.wait_until_idle)
             cleanup.callback(self.event_bus.flush_event_buffers)
 
-            cleanup.callback(self.event_listener.stop_listeners)
             self.event_listener.create_listeners()
+            cleanup.callback(self.event_listener.stop_listeners)
 
             self.model_runtime.turn_on_all_models()
             cleanup.callback(self.model_runtime.turn_off_all_models)
