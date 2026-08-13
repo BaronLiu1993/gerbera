@@ -3,7 +3,14 @@ from dataclasses import dataclass, field
 from gerbera_harness.workflows.agent_runtime import AgentRuntime
 from gerbera_harness.domain.session import Session
 from gerbera_harness.infrastructure.model import Model, ModelProviderEnum
-from gerbera_harness.memory import Memory
+from gerbera_harness.memory import (
+    EventStateSchema,
+    HardwareConfigurationStateSchema,
+    Memory,
+    TaskStateSchema,
+    TemporalStateSchema,
+    WorldStateSchema,
+)
 from gerbera_harness.tools.registry import LocalToolRegistry
 
 
@@ -26,8 +33,19 @@ class Orchestrator:
     ):
         session = Session()
         memory = Memory(
-            goal=user_prompt,
             session_id=session.session_id,
+            user_goal=user_prompt,
+            world_state=WorldStateSchema(session_id=session.session_id),
+            temporal_state=TemporalStateSchema(
+                session_id=session.session_id,
+                current_hardware_configuration={},
+            ),
+            task_state=TaskStateSchema(),
+            events_state=EventStateSchema(session_id=session.session_id),
+            hardware_configuration=HardwareConfigurationStateSchema(
+                session_id=session.session_id,
+                description="",
+            ),
         )
         model = Model(
             model_provider=ModelProviderEnum(provider),

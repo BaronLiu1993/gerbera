@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Iterable, Protocol
+from typing import Any, ClassVar, Iterable, Protocol
+from urllib.parse import urlsplit
 
 from fastmcp import Client
 from mcp.types import Tool
@@ -14,6 +15,19 @@ class MCPToolParameter(Protocol):
 @dataclass
 class MCPClient:
     mcp_url: str
+    instances: ClassVar[dict[str, "MCPClient"]] = {}
+
+    def __new__(cls, mcp_url: str):
+        cls.validate_url(mcp_url)
+        if mcp_url not in cls.instances:
+            cls.instances[mcp_url] = super().__new__(cls)
+        return cls.instances[mcp_url]
+
+    @staticmethod
+    def validate_url(mcp_url: str) -> None:
+        parsed_url = urlsplit(mcp_url)
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            raise ValueError("MCP URL must use HTTP or HTTPS")
 
     @cached_property
     def client(self) -> Client:

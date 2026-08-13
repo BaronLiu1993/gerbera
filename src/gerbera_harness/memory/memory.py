@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from typing import Any
 
+from gerbera_harness.infrastructure.mcp import MCPClient
 from gerbera_harness.memory.memory_schema import (
     EventStateSchema,
     HardwareConfigurationStateSchema,
@@ -19,11 +20,12 @@ class Memory:
     task_state: TaskStateSchema
     events_state: EventStateSchema
     hardware_configuration: HardwareConfigurationStateSchema
+    mcp_client: MCPClient = field(init=False)
 
     # wire it all up later
     # Defining world state
     async def define_world_state(self) -> WorldStateSchema:
-        environment_state: dict[str, Any] = {}
+        environment_state = await self.get_current_environment_state()
         hardware_state = await self.get_current_hardware_state()
 
         self.world_state = WorldStateSchema(
@@ -35,16 +37,19 @@ class Memory:
         return self.world_state
 
     async def get_current_environment_state(self) -> dict[str, Any]:
-        return {}
+        async with self.mcp_client as client:
+            return await client.call_tool(
+                "get_current_environment_state",
+                {},
+                frozenset({"get_current_environment_state"}),
+            )
 
     async def get_current_hardware_state(self) -> dict[str, Any]:
-        async with self.agent_client(self.mcp_url) as client:
-            tools = await client.list_tools()
-            allowed_tool_names = frozenset(tool.name for tool in tools)
+        async with self.mcp_client as client:
             hardware_state = await client.call_tool(
                 "get_current_hardware_state",
                 {},
-                "get_current_hardware_state",
+                frozenset({"get_current_hardware_state"}),
             )
 
         return json.loads(hardware_state)

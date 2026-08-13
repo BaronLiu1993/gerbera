@@ -59,6 +59,18 @@ def test_mcp_client_allows_http_urls(monkeypatch) -> None:
     assert client.client.url == "http://127.0.0.1:8001/mcp"
 
 
+def test_mcp_client_reuses_instance_for_url(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "gerbera_harness.infrastructure.mcp.Client",
+        FakeFastMCPClient,
+    )
+
+    first_client = MCPClient("https://hardware.example.com/mcp")
+    second_client = MCPClient("https://hardware.example.com/mcp")
+
+    assert first_client is second_client
+
+
 def test_mcp_client_builds_tool_arguments() -> None:
     parameters = [
         SimpleNamespace(tool_parameter="enabled", value=True),
