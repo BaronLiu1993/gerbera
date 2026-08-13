@@ -1,8 +1,8 @@
 import asyncio
 import json
 
-from gerbera_harness.agent_runtime.agent_runtime import Agent
-from gerbera_harness.agent.driver.main_loop import (
+from gerbera_harness.workflows.coordinator import Agent
+from gerbera_harness.domain.session import (
     LoopStateEnum,
     Session,
 )
@@ -113,7 +113,7 @@ class FakeExecutionProcess:
 
 def test_agent_runs_initialisation_end_to_end(monkeypatch) -> None:
     monkeypatch.setattr(
-        "gerbera_harness.agent_runtime.agent_runtime.ExecutionProcess",
+        "gerbera_harness.workflows.coordinator.ExecutionProcess",
         FakeExecutionProcess,
     )
     session = Session()

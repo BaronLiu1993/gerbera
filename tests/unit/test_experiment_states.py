@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.agent.driver.main_loop import (
+from gerbera_harness.domain.session import (
     Execution,
     Initialisation,
     InitialisationDecisionEnum,
@@ -9,10 +9,10 @@ from gerbera_harness.agent.driver.main_loop import (
     Session,
     Review,
 )
-from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
+from gerbera_harness.domain.responses import (
     InitialisationResponseSchema,
 )
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
+from gerbera_harness.domain.experiment import (
     HypothesisSchema,
 )
 

@@ -1,1 +1,0 @@
-"""Gerbera agent harness."""

@@ -1,12 +1,12 @@
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.agent.driver.subloop.schema.plan import (
+from gerbera_harness.domain.adaptive import (
     PlanningResponseSchema,
     PlanningReviewSchema,
     PlanningStatusEnum,
 )
-from gerbera_harness.agent.driver.subloop.schema.observe import (
+from gerbera_harness.domain.adaptive import (
     ObservationResponseSchema,
 )
 

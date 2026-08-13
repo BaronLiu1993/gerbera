@@ -1,13 +1,13 @@
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.states.base import (
+from gerbera_harness.domain.session import (
     ExecuteDecisionEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+from gerbera_harness.domain.responses import (
     ExecuteErrorSchema,
     ExecutionTypeEnum,
 )
-from gerbera_harness.agent_runtime import SubAgentResult
+from gerbera_harness.workflows.adaptive.result import SubAgentResult
 
 
 def test_subagent_result_contains_terminal_execution_data() -> None:

@@ -3,11 +3,11 @@ from dataclasses import dataclass
 
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+from gerbera_harness.domain.responses import (
     ExecuteErrorSchema,
     ExecutionTypeEnum,
 )
-from gerbera_harness.agent_runtime.context_builder import (
+from gerbera_harness.workflows.context import (
     ContextBuilder,
     ExecutionContextBuilder,
     InitialisationContextBuilder,

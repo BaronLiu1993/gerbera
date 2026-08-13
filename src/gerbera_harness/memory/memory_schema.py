@@ -5,11 +5,11 @@ from typing import Any
 
 from pydantic import Field
 
-from gerbera_harness.agent.driver.main_loop.schema.utils import StrictSchema
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.method_schema import (
+from gerbera_harness.domain.schema import StrictSchema
+from gerbera_harness.domain.experiment import (
     ExecuteActionGroupSchema,
 )
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.hypothesis_schema import (
+from gerbera_harness.domain.experiment import (
     HypothesisSchema,
 )
 
@@ -149,7 +149,7 @@ class TaskStateSchema(StrictSchema):
 
 class TemporalStateSchema(StrictSchema):
     session_id: str
-    current_hardware_configuration: list
+    current_hardware_configuration: dict[str, Any] # the servo, with the value of what it is right now if it is staeful, for sensors stream is on for instance
     recent_world_states: list[WorldStateSchema] = Field(default_factory=list)
     recent_tool_results: list[ToolSchema] = Field(default_factory=list)
     recent_task_results: list[TaskSchema] = Field(default_factory=list)

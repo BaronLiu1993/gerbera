@@ -3,18 +3,18 @@ import json
 
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
+from gerbera_harness.domain.responses import (
     Answer,
     Question,
 )
-from gerbera_harness.agent.driver.main_loop.states.base import (
+from gerbera_harness.domain.session import (
     InitialisationDecisionEnum,
     LoopStateEnum,
 )
-from gerbera_harness.agent_runtime.context_builder import (
+from gerbera_harness.workflows.context import (
     InitialisationContextBuilder,
 )
-from gerbera_harness.agent_runtime.main_loop.initialisation_runtime import (
+from gerbera_harness.workflows.initialisation import (
     InitialisationRuntime,
 )
 from gerbera_harness.memory import Memory

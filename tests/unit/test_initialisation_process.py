@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from gerbera_harness.agent.driver.main_loop.processes.initialisation_process import (
+from gerbera_harness.workflows.initialisation_process import (
     InitialisationProcess,
 )
 
@@ -53,7 +53,7 @@ def test_run_inspects_hardware_then_builds_context(monkeypatch) -> None:
             ]
 
     monkeypatch.setattr(
-        "gerbera_harness.agent.driver.main_loop.processes.initialisation_process.MCPClient",
+        "gerbera_harness.workflows.initialisation_process.MCPClient",
         FakeMCPClient,
     )
     process = InitialisationProcess(
@@ -97,8 +97,8 @@ def test_fetch_url_uses_async_http_client(monkeypatch) -> None:
             return FakeResponse()
 
     monkeypatch.setattr(
-        "gerbera_harness.agent.driver.main_loop.processes."
-        "initialisation_process.httpx.AsyncClient",
+            "gerbera_harness.workflows."
+            "initialisation_process.httpx.AsyncClient",
         FakeAsyncClient,
     )
     process = InitialisationProcess("https://hardware.example.com/mcp")

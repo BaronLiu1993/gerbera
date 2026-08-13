@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.agent.driver.subloop import (
+from gerbera_harness.domain.adaptive import (
     ActState,
     DecideResultSchema,
     DecideState,

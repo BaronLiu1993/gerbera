@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from gerbera_harness.gateway.sandbox_gateway import SandboxGateway
+from gerbera_harness.infrastructure.sandbox import SandboxGateway
 from gerbera_harness.tools.base import ToolSpec
 
 

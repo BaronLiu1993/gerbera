@@ -3,7 +3,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from uuid import UUID
 
-from gerbera_harness.gateway.database_gateway import DatabaseGateway
+from gerbera_harness.infrastructure.database import DatabaseGateway
 
 
 class FakeColumn:

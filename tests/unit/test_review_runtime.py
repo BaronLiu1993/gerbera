@@ -4,14 +4,14 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.agent.driver.main_loop import (
+from gerbera_harness.domain.session import (
     LoopStateEnum,
     ReviewDecisionEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.review import (
+from gerbera_harness.domain.responses import (
     ReviewResponseSchema,
 )
-from gerbera_harness.agent_runtime.main_loop.review_runtime import (
+from gerbera_harness.workflows.review import (
     ReviewRuntime,
 )
 from gerbera_harness.memory import Memory

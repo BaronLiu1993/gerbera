@@ -5,16 +5,16 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.agent_runtime.agent_runtime import Agent
-from gerbera_harness.agent.driver.main_loop.schema.initialisation.clarification_schema import (
+from gerbera_harness.workflows.coordinator import Agent
+from gerbera_harness.domain.responses import (
     Answer,
 )
-from gerbera_harness.agent.driver.main_loop import (
+from gerbera_harness.domain.session import (
     Initialisation,
     LoopStateEnum,
     Session,
 )
-from gerbera_harness.agent.driver.main_loop.schema.initialisation import (
+from gerbera_harness.domain.responses import (
     InitialisationResponseSchema,
 )
 
@@ -160,7 +160,7 @@ def test_agent_prepares_initialisation_context_without_transitioning() -> None:
 def test_agent_accepts_valid_initialisation(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     monkeypatch.setattr(
-        "gerbera_harness.agent_runtime.agent_runtime.ExecutionProcess",
+        "gerbera_harness.workflows.coordinator.ExecutionProcess",
         FakeExecutionProcess,
     )
     session = Session()
@@ -236,7 +236,7 @@ def test_agent_stops_after_rejected_initialisation() -> None:
 def test_reviewer_can_apply_a_small_hypothesis_fix(monkeypatch) -> None:
     FakeExecutionProcess.instances = []
     monkeypatch.setattr(
-        "gerbera_harness.agent_runtime.agent_runtime.ExecutionProcess",
+        "gerbera_harness.workflows.coordinator.ExecutionProcess",
         FakeExecutionProcess,
     )
     corrected_hypothesis = copy.deepcopy(hypothesis_response())

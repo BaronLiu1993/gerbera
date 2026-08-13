@@ -1,4 +1,4 @@
-from gerbera_harness.agent.model.database import Database
+from gerbera_harness.infrastructure.legacy_database import Database
 
 
 def test_connect_uses_database_configuration(monkeypatch) -> None:
@@ -10,7 +10,7 @@ def test_connect_uses_database_configuration(monkeypatch) -> None:
         return connection
 
     monkeypatch.setattr(
-        "gerbera_harness.agent.model.database.psycopg.connect",
+        "gerbera_harness.infrastructure.legacy_database.psycopg.connect",
         fake_connect,
     )
     database = Database(

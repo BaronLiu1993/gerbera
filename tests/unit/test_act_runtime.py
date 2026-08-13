@@ -4,15 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
+from gerbera_harness.domain.experiment import (
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
 )
-from gerbera_harness.agent.driver.subloop.schema.act import (
+from gerbera_harness.domain.adaptive import (
     ToolCallStatusEnum,
 )
-from gerbera_harness.agent_runtime.sub_loop import act_runtime
-from gerbera_harness.agent_runtime.sub_loop.act_runtime import ActRuntime
+from gerbera_harness.workflows.adaptive import act as act_runtime
+from gerbera_harness.workflows.adaptive.act import ActRuntime
 from gerbera_harness.tools.base import ToolSpec
 from gerbera_harness.tools.registry import LocalToolRegistry
 

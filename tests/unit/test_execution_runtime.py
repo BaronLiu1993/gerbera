@@ -4,25 +4,25 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from gerbera_harness.agent.driver.main_loop.states.base import (
+from gerbera_harness.domain.session import (
     ExecuteDecisionEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+from gerbera_harness.domain.responses import (
     ExecuteErrorSchema,
     ExecutionEventSchema,
     ExecutionTypeEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis.action_schema import (
+from gerbera_harness.domain.experiment import (
     ExecutionTypeEnum as ActionExecutionTypeEnum,
 )
-from gerbera_harness.agent.driver.main_loop.states.base import (
+from gerbera_harness.domain.session import (
     LoopStateEnum,
 )
-from gerbera_harness.agent_runtime.main_loop import execution_runtime
-from gerbera_harness.agent_runtime.main_loop.execution_runtime import (
+from gerbera_harness.workflows import execution as execution_runtime
+from gerbera_harness.workflows.execution import (
     ExecutionRuntime,
 )
-from gerbera_harness.agent_runtime.subagent_result import SubAgentResult
+from gerbera_harness.workflows.adaptive.result import SubAgentResult
 from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
 from gerbera_harness.tools.registry import LocalToolRegistry
 

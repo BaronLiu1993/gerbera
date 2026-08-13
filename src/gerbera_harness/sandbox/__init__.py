@@ -1,4 +1,4 @@
-from gerbera_harness.gateway.sandbox_gateway import (
+from gerbera_harness.infrastructure.sandbox import (
     LOCAL_SANDBOX_IMAGE,
     SANDBOX_IMAGE,
     Sandbox,

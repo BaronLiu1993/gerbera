@@ -6,15 +6,15 @@ from mcp.types import ToolAnnotations
 
 from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
 
-from gerbera_harness.agent.driver.subloop.schema.observe import (
+from gerbera_harness.domain.adaptive import (
     ObservationStatusEnum,
 )
-from gerbera_harness.agent_runtime.sub_loop import observe_runtime
-from gerbera_harness.agent_runtime.subagent_context import (
+from gerbera_harness.workflows.adaptive import observe as observe_runtime
+from gerbera_harness.workflows.adaptive.context import (
     SubAgentContextBuilder,
     SubAgentPromptContextBuilder,
 )
-from gerbera_harness.agent_runtime.sub_loop.observe_runtime import (
+from gerbera_harness.workflows.adaptive.observe import (
     ObservationRuntime,
 )
 from gerbera_harness.memory import Memory, TaskSchema

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from gerbera_harness.agent.driver.main_loop.schema.hypothesis import (
+from gerbera_harness.domain.experiment import (
     ActionSchema,
     AgentExecuteSchema,
     EventKeySchema,

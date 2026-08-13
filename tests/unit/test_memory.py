@@ -2,11 +2,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+from gerbera_harness.domain.responses import (
     ExecuteErrorSchema,
     ExecutionTypeEnum,
 )
-from gerbera_harness.agent.driver.main_loop.states.base import (
+from gerbera_harness.domain.session import (
     ExecuteDecisionEnum,
 )
 from gerbera_harness.memory import (

@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from gerbera_harness.agent.driver.main_loop import (
+from gerbera_harness.domain.session import (
     Execution,
     ExecuteDecisionEnum,
     InitialisationDecisionEnum,
@@ -10,8 +10,8 @@ from gerbera_harness.agent.driver.main_loop import (
     ReviewDecisionEnum,
     Session,
 )
-from gerbera_harness.agent_runtime import agent_runtime
-from gerbera_harness.agent_runtime.agent_runtime import AgentRuntime
+from gerbera_harness.workflows import coordinator as agent_runtime
+from gerbera_harness.workflows.coordinator import AgentRuntime
 from gerbera_harness.memory import Memory
 from gerbera_harness.memory import TaskSchema
 from gerbera_harness.tools.registry import LocalToolRegistry

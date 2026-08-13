@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from gerbera_harness.gateway.sandbox_gateway import SandboxResult
+from gerbera_harness.infrastructure.sandbox import SandboxResult
 from gerbera_harness.tools.database import GetTableSchemasTool, QueryDatabaseTool
 from gerbera_harness.tools.registry import LocalToolRegistry
 from gerbera_harness.tools.sandbox import RunSandboxTool

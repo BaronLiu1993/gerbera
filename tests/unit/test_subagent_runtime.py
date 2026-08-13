@@ -3,31 +3,31 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_harness.agent.driver.main_loop.states.base import (
+from gerbera_harness.domain.session import (
     ExecuteDecisionEnum,
 )
-from gerbera_harness.agent.driver.main_loop.schema.execute.execution_event_schema import (
+from gerbera_harness.domain.responses import (
     ExecuteErrorSchema,
     ExecutionTypeEnum,
 )
-from gerbera_harness.agent.driver.subloop.schema.act import (
+from gerbera_harness.domain.adaptive import (
     ToolCallStatusEnum,
 )
-from gerbera_harness.agent.driver.subloop.schema.observe import (
+from gerbera_harness.domain.adaptive import (
     ObservationStatusEnum,
 )
-from gerbera_harness.agent.driver.subloop.schema.plan import (
+from gerbera_harness.domain.adaptive import (
     PlanningStatusEnum,
     PlanningResponseSchema,
 )
-from gerbera_harness.agent.driver.subloop.states import (
+from gerbera_harness.domain.adaptive import (
     ActState,
     ObserveState,
     PlanState,
     Session,
 )
-from gerbera_harness.agent_runtime.subagent_runtime import SubAgentRuntime
-from gerbera_harness.agent_runtime.subagent_context import (
+from gerbera_harness.workflows.adaptive.runtime import SubAgentRuntime
+from gerbera_harness.workflows.adaptive.context import (
     SubAgentContextBuilder,
 )
 from gerbera_harness.memory import Memory, TaskSchema

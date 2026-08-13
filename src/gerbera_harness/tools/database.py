@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from gerbera_harness.gateway.database_gateway import DatabaseGateway
+from gerbera_harness.infrastructure.database import DatabaseGateway
 from gerbera_harness.tools.base import ToolSpec
 
 
