@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from inspect import Parameter, Signature
 import time
-from typing import Annotated, Any, Callable, Literal
+from typing import Annotated, Any, Callable
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
@@ -14,9 +14,15 @@ from gerbera_sdk.firmware.firmware_schema import (
     ParameterSpec,
 )
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.event_bus import EventBus, EventCatalog, EventMetadata
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
+from gerbera_sdk.inference.model_types import (
+    MODEL_CATALOG_TYPE_REGISTRY,
+    ModelCatalogEntry,
+    ModelCatalogType,
+    SubscribedCameraCatalogEntry,
+)
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
@@ -29,48 +35,8 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
-    VisionLanguageModelInference,
     VisionLanguageModelFrameEnvironment,
 )
-from gerbera_sdk.utils import StrictSchema
-
-ModelCatalogType = Literal["object_detection", "vision_language_model"]
-MODEL_CATALOG_TYPE_REGISTRY: dict[type, ModelCatalogType] = {
-    ObjectDetectionModelInference: "object_detection",
-    VisionLanguageModelInference: "vision_language_model",
-}
-
-EventMetadata = dict[str, str | bool]
-EventCatalog = dict[
-    str,
-    dict[str, dict[str, EventMetadata]],
-]
-
-
-class SubscribedCameraCatalogEntry(StrictSchema):
-    camera_id: str
-    name: str
-
-
-class ModelCatalogEntry(StrictSchema):
-    model_id: str
-    name: str
-    description: str
-    model_type: ModelCatalogType
-    subscribed_cameras: list[SubscribedCameraCatalogEntry]
-    is_running: bool
-    turn_on_tool: str
-    turn_off_tool: str
-    read_tool: str
-    single_inference_tool: str
-
-
-def model_catalog_type(model: Inference) -> ModelCatalogType:
-    for model_class, model_type in MODEL_CATALOG_TYPE_REGISTRY.items():
-        if isinstance(model, model_class):
-            return model_type
-
-    raise ValueError(f"Unsupported inference model type: {type(model).__name__}")
 
 
 @dataclass
@@ -95,6 +61,16 @@ class ServerRuntime:
         self.register_event_catalog_tool()
         self.register_state_memory_tool()
         self.register_environment_state_tool()
+
+    @staticmethod
+    def model_catalog_type(model: Inference) -> ModelCatalogType:
+        for model_class, model_type in MODEL_CATALOG_TYPE_REGISTRY.items():
+            if isinstance(model, model_class):
+                return model_type
+
+        raise ValueError(
+            f"Unsupported inference model type: {type(model).__name__}"
+        )
 
     # Event registration and catalog helpers.
 
@@ -739,7 +715,7 @@ class ServerRuntime:
                         model_id=model_id,
                         name=model.name,
                         description=model.description,
-                        model_type=model_catalog_type(model),
+                        model_type=self.model_catalog_type(model),
                         subscribed_cameras=cameras,
                         is_running=model.is_running,
                         turn_on_tool=f"turn_on_{model.name}",

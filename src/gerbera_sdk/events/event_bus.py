@@ -3,6 +3,13 @@ import uuid
 
 from gerbera_sdk.events.event import Event
 
+EventMetadata = dict[str, str | bool]
+EventCatalog = dict[
+    str,
+    dict[str, dict[str, EventMetadata]],
+]
+
+
 # Add an event and, we dispatch a predefined event here
 @dataclass
 class EventBus:
