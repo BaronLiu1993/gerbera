@@ -9,7 +9,7 @@ from gerbera_harness.domain.adaptive import (
     planning_adapter,
     planning_review_adapter,
 )
-from gerbera_harness.infrastructure.llm import Model
+from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.workflows.adaptive.context import (
     SubAgentPromptContextBuilder,
 )

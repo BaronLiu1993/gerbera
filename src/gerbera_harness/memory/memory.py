@@ -11,10 +11,9 @@ from gerbera_harness.memory.memory_schema import (
 
 @dataclass
 class Memory:
-    # The workflow orchestrator should set this to the main agent run_id.
     session_id: str
     user_goal: str
-    world_state: WorldStateSchema # Includes environment and the actual hardware state right now of each sensor and motor
+    world_state: WorldStateSchema 
     temporal_state: TemporalStateSchema
     task_state: TaskStateSchema
     events_state: EventStateSchema

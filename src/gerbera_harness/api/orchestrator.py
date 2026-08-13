@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 from gerbera_harness.workflows.coordinator import AgentRuntime
 from gerbera_harness.domain.session import Session
-from gerbera_harness.infrastructure.llm import Model, ModelProviderEnum
+from gerbera_harness.infrastructure.model import Model, ModelProviderEnum
 from gerbera_harness.memory import Memory
 from gerbera_harness.tools.registry import LocalToolRegistry
 

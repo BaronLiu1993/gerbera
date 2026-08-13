@@ -10,7 +10,7 @@ from gerbera_harness.domain.session import (
 from gerbera_harness.workflows.initialisation_process import (
     InitialisationProcess,
 )
-from gerbera_harness.infrastructure.llm import Model
+from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.workflows.context import (
     InitialisationContextBuilder,
     ReviewContextBuilder,

@@ -3,8 +3,8 @@ import asyncio
 import httpx
 import pytest
 
-from gerbera_harness.infrastructure import llm_adapters as model_adapters
-from gerbera_harness.infrastructure.llm_adapters import (
+from gerbera_harness.infrastructure import model_adapters as model_adapters
+from gerbera_harness.infrastructure.model_adapters import (
     AnthropicAdapter,
     GoogleAdapter,
     OpenAIAdapter,

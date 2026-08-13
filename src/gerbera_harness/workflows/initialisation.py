@@ -14,7 +14,7 @@ from gerbera_harness.domain.experiment import (
 from gerbera_harness.domain.responses import (
     InitialisationResponseSchema,
 )
-from gerbera_harness.infrastructure.llm import Model
+from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.workflows.context import (
     InitialisationContextBuilder,
 )

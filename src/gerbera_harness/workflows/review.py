@@ -7,7 +7,7 @@ from gerbera_harness.domain.session import (
     LoopStateEnum,
     ReviewDecisionEnum,
 )
-from gerbera_harness.infrastructure.llm import Model
+from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.workflows.context import ContextBuilder
 from gerbera_harness.memory import Memory
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt

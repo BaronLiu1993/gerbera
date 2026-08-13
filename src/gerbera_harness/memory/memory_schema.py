@@ -17,12 +17,6 @@ class EventTypeEnum(str, Enum):
     SENSOR_READING = "sensor_reading"
     WORLD_STATE_UPDATED = "world_state_updated"
 
-    SKILL_STARTED = "skill_started"
-    SKILL_PROGRESS = "skill_progress"
-    SKILL_COMPLETED = "skill_completed"
-    SKILL_FAILED = "skill_failed"
-    SKILL_RETRYING = "skill_retrying"
-
     TASK_STARTED = "task_started"
     TASK_COMPLETED = "task_completed"
     TASK_FAILED = "task_failed"
@@ -58,7 +52,6 @@ class HardwareComponentEnum(str, Enum):
     SERVO_MOTOR = "servo_motor"
     DC_MOTOR = "dc_motor"
     IR_SENSOR = "ir_sensor"
-
 
 class HardwareEdgeSchema(StrictSchema):
     source_id: str
@@ -129,7 +122,6 @@ class TaskSchema(StrictSchema):
     task_goal: str
     status: TaskStatusEnum
     task: ExecuteActionGroupSchema
-
     session_id: str
     attempts: int = 0
     task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))

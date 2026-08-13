@@ -20,7 +20,7 @@ from gerbera_harness.domain.experiment import (
 from gerbera_harness.domain.adaptive import (
     Session as SubAgentSession,
 )
-from gerbera_harness.infrastructure.llm import Model
+from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.workflows.adaptive.context import (
     SubAgentContextBuilder,
 )
