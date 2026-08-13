@@ -23,7 +23,7 @@ class Memory:
     # wire it all up later
     # Defining world state
     async def define_world_state(self) -> WorldStateSchema:
-        environment_state = await self.get_current_environment_state()
+        environment_state: dict[str, Any] = {}
         hardware_state = await self.get_current_hardware_state()
 
         self.world_state = WorldStateSchema(
@@ -35,7 +35,7 @@ class Memory:
         return self.world_state
 
     async def get_current_environment_state(self) -> dict[str, Any]:
-        pass
+        return {}
 
     async def get_current_hardware_state(self) -> dict[str, Any]:
         async with self.agent_client(self.mcp_url) as client:

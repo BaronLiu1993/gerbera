@@ -96,6 +96,7 @@ class ServerRuntime:
         # self.register_reaction_tools()
         self.register_event_catalog_tool()
         self.register_state_memory_tool()
+        self.register_environment_state_tool()
 
     # Event registration and catalog helpers.
 
@@ -808,17 +809,30 @@ class ServerRuntime:
         )
 
     def register_state_memory_tool(self) -> None:
-        def get_current_hardware_state() -> str:
-            return self.state_runtime.get_state_store()
-
         self.register_tool(
             name="get_current_hardware_state",
             description=(
                 "Read the current hardware state memory as serialized JSON."
             ),
-            tool_function=get_current_hardware_state,
+            tool_function=self.state_runtime.get_state_store,
             annotations=ToolAnnotations(
                 title="Get current hardware state",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=False,
+            ),
+        )
+
+    def register_environment_state_tool(self) -> None:
+        self.register_tool(
+            name="get_current_environment_state",
+            description=(
+                "Read the current environment state from model outputs."
+            ),
+            tool_function=self.model_runtime.model_output_store.get_environment_state,
+            annotations=ToolAnnotations(
+                title="Get current environment state",
                 readOnlyHint=True,
                 destructiveHint=False,
                 idempotentHint=True,

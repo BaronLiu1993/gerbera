@@ -83,6 +83,35 @@ def test_writes_and_reads_latest_model_output() -> None:
     assert store.read_model_output(camera.camera_id, model.model_id) is output
 
 
+def test_environment_state_snapshot_excludes_object_detection_frame() -> None:
+    camera = make_camera("camera")
+    store = ModelOutputStore()
+    model = make_model([camera])
+    output = make_output(camera, model)
+    register_model(store, model)
+    store.write_model_output(camera.camera_id, model.model_id, output)
+
+    snapshot = store.get_environment_state()
+
+    state = snapshot[f"{camera.camera_id}::{model.model_id}"]
+    assert state == {
+        "camera_id": camera.camera_id,
+        "model_name": model.name,
+        "perception_objects": [],
+    }
+
+
+def test_environment_state_snapshot_includes_unproduced_outputs() -> None:
+    camera = make_camera("camera")
+    store = ModelOutputStore()
+    model = make_model([camera])
+    register_model(store, model)
+
+    assert store.get_environment_state() == {
+        f"{camera.camera_id}::{model.model_id}": None
+    }
+
+
 def test_read_fails_before_model_produces_output() -> None:
     camera = make_camera("camera")
     store = ModelOutputStore()

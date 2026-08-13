@@ -772,6 +772,37 @@ def test_server_exposes_state_memory_tool() -> None:
     )
 
 
+def test_server_exposes_environment_state_tool() -> None:
+    app = FakeApp()
+    runtime = ServerRuntime(
+        hardware_system=HardwareSystem(),
+        board_runtime=object(),
+        event_bus=EventBus(),
+        event_worker=_event_worker(),
+        app=app,
+        camera_runtime=SimpleNamespace(),
+        model_runtime=SimpleNamespace(
+            model_inferences={},
+            model_output_store=SimpleNamespace(
+                get_environment_state=lambda: {"camera::model": None}
+            ),
+        ),
+    )
+
+    runtime.register_environment_state_tool()
+
+    assert app.tools["get_current_environment_state"]() == {
+        "camera::model": None
+    }
+    assert app.annotations["get_current_environment_state"] == ToolAnnotations(
+        title="Get current environment state",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+
+
 def test_database_backed_tool_description_includes_table_name() -> None:
     database = Database("localhost", 5432, "user", "password", "gerbera")
     connection = Connection(
