@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Iterable, Protocol
-from urllib.parse import urlsplit
 
 from fastmcp import Client
 from mcp.types import Tool
 
 
-class _MCPToolParameter(Protocol):
+class MCPToolParameter(Protocol):
     tool_parameter: str
     value: Any
 
@@ -32,7 +31,7 @@ class MCPClient:
 
     @staticmethod
     def build_arguments(
-        parameters: Iterable[_MCPToolParameter],
+        parameters: Iterable[MCPToolParameter],
     ) -> dict[str, Any]:
         arguments: dict[str, Any] = {}
 

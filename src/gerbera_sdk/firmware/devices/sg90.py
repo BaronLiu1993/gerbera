@@ -45,8 +45,6 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
         return ToolAnnotations(
             title=f"Set {connection.name} servo angle",
             readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=True,
             openWorldHint=False,
         )
 

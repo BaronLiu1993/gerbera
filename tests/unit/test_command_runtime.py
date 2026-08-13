@@ -93,6 +93,4 @@ def test_every_device_command_defines_complete_tool_annotations(
         )
         assert annotations.title
         assert annotations.readOnlyHint is not None
-        assert annotations.destructiveHint is not None
-        assert annotations.idempotentHint is not None
         assert annotations.openWorldHint is not None

@@ -7,7 +7,6 @@ from mcp.types import ToolAnnotations
 import numpy as np
 import pytest
 
-from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
@@ -155,8 +154,6 @@ def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
     assert tool.annotations == ToolAnnotations(
         title="Capture frames from local_camera",
         readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
         openWorldHint=False,
     )
     assert asyncio.run(app.get_tool("turn_on_local_camera_stream")) is None
@@ -225,12 +222,8 @@ def test_server_registers_model_base64_prediction_as_a_tool() -> None:
     assert app.annotations[
         "read_openai-vision-language-model"
     ].readOnlyHint is True
-    assert app.metadata[
-        "turn_on_openai-vision-language-model"
-    ] == stage_metadata(ToolStage.OBSERVATION)
-    assert app.metadata[
-        "turn_off_openai-vision-language-model"
-    ] == stage_metadata(ToolStage.OBSERVATION)
+    assert app.metadata["turn_on_openai-vision-language-model"] is None
+    assert app.metadata["turn_off_openai-vision-language-model"] is None
 
 
 def test_server_registers_single_object_detection_as_a_tool() -> None:
@@ -356,11 +349,9 @@ def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
     assert tool.annotations == ToolAnnotations(
         title="Perform one-shot inference with part-detector",
         readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
         openWorldHint=False,
     )
-    assert turn_on_tool.meta == stage_metadata(ToolStage.OBSERVATION)
+    assert turn_on_tool.meta is None
 
 
 def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
@@ -491,8 +482,6 @@ def test_server_registers_tools_that_execute_through_the_board_runtime(
     assert app.annotations["write_status_led"] == ToolAnnotations(
         title="Set status_led LED state",
         readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
         openWorldHint=False,
     )
 
@@ -582,13 +571,8 @@ def test_streaming_sensor_exposes_only_read_and_stream_controls(
         "turn_off_ir_sensor_stream",
     }
     assert app.annotations["read_ir_sensor"].readOnlyHint is True
-    assert app.annotations["turn_on_ir_sensor_stream"].idempotentHint is True
-    assert app.metadata["turn_on_ir_sensor_stream"] == stage_metadata(
-        ToolStage.OBSERVATION
-    )
-    assert app.metadata["turn_off_ir_sensor_stream"] == stage_metadata(
-        ToolStage.OBSERVATION
-    )
+    assert app.metadata["turn_on_ir_sensor_stream"] is None
+    assert app.metadata["turn_off_ir_sensor_stream"] is None
 
 
 def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
@@ -622,8 +606,6 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
     assert tool.annotations == ToolAnnotations(
         title="Set motor servo angle",
         readOnlyHint=False,
-        destructiveHint=True,
-        idempotentHint=True,
         openWorldHint=False,
     )
     assert tool.parameters == {
@@ -765,10 +747,6 @@ def test_server_exposes_state_memory_tool() -> None:
     assert app.tools["get_current_hardware_state"]() == '{"status_led::led": null}'
     assert app.annotations["get_current_hardware_state"] == ToolAnnotations(
         title="Get current hardware state",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
     )
 
 
@@ -796,10 +774,6 @@ def test_server_exposes_environment_state_tool() -> None:
     }
     assert app.annotations["get_current_environment_state"] == ToolAnnotations(
         title="Get current environment state",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
     )
 
 

@@ -113,7 +113,12 @@ class ActRuntime:
     ) -> Any:
         async with MCPClient(self.mcp_url) as client:
             tools = await client.list_tools()
-            allowed_tool_names = frozenset(tool.name for tool in tools)
+            allowed_tool_names = frozenset(
+                tool.name
+                for tool in tools
+                if tool.annotations is not None
+                and tool.annotations.readOnlyHint is not None
+            )
             return await client.call_tool(
                 tool_name,
                 arguments,

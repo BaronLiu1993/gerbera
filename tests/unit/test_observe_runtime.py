@@ -4,8 +4,6 @@ from types import SimpleNamespace
 
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.firmware.firmware_schema import ToolStage, stage_metadata
-
 from gerbera_harness.domain.adaptive import (
     ObservationStatusEnum,
 )
@@ -75,7 +73,12 @@ class FakeMCPClient:
             SimpleNamespace(
                 name="turn_on_temperature_stream",
                 annotations=ToolAnnotations(readOnlyHint=False),
-                meta=stage_metadata(ToolStage.OBSERVATION),
+                meta=None,
+            ),
+            SimpleNamespace(
+                name="get_current_hardware_state",
+                annotations=ToolAnnotations(title="Get current hardware state"),
+                meta=None,
             ),
             SimpleNamespace(
                 name="unclassified_tool",
@@ -95,7 +98,6 @@ class FakeMCPClient:
                 "read_temperature",
                 "set_heater",
                 "turn_on_temperature_stream",
-                "unclassified_tool",
             }
         )
         assert name in allowed_tool_names

@@ -177,7 +177,11 @@ class ObservationRuntime:
     ) -> object:
         async with MCPClient(self.mcp_url) as mcp_client:
             tools = await mcp_client.list_tools()
-            allowed_tool_names = frozenset(tool.name for tool in tools)
+            allowed_tool_names = frozenset(
+                tool.name
+                for tool in tools
+                if tool.annotations.readOnlyHint is not None
+            )
             return await mcp_client.call_tool(
                 name=observation.tool_name,
                 arguments=observation.arguments,

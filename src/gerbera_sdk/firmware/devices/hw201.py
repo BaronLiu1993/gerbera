@@ -61,16 +61,12 @@ class HW201FirmwareBuilder(BaseFirmwareBuilder):
             return ToolAnnotations(
                 title=f"Read current value from {connection.name}",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             )
         if method == "WRITE":
             return ToolAnnotations(
                 title=f"Set {connection.name} stream state",
                 readOnlyHint=False,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             )
         raise ValueError(f"Unsupported HW201 command: {command.method}")

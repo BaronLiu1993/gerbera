@@ -58,8 +58,6 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
         return ToolAnnotations(
             title=f"Set {connection.name} motor motion",
             readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=False,
             openWorldHint=False,
         )
 

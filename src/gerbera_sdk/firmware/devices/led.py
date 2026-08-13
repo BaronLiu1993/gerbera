@@ -44,8 +44,6 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
         return ToolAnnotations(
             title=f"Set {connection.name} LED state",
             readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
             openWorldHint=False,
         )
 

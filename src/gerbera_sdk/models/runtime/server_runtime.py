@@ -12,8 +12,6 @@ from pydantic import Field
 from gerbera_sdk.firmware.firmware_schema import (
     CommandSpec,
     ParameterSpec,
-    ToolStage,
-    stage_metadata,
 )
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_bus import EventBus
@@ -534,7 +532,6 @@ class ServerRuntime:
                 microcontroller,
                 connection,
                 toggle_annotations,
-                meta=stage_metadata(ToolStage.OBSERVATION),
             )
         else:
             self.register_state_toggle_tools(connection, toggle_annotations)
@@ -575,8 +572,6 @@ class ServerRuntime:
                 annotations=ToolAnnotations(
                     title=f"Capture frames from {camera.name}",
                     readOnlyHint=True,
-                    destructiveHint=False,
-                    idempotentHint=True,
                     openWorldHint=False,
                 ),
             )
@@ -614,14 +609,11 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Start continuous inference for {model.name}",
                 readOnlyHint=False,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=not isinstance(
                     model,
                     ObjectDetectionModelInference,
                 ),
             ),
-            meta=stage_metadata(ToolStage.OBSERVATION),
         )
         self.register_tool(
             name=f"turn_off_{model.name}",
@@ -630,11 +622,8 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Stop continuous inference for {model.name}",
                 readOnlyHint=False,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             ),
-            meta=stage_metadata(ToolStage.OBSERVATION),
         )
 
         if isinstance(model, ObjectDetectionModelInference):
@@ -672,8 +661,6 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Read latest inference from {model.name}",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             ),
         )
@@ -687,8 +674,6 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Perform one-shot inference with {model.name}",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             ),
         )
@@ -718,8 +703,6 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Read latest inference from {model.name}",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             ),
         )
@@ -732,8 +715,6 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Perform one-shot inference with {model.name}",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=True,
             ),
         )
@@ -780,8 +761,6 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title="List configured inference models",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             ),
         )
@@ -802,8 +781,6 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title="List events available for reactions",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             ),
         )
@@ -817,10 +794,6 @@ class ServerRuntime:
             tool_function=self.state_runtime.get_state_store,
             annotations=ToolAnnotations(
                 title="Get current hardware state",
-                readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
-                openWorldHint=False,
             ),
         )
 
@@ -833,9 +806,5 @@ class ServerRuntime:
             tool_function=self.model_runtime.model_output_store.get_environment_state,
             annotations=ToolAnnotations(
                 title="Get current environment state",
-                readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
-                openWorldHint=False,
             ),
         )

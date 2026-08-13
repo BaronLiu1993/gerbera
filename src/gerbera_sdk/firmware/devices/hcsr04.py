@@ -64,16 +64,12 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
             return ToolAnnotations(
                 title=f"Read current distance from {connection.name}",
                 readOnlyHint=True,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             )
         if method == "WRITE":
             return ToolAnnotations(
                 title=f"Set {connection.name} stream state",
                 readOnlyHint=False,
-                destructiveHint=False,
-                idempotentHint=True,
                 openWorldHint=False,
             )
         raise ValueError(f"Unsupported HC-SR04 command: {command.method}")
