@@ -744,7 +744,9 @@ def test_server_exposes_state_memory_tool() -> None:
 
     runtime.register_state_memory_tool()
 
-    assert app.tools["get_current_hardware_state"]() == '{"status_led::led": null}'
+    assert app.tools["get_current_hardware_state"]() == {
+        "status_led::led": None
+    }
     assert app.annotations["get_current_hardware_state"] == ToolAnnotations(
         title="Get current hardware state",
     )

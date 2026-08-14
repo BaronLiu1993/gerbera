@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-import json
+from typing import Any
 
 
 @dataclass
@@ -29,9 +29,8 @@ class StateRuntime:
     ) -> None:
         self.state_store[(connection_name, component_type)] = state
 
-    def get_state_store(self):
-        serializable = {
+    def get_state_store(self) -> dict[str, Any]:
+        return {
             f"{conn}::{comp}": asdict(value) if value is not None else None
             for (conn, comp), value in self.state_store.items()
         }
-        return json.dumps(serializable)

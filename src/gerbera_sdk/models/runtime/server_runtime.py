@@ -765,7 +765,7 @@ class ServerRuntime:
         self.register_tool(
             name="get_current_hardware_state",
             description=(
-                "Read the current hardware state memory as serialized JSON."
+                "Read the current hardware state memory."
             ),
             tool_function=self.state_runtime.get_state_store,
             annotations=ToolAnnotations(

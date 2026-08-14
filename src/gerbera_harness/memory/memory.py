@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field
-import json
+from dataclasses import dataclass
 from typing import Any
 
 from gerbera_harness.infrastructure.mcp import MCPClient
@@ -20,7 +19,7 @@ class Memory:
     task_state: TaskStateSchema
     events_state: EventStateSchema
     hardware_configuration: HardwareConfigurationStateSchema
-    mcp_client: MCPClient = field(init=False)
+    mcp_client: MCPClient
 
     # wire it all up later
     # Defining world state
@@ -46,15 +45,14 @@ class Memory:
 
     async def get_current_hardware_state(self) -> dict[str, Any]:
         async with self.mcp_client as client:
-            hardware_state = await client.call_tool(
+            return await client.call_tool(
                 "get_current_hardware_state",
                 {},
                 frozenset({"get_current_hardware_state"}),
             )
 
-        return json.loads(hardware_state)
-
     def define_task_state(self):
+        
         pass
 
     def get_task_state(self):
