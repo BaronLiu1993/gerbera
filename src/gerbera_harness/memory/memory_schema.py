@@ -1,14 +1,10 @@
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
-
+from typing import Any, Literal
 from pydantic import Field
 
-from gerbera_harness.domain.schema import StrictSchema
-from gerbera_harness.domain.experiment import (
-    ExecuteActionGroupSchema,
-)
+from gerbera_harness.domain.schema import SnakeCaseVariable, StrictSchema
 from gerbera_harness.domain.experiment import (
     HypothesisSchema,
 )
@@ -37,7 +33,7 @@ class EventSchema(StrictSchema):
     event_type: EventTypeEnum
     source_name: str
     payload: dict[str, Any]
-    task_id: str | None = None
+    task_id: str 
     occurred_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -94,13 +90,73 @@ class ToolStatusEnum(str, Enum):
     FAILED = "failed"
     TIMEOUT = "timeout"
 
+class ActionTypeEnum(str, Enum):
+    EXECUTE = "execute"
+    REVIEW = "review"
+
+class ParameterTypeSchema(str, Enum):
+    BOOL = "bool"
+    INT = "int"
+    FLOAT = "float"
+    STRING = "string"
+
+# Execution building blocks
+class ExecuteActionParameterSchema(StrictSchema):
+    tool_parameter: SnakeCaseVariable = Field(
+        description="Exact input name from the MCP tool schema.",
+    )
+    value: bool | int | float | str
+    unit: str | None
+    type: ParameterTypeSchema
+
+
+# Deterministic execution actions
+class ContinuousExecuteSchema(StrictSchema):
+    description: str
+    action_type: Literal["execute"]
+    execution_type: Literal["continuous"]
+    start_offset_seconds: float = Field(
+        ge=0,
+        description=(
+            "Seconds after the execution group begins before this action starts."
+        ),
+    )
+    duration_seconds: float = Field(gt=0)
+    dependent_variables: list[SnakeCaseVariable]
+    independent_variables: list[SnakeCaseVariable]
+    forward_tool_call: str = Field(min_length=1)
+    reverse_tool_call: str = Field(min_length=1)
+    forward_tool_call_params: list[ExecuteActionParameterSchema]
+    reverse_tool_call_params: list[ExecuteActionParameterSchema]
+
+class DiscreteExecuteSchema(StrictSchema):
+    description: str
+    action_type: Literal["execute"]
+    execution_type: Literal["discrete"]
+    start_offset_seconds: float = Field(
+        ge=0,
+        description=(
+            "Seconds after the execution group begins before this action starts."
+        ),
+    )
+    dependent_variables: list[SnakeCaseVariable]
+    independent_variables: list[SnakeCaseVariable]
+    forward_tool_call: str = Field(min_length=1)
+    params: list[ExecuteActionParameterSchema]
+
+class AgentExecuteSchema(StrictSchema):
+    action_type: Literal["execute"]
+    execution_type: Literal["agent"]
+    goal: str = Field(min_length=1)
+    completion_criteria: str = Field(min_length=1)
+    max_turns: int = Field(ge=1)
+    timeout_seconds: float = Field(gt=0)
 
 class ToolSchema(StrictSchema):
     session_id: str
-    tool_name: str
+    action: DiscreteExecuteSchema | ContinuousExecuteSchema | AgentExecuteSchema # Individual action that execeutes and contains all the metadata about the tool call
     tool_status: ToolStatusEnum
     result: dict[str, Any] = Field(default_factory=dict)
-
     error_code: str | None = None
     error_message: str | None = None
     timestamp: datetime = Field(
@@ -121,15 +177,12 @@ class TaskStatusEnum(str, Enum):
 class TaskSchema(StrictSchema):
     task_goal: str
     status: TaskStatusEnum
-    actions: list[ExecuteActionGroupSchema]
     session_id: str
     attempts: int = 0
     task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     tool_calls: list[ToolSchema] = Field(default_factory=list)
     result: dict[str, Any] | None = None
-    started_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    started_at: datetime | None = None
     finished_at: datetime | None = None
 
 
@@ -146,7 +199,6 @@ class TemporalStateSchema(StrictSchema):
     recent_tool_results: list[ToolSchema] = Field(default_factory=list)
     recent_task_results: list[TaskSchema] = Field(default_factory=list)
     temporal_memory_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-
 
 
 

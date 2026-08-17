@@ -93,15 +93,6 @@ class DiscreteExecuteSchema(StrictSchema):
     params: list[ExecuteActionParameterSchema]
 
 
-# Adaptive execution action
-class AgentExecuteSchema(StrictSchema):
-    action_type: Literal["execute"]
-    execution_type: Literal["agent"]
-    goal: str = Field(min_length=1)
-    completion_criteria: str = Field(min_length=1)
-    max_turns: int = Field(ge=1)
-    timeout_seconds: float = Field(gt=0)
-
 
 # Review actions
 class ReviewVariableSchema(StrictSchema):
@@ -129,29 +120,25 @@ class ReviewSchema(StrictSchema):
     )
 
 
-# Action unions and collection constraints
-DeterministicExecuteSchema: TypeAlias = (
-    ContinuousExecuteSchema | DiscreteExecuteSchema
-)
-ExecuteSchema: TypeAlias = DeterministicExecuteSchema | AgentExecuteSchema
-ActionSchema: TypeAlias = ExecuteSchema | ReviewSchema
+# # Action unions and collection constraints
+# DeterministicExecuteSchema: TypeAlias = (
+#     ContinuousExecuteSchema | DiscreteExecuteSchema
+# )
+# ExecuteSchema: TypeAlias = DeterministicExecuteSchema | AgentExecuteSchema
+# ActionSchema: TypeAlias = ExecuteSchema | ReviewSchema
 
 
-DeterministicActionList: TypeAlias = Annotated[
-    list[DeterministicExecuteSchema],
-    Field(min_length=1),
-]
-AgentActionList: TypeAlias = Annotated[
-    list[AgentExecuteSchema],
-    Field(min_length=1, max_length=1),
-]
+# DeterministicActionList: TypeAlias = Annotated[
+#     list[DeterministicExecuteSchema],
+#     Field(min_length=1),
+# ]
+# AgentActionList: TypeAlias = Annotated[
+#     list[AgentExecuteSchema],
+#     Field(min_length=1, max_length=1),
+# ]
 
 
 # Plan groups
-class ExecuteActionGroupSchema(StrictSchema):
-    goal: str
-    action_type: Literal["execute"]
-    actions: DeterministicActionList | AgentActionList
 
 
 class ReviewActionGroupSchema(StrictSchema):
@@ -163,7 +150,7 @@ class ReviewActionGroupSchema(StrictSchema):
 class MethodSchema(StrictSchema):
     description: str
     name: str
-    execute_steps: list[ExecuteActionGroupSchema] = Field(min_length=1)
+    execute_steps: list[TaskSchema] = Field(min_length=1)
     final_review: ReviewActionGroupSchema
 
 
