@@ -6,35 +6,35 @@ The harness owns agent reasoning and orchestration around Gerbera hardware.
 
 ```text
 api/             HTTP application and session orchestration
-domain/          Schemas, experiment models, events, and state machines
 infrastructure/  LLM, MCP, database, and sandbox adapters
-memory/          Robot memory state and memory schemas
-prompts/         Main-loop and adaptive-loop system prompts
+memory/          Thin memory API and memory-owned schemas
+runtime/         Agent runtime, session state, initialisation, execution, review, context builders, schemas, and subagents
+runtime/context/ Prompt context builders
+runtime/schemas/ Runtime-owned action, experiment, response, and execution schemas
+runtime/subagent/ Bounded observe-plan-act subagent runtime
+runtime/subagent/context/ Subagent context model and state-specific prompt context builders
+runtime/subagent/schemas/ Subagent states, tool-call, observation, and planning schemas
+runtime/utils.py Shared runtime schema helpers
+prompts/         Main-loop and subagent system prompts
 tools/           Agent-facing local tools and their registry
-workflows/       Planning, execution, review, and adaptive runtimes
 ```
 
 ## Dependency Direction
 
 ```text
-api -> workflows -> domain
-                -> memory
+api -> runtime -> memory
                 -> tools -> infrastructure
-workflows       -> infrastructure
+runtime -> infrastructure
 ```
 
-Domain modules must not depend on workflow, API, or infrastructure modules.
-Memory owns robot state; workflows decide how events and state drive execution.
+Memory owns current state and recent history; runtime decides how events and state drive execution.
 
 ## Runtime Flow
 
 ```text
 API request
-  -> workflow coordinator
+  -> agent runtime
   -> initialisation and planning
-  -> deterministic execution or adaptive observe-plan-act execution
+  -> deterministic execution or bounded subagent observe-plan-act execution
   -> review
 ```
-
-The old `agent/driver` package-level exports remain temporarily available as
-compatibility surfaces, but their definitions now live in `domain/`.
