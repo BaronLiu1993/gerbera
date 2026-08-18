@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import Field
 
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
 class EventTypeEnum(str, Enum):
@@ -34,7 +34,7 @@ class SourceTypeEnum(str, Enum):
     SYSTEM = "system"
 
 
-class EventSchema(StrictSchema):
+class EventSchema(HarnessSchema):
     session_id: str
     event_type: EventTypeEnum
     source_name: str
@@ -46,6 +46,6 @@ class EventSchema(StrictSchema):
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
-class EventStateSchema(StrictSchema):
+class EventStateSchema(HarnessSchema):
     session_id: str
     events: list[EventSchema] = Field(default_factory=list)

@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field, TypeAdapter, model_validator
 
-from gerbera_harness.runtime.utils import SnakeCaseVariable, StrictSchema
+from gerbera_harness.runtime.schemas.base import SnakeCaseIdentifier, HarnessSchema
 from gerbera_harness.runtime.schemas.execute import (
     ActionSchema,
     AgentExecuteSchema,
@@ -11,7 +11,7 @@ from gerbera_harness.runtime.schemas.execute import (
 )
 
 
-class ExecuteActionGroupSchema(StrictSchema):
+class ExecuteActionGroupSchema(HarnessSchema):
     goal: str
     action_type: Literal["execute"]
     actions: ExecuteActionList
@@ -29,7 +29,7 @@ class ExecuteActionGroupSchema(StrictSchema):
         return self
 
 
-class ReviewActionGroupSchema(StrictSchema):
+class ReviewActionGroupSchema(HarnessSchema):
     action_type: Literal["review"]
     actions: list[ReviewSchema] = Field(min_length=1, max_length=1)
 
@@ -37,17 +37,17 @@ class ReviewActionGroupSchema(StrictSchema):
 action_adapter = TypeAdapter(ActionSchema)
 
 
-class MethodSchema(StrictSchema):
+class MethodSchema(HarnessSchema):
     description: str
     name: str
     execute_steps: list[ExecuteActionGroupSchema] = Field(min_length=1)
     final_review: ReviewActionGroupSchema
 
 
-class HypothesisSchema(StrictSchema):
+class HypothesisSchema(HarnessSchema):
     hypothesis: str
-    dependent_variables: list[SnakeCaseVariable]
-    independent_variables: list[SnakeCaseVariable]
-    controlled_variables: list[SnakeCaseVariable]
+    dependent_variables: list[SnakeCaseIdentifier]
+    independent_variables: list[SnakeCaseIdentifier]
+    controlled_variables: list[SnakeCaseIdentifier]
     assumptions: list[str]
     method: MethodSchema

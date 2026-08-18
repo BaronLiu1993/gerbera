@@ -1,22 +1,22 @@
 from typing import Literal
 
 from gerbera_harness.runtime.session import LoopStateEnum, ReviewDecisionEnum
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
-class AcceptedReviewResponseSchema(StrictSchema):
+class AcceptedReviewResponseSchema(HarnessSchema):
     decision: Literal[ReviewDecisionEnum.ACCEPTED]
     next_state: None
     feedback: list[str]
 
 
-class RejectedReviewResponseSchema(StrictSchema):
+class RejectedReviewResponseSchema(HarnessSchema):
     decision: Literal[ReviewDecisionEnum.REJECTED]
     next_state: None
     feedback: list[str]
 
 
-class ReplanReviewResponseSchema(StrictSchema):
+class ReplanReviewResponseSchema(HarnessSchema):
     decision: Literal[ReviewDecisionEnum.REPLAN]
     next_state: Literal[LoopStateEnum.INITIALISATION]
     feedback: list[str]
@@ -29,5 +29,5 @@ ReviewDecisionResponseSchema = (
 )
 
 
-class ReviewResponseSchema(StrictSchema):
+class ReviewResponseSchema(HarnessSchema):
     response: ReviewDecisionResponseSchema

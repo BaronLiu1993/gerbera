@@ -4,10 +4,10 @@ from typing import Any
 
 from pydantic import Field
 
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
-class WorldStateSchema(StrictSchema):
+class WorldStateSchema(HarnessSchema):
     session_id: str
     environment_state: dict[str, Any] = Field(default_factory=dict)
     hardware_state: dict[str, Any] = Field(default_factory=dict)

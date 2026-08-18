@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import Field
 
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
 class ToolCallStatusEnum(str, Enum):
@@ -16,7 +16,7 @@ class ToolCallTypeEnum(str, Enum):
     REVERSE = "reverse"
 
 
-class ToolCallEventSchema(StrictSchema):
+class ToolCallEventSchema(HarnessSchema):
     tool_name: str
     arguments: dict[str, object] = Field(default_factory=dict)
     status: ToolCallStatusEnum

@@ -8,11 +8,11 @@ from gerbera_harness.runtime.session import (
     InitialisationDecisionEnum,
     LoopStateEnum,
 )
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 from gerbera_harness.runtime.schemas.experiment import HypothesisSchema
 
 
-class QuestionSchema(StrictSchema):
+class QuestionSchema(HarnessSchema):
     question: str
     options: list[str]
 
@@ -31,7 +31,7 @@ class Answer:
     answer: str
 
 
-class AcceptedInitialisationResponseSchema(StrictSchema):
+class AcceptedInitialisationResponseSchema(HarnessSchema):
     decision: Literal[InitialisationDecisionEnum.ACCEPTED]
     next_state: Literal[LoopStateEnum.EXECUTION]
     hypothesis: HypothesisSchema
@@ -40,7 +40,7 @@ class AcceptedInitialisationResponseSchema(StrictSchema):
     clarifying_questions: list[QuestionSchema] = Field(max_length=0)
 
 
-class RejectedInitialisationResponseSchema(StrictSchema):
+class RejectedInitialisationResponseSchema(HarnessSchema):
     decision: Literal[InitialisationDecisionEnum.REJECTED]
     next_state: Literal[LoopStateEnum.INITIALISATION]
     hypothesis: None
@@ -49,7 +49,7 @@ class RejectedInitialisationResponseSchema(StrictSchema):
     clarifying_questions: list[QuestionSchema] = Field(max_length=0)
 
 
-class ClarifyInitialisationResponseSchema(StrictSchema):
+class ClarifyInitialisationResponseSchema(HarnessSchema):
     decision: Literal[InitialisationDecisionEnum.CLARIFY]
     next_state: Literal[LoopStateEnum.INITIALISATION]
     hypothesis: None
@@ -65,5 +65,5 @@ InitialisationDecisionResponseSchema = (
 )
 
 
-class InitialisationResponseSchema(StrictSchema):
+class InitialisationResponseSchema(HarnessSchema):
     response: InitialisationDecisionResponseSchema

@@ -3,8 +3,7 @@ from typing import Literal
 
 from pydantic import TypeAdapter
 
-from gerbera_harness.runtime.utils import StrictSchema
-from gerbera_harness.runtime.subagent.schemas.types import JsonScalar
+from gerbera_harness.runtime.schemas.base import HarnessSchema, JsonScalar
 
 
 class ObservationStatusEnum(str, Enum):
@@ -14,25 +13,25 @@ class ObservationStatusEnum(str, Enum):
     COMPLETE = "complete"
 
 
-class ObservationValueSchema(StrictSchema):
+class ObservationValueSchema(HarnessSchema):
     key: str
     value: JsonScalar
 
 
-class ObservationToolCallSchema(StrictSchema):
+class ObservationToolCallSchema(HarnessSchema):
     content_type: Literal["tool_call"]
     tool_name: str
     arguments: dict[str, JsonScalar]
 
 
-class ObservationResultSchema(StrictSchema):
+class ObservationResultSchema(HarnessSchema):
     content_type: Literal["finish"]
     reason: str
     summary: str
     result: dict[str, JsonScalar]
 
 
-class ObservationResponseSchema(StrictSchema):
+class ObservationResponseSchema(HarnessSchema):
     content_type: Literal["tool_call", "finish"]
     tool_name: str | None
     arguments: list[ObservationValueSchema]
@@ -41,7 +40,7 @@ class ObservationResponseSchema(StrictSchema):
     result: list[ObservationValueSchema]
 
 
-class ObservationReviewSchema(StrictSchema):
+class ObservationReviewSchema(HarnessSchema):
     status: ObservationStatusEnum
     feedback: str
 

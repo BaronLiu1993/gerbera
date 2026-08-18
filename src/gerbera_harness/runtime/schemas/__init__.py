@@ -1,3 +1,9 @@
+from gerbera_harness.runtime.schemas.base import (
+    JsonScalar,
+    SNAKE_CASE_IDENTIFIER_PATTERN,
+    SnakeCaseIdentifier,
+    HarnessSchema,
+)
 from gerbera_harness.runtime.schemas.execute import (
     ActionSchema,
     ActionTypeEnum,
@@ -65,6 +71,7 @@ __all__ = [
     "HypothesisSchema",
     "InitialisationDecisionResponseSchema",
     "InitialisationResponseSchema",
+    "JsonScalar",
     "MethodSchema",
     "ParameterTypeSchema",
     "Question",
@@ -77,5 +84,8 @@ __all__ = [
     "ReviewResponseSchema",
     "ReviewSchema",
     "ReviewVariableSchema",
+    "SNAKE_CASE_IDENTIFIER_PATTERN",
+    "SnakeCaseIdentifier",
+    "HarnessSchema",
     "action_adapter",
 ]

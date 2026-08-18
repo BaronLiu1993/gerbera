@@ -11,7 +11,7 @@ from gerbera_harness.runtime.schemas.execute import (
     DiscreteExecuteSchema,
 )
 from gerbera_harness.runtime.schemas.experiment import HypothesisSchema
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
 class ToolStatusEnum(str, Enum):
@@ -20,7 +20,7 @@ class ToolStatusEnum(str, Enum):
     TIMEOUT = "timeout"
 
 
-class ToolSchema(StrictSchema):
+class ToolSchema(HarnessSchema):
     session_id: str
     action: DiscreteExecuteSchema | ContinuousExecuteSchema | AgentExecuteSchema
     tool_status: ToolStatusEnum
@@ -40,7 +40,7 @@ class TaskStatusEnum(str, Enum):
     FAILED = "failed"
 
 
-class TaskSchema(StrictSchema):
+class TaskSchema(HarnessSchema):
     task_goal: str
     status: TaskStatusEnum
     session_id: str
@@ -52,7 +52,7 @@ class TaskSchema(StrictSchema):
     finished_at: datetime | None = None
 
 
-class TaskStateSchema(StrictSchema):
+class TaskStateSchema(HarnessSchema):
     hypothesis: HypothesisSchema | None = None
     tasks: list[TaskSchema] = Field(default_factory=list)
     current_task_id: str | None = None

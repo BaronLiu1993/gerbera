@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 from typing_extensions import TypeAlias
 
-from gerbera_harness.runtime.utils import SnakeCaseVariable, StrictSchema
+from gerbera_harness.runtime.schemas.base import SnakeCaseIdentifier, HarnessSchema
 
 
 class ActionTypeEnum(str, Enum):
@@ -25,14 +25,14 @@ class ExecutionTypeEnum(str, Enum):
     DISCRETE = "discrete"
 
 
-class EventKeySchema(StrictSchema):
+class EventKeySchema(HarnessSchema):
     event_type: str
     microcontroller_id: str
     event_name: str
 
 
-class ExecuteActionParameterSchema(StrictSchema):
-    tool_parameter: SnakeCaseVariable = Field(
+class ExecuteActionParameterSchema(HarnessSchema):
+    tool_parameter: SnakeCaseIdentifier = Field(
         description="Exact input name from the MCP tool schema.",
     )
     value: bool | int | float | str
@@ -40,7 +40,7 @@ class ExecuteActionParameterSchema(StrictSchema):
     type: ParameterTypeSchema
 
 
-class ContinuousExecuteSchema(StrictSchema):
+class ContinuousExecuteSchema(HarnessSchema):
     description: str
     action_type: Literal["execute"]
     execution_type: Literal["continuous"]
@@ -51,8 +51,8 @@ class ContinuousExecuteSchema(StrictSchema):
         ),
     )
     duration_seconds: float = Field(gt=0)
-    dependent_variables: list[SnakeCaseVariable]
-    independent_variables: list[SnakeCaseVariable]
+    dependent_variables: list[SnakeCaseIdentifier]
+    independent_variables: list[SnakeCaseIdentifier]
     forward_tool_call: str = Field(min_length=1)
     reverse_tool_call: str = Field(min_length=1)
     forward_tool_call_params: list[ExecuteActionParameterSchema]
@@ -64,7 +64,7 @@ class ContinuousExecuteSchema(StrictSchema):
     )
 
 
-class DiscreteExecuteSchema(StrictSchema):
+class DiscreteExecuteSchema(HarnessSchema):
     description: str
     action_type: Literal["execute"]
     execution_type: Literal["discrete"]
@@ -74,13 +74,13 @@ class DiscreteExecuteSchema(StrictSchema):
             "Seconds after the execution group begins before this action starts."
         ),
     )
-    dependent_variables: list[SnakeCaseVariable]
-    independent_variables: list[SnakeCaseVariable]
+    dependent_variables: list[SnakeCaseIdentifier]
+    independent_variables: list[SnakeCaseIdentifier]
     forward_tool_call: str = Field(min_length=1)
     params: list[ExecuteActionParameterSchema]
 
 
-class AgentExecuteSchema(StrictSchema):
+class AgentExecuteSchema(HarnessSchema):
     action_type: Literal["execute"]
     execution_type: Literal["agent"]
     goal: str = Field(min_length=1)
@@ -89,14 +89,14 @@ class AgentExecuteSchema(StrictSchema):
     timeout_seconds: float = Field(gt=0)
 
 
-class ReviewVariableSchema(StrictSchema):
-    variable: SnakeCaseVariable
+class ReviewVariableSchema(HarnessSchema):
+    variable: SnakeCaseIdentifier
     table_name: str
     unit: str | None
     type: ParameterTypeSchema
 
 
-class ReviewSchema(StrictSchema):
+class ReviewSchema(HarnessSchema):
     description: str
     action_type: Literal["review"]
     analysis_goal: str = Field(

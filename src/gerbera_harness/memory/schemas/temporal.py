@@ -5,10 +5,10 @@ from pydantic import Field
 
 from gerbera_harness.memory.schemas.task import TaskSchema, ToolSchema
 from gerbera_harness.memory.schemas.world import WorldStateSchema
-from gerbera_harness.runtime.utils import StrictSchema
+from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
-class TemporalStateSchema(StrictSchema):
+class TemporalStateSchema(HarnessSchema):
     session_id: str
     current_hardware_configuration: dict[str, Any]
     recent_world_states: list[WorldStateSchema] = Field(default_factory=list)

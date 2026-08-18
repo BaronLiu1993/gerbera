@@ -17,7 +17,7 @@ from gerbera_harness.runtime.subagent.schemas.planning import (
     planning_review_adapter,
 )
 from gerbera_harness.runtime.subagent.schemas.result import SubAgentResult
-from gerbera_harness.runtime.subagent.schemas.states import (
+from gerbera_harness.runtime.subagent.session import (
     ActState,
     ExecuteLoopState,
     ExecuteLoopStateEnum,
@@ -30,7 +30,7 @@ from gerbera_harness.runtime.subagent.schemas.tool_calls import (
     ToolCallStatusEnum,
     ToolCallTypeEnum,
 )
-from gerbera_harness.runtime.subagent.schemas.types import JsonScalar
+from gerbera_harness.runtime.schemas.base import JsonScalar
 
 __all__ = [
     "ActState",
