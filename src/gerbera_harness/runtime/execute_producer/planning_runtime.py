@@ -1,8 +1,6 @@
-from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from gerbera_harness.runtime.subagent.schemas import (
-    PlanningExecuteActionSchema,
+from gerbera_harness.runtime.execute_producer.schemas import (
     PlanningResponseSchema,
     PlanningReviewSchema,
     PlanningStatusEnum,
@@ -10,7 +8,8 @@ from gerbera_harness.runtime.subagent.schemas import (
     planning_review_adapter,
 )
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.runtime.subagent.context import (
+from gerbera_harness.runtime.schemas.experiment import ExecuteActionGroupSchema
+from gerbera_harness.runtime.execute_producer.context import (
     PlanningPromptContextBuilder,
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
@@ -26,42 +25,38 @@ PLANNING_REVIEW_PROMPT = load_prompt(
 class PlanningRuntime:
     model: Model
     context_builder: PlanningPromptContextBuilder
-    messages: list[dict[str, object]]
-    on_action_planned: Callable[[PlanningExecuteActionSchema], None]
 
     async def run_planning(self) -> PlanningStatusEnum:
         client = self.model.get_agent_client()
+        context = self.context_builder.build()
 
         raw_response = await client.send(
-            self.context_builder.build(),
+            context,
             PLANNING_PROMPT,
             PlanningResponseSchema.model_json_schema(),
         )
         response = planning_adapter.validate_json(raw_response)
-        self.on_action_planned(response.action)
-
-        self.messages.append(
-            {"role": "assistant", "content": response.model_dump_json()}
-        )
 
         raw_review = await client.send(
-            self.context_builder.build(),
+            [
+                *context,
+                {"role": "assistant", "content": raw_response},
+            ],
             PLANNING_REVIEW_PROMPT,
             PlanningReviewSchema.model_json_schema(),
         )
         review = planning_review_adapter.validate_json(raw_review)
 
         if review.status is PlanningStatusEnum.COMPLETE:
+            self.action_groups = response.action_groups
             return review.status
 
         if review.status in {
             PlanningStatusEnum.READY,
             PlanningStatusEnum.BLOCKED,
         }:
+            if review.status is PlanningStatusEnum.READY:
+                self.action_groups = response.action_groups
             return review.status
-
-        self.messages.append(
-            {"role": "user", "content": review.model_dump_json()}
-        )
 
         return PlanningStatusEnum.CONTINUE

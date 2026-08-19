@@ -80,48 +80,42 @@ class DiscreteExecuteSchema(HarnessSchema):
     params: list[ExecuteActionParameterSchema]
 
 
-class AgentExecuteSchema(HarnessSchema):
-    action_type: Literal["execute"]
-    execution_type: Literal["agent"]
-    goal: str = Field(min_length=1)
-    completion_criteria: str = Field(min_length=1)
-    max_turns: int = Field(ge=1)
-    timeout_seconds: float = Field(gt=0)
+# class AgentExecuteSchema(HarnessSchema):
+#     action_type: Literal["execute"]
+#     execution_type: Literal["agent"]
+#     goal: str = Field(min_length=1)
+#     completion_criteria: str = Field(min_length=1)
+#     max_turns: int = Field(ge=1)
+#     timeout_seconds: float = Field(gt=0)
 
 
-class ReviewVariableSchema(HarnessSchema):
-    variable: SnakeCaseIdentifier
-    table_name: str
-    unit: str | None
-    type: ParameterTypeSchema
+# class ReviewVariableSchema(HarnessSchema):
+#     variable: SnakeCaseIdentifier
+#     table_name: str
+#     unit: str | None
+#     type: ParameterTypeSchema
 
 
-class ReviewSchema(HarnessSchema):
-    description: str
-    action_type: Literal["review"]
-    analysis_goal: str = Field(
-        min_length=1,
-        description="Analysis to perform after data collection is complete.",
-    )
-    independent_variables: list[ReviewVariableSchema] = Field(min_length=1)
-    dependent_variables: list[ReviewVariableSchema] = Field(min_length=1)
-    expected: str = Field(
-        min_length=1,
-        description=(
-            "Expected result or acceptance criterion to compare with the "
-            "collected data."
-        ),
-    )
+# class ReviewSchema(HarnessSchema):
+#     description: str
+#     action_type: Literal["review"]
+#     analysis_goal: str = Field(
+#         min_length=1,
+#         description="Analysis to perform after data collection is complete.",
+#     )
+#     independent_variables: list[ReviewVariableSchema] = Field(min_length=1)
+#     dependent_variables: list[ReviewVariableSchema] = Field(min_length=1)
+#     expected: str = Field(
+#         min_length=1,
+#         description=(
+#             "Expected result or acceptance criterion to compare with the "
+#             "collected data."
+#         ),
+#     )
 
 
-DeterministicExecuteSchema: TypeAlias = (
+ActionExecuteSchema: TypeAlias = (
     ContinuousExecuteSchema | DiscreteExecuteSchema
 )
-ExecuteActionSchema: TypeAlias = (
-    ContinuousExecuteSchema | DiscreteExecuteSchema | AgentExecuteSchema
-)
-ExecuteActionList: TypeAlias = Annotated[
-    list[ExecuteActionSchema],
-    Field(min_length=1),
-]
-ActionSchema: TypeAlias = ExecuteActionSchema | ReviewSchema
+
+

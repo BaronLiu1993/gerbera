@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from gerbera_harness.runtime.subagent.schemas import (
+from gerbera_harness.runtime.execute_producer.schemas import (
     JsonScalar,
     ObservationResponseSchema,
     ObservationResultSchema,
@@ -15,7 +15,7 @@ from gerbera_harness.runtime.subagent.schemas import (
 )
 from gerbera_harness.infrastructure.mcp import MCPClient
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.runtime.subagent.context import (
+from gerbera_harness.runtime.execute_producer.context import (
     ObservationPromptContextBuilder,
 )
 from gerbera_harness.memory.schemas.world import WorldStateSchema

@@ -6,7 +6,7 @@ from typing import ClassVar
 class ExecuteLoopStateEnum(str, Enum):
     OBSERVE = "observe"
     PLAN = "plan"
-    ACT = "act"
+    RUNNING = "running"
 
 
 @dataclass(frozen=True)
@@ -30,13 +30,13 @@ class ObserveState(ExecuteLoopState):
 class PlanState(ExecuteLoopState):
     state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.PLAN
     valid_transition_states: ClassVar[frozenset[ExecuteLoopStateEnum]] = (
-        frozenset({ExecuteLoopStateEnum.ACT, ExecuteLoopStateEnum.OBSERVE})
+        frozenset({ExecuteLoopStateEnum.RUNNING, ExecuteLoopStateEnum.OBSERVE})
     )
 
 
 @dataclass(frozen=True)
-class ActState(ExecuteLoopState):
-    state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.ACT
+class RunningState(ExecuteLoopState):
+    state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.RUNNING
     valid_transition_states: ClassVar[frozenset[ExecuteLoopStateEnum]] = (
         frozenset({ExecuteLoopStateEnum.OBSERVE})
     )
@@ -45,7 +45,7 @@ class ActState(ExecuteLoopState):
 SUBAGENT_STATE_TYPES: dict[ExecuteLoopStateEnum, type[ExecuteLoopState]] = {
     ExecuteLoopStateEnum.OBSERVE: ObserveState,
     ExecuteLoopStateEnum.PLAN: PlanState,
-    ExecuteLoopStateEnum.ACT: ActState,
+    ExecuteLoopStateEnum.RUNNING: RunningState,
 }
 
 

@@ -42,6 +42,7 @@ class InitialisationRuntime:
     )
     context: list[dict[str, object]] = field(default_factory=list)
 
+    # Agent runtime orchestrator will run this function multiple times and add to it through 
     async def run_initial(
         self,
         source_urls: list[str],
@@ -75,7 +76,7 @@ class InitialisationRuntime:
             if decision is InitialisationDecisionEnum.CLARIFY:
                 for question in questions:
                     self.clarifying_questions[question.question_id] = None
-                    
+
                 return InitialisationResultSchema(
                     decision=decision,
                     requested_next_state=response.next_state,
