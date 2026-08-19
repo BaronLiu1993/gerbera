@@ -10,7 +10,6 @@ from gerbera_harness.runtime.session import (
 )
 from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
-from gerbera_harness.memory.schemas.task import TaskSchema
 from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.tools.registry import LocalToolRegistry
 from gerbera_harness.runtime.context import (
@@ -77,20 +76,15 @@ class AgentRuntime:
                 },
             )
             if current_state.state is LoopStateEnum.INITIALISATION:
-                result = await self.initialisation_runtime.run_initial()
+                result = await self.initialisation_runtime.run_initial(
+                    sources=[],
+                    feedback=initial_user_prompt,
+                )
 
                 print("initialisation result", result)
 
                 if result.decision is InitialisationDecisionEnum.ACCEPTED:
-                    if result.hypothesis is None:
-                        raise RuntimeError(
-                            "Accepted initialisation requires a hypothesis"
-                        )
-                    self.memory.current_hypothesis = result.hypothesis
-                    self.memory.tasks = [
-                        TaskSchema(task=step)
-                        for step in result.hypothesis.method.execute_steps
-                    ]
+                    self.memory.initialisation_intent = result.intent
                     self.session.perform_transition(result.requested_next_state)
                 elif result.decision is InitialisationDecisionEnum.CLARIFY:
                     break

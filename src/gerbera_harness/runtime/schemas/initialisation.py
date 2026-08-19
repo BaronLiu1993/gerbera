@@ -8,7 +8,6 @@ from gerbera_harness.runtime.session import (
     LoopStateEnum,
 )
 from gerbera_harness.runtime.schemas.base import HarnessSchema
-from gerbera_harness.runtime.schemas.experiment import HypothesisSchema
 
 
 class Question(HarnessSchema):
@@ -66,3 +65,11 @@ InitialisationDecisionResponseSchema = (
 
 class InitialisationResponseSchema(HarnessSchema):
     response: InitialisationDecisionResponseSchema
+
+
+class InitialisationResultSchema(HarnessSchema):
+    decision: InitialisationDecisionEnum
+    requested_next_state: LoopStateEnum
+    intent: InitialisationIntentSchema
+    clarifying_questions: list[Question] = Field(default_factory=list)
+    rejection_reasons: list[str] = Field(default_factory=list)
