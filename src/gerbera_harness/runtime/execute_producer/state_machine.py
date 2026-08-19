@@ -50,7 +50,7 @@ SUBAGENT_STATE_TYPES: dict[ExecuteLoopStateEnum, type[ExecuteLoopState]] = {
 
 
 @dataclass
-class Session:
+class StateMachine:
     state: ExecuteLoopState = field(default_factory=ObserveState)
 
     def perform_transition(
@@ -59,7 +59,7 @@ class Session:
     ) -> ExecuteLoopState:
         if not self.valid_transition(target_state):
             raise ValueError("Invalid transition state")
-
+        
         self.state = SUBAGENT_STATE_TYPES[target_state]()
         return self.state
 

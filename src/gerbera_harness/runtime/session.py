@@ -23,8 +23,8 @@ class InitialisationDecisionEnum(str, Enum):
 
 
 class ExecuteDecisionEnum(str, Enum):
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,7 @@ STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
 
 
 @dataclass
-class Session:
+class StateMachine:
     state: ExperimentState = field(default_factory=Initialisation)
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
