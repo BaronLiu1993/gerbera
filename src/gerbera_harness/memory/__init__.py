@@ -4,8 +4,8 @@ from gerbera_harness.memory.schemas.events import (
     EventTypeEnum,
     SourceTypeEnum,
 )
-from gerbera_harness.memory.schemas.hardware_configuration import (
-    HardwareConfigurationStateSchema,
+from gerbera_harness.memory.schemas.physical import (
+    PhysicalConfigurationStateSchema,
 )
 from gerbera_harness.memory.schemas.task import (
     TaskSchema,
@@ -20,8 +20,8 @@ __all__ = [
     "EventStateSchema",
     "EventSchema",
     "EventTypeEnum",
-    "HardwareConfigurationStateSchema",
     "Memory",
+    "PhysicalConfigurationStateSchema",
     "SourceTypeEnum",
     "TaskSchema",
     "TaskStateSchema",
