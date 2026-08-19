@@ -8,18 +8,16 @@ from gerbera_harness.runtime.session import (
     ReviewDecisionEnum,
     Session,
 )
-from gerbera_harness.infrastructure.mcp import MCPClient
 from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
 from gerbera_harness.memory.schemas.task import TaskSchema
+from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.tools.registry import LocalToolRegistry
 from gerbera_harness.runtime.context import (
-    InitialisationContextBuilder,
     ReviewContextBuilder,
 )
 from gerbera_harness.runtime.execution import ExecutionRuntime
 from gerbera_harness.runtime.initialisation import (
-    InitialisationProcess,
     InitialisationRuntime,
 )
 from gerbera_harness.runtime.review import ReviewRuntime
@@ -36,21 +34,13 @@ class AgentRuntime:
     context_window_size: int = 20
 
     @cached_property
-    def mcp_client(self) -> MCPClient:
-        return MCPClient(self.mcp_url)
-
-    @cached_property
     def initialisation_runtime(self) -> InitialisationRuntime:
         self._initialisation_runtime = InitialisationRuntime(
             model=self.model,
             memory=self.memory,
-            context_builder=InitialisationContextBuilder(
-                memory=self.memory,
-                context_window_size=self.context_window_size,
-            ),
-            process=InitialisationProcess(
+            tool_client=ToolClient(
                 mcp_url=self.mcp_url,
-                local_tools=tuple(self.local_tool_registry.list_tools()),
+                local_tool_registry=self.local_tool_registry,
             ),
         )
         return self._initialisation_runtime
@@ -87,10 +77,7 @@ class AgentRuntime:
                 },
             )
             if current_state.state is LoopStateEnum.INITIALISATION:
-                result = await self.initialisation_runtime.run_initial(
-                    initial_user_prompt,
-                    self.feedback,
-                )
+                result = await self.initialisation_runtime.run_initial()
 
                 print("initialisation result", result)
 

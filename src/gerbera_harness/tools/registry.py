@@ -14,9 +14,6 @@ class LocalToolRegistry:
             raise ValueError(f"Local tool is already registered: {name}")
         self.tools[name] = tool
 
-    def has(self, name: str) -> bool:
-        return name in self.tools
-
     def list_tools(self) -> list[ToolSpec]:
         return [tool.spec for tool in self.tools.values()]
 

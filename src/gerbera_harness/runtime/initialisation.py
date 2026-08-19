@@ -14,17 +14,13 @@ from gerbera_harness.runtime.schemas.initialisation import (
     InitialisationResponseSchema,
 )
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.runtime.context import (
-    InitialisationContextBuilder,
-)
 from gerbera_harness.runtime.schemas.initialisation import (
     Answer,
     Question,
 )
 from gerbera_harness.memory import Memory
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
-from gerbera_harness.infrastructure.mcp import MCPClient
-from gerbera_harness.tools.base import ToolSpec
+from gerbera_harness.tools.client import ToolClient
 
 
 INITIALISATION_PROMPT = load_prompt(
@@ -35,88 +31,6 @@ INITIALISATION_REVIEW_PROMPT = load_prompt(
     PromptTypeEnum.MAIN,
     "INITIALISATION_REVIEW.md",
 )
-
-
-@dataclass
-class InitialisationProcess:
-    mcp_url: str
-    local_tools: tuple[ToolSpec, ...]
-    urls: list[str] = field(default_factory=list)
-
-    def generate_agent_context(
-        self,
-        user_prompt: str,
-        hardware_tools: list[dict],
-        sources: dict[str, str],
-    ) -> str:
-        sections = [
-            "# Experiment Context",
-            "## Objective",
-            user_prompt.strip(),
-        ]
-
-        sections.append("## Available Hardware Tools")
-        for tool in hardware_tools:
-            sections.append(f"### {tool['name']}")
-            sections.append(tool["description"])
-            sections.append("```json")
-            sections.append(json.dumps(tool["schema"], indent=2))
-            sections.append("```")
-
-        sections.append("## Available Local Tools")
-        for tool in self.local_tools:
-            sections.append(f"### {tool.name}")
-            sections.append(tool.description)
-            sections.append("```json")
-            sections.append(json.dumps(tool.input_schema, indent=2))
-            sections.append("```")
-
-        sections.append("## Research Sources")
-        if not sources:
-            sections.append("No research sources were provided.")
-
-        for url, content in sources.items():
-            sections.append(f"### {url}")
-            sections.append(content.strip())
-
-        print(sections)
-        return "\n\n".join(sections)
-
-    async def fetch_url(self, fetch_url: str) -> str:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(fetch_url)
-        response.raise_for_status()
-        return response.text
-
-    async def inspect_hardware(self, client: MCPClient) -> list[dict]:
-        tools = await client.list_tools()
-        hardware_tools: list[dict] = []
-        for tool in tools:
-            hardware_tools.append(
-                {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "schema": tool.inputSchema,
-                }
-            )
-
-        if not hardware_tools:
-            raise RuntimeError("No hardware tools were registered")
-        return hardware_tools
-
-    async def run(self, user_prompt: str) -> str:
-        async with MCPClient(self.mcp_url) as client:
-            hardware_tools = await self.inspect_hardware(client)
-
-        sources: dict[str, str] = {}
-        for url in self.urls:
-            sources[url] = await self.fetch_url(url)
-
-        return self.generate_agent_context(
-            user_prompt=user_prompt,
-            hardware_tools=hardware_tools,
-            sources=sources,
-        )
 
 
 @dataclass(frozen=True)
@@ -132,29 +46,22 @@ class InitialisationResult:
 class InitialisationRuntime:
     model: Model
     memory: Memory
-    context_builder: InitialisationContextBuilder
-    process: InitialisationProcess
+    tool_client: ToolClient
     max_attempts: int = 3
+    urls: list[str] = field(default_factory=list)
     clarifying_questions: list[Question] = field(default_factory=list)
 
     async def run_initial(
         self,
-        user_prompt: str,
-        feedback: list[str],
+        # feedback: list[str],
     ) -> InitialisationResult | None:
         client = self.model.get_agent_client()
 
-        if feedback:
-            self.memory.append_message(
-                "user",
-                json.dumps({"review_feedback": feedback}),
-            )
-
         for _ in range(self.max_attempts):
-            res = await self.process.run(user_prompt=user_prompt)
+            res = await self.build_agent_context()
             self.memory.append_message("user", res)
             raw_hypothesis = await client.send(
-                self.context_builder.build(),
+                self.build_context(),
                 INITIALISATION_PROMPT,
                 HypothesisSchema.model_json_schema(),
             )
@@ -165,9 +72,7 @@ class InitialisationRuntime:
             candidate_hypothesis = self.candidate_hypothesis(raw_hypothesis)
 
             raw_evaluation = await client.send(
-                self.context_builder.build_review_context(
-                    candidate_hypothesis
-                ),
+                self.build_review_context(candidate_hypothesis),
                 INITIALISATION_REVIEW_PROMPT,
                 InitialisationResponseSchema.model_json_schema(),
             )
@@ -175,11 +80,6 @@ class InitialisationRuntime:
             response = InitialisationResponseSchema.model_validate_json(
                 raw_evaluation
             ).response
-
-            self.memory.append_message(
-                "assistant",
-                response.model_dump_json(),
-            )
 
             decision = response.decision
             requested_next_state = response.next_state
@@ -218,46 +118,74 @@ class InitialisationRuntime:
     def get_questions(self) -> list[Question]:
         return list(self.clarifying_questions)
 
-    def candidate_hypothesis(self, raw_hypothesis: str) -> HypothesisSchema:
-        try:
-            return HypothesisSchema.model_validate_json(raw_hypothesis)
-        except ValueError as exc:
-            preview = raw_hypothesis[:500]
-            raise RuntimeError(
-                "Initialisation did not produce a valid hypothesis: "
-                f"{preview}"
-            ) from exc
-
     async def submit_answers(self, answers: list[Answer]):
-        answer_ids = [answer.question_id for answer in answers]
-        question_ids = [
-            question.question_id for question in self.clarifying_questions
-        ]
-        if (
-            len(answers) != len(self.clarifying_questions)
-            or sorted(answer_ids) != sorted(question_ids)
-        ):
-            raise ValueError(
-                "Answers must match all clarifying question IDs"
-            )
+        pass
+        # answer_ids = [answer.question_id for answer in answers]
+        # question_ids = [
+        #     question.question_id for question in self.clarifying_questions
+        # ]
+        # if (
+        #     len(answers) != len(self.clarifying_questions)
+        #     or sorted(answer_ids) != sorted(question_ids)
+        # ):
+        #     raise ValueError(
+        #         "Answers must match all clarifying question IDs"
+        #     )
 
-        responses = []
+        # responses = []
 
-        for answer in answers:
-            question = next(
-                question
-                for question in self.clarifying_questions
-                if question.question_id == answer.question_id
-            )
-            responses.append(
-                {
-                    "question_id": answer.question_id,
-                    "question": question.question,
-                    "answer": answer.answer,
-                }
-            )
+        # for answer in answers:
+        #     question = next(
+        #         question
+        #         for question in self.clarifying_questions
+        #         if question.question_id == answer.question_id
+        #     )
+            
 
-        self.memory.append_message(
-            "assistant",
-            json.dumps({"clarification_answers": responses}),
+    async def build_agent_context(self) -> str:
+        tools = await self.tool_client.list_tools()
+        sources: dict[str, str] = {}
+        for url in self.urls:
+            sources[url] = await self.fetch_url(url)
+
+        return self.generate_agent_context(
+            objective=self.memory_objective(),
+            tools=tools,
+            sources=sources,
         )
+
+    def generate_agent_context(
+        self,
+        objective: str,
+        tools: list,
+        sources: dict[str, str],
+    ) -> str:
+        sections = [
+            "# Experiment Context",
+            "## Objective",
+            objective.strip(),
+        ]
+
+        sections.append("## Available Tools")
+        for tool in tools:
+            sections.append(f"### {tool.name}")
+            sections.append(tool.description)
+            sections.append("```json")
+            sections.append(json.dumps(tool.input_schema, indent=2))
+            sections.append("```")
+
+        sections.append("## Research Sources")
+        if not sources:
+            sections.append("No research sources were provided.")
+
+        for url, content in sources.items():
+            sections.append(f"### {url}")
+            sections.append(content.strip())
+
+        return "\n\n".join(sections)
+
+    async def fetch_url(self, fetch_url: str) -> str:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(fetch_url)
+        response.raise_for_status()
+        return response.text

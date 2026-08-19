@@ -44,33 +44,31 @@ class DatabaseGateway:
             open=False,
         )
 
-    @cached_property
-    def write_connection_pool(self):
-        conninfo = (
-            f"dbname={self.db_name} "
-            f"user={self.write_user} "
-            f"password={self.write_password} "
-            f"host={self.host} "
-            f"port={self.port}"
-        )
+    # @cached_property
+    # def write_connection_pool(self):
+    #     conninfo = (
+    #         f"dbname={self.db_name} "
+    #         f"user={self.write_user} "
+    #         f"password={self.write_password} "
+    #         f"host={self.host} "
+    #         f"port={self.port}"
+    #     )
 
-        return AsyncConnectionPool(
-            conninfo=conninfo,
-            timeout=self.timeout,
-            min_size=self.min_size,
-            max_size=self.max_size,
-            open=False,
-        )
+    #     return AsyncConnectionPool(
+    #         conninfo=conninfo,
+    #         timeout=self.timeout,
+    #         min_size=self.min_size,
+    #         max_size=self.max_size,
+    #         open=False,
+    #     )
 
-    async def write_to_memory(self) -> None:
-        await self.write_connection_pool.open()
-        async with self.write_connection_pool as conn:
-            async with conn.transaction():
-                await conn.execute("SET LOCAL statement_timeout = '10s'")
-                async with conn.cursor() as cur:
-                    await cur.execute()
-
-
+    # async def write_to_memory(self) -> None:
+    #     await self.write_connection_pool.open()
+    #     async with self.write_connection_pool as conn:
+    #         async with conn.transaction():
+    #             await conn.execute("SET LOCAL statement_timeout = '10s'")
+    #             async with conn.cursor() as cur:
+    #                 await cur.execute()
 
     # No need to check queries, we have DB level user permissioning with read roles
     async def execute_query(
