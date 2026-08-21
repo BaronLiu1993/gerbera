@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from gerbera_harness.runtime.session import (
+from gerbera_harness.runtime.state_machine import (
     InitialisationDecisionEnum,
 )
 
@@ -40,7 +40,6 @@ class InitialisationRuntime:
     clarifying_questions: dict[str, tuple[Question, Answer] | None] = field(
         default_factory=dict
     )
-    context: list[dict[str, object]] = field(default_factory=list)
 
     # Agent runtime orchestrator will run this function multiple times and add to it through 
     async def run_initial(
@@ -50,7 +49,7 @@ class InitialisationRuntime:
     ) -> InitialisationResultSchema:
         client = self.model.get_agent_client()
         for _ in range(self.max_attempts):
-            self.context += await self.build_agent_context(
+            += await self.build_agent_context(
                 source_urls=source_urls, feedback=feedback
             )
 

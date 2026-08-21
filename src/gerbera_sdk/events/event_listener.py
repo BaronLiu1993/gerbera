@@ -10,7 +10,11 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
-from gerbera_sdk.models.runtime.state_runtime import ConnectionState, StateRuntime
+from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.hardware_runtime import (
+    ConnectionState,
+    HardwareRuntime,
+)
 
 
 # Runs at runtime
@@ -25,7 +29,7 @@ class EventListener:
     # Reaction code
 
     reaction_bus: ReactionBus
-    state_runtime: StateRuntime
+    hardware_runtime: HardwareRuntime
 
     reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
@@ -154,11 +158,17 @@ class EventListener:
             event_name,
         )
         handler.perform_work(payload)
-        unit, value = next(iter(payload.items()))
+        payload_field, value = next(iter(payload.items()))
+        state_field = CommandCompiler.state_field(
+            handler.component_type,
+            payload_field,
+        )
+        unit = CommandCompiler.state_unit(handler.component_type, payload_field)
 
-        self.state_runtime.update_state(
+        self.hardware_runtime.update_state(
             handler.connection_name,
             handler.component_type,
+            state_field,
             ConnectionState(value=value, unit=unit),
         )
 

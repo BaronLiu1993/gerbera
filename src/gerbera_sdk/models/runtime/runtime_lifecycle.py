@@ -9,8 +9,8 @@ from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.state_runtime import StateRuntime
+from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
+from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 
 
 @dataclass
@@ -18,10 +18,10 @@ class RuntimeLifecycle:
     board_runtime: BoardRuntime
     camera_runtime: CameraRuntime
     event_worker: EventWorker
-    model_runtime: ModelRuntime
+    environment_runtime: EnvironmentRuntime
     event_listener: EventListener
     event_bus: EventBus
-    state_runtime: StateRuntime
+    hardware_runtime: HardwareRuntime
 
     @asynccontextmanager
     async def __call__(
@@ -33,8 +33,8 @@ class RuntimeLifecycle:
                 "board_runtime": self.board_runtime,
                 "camera_runtime": self.camera_runtime,
                 "event_worker": self.event_worker,
-                "model_runtime": self.model_runtime,
-                "state_runtime": self.state_runtime,
+                "environment_runtime": self.environment_runtime,
+                "hardware_runtime": self.hardware_runtime,
             }
 
     def _start_resources(
@@ -56,8 +56,8 @@ class RuntimeLifecycle:
             self.event_listener.create_listeners()
             cleanup.callback(self.event_listener.stop_listeners)
 
-            self.model_runtime.turn_on_all_models()
-            cleanup.callback(self.model_runtime.turn_off_all_models)
+            self.environment_runtime.turn_on_all_models()
+            cleanup.callback(self.environment_runtime.turn_off_all_models)
         except Exception:
             cleanup.close()
             raise

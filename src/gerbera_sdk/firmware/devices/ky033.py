@@ -92,6 +92,12 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
             ),
         }
 
+    def state_definitions(self) -> dict[str, dict[str, str | None]]:
+        return {
+            "fields": {"value": "line_detected"},
+            "units": {"value": None},
+        }
+
     def build_definitions(self, connection: Connection) -> str:
         if not connection.stream_enabled:
             return ""
@@ -136,13 +142,13 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
     float state = stateValue.toFloat();
     if (state == 1) {{
       {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.event_name},boolean:1");
+      Serial.println("MCP,{connection.event_name},value:1");
       return;
     }}
 
     if (state == 0) {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.event_name},boolean:0");
+      Serial.println("MCP,{connection.event_name},value:0");
       return;
     }}
 

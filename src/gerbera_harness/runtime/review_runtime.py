@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from gerbera_harness.runtime.schemas.review import (
     ReviewResponseSchema,
 )
-from gerbera_harness.runtime.session import (
+from gerbera_harness.runtime.state_machine import (
     LoopStateEnum,
     ReviewDecisionEnum,
 )

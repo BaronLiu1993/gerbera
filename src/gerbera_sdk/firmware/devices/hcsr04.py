@@ -94,6 +94,12 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
             ),
         }
 
+    def state_definitions(self) -> dict[str, dict[str, str | None]]:
+        return {
+            "fields": {"value": "distance"},
+            "units": {"value": "cm"},
+        }
+
     def build_definitions(self, connection: Connection) -> str:
         if not connection.stream_enabled:
             return ""
@@ -110,7 +116,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
             *read_distance,
             "    if (duration > 0) {",
             "      float distanceCm = duration * 0.0343 / 2.0;",
-            f'      Serial.print("STREAM,{connection.event_name},cm:");',
+            f'      Serial.print("STREAM,{connection.event_name},value:");',
             "      Serial.println(distanceCm);",
             "    }",
             "    delay(100);",
@@ -130,7 +136,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
   }}
 
   float distanceCm = duration * 0.0343 / 2.0;
-  Serial.print("MCP,{connection.event_name},cm:");
+  Serial.print("MCP,{connection.event_name},value:");
   Serial.println(distanceCm);
 }}"""
 
@@ -147,13 +153,13 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
     float state = stateValue.toFloat();
     if (state == 1) {{
       {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.event_name},BOOLEAN:1");
+      Serial.println("MCP,{connection.event_name},value:1");
       return;
     }}
 
     if (state == 0) {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.event_name},BOOLEAN:0");
+      Serial.println("MCP,{connection.event_name},value:0");
       return;
     }}
 
@@ -168,7 +174,7 @@ class HCSR04FirmwareBuilder(BaseFirmwareBuilder):
   }}
 
   float distanceCm = duration * 0.0343 / 2.0;
-  Serial.print("MCP,{connection.event_name},cm:");
+  Serial.print("MCP,{connection.event_name},value:");
   Serial.println(distanceCm);
 }}"""
 

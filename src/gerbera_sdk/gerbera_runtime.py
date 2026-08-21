@@ -12,10 +12,10 @@ from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
-from gerbera_sdk.models.runtime.state_runtime import StateRuntime
+from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 
 
 class GerberaRuntime:
@@ -50,11 +50,11 @@ class GerberaRuntime:
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker(database=database)
-        model_runtime = ModelRuntime(hardware_system)
-        state_runtime = StateRuntime()
+        environment_runtime = EnvironmentRuntime(hardware_system)
+        hardware_runtime = HardwareRuntime()
         GerberaRuntime.register_connection_states(
             hardware_system=hardware_system,
-            state_runtime=state_runtime,
+            hardware_runtime=hardware_runtime,
         )
 
         event_bus = EventBus()
@@ -64,16 +64,16 @@ class GerberaRuntime:
             serial_pool=board_runtime.serial_pool,
             event_bus=event_bus,
             reaction_bus=reaction_bus,
-            state_runtime=state_runtime,
+            hardware_runtime=hardware_runtime,
         )
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,
             camera_runtime=camera_runtime,
             event_worker=event_worker,
-            model_runtime=model_runtime,
+            environment_runtime=environment_runtime,
             event_listener=event_listener,
             event_bus=event_bus,
-            state_runtime=state_runtime,
+            hardware_runtime=hardware_runtime,
         )
         app = FastMCP(
             hardware_system.description,
@@ -86,10 +86,10 @@ class GerberaRuntime:
             event_worker=event_worker,
             app=app,
             camera_runtime=camera_runtime,
-            model_runtime=model_runtime,
+            environment_runtime=environment_runtime,
             event_listener=event_listener,
             reaction_bus=reaction_bus,
-            state_runtime=state_runtime,
+            hardware_runtime=hardware_runtime,
         )
 
         server_runtime.register_events()
@@ -121,14 +121,10 @@ class GerberaRuntime:
     @staticmethod
     def register_connection_states(
         hardware_system: HardwareSystem,
-        state_runtime: StateRuntime,
+        hardware_runtime: HardwareRuntime,
     ) -> None:
-        for microcontroller in hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
-                state_runtime.register_state_store(
-                    connection.name,
-                    connection.component_type,
-                )
+        _ = hardware_system
+        _ = hardware_runtime
 
     # Change the database layer after
     @staticmethod

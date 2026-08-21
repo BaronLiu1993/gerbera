@@ -20,6 +20,22 @@ class CommandCompiler:
         return builder.annotations(connection, command)
 
     @staticmethod
+    def state_unit(
+        component_type: str,
+        field_name: str,
+    ) -> str | None:
+        builder = get_device_builder(component_type)
+        return builder.state_definitions()["units"].get(field_name)
+
+    @staticmethod
+    def state_field(
+        component_type: str,
+        field_name: str,
+    ) -> str:
+        builder = get_device_builder(component_type)
+        return builder.state_definitions()["fields"][field_name]
+
+    @staticmethod
     def _command_spec_for_action(
         connection: Connection,
         action: str,

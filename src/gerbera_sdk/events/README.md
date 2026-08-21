@@ -85,6 +85,48 @@ MCP,<event_name>,key:value
 STREAM,<event_name>,key:value
 ```
 
+Successful MCP and STREAM readings must use `value` as the payload key:
+
+```text
+MCP,<event_name>,value:<reading>
+STREAM,<event_name>,value:<reading>
+```
+
+The `value` field is intentionally shared by firmware responses, stream
+database tables, and event payloads. Hardware state memory uses semantic keys
+from the firmware device builder. Device-specific state fields and units are
+not encoded in the serial payload key.
+
+Each firmware device builder must define the internal mapping:
+
+```python
+def state_definitions(self) -> dict[str, dict[str, str | None]]:
+    return {
+        "fields": {"value": "...semantic_field..."},
+        "units": {"value": "...unit or None..."},
+    }
+```
+
+Runtime maps payload field `value` through those contracts before updating
+state memory.
+
+Examples:
+
+```python
+# HW201 digital sensor
+{"hw201.ir_sensor.obstacle_detected": {"value": "1", "unit": None}}
+
+# HC-SR04 distance sensor
+{"hcsr04.distance_sensor.distance": {"value": "12.4", "unit": "cm"}}
+
+# SG90 servo response
+{"sg90.servo_motor.angle": {"value": "90", "unit": "degrees"}}
+```
+
+Stream helper tools also maintain `stream_enabled`, but serial MCP/STREAM
+readings and normal write acknowledgements still report returned data under
+`value`.
+
 That identifier is generated from:
 
 - `component_type`

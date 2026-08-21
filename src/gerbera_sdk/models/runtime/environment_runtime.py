@@ -14,7 +14,7 @@ from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 
 @dataclass
-class ModelRuntime:
+class EnvironmentRuntime:
     hardware_system: HardwareSystem
     _lock: threading.Lock = field(
         default_factory=threading.Lock,
@@ -50,8 +50,7 @@ class ModelRuntime:
         model_id: str,
         inference_input: str | list[str],
     ) -> (
-        PerceptionStateModel
-        | list[PerceptionStateModel]
+        list[PerceptionStateModel]
         | VisionLanguageModelFrameEnvironment
     ):
         inference = self.model_inferences[model_id]

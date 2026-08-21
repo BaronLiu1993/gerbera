@@ -29,8 +29,11 @@ from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.state_runtime import ConnectionState, StateRuntime
+from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
+from gerbera_sdk.models.runtime.hardware_runtime import (
+    ConnectionState,
+    HardwareRuntime,
+)
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference import (
     Inference,
@@ -47,10 +50,10 @@ class ServerRuntime:
     event_worker: EventWorker
     app: FastMCP
     camera_runtime: CameraRuntime
-    model_runtime: ModelRuntime
+    environment_runtime: EnvironmentRuntime
     event_listener: EventListener
     reaction_bus: ReactionBus
-    state_runtime: StateRuntime
+    hardware_runtime: HardwareRuntime
     event_read_timeout_seconds: float = 1.0
     event_read_poll_seconds: float = 0.02
 
@@ -277,6 +280,7 @@ class ServerRuntime:
         self,
         connection: Connection,
         state: int,
+        field_name: str | None = None,
         stream_microcontroller: Microcontroller | None = None,
     ) -> Callable[[], dict[str, object]]:
         def tool_function() -> dict[str, object]:
@@ -291,10 +295,11 @@ class ServerRuntime:
                 stream_event.flush()
                 self.event_worker.wait_until_idle()
 
-            if response["success"]:
-                self.state_runtime.update_state(
+            if response["success"] and field_name is not None:
+                self.hardware_runtime.update_state(
                     connection.name,
                     connection.component_type,
+                    field_name,
                     ConnectionState(value=str(state), unit="BOOLEAN"),
                 )
             return response
@@ -320,6 +325,15 @@ class ServerRuntime:
 
         action = command.method.strip().lower()
         tool_name = f"{action}_{connection.name}"
+        field_name = CommandCompiler.state_field(
+            connection.component_type,
+            "value",
+        )
+        self.hardware_runtime.register_state_store(
+            connection.name,
+            connection.component_type,
+            field_name,
+        )
         tool_function = self.build_tool_function(
             connection,
             command,
@@ -329,6 +343,13 @@ class ServerRuntime:
             description=description,
             tool_function=tool_function,
             annotations=annotations,
+            meta={
+                "key": (
+                    f"{connection.component_type}."
+                    f"{connection.name}."
+                    f"{field_name}"
+                ),
+            },
         )
 
     def register_tool(
@@ -369,6 +390,13 @@ class ServerRuntime:
             annotations=annotations.model_copy(
                 update={"title": description.rstrip(".")}
             ),
+            meta={
+                "key": (
+                    f"{connection.component_type}."
+                    f"{connection.name}."
+                    "value"
+                ),
+            },
         )
 
     def register_state_toggle_tools(
@@ -401,9 +429,16 @@ class ServerRuntime:
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
+        field_name = "stream_enabled"
+        self.hardware_runtime.register_state_store(
+            connection.name,
+            connection.component_type,
+            field_name,
+        )
         tool_function = self.build_toggle_tool_function(
             connection=connection,
             state=state,
+            field_name=field_name,
             stream_microcontroller=microcontroller,
         )
         self.register_tool(
@@ -413,7 +448,14 @@ class ServerRuntime:
             annotations=annotations.model_copy(
                 update={"title": description.rstrip(".")}
             ),
-            meta=meta,
+            meta=meta
+            or {
+                "key": (
+                    f"{connection.component_type}."
+                    f"{connection.name}."
+                    f"{field_name}"
+                ),
+            },
         )
 
     def register_stream_toggle_tools(
@@ -554,7 +596,9 @@ class ServerRuntime:
 
     def register_inference_tools(self) -> None:
         registered_models: dict[str, tuple[str, Inference]] = {}
-        for model_id, inference in self.model_runtime.model_inferences.items():
+        for model_id, inference in (
+            self.environment_runtime.model_inferences.items()
+        ):
             if inference.name in registered_models:
                 raise ValueError(
                     f"Inference model name must be unique: {inference.name}"
@@ -573,10 +617,10 @@ class ServerRuntime:
         model: Inference,
     ) -> None:
         def turn_on_inference() -> None:
-            self.model_runtime.turn_on_model(model_id)
+            self.environment_runtime.turn_on_model(model_id)
 
         def turn_off_inference() -> None:
-            self.model_runtime.turn_off_model(model_id)
+            self.environment_runtime.turn_off_model(model_id)
 
         self.register_tool(
             name=f"turn_on_{model.name}",
@@ -613,13 +657,13 @@ class ServerRuntime:
         model: ObjectDetectionModelInference,
     ) -> None:
         def read_model_output(camera_id: str) -> dict[str, object]:
-            result = self.model_runtime.read_model_output(model_id, camera_id)
+            result = self.environment_runtime.read_model_output(model_id, camera_id)
             return result.model_dump(mode="json", exclude={"frame"})
 
         def predict_with_model(
             camera_ids: Annotated[list[str], Field(min_length=1)],
         ) -> list[dict[str, object]]:
-            results = self.model_runtime.single_inference(model_id, camera_ids)
+            results = self.environment_runtime.single_inference(model_id, camera_ids)
             serialized_results: list[dict[str, object]] = []
             for result in results:
                 serialized_results.append(
@@ -662,12 +706,12 @@ class ServerRuntime:
         def read_model_output(
             camera_id: str,
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.model_runtime.read_model_output(model_id, camera_id)
+            return self.environment_runtime.read_model_output(model_id, camera_id)
 
         def predict_with_model(
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.model_runtime.single_inference(model_id, frames)
+            return self.environment_runtime.single_inference(model_id, frames)
 
         self.register_tool(
             name=f"read_{model.name}",
@@ -743,23 +787,23 @@ class ServerRuntime:
 
     # Reaction and event catalog tools.
 
-    def register_event_catalog_tool(self) -> None:
-        def list_reaction_events() -> EventCatalog:
-            return self.get_event_catalog()
+    # def register_event_catalog_tool(self) -> None:
+    #     def list_reaction_events() -> EventCatalog:
+    #         return self.get_event_catalog()
 
-        self.register_tool(
-            name="list_reaction_events",
-            description=(
-                "List the registered hardware events that can be used "
-                "when creating reactions."
-            ),
-            tool_function=list_reaction_events,
-            annotations=ToolAnnotations(
-                title="List events available for reactions",
-                readOnlyHint=True,
-                openWorldHint=False,
-            ),
-        )
+    #     self.register_tool(
+    #         name="list_reaction_events",
+    #         description=(
+    #             "List the registered hardware events that can be used "
+    #             "when creating reactions."
+    #         ),
+    #         tool_function=list_reaction_events,
+    #         annotations=ToolAnnotations(
+    #             title="List events available for reactions",
+    #             readOnlyHint=True,
+    #             openWorldHint=False,
+    #         ),
+    #     )
 
     def register_state_memory_tool(self) -> None:
         self.register_tool(
@@ -767,7 +811,7 @@ class ServerRuntime:
             description=(
                 "Read the current hardware state memory."
             ),
-            tool_function=self.state_runtime.get_state_store,
+            tool_function=self.hardware_runtime.get_state_store,
             annotations=ToolAnnotations(
                 title="Get current hardware state",
             ),
@@ -779,7 +823,9 @@ class ServerRuntime:
             description=(
                 "Read the current environment state from model outputs."
             ),
-            tool_function=self.model_runtime.model_output_store.get_environment_state,
+            tool_function=(
+                self.environment_runtime.model_output_store.get_environment_state
+            ),
             annotations=ToolAnnotations(
                 title="Get current environment state",
             ),

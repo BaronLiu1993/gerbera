@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from gerbera_harness.runtime.session import (
+from gerbera_harness.runtime.state_machine import (
     ExecuteDecisionEnum,
     InitialisationDecisionEnum,
     LoopStateEnum,
@@ -16,10 +16,10 @@ from gerbera_harness.runtime.context import (
     ReviewContextBuilder,
 )
 from gerbera_harness.runtime.execution import ExecutionRuntime
-from gerbera_harness.runtime.initialisation import (
+from gerbera_harness.runtime.initialisation_runtime import (
     InitialisationRuntime,
 )
-from gerbera_harness.runtime.review import ReviewRuntime
+from gerbera_harness.runtime.review_runtime import ReviewRuntime
 
 
 @dataclass
@@ -67,14 +67,6 @@ class AgentRuntime:
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
             current_state = self.session.state
-            print(
-                "run_agent state",
-                {
-                    "session_id": self.session.session_id,
-                    "memory_session_id": self.memory.session_id,
-                    "state": current_state.state.value,
-                },
-            )
             if current_state.state is LoopStateEnum.INITIALISATION:
                 result = await self.initialisation_runtime.run_initial(
                     sources=[],

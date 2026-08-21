@@ -603,6 +603,7 @@ def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
 
     tool = asyncio.run(app.get_tool("write_motor"))
     assert tool.description == "Set servo angle."
+    assert tool.meta == {"key": "sg90.motor.angle"}
     assert tool.annotations == ToolAnnotations(
         title="Set motor servo angle",
         readOnlyHint=False,

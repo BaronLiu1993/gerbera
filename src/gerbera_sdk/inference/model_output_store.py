@@ -9,6 +9,7 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_sc
     VisionLanguageModelFrameEnvironment,
 )
 
+# Will contain more in the future
 ModelOutput = Union[PerceptionStateModel, VisionLanguageModelFrameEnvironment]
 
 
@@ -23,22 +24,14 @@ class ModelOutputStore:
         repr=False,
     )
 
-    def _require_registered(self, key: tuple[str, str]) -> None:
+    def require_registered(self, key: tuple[str, str]) -> None:
         if key not in self.model_outputs:
             raise KeyError(f"Model output is not registered: {key}")
 
     def register(self, keys: list[tuple[str, str]]) -> None:
         with self._lock:
-            if len(keys) != len(set(keys)):
-                raise KeyError("Model output key is registered more than once")
-
-            duplicate_keys = set(keys) & self.model_outputs.keys()
-            if duplicate_keys:
-                duplicate_key = duplicate_keys.pop()
-                raise KeyError(f"Model output is already registered: {duplicate_key}")
-
-            for key in keys:
-                self.model_outputs[key] = None
+            for key in dict.fromkeys(keys):
+                self.model_outputs.setdefault(key, None)
 
     def write_model_output(
         self,
@@ -48,7 +41,7 @@ class ModelOutputStore:
     ) -> None:
         key = (camera_id, model_id)
         with self._lock:
-            self._require_registered(key)
+            self.require_registered(key)
             self.model_outputs[key] = model_output
 
     def read_model_output(
@@ -58,7 +51,7 @@ class ModelOutputStore:
     ) -> ModelOutput:
         key = (camera_id, model_id)
         with self._lock:
-            self._require_registered(key)
+            self.require_registered(key)
             model_output = self.model_outputs[key]
             if model_output is None:
                 raise RuntimeError(

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from gerbera_harness.runtime.agent_runtime import AgentRuntime
-from gerbera_harness.runtime.session import Session
+from gerbera_harness.runtime.state_machine import Session
 from gerbera_harness.infrastructure.model import Model, ModelProviderEnum
 from gerbera_harness.memory import Memory
 from gerbera_harness.tools.registry import LocalToolRegistry

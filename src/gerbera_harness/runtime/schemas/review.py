@@ -1,6 +1,6 @@
 from typing import Literal
 
-from gerbera_harness.runtime.session import LoopStateEnum, ReviewDecisionEnum
+from gerbera_harness.runtime.state_machine import LoopStateEnum, ReviewDecisionEnum
 from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 

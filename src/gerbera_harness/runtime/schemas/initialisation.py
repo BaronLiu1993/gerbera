@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from gerbera_harness.runtime.session import (
+from gerbera_harness.runtime.state_machine import (
     InitialisationDecisionEnum,
     LoopStateEnum,
 )

@@ -51,6 +51,11 @@ class BaseFirmwareBuilder(ABC):
             connection=connection,
         )
 
+    @abstractmethod
+    def state_definitions(
+        self,
+    ) -> dict[str, dict[str, str | None]]:
+        raise NotImplementedError
 
     # All Required to Implement
     @abstractmethod
