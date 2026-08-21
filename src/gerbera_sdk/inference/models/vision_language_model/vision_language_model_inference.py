@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, InstanceOf
 import threading
@@ -33,6 +34,7 @@ VISION_LANGUAGE_MODEL_VALID_NAME = {
 
 class VisionLanguageModel(StrictSchema):
     # We need these
+    model_type: Literal["vision_language_model"] = "vision_language_model"
     model_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = Field(min_length=1)
     model_provider: VisionLanguageModelProviderEnum
@@ -49,6 +51,7 @@ class VisionLanguageModel(StrictSchema):
     # optional
     description: str = ""
     interval_seconds: float = Field(default=5.0, gt=0)
+    output_field: str = "scene"
 
     def create_inference(
         self,
@@ -79,6 +82,8 @@ class VisionLanguageModel(StrictSchema):
             subscribed_cameras=self.subscribed_cameras,
             interval_seconds=self.interval_seconds,
             model_id=self.model_id,
+            model_type=self.model_type,
+            output_field=self.output_field,
         )
 
 
@@ -96,6 +101,8 @@ class VisionLanguageModelInference:
     name: str
     description: str
     model_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    model_type: str = "vision_language_model"
+    output_field: str = "scene"
     user_prompt: str = Field(min_length=1)
     subscribed_cameras: list[Camera] = field(default_factory=list)
     interval_seconds: float = 5.0
@@ -193,8 +200,12 @@ class VisionLanguageModelInference:
 
                 for camera in cameras:
                     self.model_session.model_output_store.write_model_output(
-                        camera_id=camera.camera_id,
-                        model_id=self.model_id,
+                        key=(
+                            f"{camera.name}."
+                            f"{self.name}."
+                            f"{self.model_type}."
+                            f"{self.output_field}"
+                        ),
                         model_output=model_output,
                     )
 

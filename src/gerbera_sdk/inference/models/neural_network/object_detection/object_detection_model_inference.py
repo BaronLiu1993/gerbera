@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Literal
 
 from pydantic import Field, InstanceOf
 import threading
@@ -20,11 +21,11 @@ from gerbera_sdk.models.hardware.camera import Camera
 
 @dataclass
 class ObjectDetectionModel:
-    model_id: str = field(
-        default_factory=lambda: str(uuid.uuid4()),
-        init=False,
-    )
     model_name: ObjectDetectionModelProviderEnum
+    model_id: str = field(
+            default_factory=lambda: str(uuid.uuid4()),
+            init=False,
+        )
     name: str = Field(min_length=1)
     model_source: str = Field(min_length=1)
     subscribed_cameras: list[InstanceOf[Camera]] = Field(min_length=1)
@@ -32,6 +33,8 @@ class ObjectDetectionModel:
     iou_threshold: float = 0.45
     max_detections: int = 300
     description: str = ""
+    model_type: str = "vision_language_model"
+    output_field: str = "detected_objects"
 
     def create_inference(
         self,
@@ -54,6 +57,8 @@ class ObjectDetectionModel:
             description=self.description,
             subscribed_cameras=self.subscribed_cameras,
             model_id=self.model_id,
+            model_type=self.model_type,
+            output_field=self.output_field,
         )
 
 
@@ -71,6 +76,8 @@ class ObjectDetectionModelInference:
     name: str
     description: str
     model_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    model_type: str = "object_detection"
+    output_field: str = "detected_objects"
     subscribed_cameras: list[Camera] = field(default_factory=list)
     interval_seconds: float = 0.2
     _lock: threading.Lock = field(
@@ -189,8 +196,12 @@ class ObjectDetectionModelInference:
                 if camera.latest_frame is not None:
                     perception_state = self.predict(camera.camera_id)
                     self.model_session.model_output_store.write_model_output(
-                        camera_id=camera.camera_id,
-                        model_id=self.model_id,
+                        key=(
+                            f"{camera.name}."
+                            f"{self.name}."
+                            f"{self.model_type}."
+                            f"{self.output_field}"
+                        ),
                         model_output=perception_state,
                     )
 

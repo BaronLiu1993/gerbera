@@ -280,7 +280,7 @@ class ServerRuntime:
         self,
         connection: Connection,
         state: int,
-        field_name: str | None = None,
+        state_key: str | None = None,
         stream_microcontroller: Microcontroller | None = None,
     ) -> Callable[[], dict[str, object]]:
         def tool_function() -> dict[str, object]:
@@ -295,11 +295,9 @@ class ServerRuntime:
                 stream_event.flush()
                 self.event_worker.wait_until_idle()
 
-            if response["success"] and field_name is not None:
+            if response["success"] and state_key is not None:
                 self.hardware_runtime.update_state(
-                    connection.name,
-                    connection.component_type,
-                    field_name,
+                    state_key,
                     ConnectionState(value=str(state), unit="BOOLEAN"),
                 )
             return response
@@ -329,11 +327,12 @@ class ServerRuntime:
             connection.component_type,
             "value",
         )
-        self.hardware_runtime.register_state_store(
-            connection.name,
-            connection.component_type,
-            field_name,
+        state_key = (
+            f"{connection.component_type}."
+            f"{connection.name}."
+            f"{field_name}"
         )
+        self.hardware_runtime.register_state_store(state_key)
         tool_function = self.build_tool_function(
             connection,
             command,
@@ -430,15 +429,16 @@ class ServerRuntime:
         meta: dict[str, Any] | None = None,
     ) -> None:
         field_name = "stream_enabled"
-        self.hardware_runtime.register_state_store(
-            connection.name,
-            connection.component_type,
-            field_name,
+        state_key = (
+            f"{connection.component_type}."
+            f"{connection.name}."
+            f"{field_name}"
         )
+        self.hardware_runtime.register_state_store(state_key)
         tool_function = self.build_toggle_tool_function(
             connection=connection,
             state=state,
-            field_name=field_name,
+            state_key=state_key,
             stream_microcontroller=microcontroller,
         )
         self.register_tool(

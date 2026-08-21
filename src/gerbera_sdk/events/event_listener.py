@@ -163,12 +163,15 @@ class EventListener:
             handler.component_type,
             payload_field,
         )
+        state_key = (
+            f"{handler.component_type}."
+            f"{handler.connection_name}."
+            f"{state_field}"
+        )
         unit = CommandCompiler.state_unit(handler.component_type, payload_field)
 
         self.hardware_runtime.update_state(
-            handler.connection_name,
-            handler.component_type,
-            state_field,
+            state_key,
             ConnectionState(value=value, unit=unit),
         )
 

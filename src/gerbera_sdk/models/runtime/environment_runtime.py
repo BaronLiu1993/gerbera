@@ -26,7 +26,12 @@ class EnvironmentRuntime:
     def model_output_store(self) -> ModelOutputStore:
         store = ModelOutputStore()
         keys = [
-            (camera.camera_id, model.model_id)
+            (
+                f"{camera.name}."
+                f"{model.name}."
+                f"{model.model_type}."
+                f"{model.output_field}"
+            )
             for model in self.hardware_system.models
             for camera in model.subscribed_cameras
         ]
@@ -41,9 +46,22 @@ class EnvironmentRuntime:
         }
 
     def read_model_output(self, model_id: str, camera_id: str) -> object:
-        return self.model_output_store.read_model_output(
-            model_id=model_id, camera_id=camera_id
-        )
+        for model in self.hardware_system.models:
+            if model.model_id != model_id:
+                continue
+            for camera in model.subscribed_cameras:
+                if camera.camera_id != camera_id:
+                    continue
+                return self.model_output_store.read_model_output(
+                    (
+                        f"{camera.name}."
+                        f"{model.name}."
+                        f"{model.model_type}."
+                        f"{model.output_field}"
+                    )
+                )
+
+        raise RuntimeError(f"Model output is not registered: {camera_id}, {model_id}")
 
     def single_inference(
         self,
