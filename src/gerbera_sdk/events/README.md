@@ -85,30 +85,37 @@ MCP,<event_name>,key:value
 STREAM,<event_name>,key:value
 ```
 
-Successful MCP and STREAM readings must use `value` as the payload key:
+Successful MCP and STREAM payloads use semantic payload keys:
 
 ```text
-MCP,<event_name>,value:<reading>
-STREAM,<event_name>,value:<reading>
+MCP,<event_name>,distance:<reading>
+STREAM,<event_name>,distance:<reading>
+MCP,<event_name>,stream_enabled:<0-or-1>
+MCP,<event_name>,led_state:<0-or-1>
+MCP,<event_name>,angle:<degrees>
 ```
 
-The `value` field is intentionally shared by firmware responses, stream
-database tables, and event payloads. Hardware state memory uses semantic keys
-from the firmware device builder. Device-specific state fields and units are
-not encoded in the serial payload key.
+The payload key is the hardware state field. Runtime routes it directly into
+hardware state memory as:
 
-Each firmware device builder must define the internal mapping:
+```text
+<component_type>.<connection_name>.<payload_key>
+```
+
+Each firmware device builder must define units for every state field it emits:
 
 ```python
 def state_definitions(self) -> dict[str, dict[str, str | None]]:
     return {
-        "fields": {"value": "...semantic_field..."},
-        "units": {"value": "...unit or None..."},
+        "units": {
+            "distance": "cm",
+            "stream_enabled": None,
+        },
     }
 ```
 
-Runtime maps payload field `value` through those contracts before updating
-state memory.
+Runtime validates the payload key against `state_definitions()["units"]`
+before updating state memory.
 
 Examples:
 
@@ -124,8 +131,8 @@ Examples:
 ```
 
 Stream helper tools also maintain `stream_enabled`, but serial MCP/STREAM
-readings and normal write acknowledgements still report returned data under
-`value`.
+readings and normal write acknowledgements now report returned data under the
+semantic state field they modify or observe.
 
 That identifier is generated from:
 
