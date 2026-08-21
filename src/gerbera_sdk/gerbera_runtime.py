@@ -12,6 +12,7 @@ from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
@@ -123,8 +124,10 @@ class GerberaRuntime:
         hardware_system: HardwareSystem,
         hardware_runtime: HardwareRuntime,
     ) -> None:
-        _ = hardware_system
-        _ = hardware_runtime
+        for microcontroller in hardware_system.microcontrollers:
+            for connection in microcontroller.connections:
+                for key in CommandCompiler.state_keys(connection):
+                    hardware_runtime.register_state_store(key)
 
     # Change the database layer after
     @staticmethod

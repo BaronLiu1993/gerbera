@@ -63,8 +63,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
         return {
-            "fields": {"value": "motor_state"},
-            "units": {"value": None},
+            "units": {"motor_state": None},
         }
 
     def build_handler(self, connection: Connection) -> str:
@@ -98,7 +97,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     digitalWrite({in1_pin}, HIGH);
     digitalWrite({in2_pin}, LOW);
     analogWrite({enable_pin}, speed);
-    Serial.println("MCP,{connection.event_name},value:1");
+    Serial.println("MCP,{connection.event_name},motor_state:1");
     return;
   }}
 
@@ -106,7 +105,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     digitalWrite({in1_pin}, LOW);
     digitalWrite({in2_pin}, HIGH);
     analogWrite({enable_pin}, speed);
-    Serial.println("MCP,{connection.event_name},value:-1");
+    Serial.println("MCP,{connection.event_name},motor_state:-1");
     return;
   }}
 
@@ -114,7 +113,7 @@ class DCMotorFirmwareBuilder(BaseFirmwareBuilder):
     digitalWrite({in1_pin}, LOW);
     digitalWrite({in2_pin}, LOW);
     analogWrite({enable_pin}, 0);
-    Serial.println("MCP,{connection.event_name},value:0");
+    Serial.println("MCP,{connection.event_name},motor_state:0");
     return;
   }}
 

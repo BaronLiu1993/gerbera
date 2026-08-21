@@ -158,15 +158,15 @@ class EventListener:
             event_name,
         )
         handler.perform_work(payload)
+        # TODO: route error payloads into command results instead of hardware state.
+        if "error" in payload:
+            return
+
         payload_field, value = next(iter(payload.items()))
-        state_field = CommandCompiler.state_field(
+        state_key = CommandCompiler.state_key(
             handler.component_type,
+            handler.connection_name,
             payload_field,
-        )
-        state_key = (
-            f"{handler.component_type}."
-            f"{handler.connection_name}."
-            f"{state_field}"
         )
         unit = CommandCompiler.state_unit(handler.component_type, payload_field)
 

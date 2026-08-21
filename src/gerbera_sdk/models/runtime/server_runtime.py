@@ -298,7 +298,7 @@ class ServerRuntime:
             if response["success"] and state_key is not None:
                 self.hardware_runtime.update_state(
                     state_key,
-                    ConnectionState(value=str(state), unit="BOOLEAN"),
+                    ConnectionState(value=str(state), unit=None),
                 )
             return response
 
@@ -323,16 +323,7 @@ class ServerRuntime:
 
         action = command.method.strip().lower()
         tool_name = f"{action}_{connection.name}"
-        field_name = CommandCompiler.state_field(
-            connection.component_type,
-            "value",
-        )
-        state_key = (
-            f"{connection.component_type}."
-            f"{connection.name}."
-            f"{field_name}"
-        )
-        self.hardware_runtime.register_state_store(state_key)
+        state_key = CommandCompiler.state_keys(connection)[0]
         tool_function = self.build_tool_function(
             connection,
             command,
@@ -343,11 +334,7 @@ class ServerRuntime:
             tool_function=tool_function,
             annotations=annotations,
             meta={
-                "key": (
-                    f"{connection.component_type}."
-                    f"{connection.name}."
-                    f"{field_name}"
-                ),
+                "key": state_key,
             },
         )
 
@@ -378,9 +365,11 @@ class ServerRuntime:
         description: str,
         annotations: ToolAnnotations,
     ) -> None:
+        state_key = CommandCompiler.state_keys(connection)[0]
         tool_function = self.build_toggle_tool_function(
             connection=connection,
             state=state,
+            state_key=state_key,
         )
         self.register_tool(
             name=tool_name,
@@ -390,11 +379,7 @@ class ServerRuntime:
                 update={"title": description.rstrip(".")}
             ),
             meta={
-                "key": (
-                    f"{connection.component_type}."
-                    f"{connection.name}."
-                    "value"
-                ),
+                "key": state_key,
             },
         )
 
@@ -428,13 +413,11 @@ class ServerRuntime:
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
-        field_name = "stream_enabled"
-        state_key = (
-            f"{connection.component_type}."
-            f"{connection.name}."
-            f"{field_name}"
+        state_key = CommandCompiler.state_key(
+            connection.component_type,
+            connection.name,
+            "stream_enabled",
         )
-        self.hardware_runtime.register_state_store(state_key)
         tool_function = self.build_toggle_tool_function(
             connection=connection,
             state=state,
@@ -450,11 +433,7 @@ class ServerRuntime:
             ),
             meta=meta
             or {
-                "key": (
-                    f"{connection.component_type}."
-                    f"{connection.name}."
-                    f"{field_name}"
-                ),
+                "key": state_key,
             },
         )
 

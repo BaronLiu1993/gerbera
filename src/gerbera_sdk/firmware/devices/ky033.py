@@ -94,8 +94,10 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
         return {
-            "fields": {"value": "line_detected"},
-            "units": {"value": None},
+            "units": {
+                "line_detected": None,
+                "stream_enabled": None,
+            },
         }
 
     def build_definitions(self, connection: Connection) -> str:
@@ -112,7 +114,7 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
         return [
             f"  if ({connection.name}_stream_on) {{",
             f"    int value = digitalRead({out_pin});",
-            f'    Serial.print("STREAM,{connection.event_name},value:");',
+            f'    Serial.print("STREAM,{connection.event_name},line_detected:");',
             "    Serial.println(value);",
             "    delay(100);",
             "  }",
@@ -125,7 +127,7 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
             return f"""void handle_{connection.name}(const String& input) {{
   (void)input;
   int value = digitalRead({out_pin});
-  Serial.print("MCP,{connection.event_name},value:");
+  Serial.print("MCP,{connection.event_name},line_detected:");
   Serial.println(value);
 }}"""
 
@@ -142,13 +144,13 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
     float state = stateValue.toFloat();
     if (state == 1) {{
       {connection.name}_stream_on = true;
-      Serial.println("MCP,{connection.event_name},value:1");
+      Serial.println("MCP,{connection.event_name},stream_enabled:1");
       return;
     }}
 
     if (state == 0) {{
       {connection.name}_stream_on = false;
-      Serial.println("MCP,{connection.event_name},value:0");
+      Serial.println("MCP,{connection.event_name},stream_enabled:0");
       return;
     }}
 
@@ -157,6 +159,6 @@ class KY033FirmwareBuilder(BaseFirmwareBuilder):
   }}
 
   int value = digitalRead({out_pin});
-  Serial.print("MCP,{connection.event_name},value:");
+  Serial.print("MCP,{connection.event_name},line_detected:");
   Serial.println(value);
 }}"""

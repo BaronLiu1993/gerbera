@@ -49,8 +49,7 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
         return {
-            "fields": {"value": "led_state"},
-            "units": {"value": None},
+            "units": {"led_state": None},
         }
 
     def build_handler(self, connection: Connection) -> str:
@@ -68,13 +67,13 @@ class LEDFirmwareBuilder(BaseFirmwareBuilder):
 
   if (state == 1) {{
     digitalWrite({out_pin}, HIGH);
-    Serial.println("MCP,{connection.event_name},value:1");
+    Serial.println("MCP,{connection.event_name},led_state:1");
     return;
   }}
 
   if (state == 0) {{
     digitalWrite({out_pin}, LOW);
-    Serial.println("MCP,{connection.event_name},value:0");
+    Serial.println("MCP,{connection.event_name},led_state:0");
     return;
   }}
 

@@ -50,8 +50,7 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
         return {
-            "fields": {"value": "angle"},
-            "units": {"value": "degrees"},
+            "units": {"angle": "degrees"},
         }
 
     def build_definitions(self, connection: Connection) -> str:
@@ -71,6 +70,6 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
 
   int angle = angleValue.toInt();
   {connection.name}_servo.write(angle);
-  Serial.print("MCP,{connection.event_name},value:");
+  Serial.print("MCP,{connection.event_name},angle:");
   Serial.println(angle);
 }}"""

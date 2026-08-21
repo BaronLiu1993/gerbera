@@ -25,15 +25,43 @@ class CommandCompiler:
         field_name: str,
     ) -> str | None:
         builder = get_device_builder(component_type)
-        return builder.state_definitions()["units"].get(field_name)
+        units = builder.state_definitions()["units"]
+        if field_name not in units:
+            raise ValueError(
+                f"Unsupported state field for {component_type}: {field_name}"
+            )
+        return units[field_name]
 
     @staticmethod
     def state_field(
         component_type: str,
         field_name: str,
     ) -> str:
-        builder = get_device_builder(component_type)
-        return builder.state_definitions()["fields"][field_name]
+        CommandCompiler.state_unit(component_type, field_name)
+        return field_name
+
+    @staticmethod
+    def state_key(
+        component_type: str,
+        connection_name: str,
+        field_name: str,
+    ) -> str:
+        CommandCompiler.state_unit(component_type, field_name)
+        return f"{component_type}.{connection_name}.{field_name}"
+
+    @staticmethod
+    def state_keys(connection: Connection) -> list[str]:
+        builder = get_device_builder(connection.component_type)
+        fields = builder.state_definitions()["units"]
+        return [
+            CommandCompiler.state_key(
+                connection.component_type,
+                connection.name,
+                field_name,
+            )
+            for field_name in fields
+            if field_name != "stream_enabled" or connection.stream_enabled
+        ]
 
     @staticmethod
     def _command_spec_for_action(
