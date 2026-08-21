@@ -25,10 +25,8 @@ class EventTypeEnum(str, Enum):
 
 
 class SourceTypeEnum(str, Enum):
-    RUNTIME = "runtime"
     MCP_TOOL = "mcp_tool"
     LOCAL_TOOL = "local_tool"
-    MODEL = "model"
     AGENT = "agent"
     USER = "user"
     SYSTEM = "system"
@@ -38,6 +36,7 @@ class EventSchema(HarnessSchema):
     session_id: str
     event_type: EventTypeEnum
     source_name: str
+    source_type: SourceTypeEnum
     payload: dict[str, Any]
     task_id: str
     occurred_at: datetime = Field(

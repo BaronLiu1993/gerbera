@@ -20,6 +20,7 @@ OBSERVATION_PROMPT = load_prompt(
 class ObservationRuntime:
     model: Model
     memory: Memory
+    tool_client: ToolClient
     execute_consumer: ExecuteConsumer
     context_builder: ObservationContextBuilder
     objective: str # what do we want to gain from observing 
@@ -43,12 +44,11 @@ class ObservationRuntime:
             await self.execute_consumer.execute_action_groups(
                 action.action_groups
             )
-            
+
+            # update the world state
             world_state = await self.memory.define_world_state()
-            for :
-                world_state
             self.memory.update_world_state(world_state)
-            self.memory.rebuild_temporal_memory()
+            self.memory.rebuild_temporal_state()
 
             
             # for now lets just say it is always accepted, no error handling for now

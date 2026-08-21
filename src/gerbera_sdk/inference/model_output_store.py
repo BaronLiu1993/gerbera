@@ -29,9 +29,8 @@ class ModelOutputStore:
             raise KeyError(f"Model output is not registered: {key}")
 
     def register(self, keys: list[str]) -> None:
-        with self._lock:
-            for key in dict.fromkeys(keys):
-                self.model_outputs.setdefault(key, None)
+        for key in dict.fromkeys(keys):
+            self.model_outputs.setdefault(key, None)
 
     def write_model_output(
         self,
