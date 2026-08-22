@@ -11,26 +11,28 @@ from gerbera_harness.memory import (
     WorldStateSchema,
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
-from gerbera_harness.runtime.context import ObservationContextBuilder
-from gerbera_harness.runtime.execute_producer.schemas.observe import (
-    ObservationAction,
-    ObservationResult,
+from gerbera_harness.runtime.context import ReviewContextBuilder
+from gerbera_harness.runtime.execute_producer.schemas.review import (
+    ReviewAction,
+    ReviewResult,
 )
 from gerbera_harness.runtime.execute_producer.session import LoopDecision
 
-OBSERVATION_PROMPT = load_prompt(
+REVIEW_PROMPT = load_prompt(
     PromptTypeEnum.SUB,
-    "OBSERVE.md",
+    "OBSERVATION_REVIEW.md",
 )
 
 
 @dataclass
-class ObservationRuntime:
+class ReviewRuntime:
     model: Model
     memory: Memory
     call_tool: Callable[[str, dict[str, Any]], Awaitable[Any]]
-    context_builder: ObservationContextBuilder
-    prev_state_context: str  # what do we want to gain from observing
+    context_builder: ReviewContextBuilder
+    prev_state_context: (
+        str  # what do we want to gain from observing that checks if it was done
+    )
     max_attempts: int = 3
 
     async def get_current_environment_state(self) -> dict[str, Any]:
@@ -79,51 +81,47 @@ class ObservationRuntime:
         self.memory.define_world_state(world_state)
         self.memory.rebuild_temporal_state()
 
-    def update_memory_with_plan(self, agent_payload: dict[str, Any]) -> None:
+    def update_memory_with_review(self, agent_payload: dict[str, Any]) -> None:
         task_id = self.memory.task_state.current_task_id
-        observe_plan_upload = EventSchema(
+        review_event = EventSchema(
             session_id=self.memory.session_id,
             event_type=EventTypeEnum.OBSERVATION_CREATED,
             source_type=SourceTypeEnum.AGENT,
-            source_name="observe_runtime",
+            source_name="review_runtime",
             payload=agent_payload,
             task_id=task_id,
         )
-        self.memory.insert_event(observe_plan_upload)
+        self.memory.insert_event(review_event)
 
-    async def run_observation(self) -> ObservationResult:
+    async def run_review(self) -> ReviewResult:
         client = self.model.get_agent_client()
         before_context = self.context_builder.build_runtime_context()
         context = {
-            "observation_context": before_context,
+            "review_context": before_context,
             "prev_state_context": self.prev_state_context,
         }
 
         for _ in range(self.max_attempts):
             raw_response = await client.send(
                 context,
-                OBSERVATION_PROMPT,
-                ObservationAction.model_json_schema(),
+                REVIEW_PROMPT,
+                ReviewAction.model_json_schema(),
             )
 
-            action = ObservationAction.model_validate_json(raw_response)
-            # do not evaluate yet just make it opened looped system for complexity reduction
-            self.update_memory_with_plan(action.model_dump(mode="json"))
+            action = ReviewAction.model_validate_json(raw_response)
+            self.update_memory_with_review(action.model_dump(mode="json"))
 
-            # update the world state
             environment_state = await self.get_current_environment_state()
             hardware_state = await self.get_current_hardware_state()
             self.update_memory(environment_state, hardware_state)
 
-            # for now lets just say it is always accepted, no error handling for now
-            return ObservationResult(
+            return ReviewResult(
                 context=action.context,
                 actions=action.actions,
                 result=LoopDecision.SUCCESS,
             )
 
-        # only code happy path for now
-        return ObservationResult(
+        return ReviewResult(
             context="FAILED TASK",
             actions=[],
             result=LoopDecision.FAIL,

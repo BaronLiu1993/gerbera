@@ -68,7 +68,7 @@ STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
 
 
 @dataclass
-class StateMachine:
+class Session:
     state: ExperimentState = field(default_factory=Initialisation)
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
