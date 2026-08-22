@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from gerbera_harness.runtime.state_machine import (
+from gerbera_harness.runtime.session import (
     ExecuteDecisionEnum,
     InitialisationDecisionEnum,
     LoopStateEnum,

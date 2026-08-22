@@ -53,6 +53,7 @@ class TaskSchema(HarnessSchema):
 
 
 class TaskStateSchema(HarnessSchema):
-    hypothesis: HypothesisSchema | None = None
+    user_intent: str 
+    goal: str
     tasks: list[TaskSchema] = Field(default_factory=list)
     current_task_id: str | None = None

@@ -1,75 +1,103 @@
-import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.tools.client import ToolClient
-from gerbera_harness.prompts import PromptTypeEnum, load_prompt
-
-EXECUTION_PROMPT = load_prompt(
-    PromptTypeEnum.MAIN,
-    "EXECUTION.md",
+from gerbera_harness.memory import Memory
+from gerbera_harness.runtime.context import (
+    ObservationContextBuilder,
+    PlanningContextBuilder,
+    ReviewContextBuilder,
 )
+from gerbera_harness.runtime.execute_consumer import ExecuteConsumer
+from gerbera_harness.runtime.execute_producer.observe_runtime import (
+    ObservationRuntime,
+)
+from gerbera_harness.runtime.execute_producer.planning_runtime import (
+    PlanningRuntime,
+)
+from gerbera_harness.runtime.execute_producer.review_runtime import ReviewRuntime
+from gerbera_harness.runtime.execute_producer.session import (
+    ExecuteLoopStateEnum,
+    LoopDecision,
+    StateMachine,
+)
+from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
+from gerbera_harness.tools.client import ToolClient
+
 
 @dataclass
 class ExecuteProducer:
     model: Model
     tool_client: ToolClient
-    messages: list[dict[str, object]] = field(default_factory=list)
+    memory: Memory
+    context: str  # pass in the initialisation context
+    execute_consumer: ExecuteConsumer
+    state_machine: StateMachine
+    max_turns: int = 3
 
-    @cached_property
-        def observation_runtime(self) -> ObservationRuntime:
-            return ObservationRuntime(
-                model=self.model,
-                mcp_url=self.mcp_url,
-                context_builder=ObservationPromptContextBuilder(
-                    context=self.context,
-                    messages=self.messages,
-                    observations=self.observations,
-                    tool_events=self.tool_events,
-                    context_window_size=self.context_window_size,
-                    available_tools=tuple(self.local_tool_registry.list_tools()),
-                ),
-                messages=self.messages,
-                observations=self.observations,
-                tool_events=self.tool_events,
-                local_tool_registry=self.local_tool_registry,
-            )
-    
-        @cached_property
-        def planning_runtime(self) -> PlanningRuntime:
-            return PlanningRuntime(
-                model=self.model,
-                context_builder=PlanningPromptContextBuilder(
-                    context=self.context,
-                    messages=self.messages,
-                    observations=self.observations,
-                    tool_events=self.tool_events,
-                    context_window_size=self.context_window_size,
-                    previous_act_error=self.previous_act_error,
-                    available_tools=tuple(self.local_tool_registry.list_tools()),
-                ),
-                messages=self.messages,
-                on_action_planned=lambda action_plan: setattr(
-                    self, "action_plan", action_plan
-                ),
-            )
-
-    async def produce_action_groups(
+    async def submit_action_groups(
         self,
-        intent_context: str,
-    ) -> list[ExecuteActionGroupSchema]:
-        client = self.model.get_agent_client()
+        action_groups: list[list[ActionExecuteSchema]],
+    ) -> None:
+        await self.execute_consumer.execute_actions(action_groups=action_groups)
 
+    async def produce_action_groups(self) -> None:
         while True:
-            
-            # context = await self.build_context(intent_context)
-            raw_response = await client.send(
-                context,
-                EXECUTION_PROMPT,
-                ExecuteProducerResponseSchema.model_json_schema(),
-            )
-            response = ExecuteProducerResponseSchema.model_validate_json(
-                raw_response
-            )
+            if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
+                observation = await ObservationRuntime(
+                    model=self.model,
+                    memory=self.memory,
+                    # Tool calls go straight through the consumer for now.
+                    # Reintroduce a producer wrapper here only if the producer
+                    # needs to enforce permissions, retries, or routing.
+                    call_tool=self.execute_consumer.call_tool,
+                    context_builder=ObservationContextBuilder(
+                        memory=self.memory,
+                    ),
+                    prev_state_context=self.context,
+                ).run_observation()
 
-            return response.action_groups
+                if observation.result is LoopDecision.FAIL:
+                    break
+
+                await self.submit_action_groups(observation.actions)
+                self.context = observation.context
+                self.state_machine.perform_transition(ExecuteLoopStateEnum.PLAN)
+            elif self.state_machine.current_state is ExecuteLoopStateEnum.PLAN:
+                planning = await PlanningRuntime(
+                    model=self.model,
+                    memory=self.memory,
+                    prev_state_context=self.context,
+                    context_builder=PlanningContextBuilder(
+                        memory=self.memory,
+                    ),
+                ).run_planning()
+
+                if planning.result is LoopDecision.FAIL:
+                    break
+
+                action_groups = planning.actions
+                await self.submit_action_groups(action_groups)
+
+                self.context = planning.context
+                self.state_machine.perform_transition(ExecuteLoopStateEnum.REVIEW)
+            elif self.state_machine.current_state is ExecuteLoopStateEnum.REVIEW:
+                review = await ReviewRuntime(
+                    model=self.model,
+                    memory=self.memory,
+                    # Tool calls go straight through the consumer for now.
+                    # Reintroduce a producer wrapper here only if the producer
+                    # needs to enforce permissions, retries, or routing.
+                    call_tool=self.execute_consumer.call_tool,
+                    context_builder=ReviewContextBuilder(memory=self.memory),
+                    prev_state_context=self.context,
+                ).run_review()
+                if review.result is LoopDecision.FAIL:
+                    break
+
+                await self.submit_action_groups(review.actions)
+                self.context = review.context
+                break
+                # if review.result is LoopDecision.FAIL:
+                #     self.state_machine.perform_transition(ExecuteLoopStateEnum.OBSERVE)
+            else:
+                raise ValueError("Unsupported State")

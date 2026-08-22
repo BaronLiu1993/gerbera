@@ -2,42 +2,41 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from typing_extensions import TypeAlias
-
 from gerbera_harness.infrastructure.mcp import MCPClient
+from gerbera_harness.memory import (
+    EventSchema,
+    EventTypeEnum,
+    Memory,
+    SourceTypeEnum,
+)
 from gerbera_harness.runtime.schemas.execute import (
+    ActionExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
 )
-from gerbera_harness.runtime.schemas.experiment import (
-    ExecuteActionGroupSchema,
-)
 from gerbera_harness.tools.client import ToolClient
-
-DeterministicActionSchema: TypeAlias = ContinuousExecuteSchema | DiscreteExecuteSchema
-
 
 @dataclass
 class ExecuteConsumer:
     tool_client: ToolClient
+    memory: Memory
 
     # Run the whole thing
-    async def execute_action_groups(
+    async def execute_actions(
         self,
-        action_groups: list[ExecuteActionGroupSchema],
+        action_groups: list[list[ActionExecuteSchema]],
     ) -> None:
-        for group in action_groups:
-            await self.execute_action_group(group)
+        for actions in action_groups:
+            await self.execute_action_group(actions)
 
-    # Run an invidiual group
     async def execute_action_group(
         self,
-        group: ExecuteActionGroupSchema,
+        actions: list[ActionExecuteSchema],
     ) -> None:
         group_start = asyncio.get_running_loop().time()
 
         async with asyncio.TaskGroup() as task_group:
-            for action in group.actions:
+            for action in actions:
                 task_group.create_task(
                     self.execute_action(
                         action=action,
@@ -48,7 +47,7 @@ class ExecuteConsumer:
     async def execute_action(
         self,
         *,
-        action: DeterministicActionSchema,
+        action: ActionExecuteSchema,
         group_start: float,
     ) -> None:
         start_at = group_start + action.start_offset_seconds
@@ -89,5 +88,19 @@ class ExecuteConsumer:
         self,
         tool_name: str,
         arguments: dict[str, Any],
-    ) -> None:
-        await self.tool_client.call_tool(tool_name, arguments)
+    ) -> Any:
+        result = await self.tool_client.call_tool(tool_name, arguments)
+        self.memory.insert_event(
+            EventSchema(
+                session_id=self.memory.session_id,
+                event_type=EventTypeEnum.TOOL_CALL,
+                source_type=SourceTypeEnum.MCP_TOOL,
+                source_name=tool_name,
+                payload={
+                    "arguments": arguments,
+                    "result": result,
+                },
+                task_id=self.memory.task_state.current_task_id,
+            )
+        )
+        return result

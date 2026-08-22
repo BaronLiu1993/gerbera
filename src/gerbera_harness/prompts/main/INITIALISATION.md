@@ -2,9 +2,9 @@
 
 Generate the current initialisation intent frame for the requested run.
 
-Initialisation is for research, context gathering, and intent framing only. It
-does not create tasks, action groups, tool-call plans, hypotheses, methods, or
-review programs.
+Initialisation is for research, context gathering, intent framing, and
+high-level task creation only. It does not create action groups, tool-call
+plans, hypotheses, methods, or review programs.
 
 Return only the fields allowed by the response schema.
 
@@ -16,6 +16,7 @@ Return only the fields allowed by the response schema.
 - Capture assumptions that execution and review should know.
 - Capture constraints, safety boundaries, and tool/capability limitations.
 - Define success criteria for deciding whether the overall goal is achieved.
+- Create high-level task goals that execution can work through one at a time.
 - Summarize available tools by name and capability.
 
 ## Boundaries
@@ -23,7 +24,8 @@ Return only the fields allowed by the response schema.
 - Do not operate hardware.
 - Do not call tools.
 - Do not claim the world has been observed unless the context says so.
-- Do not generate ordered tasks or action sequences.
+- Do not generate executable action sequences.
+- Do not put tool names, tool parameters, or timing details in tasks.
 - Do not output a hypothesis or experimental method.
 - Do not invent tool names, parameters, measurements, or physical state.
 
