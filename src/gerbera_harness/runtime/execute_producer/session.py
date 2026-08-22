@@ -2,13 +2,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import ClassVar
 
-
 class ExecuteLoopStateEnum(str, Enum):
     OBSERVE = "observe"
     PLAN = "plan"
-    RUNNING = "running"
+    REVIEW = "review"
 
+class LoopDecision(str, Enum):
+    SUCCESS = "success"
+    FAIL = "fail"
 
+# Base Class
 @dataclass(frozen=True)
 class ExecuteLoopState:
     state: ClassVar[ExecuteLoopStateEnum]
@@ -30,28 +33,30 @@ class ObserveState(ExecuteLoopState):
 class PlanState(ExecuteLoopState):
     state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.PLAN
     valid_transition_states: ClassVar[frozenset[ExecuteLoopStateEnum]] = (
-        frozenset({ExecuteLoopStateEnum.RUNNING, ExecuteLoopStateEnum.OBSERVE})
+        frozenset({ExecuteLoopStateEnum.REVIEW, ExecuteLoopStateEnum.OBSERVE})
     )
-
 
 @dataclass(frozen=True)
-class RunningState(ExecuteLoopState):
-    state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.RUNNING
+class ReviewState(ExecuteLoopState):
+    state: ClassVar[ExecuteLoopStateEnum] = ExecuteLoopStateEnum.REVIEW
     valid_transition_states: ClassVar[frozenset[ExecuteLoopStateEnum]] = (
-        frozenset({ExecuteLoopStateEnum.OBSERVE})
+        frozenset({ExecuteLoopStateEnum.OBSERVE, ExecuteLoopStateEnum.PLAN})
     )
 
 
-SUBAGENT_STATE_TYPES: dict[ExecuteLoopStateEnum, type[ExecuteLoopState]] = {
+EXECUTE_PRODUCER_STATE_TYPES: dict[ExecuteLoopStateEnum, type[ExecuteLoopState]] = {
     ExecuteLoopStateEnum.OBSERVE: ObserveState,
     ExecuteLoopStateEnum.PLAN: PlanState,
-    ExecuteLoopStateEnum.RUNNING: RunningState,
+    ExecuteLoopStateEnum.REVIEW: ReviewState,
 }
 
-
 @dataclass
-class StateMachine:
+class Session:
     state: ExecuteLoopState = field(default_factory=ObserveState)
+
+    @property
+    def current_state(self) -> ExecuteLoopStateEnum:
+        return self.state.state
 
     def perform_transition(
         self,
@@ -60,7 +65,7 @@ class StateMachine:
         if not self.valid_transition(target_state):
             raise ValueError("Invalid transition state")
         
-        self.state = SUBAGENT_STATE_TYPES[target_state]()
+        self.state = EXECUTE_PRODUCER_STATE_TYPES[target_state]()
         return self.state
 
     def valid_transition(self, new_state: ExecuteLoopStateEnum) -> bool:
