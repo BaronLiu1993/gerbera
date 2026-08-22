@@ -7,7 +7,6 @@ from gerbera_harness.runtime.session import (
     InitialisationDecisionEnum,
     LoopStateEnum,
 )
-from gerbera_harness.memory.schemas.task import TaskSchema
 from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
@@ -24,19 +23,19 @@ class Answer(HarnessSchema):
     question: str
     answer: str
 
+class InitialisationTaskMetadataSchema(HarnessSchema):
+    task_goal: str
+    success_criteria: list[str] = Field(min_length=1)
 
-# Model output for the happy-path initialisation pass.
 
 class InitialisationIntentSchema(HarnessSchema):
-    user_intent: str 
     goal: str
     context_summary: str
-    tasks: list[TaskSchema] = Field(min_length=1)
+    tasks: list[InitialisationTaskMetadataSchema] = Field(min_length=1)
     assumptions: list[str] = Field(default_factory=list)
-    #constraints: list[str] = Field(default_factory=list)
-    success_criteria: list[str] = Field(default_factory=list)
-
-# Optional review/clarification response shapes.
+    constraints: list[str] = Field(default_factory=list)
+    success_criteria: list[str] = Field(min_length=1)
+    # this sucess criteria is for the whole thing
 
 class AcceptedInitialisationResponseSchema(HarnessSchema):
     decision: Literal[InitialisationDecisionEnum.ACCEPTED]
@@ -58,6 +57,10 @@ InitialisationDecisionResponseSchema = (
     | ClarifyInitialisationResponseSchema
 )
 
-
 class InitialisationResponseSchema(HarnessSchema):
     response: InitialisationDecisionResponseSchema
+
+
+class InitialisationResultSchema(HarnessSchema):
+    decision: InitialisationDecisionEnum
+    intent: InitialisationIntentSchema

@@ -42,6 +42,7 @@ class TaskStatusEnum(str, Enum):
 
 class TaskSchema(HarnessSchema):
     task_goal: str
+    success_criteria: list[str] = Field(default_factory=list)
     status: TaskStatusEnum
     session_id: str
     attempts: int = 0
