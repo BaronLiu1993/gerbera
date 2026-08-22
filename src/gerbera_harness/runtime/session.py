@@ -7,10 +7,10 @@ from typing import ClassVar
 class LoopStateEnum(str, Enum):
     INITIALISATION = "initialisation"
     EXECUTION = "execution"
-    REVIEW = "review"
+    EVALUATION = "evaluation"
 
 
-class ReviewDecisionEnum(str, Enum):
+class EvaluationDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     REPLAN = "replan"
@@ -48,13 +48,13 @@ class Initialisation(ExperimentState):
 class Execution(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.EXECUTION
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {LoopStateEnum.EXECUTION, LoopStateEnum.REVIEW}
+        {LoopStateEnum.EXECUTION, LoopStateEnum.EVALUATION}
     )
 
 
 @dataclass(frozen=True)
-class Review(ExperimentState):
-    state: ClassVar[LoopStateEnum] = LoopStateEnum.REVIEW
+class Evaluation(ExperimentState):
+    state: ClassVar[LoopStateEnum] = LoopStateEnum.EVALUATION
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
         {LoopStateEnum.INITIALISATION}
     )
@@ -63,7 +63,7 @@ class Review(ExperimentState):
 STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
     LoopStateEnum.INITIALISATION: Initialisation,
     LoopStateEnum.EXECUTION: Execution,
-    LoopStateEnum.REVIEW: Review,
+    LoopStateEnum.EVALUATION: Evaluation,
 }
 
 

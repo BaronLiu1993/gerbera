@@ -33,16 +33,16 @@ from gerbera_harness.runtime.schemas.initialisation import (
     RejectedInitialisationResponseSchema,
 )
 from gerbera_harness.runtime.schemas.evaluate import (
-    AcceptedReviewResponseSchema,
-    RejectedReviewResponseSchema,
-    ReplanReviewResponseSchema,
-    ReviewDecisionResponseSchema,
-    ReviewResponseSchema,
+    AcceptedEvaluationResponseSchema,
+    EvaluationDecisionResponseSchema,
+    EvaluationResponseSchema,
+    RejectedEvaluationResponseSchema,
+    ReplanEvaluationResponseSchema,
 )
 
 __all__ = [
     "AcceptedInitialisationResponseSchema",
-    "AcceptedReviewResponseSchema",
+    "AcceptedEvaluationResponseSchema",
     "ActionExecuteSchema",
     "ActionTypeEnum",
     "Answer",
@@ -64,11 +64,11 @@ __all__ = [
     "ParameterTypeSchema",
     "Question",
     "RejectedInitialisationResponseSchema",
-    "RejectedReviewResponseSchema",
-    "ReplanReviewResponseSchema",
+    "RejectedEvaluationResponseSchema",
+    "ReplanEvaluationResponseSchema",
     "ReviewActionGroupSchema",
-    "ReviewDecisionResponseSchema",
-    "ReviewResponseSchema",
+    "EvaluationDecisionResponseSchema",
+    "EvaluationResponseSchema",
     "SNAKE_CASE_IDENTIFIER_PATTERN",
     "SnakeCaseIdentifier",
     "action_adapter",

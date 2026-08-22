@@ -2,24 +2,21 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from gerbera_harness.runtime.session import (
+    EvaluationDecisionEnum,
     ExecuteDecisionEnum,
     InitialisationDecisionEnum,
     LoopStateEnum,
-    ReviewDecisionEnum,
     Session,
 )
 from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
 from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.tools.registry import LocalToolRegistry
-from gerbera_harness.runtime.context import (
-    ReviewContextBuilder,
-)
+from gerbera_harness.runtime.evaluation_runtime import EvaluationRuntime
 from gerbera_harness.runtime.execution import ExecutionRuntime
 from gerbera_harness.runtime.initialisation_runtime import (
     InitialisationRuntime,
 )
-from gerbera_harness.runtime.review_runtime import ReviewRuntime
 
 
 @dataclass
@@ -54,14 +51,9 @@ class AgentRuntime:
         )
 
     @cached_property
-    def review_runtime(self) -> ReviewRuntime:
-        return ReviewRuntime(
-            model=self.model,
+    def evaluation_runtime(self) -> EvaluationRuntime:
+        return EvaluationRuntime(
             memory=self.memory,
-            context_builder=ReviewContextBuilder(
-                memory=self.memory,
-                context_window_size=self.context_window_size,
-            ),
         )
 
     async def run_agent(self, initial_user_prompt: str) -> None:
@@ -93,18 +85,18 @@ class AgentRuntime:
                     break
                 else:
                     raise ValueError("Unsupported Decision")
-            elif current_state.state is LoopStateEnum.REVIEW:
-                result = await self.review_runtime.run_review()
-                print("review result", result)
-                if result.decision is ReviewDecisionEnum.REPLAN:
+            elif current_state.state is LoopStateEnum.EVALUATION:
+                result = await self.evaluation_runtime.run_evaluation()
+                print("evaluation result", result)
+                if result.decision is EvaluationDecisionEnum.REPLAN:
                     self.feedback = result.feedback
                     # Replanning is intentionally paused while the first
                     # single-pass workflow is stabilized.
                     # self.session.perform_transition(result.requested_next_state)
                     break
-                elif result.decision is ReviewDecisionEnum.ACCEPTED:
+                elif result.decision is EvaluationDecisionEnum.ACCEPTED:
                     break
-                elif result.decision is ReviewDecisionEnum.REJECTED:
+                elif result.decision is EvaluationDecisionEnum.REJECTED:
                     break
                 else:
                     raise ValueError("Unsupported Decision")
