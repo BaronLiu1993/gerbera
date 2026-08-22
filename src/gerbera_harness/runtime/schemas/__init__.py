@@ -32,7 +32,7 @@ from gerbera_harness.runtime.schemas.initialisation import (
     Question,
     RejectedInitialisationResponseSchema,
 )
-from gerbera_harness.runtime.schemas.review import (
+from gerbera_harness.runtime.schemas.evaluate import (
     AcceptedReviewResponseSchema,
     RejectedReviewResponseSchema,
     ReplanReviewResponseSchema,
