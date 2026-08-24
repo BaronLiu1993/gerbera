@@ -1,23 +1,25 @@
 from gerbera_harness.runtime.execute_producer.schemas.observe import (
+    ObservationDecision,
     ObservationAction,
     ObservationResult,
 )
 from gerbera_harness.runtime.execute_producer.schemas.planning import (
+    PlanningDecision,
     PlanningAction,
     PlanningResult,
 )
 from gerbera_harness.runtime.execute_producer.schemas.review import (
-    ReviewAction,
+    ReviewDecision,
     ReviewResult,
 )
-from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 __all__ = [
-    "LoopDecision",
+    "ObservationDecision",
     "ObservationAction",
     "ObservationResult",
+    "PlanningDecision",
     "PlanningAction",
     "PlanningResult",
-    "ReviewAction",
+    "ReviewDecision",
     "ReviewResult",
 ]

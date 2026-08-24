@@ -7,10 +7,6 @@ class ExecuteLoopStateEnum(str, Enum):
     PLAN = "plan"
     REVIEW = "review"
 
-class LoopDecision(str, Enum):
-    SUCCESS = "success"
-    FAIL = "fail"
-
 # Base Class
 @dataclass(frozen=True)
 class ExecuteLoopState:

@@ -17,8 +17,13 @@ from gerbera_harness.runtime.execute_producer.planning_runtime import (
 from gerbera_harness.runtime.execute_producer.review_runtime import ReviewRuntime
 from gerbera_harness.runtime.execute_producer.state_machine import (
     ExecuteLoopStateEnum,
-    LoopDecision,
     StateMachine,
+)
+from gerbera_harness.runtime.execute_producer.schemas import (
+    ObservationDecision,
+    PlanningDecision,
+    ReviewDecision,
+    ReviewResult,
 )
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 from gerbera_harness.tools.client import ToolClient
@@ -40,7 +45,7 @@ class ExecuteProducerRuntime:
     ) -> None:
         await self.execute_consumer.execute_actions(action_groups=action_groups)
 
-    async def produce_action_groups(self) -> None:
+    async def produce_action_groups(self) -> ReviewResult:
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
                 observation = await ObservationRuntime(
@@ -56,8 +61,11 @@ class ExecuteProducerRuntime:
                     prev_state_context=self.context,
                 ).run_observation()
 
-                if observation.result is LoopDecision.FAIL:
-                    return observation.result
+                if observation.result is ObservationDecision.FAIL:
+                    return ReviewResult(
+                        decision=ReviewDecision.FAIL,
+                        context=observation.context,
+                    )
 
                 await self.submit_action_groups(observation.actions)
                 self.context = observation.context
@@ -72,8 +80,11 @@ class ExecuteProducerRuntime:
                     ),
                 ).run_planning()
 
-                if planning.result is LoopDecision.FAIL:
-                    return planning.result
+                if planning.result is PlanningDecision.FAIL:
+                    return ReviewResult(
+                        decision=ReviewDecision.FAIL,
+                        context=planning.context,
+                    )
 
                 action_groups = planning.actions
                 await self.submit_action_groups(action_groups)
@@ -91,10 +102,7 @@ class ExecuteProducerRuntime:
                     context_builder=ReviewContextBuilder(memory=self.memory),
                     prev_state_context=self.context,
                 ).run_review()
-                if review.result is LoopDecision.FAIL:
-                    return review.result
                 self.context = review.context
-                await self.submit_action_groups(review.actions)
-                return review.result
+                return review
             else:
                 raise ValueError("Unsupported State")

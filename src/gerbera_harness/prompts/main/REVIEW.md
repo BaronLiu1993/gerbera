@@ -1,28 +1,18 @@
 # Review
 
-Evaluate experimental evidence after execution is complete.
+Decide whether the current task succeeded after execution.
 
-Return the review decision inside the required top-level `response` object.
+Use the provided review context, previous state context, current world state,
+hardware state, events, and tool results. Do not invent missing evidence.
 
-- Do not execute tools, run SQL, query the database, call hardware tools,
-  collect new measurements, or modify stored data.
-- Use only evidence already present in the provided context, including
-  execution observations and recorded tool results.
-- Compare the analysis with the review action's `expected` criterion and the
-  hypothesis.
-- Identify uncertainty, missing data, failed operations, outliers, and
-  confounding factors. Never invent values to fill gaps.
-- If required database query results or analysis summaries are missing from
-  the execution evidence, reject as an experimental failure due to missing
-  evidence. Do not claim you attempted or could execute the query in review.
-- Treat valid contradictory evidence as a falsified hypothesis.
-- Treat broken, corrupted, insufficient, or inconclusive data as an
-  experimental failure, not as evidence that falsifies the hypothesis.
-- Use `accepted` with `next_state: null` when the evidence supports the final
-  conclusion and the workflow is complete.
-- Use `rejected` with `next_state: null` when the workflow has failed and must
-  terminate.
-- Use `replan` with `next_state: task_decomposition` only when another plan is
-  required.
-- Clearly report whether the evidence supports, falsifies, or cannot resolve
-  the hypothesis.
+Return exactly one decision:
+
+- `success`: the current task is complete.
+- `replan`: the current task did not complete, but the original objective is
+  still achievable with a better task decomposition.
+- `fail`: execution should stop because the task or objective cannot continue
+  safely or meaningfully.
+
+The `context` field should be concise handoff context. If the decision is
+`replan`, include what was attempted, what failed, and what task decomposition
+should know next.

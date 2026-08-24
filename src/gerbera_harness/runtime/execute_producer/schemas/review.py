@@ -1,13 +1,16 @@
-from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
+from enum import Enum
+
 from gerbera_harness.runtime.schemas.base import HarnessSchema
-from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 
 
-class ReviewAction(HarnessSchema):
-    context: str
-    actions: list[list[ActionExecuteSchema]]
+# Keep observe/planning/review decisions separate even when values overlap.
+# Each state can grow domain-specific outcomes without changing the others.
+class ReviewDecision(str, Enum):
+    SUCCESS = "success"
+    REPLAN = "replan"
+    FAIL = "fail"
+
 
 class ReviewResult(HarnessSchema):
+    decision: ReviewDecision
     context: str
-    actions: list[list[ActionExecuteSchema]]
-    result: LoopDecision

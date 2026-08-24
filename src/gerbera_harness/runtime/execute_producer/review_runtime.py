@@ -13,10 +13,9 @@ from gerbera_harness.memory import (
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import ReviewContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas.review import (
-    ReviewAction,
+    ReviewDecision,
     ReviewResult,
 )
-from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 REVIEW_PROMPT = load_prompt(
     PromptTypeEnum.MAIN,
@@ -93,9 +92,14 @@ class ReviewRuntime:
 
     async def run_review(self) -> ReviewResult:
         client = self.model.get_agent_client()
-        before_context = self.context_builder.build_runtime_context()
+
+        environment_state = await self.get_current_environment_state()
+        hardware_state = await self.get_current_hardware_state()
+        self.update_memory(environment_state, hardware_state)
+
+        review_context = self.context_builder.build_runtime_context()
         context = {
-            "review_context": before_context,
+            "review_context": review_context,
             "prev_state_context": self.prev_state_context,
         }
 
@@ -103,24 +107,14 @@ class ReviewRuntime:
             raw_response = await client.send(
                 context,
                 REVIEW_PROMPT,
-                ReviewAction.model_json_schema(),
+                ReviewResult.model_json_schema(),
             )
 
-            action = ReviewAction.model_validate_json(raw_response)
-            self.update_memory_with_review(action.model_dump(mode="json"))
-
-            environment_state = await self.get_current_environment_state()
-            hardware_state = await self.get_current_hardware_state()
-            self.update_memory(environment_state, hardware_state)
-
-            return ReviewResult(
-                context=action.context,
-                actions=action.actions,
-                result=LoopDecision.SUCCESS,
-            )
+            review = ReviewResult.model_validate_json(raw_response)
+            self.update_memory_with_review(review.model_dump(mode="json"))
+            return review
 
         return ReviewResult(
+            decision=ReviewDecision.FAIL,
             context="FAILED TASK",
-            actions=[],
-            result=LoopDecision.FAIL,
         )

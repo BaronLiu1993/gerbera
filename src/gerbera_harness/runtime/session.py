@@ -48,7 +48,11 @@ class TaskDecomposition(ExperimentState):
 class Execution(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.EXECUTION
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {LoopStateEnum.EXECUTION, LoopStateEnum.EVALUATION}
+        {
+            LoopStateEnum.TASK_DECOMPOSITION,
+            LoopStateEnum.EXECUTION,
+            LoopStateEnum.EVALUATION,
+        }
     )
 
 

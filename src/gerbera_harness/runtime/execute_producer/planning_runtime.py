@@ -12,9 +12,9 @@ from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import PlanningContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas import (
     PlanningAction,
+    PlanningDecision,
     PlanningResult,
 )
-from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 PLANNING_PROMPT = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
 
@@ -60,11 +60,11 @@ class PlanningRuntime:
             return PlanningResult(
                 context=action.context,
                 actions=action.actions,
-                result=LoopDecision.SUCCESS,
+                result=PlanningDecision.SUCCESS,
             )
         # Happy path for now 
         return PlanningResult(
             context="FAILED TASK",
             actions=[],
-            result=LoopDecision.FAIL,
+            result=PlanningDecision.FAIL,
         )

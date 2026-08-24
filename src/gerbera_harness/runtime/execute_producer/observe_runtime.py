@@ -14,9 +14,9 @@ from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import ObservationContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas.observe import (
     ObservationAction,
+    ObservationDecision,
     ObservationResult,
 )
-from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 OBSERVATION_PROMPT = load_prompt(
     PromptTypeEnum.SUB,
@@ -119,12 +119,12 @@ class ObservationRuntime:
             return ObservationResult(
                 context=action.context,
                 actions=action.actions,
-                result=LoopDecision.SUCCESS,
+                result=ObservationDecision.SUCCESS,
             )
 
         # only code happy path for now
         return ObservationResult(
             context="FAILED TASK",
             actions=[],
-            result=LoopDecision.FAIL,
+            result=ObservationDecision.FAIL,
         )

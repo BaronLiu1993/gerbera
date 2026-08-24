@@ -1,8 +1,16 @@
+from enum import Enum
+
 from pydantic import Field
 
-from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 from gerbera_harness.runtime.schemas.base import HarnessSchema
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
+
+
+# Keep observe/planning/review decisions separate even when values overlap.
+# Each state can grow domain-specific outcomes without changing the others.
+class PlanningDecision(str, Enum):
+    SUCCESS = "success"
+    FAIL = "fail"
 
 
 class PlanningAction(HarnessSchema):
@@ -13,4 +21,4 @@ class PlanningAction(HarnessSchema):
 class PlanningResult(HarnessSchema):
     context: str
     actions: list[list[ActionExecuteSchema]]
-    result: LoopDecision
+    result: PlanningDecision
