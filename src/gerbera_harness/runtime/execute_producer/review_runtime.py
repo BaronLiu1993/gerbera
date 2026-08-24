@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -105,7 +106,12 @@ class ReviewRuntime:
 
         for _ in range(self.max_attempts):
             raw_response = await client.send(
-                context,
+                [
+                    {
+                        "role": "user",
+                        "content": json.dumps(context, indent=2),
+                    }
+                ],
                 REVIEW_PROMPT,
                 ReviewResult.model_json_schema(),
             )

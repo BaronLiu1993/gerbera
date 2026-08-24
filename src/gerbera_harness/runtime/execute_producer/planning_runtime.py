@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -48,7 +49,12 @@ class PlanningRuntime:
 
         for _ in range(self.max_attempts):
             raw_response = await client.send(
-                context,
+                [
+                    {
+                        "role": "user",
+                        "content": json.dumps(context, indent=2),
+                    }
+                ],
                 PLANNING_PROMPT,
                 PlanningAction.model_json_schema(),
             )

@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -101,7 +102,12 @@ class ObservationRuntime:
 
         for _ in range(self.max_attempts):
             raw_response = await client.send(
-                context,
+                [
+                    {
+                        "role": "user",
+                        "content": json.dumps(context, indent=2),
+                    }
+                ],
                 OBSERVATION_PROMPT,
                 ObservationAction.model_json_schema(),
             )

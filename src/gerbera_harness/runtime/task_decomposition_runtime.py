@@ -52,7 +52,7 @@ class TaskDecompositionRuntime:
                 previous_context=self.previous_context,
             )
             raw_intent = await client.send(
-                context,
+                [{"role": "user", "content": context}],
                 TASK_DECOMPOSITION_PROMPT,
                 TaskDecompositionIntentSchema.model_json_schema(),
             )

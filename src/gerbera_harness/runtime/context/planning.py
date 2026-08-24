@@ -9,9 +9,7 @@ class PlanningContextBuilder(ContextBuilder):
         task_state = self.memory.require_task_state()
         return {
             "goal": task_state.goal,
-            "current_task": self.memory.get_current_task_state().model_dump(
-                mode="json"
-            ),
+            "current_task": self.build_current_task_anchor(),
             "task_state": task_state.model_dump(mode="json"),
             "world_state": self.memory.world_state.model_dump(mode="json"),
             "recent_events": [

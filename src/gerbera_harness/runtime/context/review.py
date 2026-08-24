@@ -7,9 +7,7 @@ from gerbera_harness.runtime.context.base import ContextBuilder
 class ReviewContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
         return {
-            "current_task": self.memory.get_current_task_state().model_dump(
-                mode="json"
-            ),
+            "current_task": self.build_current_task_anchor(),
             "world_state": self.memory.world_state.model_dump(mode="json"),
             "recent_events": [
                 event.model_dump(mode="json")
