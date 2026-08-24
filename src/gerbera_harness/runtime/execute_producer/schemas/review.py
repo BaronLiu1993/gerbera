@@ -7,7 +7,8 @@ from gerbera_harness.runtime.schemas.base import HarnessSchema
 # Each state can grow domain-specific outcomes without changing the others.
 class ReviewDecision(str, Enum):
     SUCCESS = "success"
-    REPLAN = "replan"
+    REPLAN_ACTIONS = "replan_actions"
+    REDECOMPOSE_TASKS = "redecompose_tasks"
     FAIL = "fail"
 
 

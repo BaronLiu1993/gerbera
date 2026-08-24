@@ -46,7 +46,7 @@ class ExecuteProducerRuntime:
         await self.execute_consumer.execute_actions(action_groups=action_groups)
 
     async def produce_action_groups(self) -> ReviewResult:
-        while True:
+        for _ in range(self.max_turns):
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
                 observation = await ObservationRuntime(
                     model=self.model,
@@ -103,6 +103,20 @@ class ExecuteProducerRuntime:
                     prev_state_context=self.context,
                 ).run_review()
                 self.context = review.context
+                if review.decision is ReviewDecision.REPLAN_ACTIONS:
+                    self.state_machine.perform_transition(
+                        ExecuteLoopStateEnum.OBSERVE
+                    )
+                    continue
+
                 return review
             else:
                 raise ValueError("Unsupported State")
+
+        return ReviewResult(
+            decision=ReviewDecision.REDECOMPOSE_TASKS,
+            context=(
+                "Exceeded execute producer max turns while trying to complete "
+                "the current task."
+            ),
+        )
