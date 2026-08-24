@@ -1,9 +1,6 @@
-from dataclasses import dataclass, field
-from functools import cached_property
+from dataclasses import dataclass
 
 from gerbera_harness.runtime.session import (
-    EvaluationDecisionEnum,
-    ExecuteDecisionEnum,
     InitialisationDecisionEnum,
     LoopStateEnum,
     Session,
@@ -11,9 +8,10 @@ from gerbera_harness.runtime.session import (
 from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
 from gerbera_harness.tools.client import ToolClient
-from gerbera_harness.tools.registry import LocalToolRegistry
 from gerbera_harness.runtime.evaluation_runtime import EvaluationRuntime
-from gerbera_harness.runtime.execution import ExecutionRuntime
+from gerbera_harness.runtime.execute_consumer import ExecuteConsumer
+from gerbera_harness.runtime.execute_producer import ExecuteProducer
+from gerbera_harness.runtime.execute_producer.session import StateMachine
 from gerbera_harness.runtime.initialisation_runtime import (
     InitialisationRuntime,
 )
@@ -24,81 +22,46 @@ class AgentRuntime:
     session: Session
     model: Model
     memory: Memory
-    mcp_url: str
-    local_tool_registry: LocalToolRegistry
-    feedback: list[str] = field(default_factory=list)
-    context_window_size: int = 20
-
-    @cached_property
-    def initialisation_runtime(self) -> InitialisationRuntime:
-        self._initialisation_runtime = InitialisationRuntime(
-            model=self.model,
-            memory=self.memory,
-            tool_client=ToolClient(
-                mcp_url=self.mcp_url,
-                local_tool_registry=self.local_tool_registry,
-            ),
-        )
-        return self._initialisation_runtime
-
-    @cached_property
-    def execution_runtime(self) -> ExecutionRuntime:
-        return ExecutionRuntime(
-            model=self.model,
-            memory=self.memory,
-            mcp_url=self.mcp_url,
-            local_tool_registry=self.local_tool_registry,
-        )
-
-    @cached_property
-    def evaluation_runtime(self) -> EvaluationRuntime:
-        return EvaluationRuntime(
-            memory=self.memory,
-        )
+    tool_client: ToolClient
+    execute_consumer: ExecuteConsumer
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
             current_state = self.session.state
             if current_state.state is LoopStateEnum.INITIALISATION:
-                result = await self.initialisation_runtime.run_initial(
-                    sources=[],
-                    feedback=initial_user_prompt,
-                )
-
-                print("initialisation result", result)
-
-                if result.decision is InitialisationDecisionEnum.ACCEPTED:
-                    self.memory.initialisation_intent = result.intent
-                    self.session.perform_transition(result.requested_next_state)
-                elif result.decision is InitialisationDecisionEnum.CLARIFY:
-                    break
-                elif result.decision is InitialisationDecisionEnum.REJECTED:
-                    return result.rejection_reasons
-                else:
-                    raise ValueError("Unsupported Decision")
+                await self.run_initialisation(initial_user_prompt)
             elif current_state.state is LoopStateEnum.EXECUTION:
-                result = await self.execution_runtime.run_execution()
-                print("execution result", result)
-                if result.decision is ExecuteDecisionEnum.ACCEPTED:
-                    self.session.perform_transition(result.requested_next_state)
-                elif result.decision is ExecuteDecisionEnum.REJECTED:
-                    break
-                else:
-                    raise ValueError("Unsupported Decision")
+                await self.run_execution()
             elif current_state.state is LoopStateEnum.EVALUATION:
-                result = await self.evaluation_runtime.run_evaluation()
-                print("evaluation result", result)
-                if result.decision is EvaluationDecisionEnum.REPLAN:
-                    self.feedback = result.feedback
-                    # Replanning is intentionally paused while the first
-                    # single-pass workflow is stabilized.
-                    # self.session.perform_transition(result.requested_next_state)
-                    break
-                elif result.decision is EvaluationDecisionEnum.ACCEPTED:
-                    break
-                elif result.decision is EvaluationDecisionEnum.REJECTED:
-                    break
-                else:
-                    raise ValueError("Unsupported Decision")
+                await self.run_evaluation()
+                break
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
+
+    async def run_initialisation(self, initial_user_prompt: str) -> None:
+        result = await InitialisationRuntime(
+            model=self.model,
+            memory=self.memory,
+            tool_client=self.tool_client,
+            user_prompt=initial_user_prompt,
+        ).run_initial(source_urls=[])
+
+        if result.decision is InitialisationDecisionEnum.ACCEPTED:
+            self.session.perform_transition(LoopStateEnum.EXECUTION)
+            return
+
+        raise ValueError("Unsupported Initialisation Decision")
+
+    async def run_execution(self) -> None:
+        await ExecuteProducer(
+            model=self.model,
+            tool_client=self.tool_client,
+            memory=self.memory,
+            context=self.memory.task_state.goal,
+            execute_consumer=self.execute_consumer,
+            state_machine=StateMachine(),
+        ).produce_action_groups()
+        self.session.perform_transition(LoopStateEnum.EVALUATION)
+
+    async def run_evaluation(self) -> None:
+        await EvaluationRuntime(memory=self.memory).run_evaluation()

@@ -6,4 +6,13 @@ from gerbera_harness.runtime.context.base import ContextBuilder
 @dataclass(frozen=True)
 class ObservationContextBuilder(ContextBuilder):
     def build_runtime_context(self) -> dict[str, object]:
-        pass
+        return {
+            "current_task": self.memory.get_current_task_state().model_dump(
+                mode="json"
+            ),
+            "task_state": self.memory.get_tasks_state().model_dump(mode="json"),
+            "world_state": self.memory.world_state.model_dump(mode="json"),
+            "temporal_state": self.memory.get_temporal_state().model_dump(
+                mode="json"
+            ),
+        }

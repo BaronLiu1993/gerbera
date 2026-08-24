@@ -51,7 +51,7 @@ EXECUTE_PRODUCER_STATE_TYPES: dict[ExecuteLoopStateEnum, type[ExecuteLoopState]]
 }
 
 @dataclass
-class Session:
+class StateMachine:
     state: ExecuteLoopState = field(default_factory=ObserveState)
 
     @property

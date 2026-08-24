@@ -29,7 +29,7 @@ class ExecuteProducer:
     model: Model
     tool_client: ToolClient
     memory: Memory
-    context: str  # pass in the initialisation context
+    context: str
     execute_consumer: ExecuteConsumer
     state_machine: StateMachine
     max_turns: int = 3
@@ -97,6 +97,8 @@ class ExecuteProducer:
                 await self.submit_action_groups(review.actions)
                 self.context = review.context
                 break
+                # we are only coding the happy path right now, so review will basically be another observe with a different system prompt
+                # and extra review
                 # if review.result is LoopDecision.FAIL:
                 #     self.state_machine.perform_transition(ExecuteLoopStateEnum.OBSERVE)
             else:

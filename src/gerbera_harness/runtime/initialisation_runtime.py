@@ -18,6 +18,7 @@ from gerbera_harness.runtime.schemas.initialisation import (
 )
 from gerbera_harness.memory import Memory, TaskSchema, TaskStatusEnum
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
+from gerbera_harness.runtime.context import InitialisationContextBuilder
 from gerbera_harness.tools.client import ToolClient
 
 INITIALISATION_PROMPT = load_prompt(
@@ -102,6 +103,10 @@ class InitialisationRuntime:
         source_urls: list[str],
     ) -> str:
         tools = await self.tool_client.list_tools()
+        runtime_context = await InitialisationContextBuilder(
+            memory=self.memory,
+            tool_client=self.tool_client,
+        ).build_runtime_context()
         sources: dict[str, str] = {}
         for url in source_urls:
             sources[url] = await self.fetch_url(url)
@@ -109,6 +114,7 @@ class InitialisationRuntime:
         return self.generate_agent_context(
             clarifying_questions=self.clarifying_questions,
             user_prompt=user_prompt,
+            runtime_context=runtime_context,
             tools=tools,
             sources=sources,
         )
@@ -117,6 +123,7 @@ class InitialisationRuntime:
         self,
         clarifying_questions: dict[str, tuple[Question, Answer] | None],
         user_prompt: str,
+        runtime_context: dict[str, object],
         tools: list,
         sources: dict[str, str],
     ) -> str:
@@ -125,6 +132,11 @@ class InitialisationRuntime:
             "## Objective",
             user_prompt.strip(),
         ]
+
+        sections.append("## Runtime Context")
+        sections.append("```json")
+        sections.append(json.dumps(runtime_context, indent=2))
+        sections.append("```")
 
         sections.append("## Clarifying Questions")
         if not clarifying_questions:

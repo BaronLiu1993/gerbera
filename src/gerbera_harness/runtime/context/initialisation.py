@@ -1,9 +1,30 @@
 from dataclasses import dataclass
+from typing import Any
 
 from gerbera_harness.runtime.context.base import ContextBuilder
+from gerbera_harness.tools.client import ToolClient
 
 
 @dataclass(frozen=True)
 class InitialisationContextBuilder(ContextBuilder):
-    def build_runtime_context(self) -> dict[str, object]:
-        pass
+    tool_client: ToolClient
+
+    async def build_runtime_context(self) -> dict[str, object]:
+        return {
+            "session_id": self.memory.session_id,
+            "environment_state": await self.get_current_environment_state(),
+            "hardware_state": await self.get_current_hardware_state(),
+            "task_state": self.memory.task_state.model_dump(mode="json"),
+        }
+
+    async def get_current_environment_state(self) -> dict[str, Any]:
+        return await self.tool_client.call_tool(
+            "get_current_environment_state",
+            {},
+        )
+
+    async def get_current_hardware_state(self) -> dict[str, Any]:
+        return await self.tool_client.call_tool(
+            "get_current_hardware_state",
+            {},
+        )
