@@ -20,11 +20,14 @@ class Memory:
     temporal_state: TemporalStateSchema
     task_state: TaskStateSchema | None
     events_state: EventStateSchema
-    physical_configuration: PhysicalConfigurationStateSchema
+    physical_configuration: PhysicalConfigurationStateSchema | None # temporarily is none
 
     def define_world_state(self, world_state: WorldStateSchema) -> None:
         self.world_state = world_state
 
+    def define_physical_configuration(self):
+        pass
+    
     def initialise_tasks(
         self,
         tasks: list[TaskSchema],
@@ -116,10 +119,3 @@ class Memory:
         self.temporal_state.recent_world_states = (
             self.temporal_state.recent_world_states[-window_size:]
         )
-
-    #
-    # def define_physical_configuration(self):
-    #     pass
-
-    # def get_hardware_configuration(self):
-    #     return self.physical_configuration

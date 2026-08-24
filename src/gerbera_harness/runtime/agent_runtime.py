@@ -24,6 +24,7 @@ class AgentRuntime:
     memory: Memory
     tool_client: ToolClient
     execute_consumer: ExecuteConsumerRuntime
+    user_prompt: str
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
@@ -38,12 +39,12 @@ class AgentRuntime:
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
 
-    async def run_task_decomposition(self, initial_user_prompt: str) -> None:
+    async def run_task_decomposition(self) -> None:
         result = await TaskDecompositionRuntime(
             model=self.model,
             memory=self.memory,
             tool_client=self.tool_client,
-            user_prompt=initial_user_prompt,
+            user_prompt=self.user_prompt,
         ).run_task_decomposition(source_urls=[])
 
         if result.decision is TaskDecompositionDecisionEnum.ACCEPTED:

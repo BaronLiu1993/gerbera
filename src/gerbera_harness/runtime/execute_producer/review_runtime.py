@@ -19,8 +19,8 @@ from gerbera_harness.runtime.execute_producer.schemas.review import (
 from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 REVIEW_PROMPT = load_prompt(
-    PromptTypeEnum.SUB,
-    "OBSERVATION_REVIEW.md",
+    PromptTypeEnum.MAIN,
+    "REVIEW.md",
 )
 
 

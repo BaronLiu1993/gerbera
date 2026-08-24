@@ -12,7 +12,6 @@ from gerbera_harness.memory.schemas.physical import (
 )
 from gerbera_harness.runtime.schemas.execute import (
     ActionTypeEnum,
-    AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
     ExecuteActionParameterSchema,
@@ -30,7 +29,6 @@ from gerbera_harness.memory.schemas.world import WorldStateSchema
 
 __all__ = [
     "ActionTypeEnum",
-    "AgentExecuteSchema",
     "ContinuousExecuteSchema",
     "DiscreteExecuteSchema",
     "EventStateSchema",
