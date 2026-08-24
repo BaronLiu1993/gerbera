@@ -100,7 +100,7 @@ class ExecuteConsumerRuntime:
                     "arguments": arguments,
                     "result": result,
                 },
-                task_id=self.memory.task_state.current_task_id,
+                task_id=self.memory.require_task_state().current_task_id,
             )
         )
         return result

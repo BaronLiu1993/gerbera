@@ -53,6 +53,7 @@ class AgentRuntime:
         raise ValueError("Unsupported TaskDecomposition Decision")
 
     async def run_execution(self) -> None:
+        self.memory.require_task_state()
         while self.memory.has_remaining_tasks():
             self.memory.advance_to_next_task()
             self.memory.start_task()

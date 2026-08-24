@@ -50,7 +50,7 @@ class ObservationRuntime:
         environment_state: dict[str, Any],
         hardware_state: dict[str, Any],
     ) -> None:
-        task_id = self.memory.task_state.current_task_id
+        task_id = self.memory.require_task_state().current_task_id
         world_state = WorldStateSchema(
             session_id=self.memory.session_id,
             environment_state=environment_state,
@@ -80,7 +80,7 @@ class ObservationRuntime:
         self.memory.rebuild_temporal_state()
 
     def update_memory_with_plan(self, agent_payload: dict[str, Any]) -> None:
-        task_id = self.memory.task_state.current_task_id
+        task_id = self.memory.require_task_state().current_task_id
         observe_plan_upload = EventSchema(
             session_id=self.memory.session_id,
             event_type=EventTypeEnum.OBSERVATION_CREATED,

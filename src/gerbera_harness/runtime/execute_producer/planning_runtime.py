@@ -28,7 +28,7 @@ class PlanningRuntime:
     max_attempts: int = 3
 
     def update_memory_with_plan(self, agent_payload: dict[str, Any]) -> None:
-        task_id = self.memory.task_state.current_task_id
+        task_id = self.memory.require_task_state().current_task_id
         plan_event = EventSchema(
             session_id=self.memory.session_id,
             event_type=EventTypeEnum.PLAN_CREATED,
