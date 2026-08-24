@@ -6,11 +6,9 @@ from typing import Any
 from pydantic import Field
 
 from gerbera_harness.runtime.schemas.execute import (
-    AgentExecuteSchema,
     ContinuousExecuteSchema,
     DiscreteExecuteSchema,
 )
-from gerbera_harness.runtime.schemas.experiment import HypothesisSchema
 from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
@@ -22,7 +20,7 @@ class ToolStatusEnum(str, Enum):
 
 class ToolSchema(HarnessSchema):
     session_id: str
-    action: DiscreteExecuteSchema | ContinuousExecuteSchema | AgentExecuteSchema
+    action: DiscreteExecuteSchema | ContinuousExecuteSchema
     tool_status: ToolStatusEnum
     result: dict[str, Any] = Field(default_factory=dict)
     error_code: str | None = None
@@ -54,7 +52,7 @@ class TaskSchema(HarnessSchema):
 
 
 class TaskStateSchema(HarnessSchema):
-    user_intent: str 
+    user_intent: str
     goal: str
     tasks: list[TaskSchema] = Field(default_factory=list)
-    current_task_id: str | None = None
+    current_task_id: str
