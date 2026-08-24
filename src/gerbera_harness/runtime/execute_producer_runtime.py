@@ -7,7 +7,7 @@ from gerbera_harness.runtime.context import (
     PlanningContextBuilder,
     ReviewContextBuilder,
 )
-from gerbera_harness.runtime.execute_consumer import ExecuteConsumer
+from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
 from gerbera_harness.runtime.execute_producer.observe_runtime import (
     ObservationRuntime,
 )
@@ -25,12 +25,12 @@ from gerbera_harness.tools.client import ToolClient
 
 
 @dataclass
-class ExecuteProducer:
+class ExecuteProducerRuntime:
     model: Model
     tool_client: ToolClient
     memory: Memory
     context: str
-    execute_consumer: ExecuteConsumer
+    execute_consumer: ExecuteConsumerRuntime
     state_machine: StateMachine
     max_turns: int = 3
 

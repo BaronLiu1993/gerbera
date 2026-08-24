@@ -17,7 +17,7 @@ from gerbera_harness.runtime.schemas.execute import (
 from gerbera_harness.tools.client import ToolClient
 
 @dataclass
-class ExecuteConsumer:
+class ExecuteConsumerRuntime:
     tool_client: ToolClient
     memory: Memory
 

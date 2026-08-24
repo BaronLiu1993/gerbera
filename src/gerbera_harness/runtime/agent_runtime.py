@@ -9,9 +9,9 @@ from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
 from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.runtime.evaluation_runtime import EvaluationRuntime
-from gerbera_harness.runtime.execute_consumer import ExecuteConsumer
-from gerbera_harness.runtime.execute_producer import ExecuteProducer
+from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
 from gerbera_harness.runtime.execute_producer.session import StateMachine
+from gerbera_harness.runtime.execute_producer_runtime import ExecuteProducerRuntime
 from gerbera_harness.runtime.initialisation_runtime import (
     InitialisationRuntime,
 )
@@ -23,7 +23,7 @@ class AgentRuntime:
     model: Model
     memory: Memory
     tool_client: ToolClient
-    execute_consumer: ExecuteConsumer
+    execute_consumer: ExecuteConsumerRuntime
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
@@ -53,7 +53,7 @@ class AgentRuntime:
         raise ValueError("Unsupported Initialisation Decision")
 
     async def run_execution(self) -> None:
-        await ExecuteProducer(
+        await ExecuteProducerRuntime(
             model=self.model,
             tool_client=self.tool_client,
             memory=self.memory,
