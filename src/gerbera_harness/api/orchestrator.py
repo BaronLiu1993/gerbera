@@ -27,6 +27,24 @@ class Orchestrator:
         api_key: str,
         model: str,
     ) -> AgentRuntime:
+        runtime = self.build_agent_runtime(
+            user_prompt=user_prompt,
+            mcp_url=mcp_url,
+            provider=provider,
+            api_key=api_key,
+            model=model,
+        )
+        self.sessions[runtime.session.session_id] = runtime
+        return runtime
+
+    def build_agent_runtime(
+        self,
+        user_prompt: str,
+        mcp_url: str,
+        provider: str,
+        api_key: str,
+        model: str,
+    ) -> AgentRuntime:
         session = Session()
         memory = Memory(
             session_id=session.session_id,
@@ -39,7 +57,7 @@ class Orchestrator:
             events_state=EventStateSchema(session_id=session.session_id),
             physical_configuration=None,
         )
-        model = Model(
+        runtime_model = Model(
             model_provider=ModelProviderEnum(provider),
             model=model,
             api_key=api_key,
@@ -54,11 +72,10 @@ class Orchestrator:
         )
         runtime = AgentRuntime(
             session=session,
-            model=model,
+            model=runtime_model,
             memory=memory,
             tool_client=tool_client,
             user_prompt=user_prompt,
             execute_consumer=execute_consumer,
         )
-        self.sessions[session.session_id] = runtime
         return runtime
