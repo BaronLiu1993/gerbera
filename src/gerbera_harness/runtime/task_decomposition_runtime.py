@@ -33,11 +33,11 @@ class TaskDecompositionRuntime:
     memory: Memory
     tool_client: ToolClient
     user_prompt: str
+    previous_context: str
     max_attempts: int = 3
     clarifying_questions: dict[str, tuple[Question, Answer] | None] = field(
         default_factory=dict
     )
-    previous_context: str = ""
 
     async def run_task_decomposition(
         self,

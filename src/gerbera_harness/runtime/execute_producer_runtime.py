@@ -57,7 +57,7 @@ class ExecuteProducerRuntime:
                 ).run_observation()
 
                 if observation.result is LoopDecision.FAIL:
-                    break
+                    return observation.result
 
                 await self.submit_action_groups(observation.actions)
                 self.context = observation.context
@@ -73,7 +73,7 @@ class ExecuteProducerRuntime:
                 ).run_planning()
 
                 if planning.result is LoopDecision.FAIL:
-                    break
+                    return planning.result
 
                 action_groups = planning.actions
                 await self.submit_action_groups(action_groups)
@@ -92,14 +92,9 @@ class ExecuteProducerRuntime:
                     prev_state_context=self.context,
                 ).run_review()
                 if review.result is LoopDecision.FAIL:
-                    break
-
-                await self.submit_action_groups(review.actions)
+                    return review.result
                 self.context = review.context
-                break
-                # we are only coding the happy path right now, so review will basically be another observe with a different system prompt
-                # and extra review
-                # if review.result is LoopDecision.FAIL:
-                #     self.state_machine.perform_transition(ExecuteLoopStateEnum.OBSERVE)
+                await self.submit_action_groups(review.actions)
+                return review.result
             else:
                 raise ValueError("Unsupported State")

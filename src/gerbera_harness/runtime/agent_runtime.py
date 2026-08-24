@@ -25,6 +25,8 @@ class AgentRuntime:
     tool_client: ToolClient
     execute_consumer: ExecuteConsumerRuntime
     user_prompt: str
+    previous_context: str = ""
+    is_initial_run: bool = False
 
     async def run_agent(self, initial_user_prompt: str) -> None:
         while True:
@@ -39,13 +41,15 @@ class AgentRuntime:
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
 
-    async def run_task_decomposition(self) -> None:
+    async def run_task_decomposition(self, source_urls: list[str] = []) -> None:
         result = await TaskDecompositionRuntime(
             model=self.model,
             memory=self.memory,
+            is_initial_run=self.is_initial_run,
             tool_client=self.tool_client,
             user_prompt=self.user_prompt,
-        ).run_task_decomposition(source_urls=[])
+            previous_context=self.previous_context,
+        ).run_task_decomposition(source_urls=source_urls) # we will pass in the source_urls eventually
 
         if result.decision is TaskDecompositionDecisionEnum.ACCEPTED:
             self.session.perform_transition(LoopStateEnum.EXECUTION)
@@ -59,7 +63,7 @@ class AgentRuntime:
             self.memory.advance_to_next_task()
             self.memory.start_task()
             current_task = self.memory.get_current_task_state()
-            await ExecuteProducerRuntime(
+            result = await ExecuteProducerRuntime(
                 model=self.model,
                 tool_client=self.tool_client,
                 memory=self.memory,
@@ -67,6 +71,12 @@ class AgentRuntime:
                 execute_consumer=self.execute_consumer,
                 state_machine=StateMachine(),
             ).produce_action_groups()
+
+            if result.decision is LoopDecision.FAIL:
+                self.is_initial_run = True
+                self.previous_context = result.previous_context
+                self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
+
             self.memory.complete_task()
             self.memory.advance_to_next_task()
 
