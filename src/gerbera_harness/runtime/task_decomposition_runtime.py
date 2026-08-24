@@ -32,11 +32,12 @@ class TaskDecompositionRuntime:
     model: Model
     memory: Memory
     tool_client: ToolClient
+    user_prompt: str
     max_attempts: int = 3
     clarifying_questions: dict[str, tuple[Question, Answer] | None] = field(
         default_factory=dict
     )
-    user_prompt: str
+    previous_context: str = ""
 
     async def run_task_decomposition(
         self,
@@ -48,6 +49,7 @@ class TaskDecompositionRuntime:
             context = await self.build_agent_context(
                 source_urls=source_urls,
                 user_prompt=self.user_prompt,
+                previous_context=self.previous_context,
             )
             raw_intent = await client.send(
                 context,
@@ -101,6 +103,7 @@ class TaskDecompositionRuntime:
         self,
         user_prompt: str,
         source_urls: list[str],
+        previous_context: str = "",
     ) -> str:
         tools = await self.tool_client.list_tools()
         runtime_context = await TaskDecompositionContextBuilder(
@@ -116,6 +119,7 @@ class TaskDecompositionRuntime:
             user_prompt=user_prompt,
             runtime_context=runtime_context,
             tools=tools,
+            previous_context=previous_context,
             sources=sources,
         )
 
@@ -126,12 +130,17 @@ class TaskDecompositionRuntime:
         runtime_context: dict[str, object],
         tools: list,
         sources: dict[str, str],
+        previous_context: str = "",
     ) -> str:
         sections = [
             "# Experiment Context",
             "## Objective",
             user_prompt.strip(),
         ]
+
+        if previous_context:
+            sections.append("## Previous Context")
+            sections.append(previous_context.strip())
 
         sections.append("## Runtime Context")
         sections.append("```json")
