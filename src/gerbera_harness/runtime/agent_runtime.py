@@ -10,7 +10,7 @@ from gerbera_harness.memory import Memory
 from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.runtime.evaluation_runtime import EvaluationRuntime
 from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
-from gerbera_harness.runtime.execute_producer.session import StateMachine
+from gerbera_harness.runtime.execute_producer.state_machine import StateMachine
 from gerbera_harness.runtime.execute_producer_runtime import ExecuteProducerRuntime
 from gerbera_harness.runtime.task_decomposition_runtime import (
     TaskDecompositionRuntime,
@@ -53,14 +53,21 @@ class AgentRuntime:
         raise ValueError("Unsupported TaskDecomposition Decision")
 
     async def run_execution(self) -> None:
-        await ExecuteProducerRuntime(
-            model=self.model,
-            tool_client=self.tool_client,
-            memory=self.memory,
-            context=self.memory.task_state.goal,
-            execute_consumer=self.execute_consumer,
-            state_machine=StateMachine(),
-        ).produce_action_groups()
+        while self.memory.has_remaining_tasks():
+            self.memory.advance_to_next_task()
+            self.memory.start_task()
+            current_task = self.memory.get_current_task_state()
+            await ExecuteProducerRuntime(
+                model=self.model,
+                tool_client=self.tool_client,
+                memory=self.memory,
+                context=current_task.task_goal,
+                execute_consumer=self.execute_consumer,
+                state_machine=StateMachine(),
+            ).produce_action_groups()
+            self.memory.complete_task()
+            self.memory.advance_to_next_task()
+
         self.session.perform_transition(LoopStateEnum.EVALUATION)
 
     async def run_evaluation(self) -> None:

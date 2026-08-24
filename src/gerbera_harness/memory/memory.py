@@ -36,13 +36,35 @@ class Memory:
         self.task_state.tasks = list(tasks)
         self.task_state.current_task_id = tasks[0].task_id
 
+    def has_current_task(self) -> bool:
+        return any(
+            task.task_id == self.task_state.current_task_id
+            for task in self.task_state.tasks
+        )
+
+    def has_remaining_tasks(self) -> bool:
+        return any(
+            task.status is TaskStatusEnum.PENDING
+            for task in self.task_state.tasks
+        )
+
+    def advance_to_next_task(self) -> None:
+        for task in self.task_state.tasks:
+            if task.status is TaskStatusEnum.PENDING:
+                self.task_state.current_task_id = task.task_id
+                return
+
     def complete_task(self) -> None:
         task = self.get_current_task_state()
+        if task.status != TaskStatusEnum.IN_PROGRESS:
+            raise ValueError("Task has not started yet")
         task.status = TaskStatusEnum.COMPLETED
         task.finished_at = datetime.now(timezone.utc)
 
     def fail_task(self) -> None:
         task = self.get_current_task_state()
+        if task.status != TaskStatusEnum.IN_PROGRESS:
+            raise ValueError("Task has not started yet")
         task.status = TaskStatusEnum.FAILED
         task.finished_at = datetime.now(timezone.utc)
 
@@ -58,6 +80,7 @@ class Memory:
         for task in self.task_state.tasks:
             if task.task_id == current_task_id:
                 return task
+        raise RuntimeError(f"Current task not found: {current_task_id}")
 
     # get all tasks 
     def get_tasks_state(self) -> TaskStateSchema:

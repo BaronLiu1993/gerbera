@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from gerbera_harness.runtime.execute_producer.session import LoopDecision
+from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 from gerbera_harness.runtime.schemas.base import HarnessSchema
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 

@@ -14,7 +14,7 @@ from gerbera_harness.runtime.execute_producer.schemas import (
     PlanningAction,
     PlanningResult,
 )
-from gerbera_harness.runtime.execute_producer.session import LoopDecision
+from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 PLANNING_PROMPT = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
 

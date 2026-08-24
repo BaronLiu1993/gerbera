@@ -15,7 +15,7 @@ from gerbera_harness.runtime.execute_producer.planning_runtime import (
     PlanningRuntime,
 )
 from gerbera_harness.runtime.execute_producer.review_runtime import ReviewRuntime
-from gerbera_harness.runtime.execute_producer.session import (
+from gerbera_harness.runtime.execute_producer.state_machine import (
     ExecuteLoopStateEnum,
     LoopDecision,
     StateMachine,

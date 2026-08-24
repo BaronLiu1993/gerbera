@@ -10,7 +10,7 @@ from gerbera_harness.runtime.execute_producer.schemas.review import (
     ReviewAction,
     ReviewResult,
 )
-from gerbera_harness.runtime.execute_producer.session import LoopDecision
+from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 __all__ = [
     "LoopDecision",

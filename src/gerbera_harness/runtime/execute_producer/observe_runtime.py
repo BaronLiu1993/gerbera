@@ -16,7 +16,7 @@ from gerbera_harness.runtime.execute_producer.schemas.observe import (
     ObservationAction,
     ObservationResult,
 )
-from gerbera_harness.runtime.execute_producer.session import LoopDecision
+from gerbera_harness.runtime.execute_producer.state_machine import LoopDecision
 
 OBSERVATION_PROMPT = load_prompt(
     PromptTypeEnum.SUB,
