@@ -30,10 +30,12 @@ class Memory:
         tasks: list[TaskSchema],
         user_intent: str,
         goal: str,
+        success_criteria: list[str],
     ) -> None:
         self.task_state = TaskStateSchema(
             user_intent=user_intent,
             goal=goal,
+            success_criteria=success_criteria,
             tasks=list(tasks),
             current_task_id=tasks[0].task_id,
         )

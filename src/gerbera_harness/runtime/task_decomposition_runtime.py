@@ -64,6 +64,7 @@ class TaskDecompositionRuntime:
                 tasks,
                 user_intent=self.user_prompt,
                 goal=intent.goal,
+                success_criteria=intent.success_criteria,
             )
 
             return TaskDecompositionResultSchema(

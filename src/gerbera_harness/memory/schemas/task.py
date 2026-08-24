@@ -54,5 +54,6 @@ class TaskSchema(HarnessSchema):
 class TaskStateSchema(HarnessSchema):
     user_intent: str
     goal: str
+    success_criteria: list[str] = Field(default_factory=list)
     tasks: list[TaskSchema] = Field(default_factory=list)
     current_task_id: str
