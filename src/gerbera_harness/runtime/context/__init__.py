@@ -4,8 +4,8 @@ from gerbera_harness.runtime.context.base import ContextBuilder
 from gerbera_harness.runtime.context.evaluation import (
     EvaluateContextBuilder,
 )
-from gerbera_harness.runtime.context.initialisation import (
-    InitialisationContextBuilder,
+from gerbera_harness.runtime.context.task_decomposition import (
+    TaskDecompositionContextBuilder,
 )
 from gerbera_harness.runtime.context.observation import (
     ObservationContextBuilder,
@@ -20,7 +20,7 @@ from gerbera_harness.runtime.context.review import (
 __all__ = [
     "ContextBuilder",
     "EvaluateContextBuilder",
-    "InitialisationContextBuilder",
+    "TaskDecompositionContextBuilder",
     "ObservationContextBuilder",
     "PlanningContextBuilder",
     "ReviewContextBuilder",

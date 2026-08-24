@@ -22,7 +22,7 @@ Return the review decision inside the required top-level `response` object.
   conclusion and the workflow is complete.
 - Use `rejected` with `next_state: null` when the workflow has failed and must
   terminate.
-- Use `replan` with `next_state: initialisation` only when another plan is
+- Use `replan` with `next_state: task_decomposition` only when another plan is
   required.
 - Clearly report whether the evidence supports, falsifies, or cannot resolve
   the hypothesis.

@@ -5,7 +5,7 @@ from typing import ClassVar
 
 
 class LoopStateEnum(str, Enum):
-    INITIALISATION = "initialisation"
+    TASK_DECOMPOSITION = "task_decomposition"
     EXECUTION = "execution"
     EVALUATION = "evaluation"
 
@@ -16,7 +16,7 @@ class EvaluationDecisionEnum(str, Enum):
     REPLAN = "replan"
 
 
-class InitialisationDecisionEnum(str, Enum):
+class TaskDecompositionDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CLARIFY = "clarify"
@@ -37,10 +37,10 @@ class ExperimentState:
 
 
 @dataclass(frozen=True)
-class Initialisation(ExperimentState):
-    state: ClassVar[LoopStateEnum] = LoopStateEnum.INITIALISATION
+class TaskDecomposition(ExperimentState):
+    state: ClassVar[LoopStateEnum] = LoopStateEnum.TASK_DECOMPOSITION
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {LoopStateEnum.INITIALISATION, LoopStateEnum.EXECUTION}
+        {LoopStateEnum.TASK_DECOMPOSITION, LoopStateEnum.EXECUTION}
     )
 
 
@@ -56,12 +56,12 @@ class Execution(ExperimentState):
 class Evaluation(ExperimentState):
     state: ClassVar[LoopStateEnum] = LoopStateEnum.EVALUATION
     valid_transition_states: ClassVar[frozenset[LoopStateEnum]] = frozenset(
-        {LoopStateEnum.INITIALISATION}
+        {LoopStateEnum.TASK_DECOMPOSITION}
     )
 
 
 STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
-    LoopStateEnum.INITIALISATION: Initialisation,
+    LoopStateEnum.TASK_DECOMPOSITION: TaskDecomposition,
     LoopStateEnum.EXECUTION: Execution,
     LoopStateEnum.EVALUATION: Evaluation,
 }
@@ -69,7 +69,7 @@ STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
 
 @dataclass
 class Session:
-    state: ExperimentState = field(default_factory=Initialisation)
+    state: ExperimentState = field(default_factory=TaskDecomposition)
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def valid_transition(self, new_state: LoopStateEnum | str) -> bool:

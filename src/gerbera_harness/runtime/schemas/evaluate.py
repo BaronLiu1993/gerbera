@@ -18,7 +18,7 @@ class RejectedEvaluationResponseSchema(HarnessSchema):
 
 class ReplanEvaluationResponseSchema(HarnessSchema):
     decision: Literal[EvaluationDecisionEnum.REPLAN]
-    next_state: Literal[LoopStateEnum.INITIALISATION]
+    next_state: Literal[LoopStateEnum.TASK_DECOMPOSITION]
     feedback: list[str]
 
 

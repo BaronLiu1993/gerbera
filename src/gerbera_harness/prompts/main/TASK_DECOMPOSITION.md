@@ -1,8 +1,8 @@
-# Initialisation
+# Task Decomposition
 
-Generate the current initialisation intent frame for the requested run.
+Generate the current task decomposition intent frame for the requested run.
 
-Initialisation is for research, context gathering, intent framing, and
+Task decomposition is for research, context gathering, intent framing, and
 high-level task creation only. It does not create action groups, tool-call
 plans, hypotheses, methods, or review programs.
 

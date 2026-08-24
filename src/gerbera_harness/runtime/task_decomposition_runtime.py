@@ -4,31 +4,31 @@ from dataclasses import dataclass, field
 import httpx
 
 from gerbera_harness.runtime.session import (
-    InitialisationDecisionEnum,
+    TaskDecompositionDecisionEnum,
 )
 
-from gerbera_harness.runtime.schemas.initialisation import (
-    InitialisationIntentSchema,
-    InitialisationResultSchema,
+from gerbera_harness.runtime.schemas.task_decomposition import (
+    TaskDecompositionIntentSchema,
+    TaskDecompositionResultSchema,
 )
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.runtime.schemas.initialisation import (
+from gerbera_harness.runtime.schemas.task_decomposition import (
     Answer,
     Question,
 )
 from gerbera_harness.memory import Memory, TaskSchema, TaskStatusEnum
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
-from gerbera_harness.runtime.context import InitialisationContextBuilder
+from gerbera_harness.runtime.context import TaskDecompositionContextBuilder
 from gerbera_harness.tools.client import ToolClient
 
-INITIALISATION_PROMPT = load_prompt(
+TASK_DECOMPOSITION_PROMPT = load_prompt(
     PromptTypeEnum.MAIN,
-    "INITIALISATION.md",
+    "TASK_DECOMPOSITION.md",
 )
 
 
 @dataclass
-class InitialisationRuntime:
+class TaskDecompositionRuntime:
     model: Model
     memory: Memory
     tool_client: ToolClient
@@ -38,10 +38,10 @@ class InitialisationRuntime:
     )
     user_prompt: str
 
-    async def run_initial(
+    async def run_task_decomposition(
         self,
         source_urls: list[str],
-    ) -> InitialisationResultSchema:
+    ) -> TaskDecompositionResultSchema:
         client = self.model.get_agent_client()
 
         for _ in range(self.max_attempts):
@@ -51,11 +51,11 @@ class InitialisationRuntime:
             )
             raw_intent = await client.send(
                 context,
-                INITIALISATION_PROMPT,
-                InitialisationIntentSchema.model_json_schema(),
+                TASK_DECOMPOSITION_PROMPT,
+                TaskDecompositionIntentSchema.model_json_schema(),
             )
 
-            intent = InitialisationIntentSchema.model_validate_json(raw_intent)
+            intent = TaskDecompositionIntentSchema.model_validate_json(raw_intent)
 
             tasks = self.build_tasks(intent)
             self.memory.initialise_tasks(
@@ -64,14 +64,14 @@ class InitialisationRuntime:
                 goal=intent.goal,
             )
 
-            return InitialisationResultSchema(
-                decision=InitialisationDecisionEnum.ACCEPTED,
+            return TaskDecompositionResultSchema(
+                decision=TaskDecompositionDecisionEnum.ACCEPTED,
                 intent=intent,
             )
 
     def build_tasks(
         self,
-        intent: InitialisationIntentSchema,
+        intent: TaskDecompositionIntentSchema,
     ) -> list[TaskSchema]:
         return [
             TaskSchema(
@@ -103,7 +103,7 @@ class InitialisationRuntime:
         source_urls: list[str],
     ) -> str:
         tools = await self.tool_client.list_tools()
-        runtime_context = await InitialisationContextBuilder(
+        runtime_context = await TaskDecompositionContextBuilder(
             memory=self.memory,
             tool_client=self.tool_client,
         ).build_runtime_context()
