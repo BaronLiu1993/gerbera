@@ -13,11 +13,7 @@ class ContextBuilder(ABC):
     def build_current_task_anchor(self) -> dict[str, object]:
         task = self.memory.get_current_task_state()
         task_payload = task.model_dump(mode="json")
-        task_events = [
-            event
-            for event in self.memory.get_events_state()
-            if event.task_id == task.task_id
-        ]
+        task_events = self.memory.get_current_task_events()
         tool_events = [
             event
             for event in task_events

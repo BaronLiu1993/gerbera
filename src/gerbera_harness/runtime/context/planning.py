@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from gerbera_harness.memory import EventTypeEnum
 from gerbera_harness.runtime.context.base import ContextBuilder
 
 
@@ -15,5 +16,11 @@ class PlanningContextBuilder(ContextBuilder):
             "recent_events": [
                 event.model_dump(mode="json")
                 for event in self.memory.temporal_state.recent_events
+            ],
+            "recent_world_updates": [
+                event.model_dump(mode="json")
+                for event in self.memory.get_events_by_type(
+                    EventTypeEnum.WORLD_STATE_UPDATED
+                )
             ],
         }
