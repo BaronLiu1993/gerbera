@@ -26,7 +26,6 @@ class PlanningRuntime:
     memory: Memory
     prev_state_context: str
     context_builder: PlanningContextBuilder
-    max_attempts: int = 3
 
     def update_memory_with_plan(self, agent_payload: dict[str, Any]) -> None:
         task_id = self.memory.require_task_state().current_task_id
@@ -47,30 +46,23 @@ class PlanningRuntime:
             "prev_state_context": self.prev_state_context,
         }
 
-        for _ in range(self.max_attempts):
-            raw_response = await client.send(
-                [
-                    {
-                        "role": "user",
-                        "content": json.dumps(context, indent=2),
-                    }
-                ],
-                PLANNING_PROMPT,
-                PlanningAction.model_json_schema(),
-            )
-            
-            action = PlanningAction.model_validate_json(raw_response)
+        raw_response = await client.send(
+            [
+                {
+                    "role": "user",
+                    "content": json.dumps(context, indent=2),
+                }
+            ],
+            PLANNING_PROMPT,
+            PlanningAction.model_json_schema(),
+        )
 
-            self.update_memory_with_plan(action.model_dump(mode="json"))
+        action = PlanningAction.model_validate_json(raw_response)
 
-            return PlanningResult(
-                context=action.context,
-                actions=action.actions,
-                result=PlanningDecision.SUCCESS,
-            )
-        # Happy path for now 
+        self.update_memory_with_plan(action.model_dump(mode="json"))
+
         return PlanningResult(
-            context="FAILED TASK",
-            actions=[],
-            result=PlanningDecision.FAIL,
+            context=action.context,
+            actions=action.actions,
+            result=PlanningDecision.SUCCESS,
         )

@@ -32,7 +32,6 @@ class ObservationRuntime:
     call_tool: Callable[[str, dict[str, Any]], Awaitable[Any]]
     context_builder: ObservationContextBuilder
     prev_state_context: str  # what do we want to gain from observing
-    max_attempts: int = 3
 
     async def get_current_environment_state(self) -> dict[str, Any]:
         return await self.call_tool(
@@ -100,37 +99,26 @@ class ObservationRuntime:
             "prev_state_context": self.prev_state_context,
         }
 
-        for _ in range(self.max_attempts):
-            raw_response = await client.send(
-                [
-                    {
-                        "role": "user",
-                        "content": json.dumps(context, indent=2),
-                    }
-                ],
-                OBSERVATION_PROMPT,
-                ObservationAction.model_json_schema(),
-            )
+        raw_response = await client.send(
+            [
+                {
+                    "role": "user",
+                    "content": json.dumps(context, indent=2),
+                }
+            ],
+            OBSERVATION_PROMPT,
+            ObservationAction.model_json_schema(),
+        )
 
-            action = ObservationAction.model_validate_json(raw_response)
-            # do not evaluate yet just make it opened looped system for complexity reduction
-            self.update_memory_with_plan(action.model_dump(mode="json"))
+        action = ObservationAction.model_validate_json(raw_response)
+        self.update_memory_with_plan(action.model_dump(mode="json"))
 
-            # update the world state
-            environment_state = await self.get_current_environment_state()
-            hardware_state = await self.get_current_hardware_state()
-            self.update_memory(environment_state, hardware_state)
+        environment_state = await self.get_current_environment_state()
+        hardware_state = await self.get_current_hardware_state()
+        self.update_memory(environment_state, hardware_state)
 
-            # for now lets just say it is always accepted, no error handling for now
-            return ObservationResult(
-                context=action.context,
-                actions=action.actions,
-                result=ObservationDecision.SUCCESS,
-            )
-
-        # only code happy path for now
         return ObservationResult(
-            context="FAILED TASK",
-            actions=[],
-            result=ObservationDecision.FAIL,
+            context=action.context,
+            actions=action.actions,
+            result=ObservationDecision.SUCCESS,
         )

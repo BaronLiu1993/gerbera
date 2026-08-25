@@ -14,7 +14,6 @@ from gerbera_harness.memory import (
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import ReviewContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas.review import (
-    ReviewDecision,
     ReviewResult,
 )
 
@@ -31,7 +30,6 @@ class ReviewRuntime:
     call_tool: Callable[[str, dict[str, Any]], Awaitable[Any]]
     context_builder: ReviewContextBuilder
     prev_state_context: str  # what do we want to gain from observing that checks if it was done
-    max_attempts: int = 3
 
     async def get_current_environment_state(self) -> dict[str, Any]:
         return await self.call_tool(
@@ -104,23 +102,17 @@ class ReviewRuntime:
             "prev_state_context": self.prev_state_context,
         }
 
-        for _ in range(self.max_attempts):
-            raw_response = await client.send(
-                [
-                    {
-                        "role": "user",
-                        "content": json.dumps(context, indent=2),
-                    }
-                ],
-                REVIEW_PROMPT,
-                ReviewResult.model_json_schema(),
-            )
-
-            review = ReviewResult.model_validate_json(raw_response)
-            self.update_memory_with_review(review.model_dump(mode="json"))
-            return review
-
-        return ReviewResult(
-            decision=ReviewDecision.FAIL,
-            context="FAILED TASK",
+        raw_response = await client.send(
+            [
+                {
+                    "role": "user",
+                    "content": json.dumps(context, indent=2),
+                }
+            ],
+            REVIEW_PROMPT,
+            ReviewResult.model_json_schema(),
         )
+
+        review = ReviewResult.model_validate_json(raw_response)
+        self.update_memory_with_review(review.model_dump(mode="json"))
+        return review
