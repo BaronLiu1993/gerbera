@@ -27,7 +27,7 @@ class AgentRuntime:
     execute_consumer: ExecuteConsumerRuntime
     user_prompt: str
     previous_context: str = ""
-    max_task_retries: int = 5
+    max_task_recovery_attempts: int = 5
     max_agent_retries: int = 5
 
     async def run_agent(self) -> None:
@@ -43,7 +43,10 @@ class AgentRuntime:
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
 
-    async def run_task_decomposition(self, source_urls: list[str] = []) -> None:
+    async def run_task_decomposition(
+        self,
+        source_urls: list[str] | None = None,
+    ) -> None:
         result = await TaskDecompositionRuntime(
             model=self.model,
             memory=self.memory,
@@ -71,7 +74,9 @@ class AgentRuntime:
             self.memory.start_task()
             while True:
                 current_task = self.memory.get_current_task_state()
-                if current_task.attempts >= self.max_task_retries:
+                # Task attempts count failed/replan recovery cycles, not the
+                # first execution pass.
+                if current_task.attempts >= self.max_task_recovery_attempts:
                     self.memory.fail_task()
                     return
 
@@ -87,7 +92,7 @@ class AgentRuntime:
                 if result.decision is ReviewDecision.REPLAN_ACTIONS:
                     self.memory.increment_current_task_attempts()
                     current_task = self.memory.get_current_task_state()
-                    if current_task.attempts >= self.max_task_retries:
+                    if current_task.attempts >= self.max_task_recovery_attempts:
                         self.memory.fail_task()
                         self.previous_context = result.context
                         self.session.perform_transition(
@@ -105,6 +110,9 @@ class AgentRuntime:
                         return
 
                     self.memory.fail_task()
+                    # Clearing task state means structured audit for the old
+                    # task list lives in events/context. Archive task_state here
+                    # later if we need full task-list history after redecompose.
                     self.memory.clear_task_state()
                     self.session.increment_current_agent_retries()
                     self.previous_context = result.context
@@ -114,7 +122,7 @@ class AgentRuntime:
                 elif result.decision is ReviewDecision.FAIL:
                     self.memory.increment_current_task_attempts()
                     current_task = self.memory.get_current_task_state()
-                    if current_task.attempts >= self.max_task_retries:
+                    if current_task.attempts >= self.max_task_recovery_attempts:
                         self.memory.fail_task()
                         return
                     continue

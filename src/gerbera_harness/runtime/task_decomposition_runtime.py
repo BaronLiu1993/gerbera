@@ -41,9 +41,10 @@ class TaskDecompositionRuntime:
 
     async def run_task_decomposition(
         self,
-        source_urls: list[str],
+        source_urls: list[str] | None = None,
     ) -> TaskDecompositionResultSchema:
         client = self.model.get_agent_client()
+        source_urls = source_urls or []
 
         for _ in range(self.max_attempts):
             context = await self.build_agent_context(
@@ -103,9 +104,10 @@ class TaskDecompositionRuntime:
     async def build_agent_context(
         self,
         user_prompt: str,
-        source_urls: list[str],
+        source_urls: list[str] | None = None,
         previous_context: str = "",
     ) -> str:
+        source_urls = source_urls or []
         tools = await self.tool_client.list_tools()
         runtime_context = await TaskDecompositionContextBuilder(
             memory=self.memory,
