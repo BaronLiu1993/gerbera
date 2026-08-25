@@ -27,6 +27,7 @@ class AgentRuntime:
     execute_consumer: ExecuteConsumerRuntime
     user_prompt: str
     previous_context: str = ""
+    max_task_attempts: int = 5
 
     async def run_agent(self) -> None:
         while True:
@@ -48,7 +49,9 @@ class AgentRuntime:
             tool_client=self.tool_client,
             user_prompt=self.user_prompt,
             previous_context=self.previous_context,
-        ).run_task_decomposition(source_urls=source_urls) # we will pass in the source_urls eventually
+        ).run_task_decomposition(
+            source_urls=source_urls
+        )  # we will pass in the source_urls eventually
 
         if result.decision is TaskDecompositionDecisionEnum.ACCEPTED:
             # Previous context is only for the next decomposition pass. Once a
@@ -67,6 +70,10 @@ class AgentRuntime:
             self.memory.start_task()
             while True:
                 current_task = self.memory.get_current_task_state()
+                if current_task.attempts >= self.max_task_attempts:
+                    self.memory.fail_task()
+                    return
+
                 result = await ExecuteProducerRuntime(
                     model=self.model,
                     tool_client=self.tool_client,
@@ -77,19 +84,31 @@ class AgentRuntime:
                 ).produce_action_groups()
 
                 if result.decision is ReviewDecision.REPLAN_ACTIONS:
+                    self.memory.increment_current_task_attempts()
+                    current_task = self.memory.get_current_task_state()
+                    if current_task.attempts >= self.max_task_attempts:
+                        self.memory.fail_task()
+                        self.previous_context = result.context
+                        self.session.perform_transition(
+                            LoopStateEnum.TASK_DECOMPOSITION
+                        )
+                        return
                     continue
 
                 elif result.decision is ReviewDecision.REDECOMPOSE_TASKS:
                     self.memory.fail_task()
+                    self.memory.clear_task_state()
                     self.previous_context = result.context
-                    self.session.perform_transition(
-                        LoopStateEnum.TASK_DECOMPOSITION
-                    )
+                    self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
                     return
 
                 elif result.decision is ReviewDecision.FAIL:
-                    self.memory.fail_task()
-                    return
+                    self.memory.increment_current_task_attempts()
+                    current_task = self.memory.get_current_task_state()
+                    if current_task.attempts >= self.max_task_attempts:
+                        self.memory.fail_task()
+                        return
+                    continue
 
                 elif result.decision is ReviewDecision.SUCCESS:
                     self.memory.complete_task()

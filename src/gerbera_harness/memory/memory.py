@@ -44,6 +44,9 @@ class Memory:
             current_task_id=tasks[0].task_id,
         )
 
+    def clear_task_state(self) -> None:
+        self.task_state = None
+
     def require_task_state(self) -> TaskStateSchema:
         if self.task_state is None:
             raise RuntimeError("Task state has not been initialised")
@@ -83,6 +86,10 @@ class Memory:
         task.status = TaskStatusEnum.IN_PROGRESS
         task.started_at = datetime.now(timezone.utc)
         task_state.current_task_id = task.task_id
+
+    def increment_current_task_attempts(self) -> None:
+        task = self.get_current_task_state()
+        task.attempts += 1
 
     # get the one that we are currently working on
     def get_current_task_state(self) -> TaskSchema:
