@@ -6,12 +6,12 @@ from gerbera_harness.runtime.session import (
     Session,
 )
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.memory import Memory
+from gerbera_harness.memory import EventTypeEnum, Memory
 from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.runtime.evaluation_runtime import EvaluationRuntime
 from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
 from gerbera_harness.runtime.execute_producer.state_machine import StateMachine
-from gerbera_harness.runtime.execute_producer.schemas import ReviewDecision
+from gerbera_harness.runtime.execute_producer.schemas import ExecuteProducerDecision
 from gerbera_harness.runtime.execute_producer_runtime import ExecuteProducerRuntime
 from gerbera_harness.runtime.task_decomposition_runtime import (
     TaskDecompositionRuntime,
@@ -36,7 +36,9 @@ class AgentRuntime:
             if current_state.state is LoopStateEnum.TASK_DECOMPOSITION:
                 await self.run_task_decomposition()
             elif current_state.state is LoopStateEnum.EXECUTION:
-                await self.run_execution()
+                should_continue = await self.run_execution()
+                if not should_continue:
+                    return
             elif current_state.state is LoopStateEnum.EVALUATION:
                 await self.run_evaluation()
                 break
@@ -67,18 +69,20 @@ class AgentRuntime:
 
         raise ValueError("Unsupported TaskDecomposition Decision")
 
-    async def run_execution(self) -> None:
+    async def run_execution(self) -> bool:
         self.memory.require_task_state()
         while self.memory.has_remaining_tasks():
             self.memory.advance_to_next_task()
             self.memory.start_task()
+            self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_STARTED)
             while True:
                 current_task = self.memory.get_current_task_state()
                 # Task attempts count failed/replan recovery cycles, not the
                 # first execution pass.
                 if current_task.attempts >= self.max_task_recovery_attempts:
                     self.memory.fail_task()
-                    return
+                    self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_FAILED)
+                    return False
 
                 result = await ExecuteProducerRuntime(
                     model=self.model,
@@ -89,27 +93,30 @@ class AgentRuntime:
                     state_machine=StateMachine(),
                 ).produce_action_groups()
 
-                if result.decision is ReviewDecision.REPLAN_ACTIONS:
+                if result.decision is ExecuteProducerDecision.REPLAN_ACTIONS:
                     self.memory.increment_current_task_attempts()
                     current_task = self.memory.get_current_task_state()
                     if current_task.attempts >= self.max_task_recovery_attempts:
                         self.memory.fail_task()
-                        self.previous_context = result.context
-                        self.session.perform_transition(
-                            LoopStateEnum.TASK_DECOMPOSITION
+                        self.memory.insert_task_lifecycle_event(
+                            EventTypeEnum.TASK_FAILED
                         )
-                        return
+                        self.previous_context = result.context
+                        return False
+                    # Re-run the full execute producer workflow for the same
+                    # task. A fresh producer state machine starts at OBSERVE.
                     continue
 
-                elif result.decision is ReviewDecision.REDECOMPOSE_TASKS:
+                elif result.decision is ExecuteProducerDecision.REDECOMPOSE_TASKS:
                     if self.session.current_agent_retries >= self.max_agent_retries:
                         # Leave memory/session as-is for audit. At this point
                         # the agent exhausted full redecomposition attempts, so
                         # callers can inspect the current task, events, and
                         # last review context instead of seeing cleaned state.
-                        return
+                        return False
 
                     self.memory.fail_task()
+                    self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_FAILED)
                     # Clearing task state means structured audit for the old
                     # task list lives in events/context. Archive task_state here
                     # later if we need full task-list history after redecompose.
@@ -117,24 +124,33 @@ class AgentRuntime:
                     self.session.increment_current_agent_retries()
                     self.previous_context = result.context
                     self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
-                    return
+                    return True
 
-                elif result.decision is ReviewDecision.FAIL:
+                elif result.decision is ExecuteProducerDecision.FAIL:
                     self.memory.increment_current_task_attempts()
                     current_task = self.memory.get_current_task_state()
                     if current_task.attempts >= self.max_task_recovery_attempts:
                         self.memory.fail_task()
-                        return
+                        self.memory.insert_task_lifecycle_event(
+                            EventTypeEnum.TASK_FAILED
+                        )
+                        return False
+                    # Generic execution failure also retries the full workflow
+                    # from OBSERVE while the current task remains valid.
                     continue
 
-                elif result.decision is ReviewDecision.SUCCESS:
+                elif result.decision is ExecuteProducerDecision.SUCCESS:
                     self.memory.complete_task()
+                    self.memory.insert_task_lifecycle_event(
+                        EventTypeEnum.TASK_COMPLETED
+                    )
                     break
 
                 else:
                     raise ValueError("Unsupported Review Decision")
 
         self.session.perform_transition(LoopStateEnum.EVALUATION)
+        return True
 
     async def run_evaluation(self) -> None:
         await EvaluationRuntime(memory=self.memory).run_evaluation()

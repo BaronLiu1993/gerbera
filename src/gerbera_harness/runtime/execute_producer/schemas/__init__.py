@@ -9,8 +9,8 @@ from gerbera_harness.runtime.execute_producer.schemas.planning import (
     PlanningResult,
 )
 from gerbera_harness.runtime.execute_producer.schemas.review import (
-    ReviewDecision,
-    ReviewResult,
+    ExecuteProducerDecision,
+    ExecuteProducerResult,
 )
 
 __all__ = [
@@ -20,6 +20,6 @@ __all__ = [
     "PlanningDecision",
     "PlanningAction",
     "PlanningResult",
-    "ReviewDecision",
-    "ReviewResult",
+    "ExecuteProducerDecision",
+    "ExecuteProducerResult",
 ]

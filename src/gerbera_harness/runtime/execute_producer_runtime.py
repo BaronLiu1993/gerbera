@@ -20,10 +20,10 @@ from gerbera_harness.runtime.execute_producer.state_machine import (
     StateMachine,
 )
 from gerbera_harness.runtime.execute_producer.schemas import (
+    ExecuteProducerDecision,
+    ExecuteProducerResult,
     ObservationDecision,
     PlanningDecision,
-    ReviewDecision,
-    ReviewResult,
 )
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 from gerbera_harness.tools.client import ToolClient
@@ -44,7 +44,7 @@ class ExecuteProducerRuntime:
     ) -> None:
         await self.execute_consumer.execute_actions(action_groups=action_groups)
 
-    async def produce_action_groups(self) -> ReviewResult:
+    async def produce_action_groups(self) -> ExecuteProducerResult:
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
                 observation = await ObservationRuntime(
@@ -61,8 +61,8 @@ class ExecuteProducerRuntime:
                 ).run_observation()
 
                 if observation.result is ObservationDecision.FAIL:
-                    return ReviewResult(
-                        decision=ReviewDecision.FAIL,
+                    return ExecuteProducerResult(
+                        decision=ExecuteProducerDecision.FAIL,
                         context=observation.context,
                     )
 
@@ -80,8 +80,8 @@ class ExecuteProducerRuntime:
                 ).run_planning()
 
                 if planning.result is PlanningDecision.FAIL:
-                    return ReviewResult(
-                        decision=ReviewDecision.FAIL,
+                    return ExecuteProducerResult(
+                        decision=ExecuteProducerDecision.FAIL,
                         context=planning.context,
                     )
 

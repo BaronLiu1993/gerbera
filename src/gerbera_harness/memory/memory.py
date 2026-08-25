@@ -6,6 +6,7 @@ from gerbera_harness.memory.schemas import (
     EventStateSchema,
     EventTypeEnum,
     PhysicalConfigurationStateSchema,
+    SourceTypeEnum,
     TaskSchema,
     TaskStateSchema,
     TaskStatusEnum,
@@ -90,6 +91,20 @@ class Memory:
     def increment_current_task_attempts(self) -> None:
         task = self.get_current_task_state()
         task.attempts += 1
+
+    def insert_task_lifecycle_event(self, event_type: EventTypeEnum) -> None:
+        task = self.get_current_task_state()
+        self.insert_event(
+            EventSchema(
+                session_id=self.session_id,
+                event_type=event_type,
+                source_type=SourceTypeEnum.SYSTEM,
+                source_name="memory",
+                payload=task.model_dump(mode="json"),
+                task_id=task.task_id,
+            )
+        )
+        self.rebuild_temporal_state()
 
     # get the one that we are currently working on
     def get_current_task_state(self) -> TaskSchema:

@@ -14,7 +14,7 @@ from gerbera_harness.memory import (
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import ReviewContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas.review import (
-    ReviewResult,
+    ExecuteProducerResult,
 )
 
 REVIEW_PROMPT = load_prompt(
@@ -89,7 +89,7 @@ class ReviewRuntime:
         )
         self.memory.insert_event(review_event)
 
-    async def run_review(self) -> ReviewResult:
+    async def run_review(self) -> ExecuteProducerResult:
         client = self.model.get_agent_client()
 
         environment_state = await self.get_current_environment_state()
@@ -110,9 +110,9 @@ class ReviewRuntime:
                 }
             ],
             REVIEW_PROMPT,
-            ReviewResult.model_json_schema(),
+            ExecuteProducerResult.model_json_schema(),
         )
 
-        review = ReviewResult.model_validate_json(raw_response)
+        review = ExecuteProducerResult.model_validate_json(raw_response)
         self.update_memory_with_review(review.model_dump(mode="json"))
         return review
