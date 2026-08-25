@@ -27,7 +27,8 @@ class AgentRuntime:
     execute_consumer: ExecuteConsumerRuntime
     user_prompt: str
     previous_context: str = ""
-    max_task_attempts: int = 5
+    max_task_retries: int = 5
+    max_agent_retries: int = 5
 
     async def run_agent(self) -> None:
         while True:
@@ -70,7 +71,7 @@ class AgentRuntime:
             self.memory.start_task()
             while True:
                 current_task = self.memory.get_current_task_state()
-                if current_task.attempts >= self.max_task_attempts:
+                if current_task.attempts >= self.max_task_retries:
                     self.memory.fail_task()
                     return
 
@@ -86,7 +87,7 @@ class AgentRuntime:
                 if result.decision is ReviewDecision.REPLAN_ACTIONS:
                     self.memory.increment_current_task_attempts()
                     current_task = self.memory.get_current_task_state()
-                    if current_task.attempts >= self.max_task_attempts:
+                    if current_task.attempts >= self.max_task_retries:
                         self.memory.fail_task()
                         self.previous_context = result.context
                         self.session.perform_transition(
@@ -96,8 +97,16 @@ class AgentRuntime:
                     continue
 
                 elif result.decision is ReviewDecision.REDECOMPOSE_TASKS:
+                    if self.session.current_agent_retries >= self.max_agent_retries:
+                        # Leave memory/session as-is for audit. At this point
+                        # the agent exhausted full redecomposition attempts, so
+                        # callers can inspect the current task, events, and
+                        # last review context instead of seeing cleaned state.
+                        return
+
                     self.memory.fail_task()
                     self.memory.clear_task_state()
+                    self.session.increment_current_agent_retries()
                     self.previous_context = result.context
                     self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
                     return
@@ -105,7 +114,7 @@ class AgentRuntime:
                 elif result.decision is ReviewDecision.FAIL:
                     self.memory.increment_current_task_attempts()
                     current_task = self.memory.get_current_task_state()
-                    if current_task.attempts >= self.max_task_attempts:
+                    if current_task.attempts >= self.max_task_retries:
                         self.memory.fail_task()
                         return
                     continue

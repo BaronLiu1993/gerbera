@@ -74,7 +74,11 @@ STATE_TYPES: dict[LoopStateEnum, type[ExperimentState]] = {
 @dataclass
 class Session:
     state: ExperimentState = field(default_factory=TaskDecomposition)
+    current_agent_retries: int = 0
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def increment_current_agent_retries(self):
+        self.current_agent_retries += 1
 
     def valid_transition(self, new_state: LoopStateEnum | str) -> bool:
         target_state = LoopStateEnum(new_state)
