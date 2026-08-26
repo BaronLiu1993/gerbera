@@ -55,9 +55,12 @@ async def inference(request):
             model=model,
         )
 
-        await agent_runtime.run_agent(initial_user_prompt=user_prompt)
+        result = await agent_runtime.run_agent()
         return JSONResponse(
-            {"session_id": agent_runtime.session.session_id},
+            {
+                "session_id": agent_runtime.session.session_id,
+                "result": result.model_dump(mode="json"),
+            },
             status_code=200,
         )
     except Exception as e:

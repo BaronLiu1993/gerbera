@@ -14,9 +14,8 @@ from gerbera_harness.memory import (
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import ObservationContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas.observe import (
-    ObservationAction,
-    ObservationDecision,
     ObservationResult,
+    observation_result_adapter,
 )
 
 OBSERVATION_PROMPT = load_prompt(
@@ -107,18 +106,14 @@ class ObservationRuntime:
                 }
             ],
             OBSERVATION_PROMPT,
-            ObservationAction.model_json_schema(),
+            observation_result_adapter.json_schema(),
         )
 
-        action = ObservationAction.model_validate_json(raw_response)
-        self.update_memory_with_plan(action.model_dump(mode="json"))
+        result = observation_result_adapter.validate_json(raw_response)
+        self.update_memory_with_plan(result.model_dump(mode="json"))
 
         environment_state = await self.get_current_environment_state()
         hardware_state = await self.get_current_hardware_state()
         self.update_memory(environment_state, hardware_state)
 
-        return ObservationResult(
-            context=action.context,
-            actions=action.actions,
-            result=ObservationDecision.SUCCESS,
-        )
+        return result

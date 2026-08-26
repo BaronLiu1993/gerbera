@@ -13,6 +13,12 @@ from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRunt
 from gerbera_harness.runtime.execute_producer.state_machine import StateMachine
 from gerbera_harness.runtime.execute_producer.schemas import ExecuteProducerDecision
 from gerbera_harness.runtime.execute_producer_runtime import ExecuteProducerRuntime
+from gerbera_harness.runtime.schemas import (
+    AgentResultSchema,
+    AgentStatusEnum,
+    ExecutionDecisionEnum,
+    ExecutionResultSchema,
+)
 from gerbera_harness.runtime.task_decomposition_runtime import (
     TaskDecompositionRuntime,
 )
@@ -30,18 +36,36 @@ class AgentRuntime:
     max_task_recovery_attempts: int = 5
     max_agent_retries: int = 5
 
-    async def run_agent(self) -> None:
+    def task_recovery_exhausted(self) -> bool:
+        current_task = self.memory.get_current_task_state()
+        return current_task.attempts >= self.max_task_recovery_attempts
+
+    def fail_current_task(self, message: str) -> ExecutionResultSchema:
+        self.memory.fail_task()
+        self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_FAILED)
+        return ExecutionResultSchema(
+            decision=ExecutionDecisionEnum.FAILED,
+            message=message,
+        )
+
+    async def run_agent(self) -> AgentResultSchema:
         while True:
             current_state = self.session.state
             if current_state.state is LoopStateEnum.TASK_DECOMPOSITION:
                 await self.run_task_decomposition()
             elif current_state.state is LoopStateEnum.EXECUTION:
-                should_continue = await self.run_execution()
-                if not should_continue:
-                    return
+                execution_result = await self.run_execution()
+                if execution_result.decision is ExecutionDecisionEnum.FAILED:
+                    return AgentResultSchema(
+                        status=AgentStatusEnum.FAILED,
+                        message=execution_result.message,
+                    )
             elif current_state.state is LoopStateEnum.EVALUATION:
                 await self.run_evaluation()
-                break
+                return AgentResultSchema(
+                    status=AgentStatusEnum.SUCCESS,
+                    message="completed",
+                )
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
 
@@ -69,7 +93,7 @@ class AgentRuntime:
 
         raise ValueError("Unsupported TaskDecomposition Decision")
 
-    async def run_execution(self) -> bool:
+    async def run_execution(self) -> ExecutionResultSchema:
         self.memory.require_task_state()
         while self.memory.has_remaining_tasks():
             self.memory.advance_to_next_task()
@@ -79,14 +103,13 @@ class AgentRuntime:
                 current_task = self.memory.get_current_task_state()
                 # Task attempts count failed/replan recovery cycles, not the
                 # first execution pass.
-                if current_task.attempts >= self.max_task_recovery_attempts:
-                    self.memory.fail_task()
-                    self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_FAILED)
-                    return False
+                if self.task_recovery_exhausted():
+                    return self.fail_current_task(
+                        "current task exceeded recovery attempts"
+                    )
 
                 result = await ExecuteProducerRuntime(
                     model=self.model,
-                    tool_client=self.tool_client,
                     memory=self.memory,
                     context=current_task.task_goal,
                     execute_consumer=self.execute_consumer,
@@ -95,14 +118,11 @@ class AgentRuntime:
 
                 if result.decision is ExecuteProducerDecision.REPLAN_ACTIONS:
                     self.memory.increment_current_task_attempts()
-                    current_task = self.memory.get_current_task_state()
-                    if current_task.attempts >= self.max_task_recovery_attempts:
-                        self.memory.fail_task()
-                        self.memory.insert_task_lifecycle_event(
-                            EventTypeEnum.TASK_FAILED
-                        )
+                    if self.task_recovery_exhausted():
                         self.previous_context = result.context
-                        return False
+                        return self.fail_current_task(
+                            "current task exceeded action replan attempts"
+                        )
                     # Re-run the full execute producer workflow for the same
                     # task. A fresh producer state machine starts at OBSERVE.
                     continue
@@ -113,10 +133,12 @@ class AgentRuntime:
                         # the agent exhausted full redecomposition attempts, so
                         # callers can inspect the current task, events, and
                         # last review context instead of seeing cleaned state.
-                        return False
+                        return ExecutionResultSchema(
+                            decision=ExecutionDecisionEnum.FAILED,
+                            message="agent exceeded task redecomposition attempts",
+                        )
 
-                    self.memory.fail_task()
-                    self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_FAILED)
+                    self.fail_current_task("current task requested redecomposition")
                     # Clearing task state means structured audit for the old
                     # task list lives in events/context. Archive task_state here
                     # later if we need full task-list history after redecompose.
@@ -124,17 +146,17 @@ class AgentRuntime:
                     self.session.increment_current_agent_retries()
                     self.previous_context = result.context
                     self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
-                    return True
+                    return ExecutionResultSchema(
+                        decision=ExecutionDecisionEnum.CONTINUE,
+                        message="redecomposing tasks",
+                    )
 
                 elif result.decision is ExecuteProducerDecision.FAIL:
                     self.memory.increment_current_task_attempts()
-                    current_task = self.memory.get_current_task_state()
-                    if current_task.attempts >= self.max_task_recovery_attempts:
-                        self.memory.fail_task()
-                        self.memory.insert_task_lifecycle_event(
-                            EventTypeEnum.TASK_FAILED
+                    if self.task_recovery_exhausted():
+                        return self.fail_current_task(
+                            "current task failed after recovery attempts"
                         )
-                        return False
                     # Generic execution failure also retries the full workflow
                     # from OBSERVE while the current task remains valid.
                     continue
@@ -150,7 +172,10 @@ class AgentRuntime:
                     raise ValueError("Unsupported Review Decision")
 
         self.session.perform_transition(LoopStateEnum.EVALUATION)
-        return True
+        return ExecutionResultSchema(
+            decision=ExecutionDecisionEnum.SUCCEEDED,
+            message="execution completed",
+        )
 
     async def run_evaluation(self) -> None:
         await EvaluationRuntime(memory=self.memory).run_evaluation()

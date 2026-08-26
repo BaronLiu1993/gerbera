@@ -4,6 +4,10 @@ from gerbera_harness.runtime.schemas.base import (
     SNAKE_CASE_IDENTIFIER_PATTERN,
     SnakeCaseIdentifier,
 )
+from gerbera_harness.runtime.schemas.agent import (
+    AgentResultSchema,
+    AgentStatusEnum,
+)
 from gerbera_harness.runtime.schemas.execute import (
     ActionExecuteSchema,
     ActionTypeEnum,
@@ -12,6 +16,10 @@ from gerbera_harness.runtime.schemas.execute import (
     ExecuteActionParameterSchema,
     ExecutionTypeEnum,
     ParameterTypeSchema,
+)
+from gerbera_harness.runtime.schemas.execution import (
+    ExecutionDecisionEnum,
+    ExecutionResultSchema,
 )
 from gerbera_harness.runtime.schemas.task_decomposition import (
     AcceptedTaskDecompositionResponseSchema,
@@ -35,6 +43,8 @@ from gerbera_harness.runtime.schemas.evaluate import (
 __all__ = [
     "AcceptedTaskDecompositionResponseSchema",
     "AcceptedEvaluationResponseSchema",
+    "AgentResultSchema",
+    "AgentStatusEnum",
     "ActionExecuteSchema",
     "ActionTypeEnum",
     "Answer",
@@ -42,6 +52,8 @@ __all__ = [
     "ContinuousExecuteSchema",
     "DiscreteExecuteSchema",
     "ExecuteActionParameterSchema",
+    "ExecutionDecisionEnum",
+    "ExecutionResultSchema",
     "ExecutionTypeEnum",
     "HarnessSchema",
     "TaskDecompositionDecisionResponseSchema",

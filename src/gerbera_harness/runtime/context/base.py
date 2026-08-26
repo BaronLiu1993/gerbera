@@ -1,19 +1,29 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import final
-
-from gerbera_harness.memory import EventTypeEnum, Memory
+from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
 
 
 @dataclass(frozen=True)
 class ContextBuilder(ABC):
     memory: Memory
+    task_id: str | None = None
+
+    def get_task(self) -> TaskSchema:
+        if self.task_id is None:
+            return self.memory.get_current_task_state()
+
+        task_state = self.memory.require_task_state()
+        for task in task_state.tasks:
+            if task.task_id == self.task_id:
+                return task
+
+        raise RuntimeError(f"Task not found: {self.task_id}")
 
     def build_current_task_anchor(self) -> dict[str, object]:
-        task = self.memory.get_current_task_state()
+        task = self.get_task()
         task_payload = task.model_dump(mode="json")
-        task_events = self.memory.get_current_task_events()
+        task_events = self.memory.get_events_by_task_id(task.task_id)
         tool_events = [
             event
             for event in task_events

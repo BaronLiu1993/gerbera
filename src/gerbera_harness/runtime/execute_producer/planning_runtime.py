@@ -12,9 +12,8 @@ from gerbera_harness.memory import (
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import PlanningContextBuilder
 from gerbera_harness.runtime.execute_producer.schemas import (
-    PlanningAction,
-    PlanningDecision,
     PlanningResult,
+    planning_result_adapter,
 )
 
 PLANNING_PROMPT = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
@@ -54,15 +53,10 @@ class PlanningRuntime:
                 }
             ],
             PLANNING_PROMPT,
-            PlanningAction.model_json_schema(),
+            planning_result_adapter.json_schema(),
         )
 
-        action = PlanningAction.model_validate_json(raw_response)
+        result = planning_result_adapter.validate_json(raw_response)
 
-        self.update_memory_with_plan(action.model_dump(mode="json"))
-
-        return PlanningResult(
-            context=action.context,
-            actions=action.actions,
-            result=PlanningDecision.SUCCESS,
-        )
+        self.update_memory_with_plan(result.model_dump(mode="json"))
+        return result

@@ -26,13 +26,11 @@ from gerbera_harness.runtime.execute_producer.schemas import (
     PlanningDecision,
 )
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
-from gerbera_harness.tools.client import ToolClient
 
 
 @dataclass
 class ExecuteProducerRuntime:
     model: Model
-    tool_client: ToolClient
     memory: Memory
     context: str
     execute_consumer: ExecuteConsumerRuntime
@@ -60,7 +58,7 @@ class ExecuteProducerRuntime:
                     prev_state_context=self.context,
                 ).run_observation()
 
-                if observation.result is ObservationDecision.FAIL:
+                if observation.decision is ObservationDecision.FAIL:
                     return ExecuteProducerResult(
                         decision=ExecuteProducerDecision.FAIL,
                         context=observation.context,
@@ -79,14 +77,15 @@ class ExecuteProducerRuntime:
                     ),
                 ).run_planning()
 
-                if planning.result is PlanningDecision.FAIL:
+                if planning.decision is PlanningDecision.FAIL:
                     return ExecuteProducerResult(
                         decision=ExecuteProducerDecision.FAIL,
                         context=planning.context,
                     )
 
-                action_groups = planning.actions
-                await self.submit_action_groups(action_groups)
+                if planning.decision is PlanningDecision.SUCCEEDED:
+                    action_groups = planning.actions
+                    await self.submit_action_groups(action_groups)
 
                 self.context = planning.context
                 self.state_machine.perform_transition(ExecuteLoopStateEnum.REVIEW)
