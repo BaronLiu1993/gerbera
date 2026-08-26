@@ -18,7 +18,10 @@ from gerbera_harness.runtime.schemas import (
     AgentStatusEnum,
     ExecutionDecisionEnum,
     ExecutionResultSchema,
+    EvaluationDecisionEnum,
+    EvaluationResultSchema,
 )
+from gerbera_harness.runtime.context import EvaluateContextBuilder
 from gerbera_harness.runtime.task_decomposition_runtime import (
     TaskDecompositionRuntime,
 )
@@ -61,11 +64,24 @@ class AgentRuntime:
                         message=execution_result.message,
                     )
             elif current_state.state is LoopStateEnum.EVALUATION:
-                await self.run_evaluation()
-                return AgentResultSchema(
-                    status=AgentStatusEnum.SUCCESS,
-                    message="completed",
-                )
+                evaluation_result = await self.run_evaluation()
+                if evaluation_result.decision is EvaluationDecisionEnum.SUCCEEDED:
+                    return AgentResultSchema(
+                        status=AgentStatusEnum.SUCCESS,
+                        message=evaluation_result.context,
+                    )
+                if evaluation_result.decision is EvaluationDecisionEnum.FAILED:
+                    return AgentResultSchema(
+                        status=AgentStatusEnum.FAILED,
+                        message=evaluation_result.context,
+                    )
+                if evaluation_result.decision is EvaluationDecisionEnum.CONTINUE:
+                    self.previous_context = evaluation_result.context
+                    self.session.perform_transition(
+                        LoopStateEnum.TASK_DECOMPOSITION
+                    )
+                    continue
+                raise ValueError("Unsupported Evaluation Decision")
             else:
                 raise ValueError("Unsupported Main Loop State Enum")
 
@@ -177,5 +193,9 @@ class AgentRuntime:
             message="execution completed",
         )
 
-    async def run_evaluation(self) -> None:
-        await EvaluationRuntime(memory=self.memory).run_evaluation()
+    async def run_evaluation(self) -> EvaluationResultSchema:
+        return await EvaluationRuntime(
+            model=self.model,
+            memory=self.memory,
+            context_builder=EvaluateContextBuilder(memory=self.memory),
+        ).run_evaluation()

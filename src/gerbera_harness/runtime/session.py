@@ -10,12 +10,6 @@ class LoopStateEnum(str, Enum):
     EVALUATION = "evaluation"
 
 
-class EvaluationDecisionEnum(str, Enum):
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    REPLAN = "replan"
-
-
 class TaskDecompositionDecisionEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"

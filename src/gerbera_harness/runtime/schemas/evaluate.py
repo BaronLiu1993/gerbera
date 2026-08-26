@@ -1,33 +1,15 @@
-from typing import Literal
+from enum import Enum
 
-from gerbera_harness.runtime.session import LoopStateEnum, EvaluationDecisionEnum
 from gerbera_harness.runtime.schemas.base import HarnessSchema
 
 
-class AcceptedEvaluationResponseSchema(HarnessSchema):
-    decision: Literal[EvaluationDecisionEnum.ACCEPTED]
-    next_state: None
-    feedback: list[str]
+class EvaluationDecisionEnum(str, Enum):
+    SUCCEEDED = "succeeded"
+    CONTINUE = "continue"
+    FAILED = "failed"
 
 
-class RejectedEvaluationResponseSchema(HarnessSchema):
-    decision: Literal[EvaluationDecisionEnum.REJECTED]
-    next_state: None
-    feedback: list[str]
-
-
-class ReplanEvaluationResponseSchema(HarnessSchema):
-    decision: Literal[EvaluationDecisionEnum.REPLAN]
-    next_state: Literal[LoopStateEnum.TASK_DECOMPOSITION]
-    feedback: list[str]
-
-
-EvaluationDecisionResponseSchema = (
-    AcceptedEvaluationResponseSchema
-    | RejectedEvaluationResponseSchema
-    | ReplanEvaluationResponseSchema
-)
-
-
-class EvaluationResponseSchema(HarnessSchema):
-    response: EvaluationDecisionResponseSchema
+class EvaluationResultSchema(HarnessSchema):
+    decision: EvaluationDecisionEnum
+    # Summary of everything that happened in this session.
+    context: str

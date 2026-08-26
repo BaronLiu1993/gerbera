@@ -33,16 +33,12 @@ from gerbera_harness.runtime.schemas.task_decomposition import (
     RejectedTaskDecompositionResponseSchema,
 )
 from gerbera_harness.runtime.schemas.evaluate import (
-    AcceptedEvaluationResponseSchema,
-    EvaluationDecisionResponseSchema,
-    EvaluationResponseSchema,
-    RejectedEvaluationResponseSchema,
-    ReplanEvaluationResponseSchema,
+    EvaluationDecisionEnum,
+    EvaluationResultSchema,
 )
 
 __all__ = [
     "AcceptedTaskDecompositionResponseSchema",
-    "AcceptedEvaluationResponseSchema",
     "AgentResultSchema",
     "AgentStatusEnum",
     "ActionExecuteSchema",
@@ -64,10 +60,8 @@ __all__ = [
     "ParameterTypeSchema",
     "Question",
     "RejectedTaskDecompositionResponseSchema",
-    "RejectedEvaluationResponseSchema",
-    "ReplanEvaluationResponseSchema",
-    "EvaluationDecisionResponseSchema",
-    "EvaluationResponseSchema",
+    "EvaluationDecisionEnum",
+    "EvaluationResultSchema",
     "SNAKE_CASE_IDENTIFIER_PATTERN",
     "SnakeCaseIdentifier",
 ]
