@@ -21,7 +21,6 @@ from gerbera_harness.runtime.schemas import (
     EvaluationDecisionEnum,
     EvaluationResultSchema,
 )
-from gerbera_harness.runtime.context import EvaluateContextBuilder
 from gerbera_harness.runtime.task_decomposition_runtime import (
     TaskDecompositionRuntime,
 )
@@ -194,15 +193,8 @@ class AgentRuntime:
         )
 
     async def run_evaluation(self) -> EvaluationResultSchema:
-        available_tools = [
-            tool.model_dump()
-            for tool in await self.tool_client.list_tools()
-        ]
         return await EvaluationRuntime(
             model=self.model,
             memory=self.memory,
-            context_builder=EvaluateContextBuilder(
-                memory=self.memory,
-                available_tools=available_tools,
-            ),
+            tool_client=self.tool_client,
         ).run_evaluation()

@@ -47,6 +47,11 @@ class ExecuteProducerRuntime:
             tool.model_dump()
             for tool in await self.execute_consumer.tool_client.list_tools()
         ]
+        read_only_tools = [
+            tool
+            for tool in available_tools
+            if tool.get("read_only") is True
+        ]
 
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
@@ -59,7 +64,7 @@ class ExecuteProducerRuntime:
                     call_tool=self.execute_consumer.call_tool,
                     context_builder=ObservationContextBuilder(
                         memory=self.memory,
-                        available_tools=available_tools,
+                        available_tools=read_only_tools,
                     ),
                     prev_state_context=self.context,
                 ).run_observation()
@@ -106,7 +111,7 @@ class ExecuteProducerRuntime:
                     call_tool=self.execute_consumer.call_tool,
                     context_builder=ReviewContextBuilder(
                         memory=self.memory,
-                        available_tools=available_tools,
+                        available_tools=read_only_tools,
                     ),
                     prev_state_context=self.context,
                 ).run_review()

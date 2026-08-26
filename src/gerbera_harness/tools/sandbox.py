@@ -24,7 +24,7 @@ class RunSandboxTool:
                 },
                 "required": ["code"],
             },
-            read_only=False,
+            read_only=True,
             destructive=False,
         )
 

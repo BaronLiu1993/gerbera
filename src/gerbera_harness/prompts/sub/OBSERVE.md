@@ -40,3 +40,6 @@ If `get_table_schemas`, `query_database`, or `run_sandbox` are available and
 useful for observation, emit them as discrete actions. The execution consumer
 will await each tool result and store it in memory events before the next
 runtime step.
+
+Only read-only tools are available in this step. Do not request tools that can
+change hardware state, mutate data, or perform actuator commands.

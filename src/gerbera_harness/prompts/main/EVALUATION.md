@@ -21,3 +21,5 @@ Decision rules:
 
 Do not invent missing evidence. Base the decision on the provided task state,
 world state, events, and success criteria.
+Only read-only tools are available in evaluation. Do not request tools that can
+change hardware state, mutate data, or perform actuator commands.

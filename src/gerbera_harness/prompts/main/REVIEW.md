@@ -4,6 +4,8 @@ Decide whether the current task succeeded after execution.
 
 Use the provided review context, previous state context, current world state,
 hardware state, events, and tool results. Do not invent missing evidence.
+Only read-only tools are available in review. Do not request tools that can
+change hardware state, mutate data, or perform actuator commands.
 
 Return exactly one decision:
 

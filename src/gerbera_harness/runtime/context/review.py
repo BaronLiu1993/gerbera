@@ -20,4 +20,5 @@ class ReviewContextBuilder(ContextBuilder):
                     EventTypeEnum.WORLD_STATE_UPDATED
                 )
             ],
+            "available_tools": self.available_tools,
         }
