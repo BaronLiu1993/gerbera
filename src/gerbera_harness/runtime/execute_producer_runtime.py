@@ -43,6 +43,11 @@ class ExecuteProducerRuntime:
         await self.execute_consumer.execute_actions(action_groups=action_groups)
 
     async def produce_action_groups(self) -> ExecuteProducerResult:
+        available_tools = [
+            tool.model_dump()
+            for tool in await self.execute_consumer.tool_client.list_tools()
+        ]
+
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
                 observation = await ObservationRuntime(
@@ -54,6 +59,7 @@ class ExecuteProducerRuntime:
                     call_tool=self.execute_consumer.call_tool,
                     context_builder=ObservationContextBuilder(
                         memory=self.memory,
+                        available_tools=available_tools,
                     ),
                     prev_state_context=self.context,
                 ).run_observation()
@@ -74,6 +80,7 @@ class ExecuteProducerRuntime:
                     prev_state_context=self.context,
                     context_builder=PlanningContextBuilder(
                         memory=self.memory,
+                        available_tools=available_tools,
                     ),
                 ).run_planning()
 
@@ -97,7 +104,10 @@ class ExecuteProducerRuntime:
                     # Reintroduce a producer wrapper here only if the producer
                     # needs to enforce permissions, retries, or routing.
                     call_tool=self.execute_consumer.call_tool,
-                    context_builder=ReviewContextBuilder(memory=self.memory),
+                    context_builder=ReviewContextBuilder(
+                        memory=self.memory,
+                        available_tools=available_tools,
+                    ),
                     prev_state_context=self.context,
                 ).run_review()
                 self.context = review.context

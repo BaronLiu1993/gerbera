@@ -194,8 +194,15 @@ class AgentRuntime:
         )
 
     async def run_evaluation(self) -> EvaluationResultSchema:
+        available_tools = [
+            tool.model_dump()
+            for tool in await self.tool_client.list_tools()
+        ]
         return await EvaluationRuntime(
             model=self.model,
             memory=self.memory,
-            context_builder=EvaluateContextBuilder(memory=self.memory),
+            context_builder=EvaluateContextBuilder(
+                memory=self.memory,
+                available_tools=available_tools,
+            ),
         ).run_evaluation()

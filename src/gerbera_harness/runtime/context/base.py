@@ -1,6 +1,8 @@
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
+
 from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
 
 
@@ -8,6 +10,7 @@ from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
 class ContextBuilder(ABC):
     memory: Memory
     task_id: str | None = None
+    available_tools: list[dict[str, Any]] = field(default_factory=list)
 
     def get_task(self) -> TaskSchema:
         if self.task_id is None:

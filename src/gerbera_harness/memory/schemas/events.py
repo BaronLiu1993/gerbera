@@ -23,7 +23,6 @@ class EventTypeEnum(str, Enum):
     REPLAN_REQUESTED = "replan_requested"
 
     TOOL_CALL = "tool_call"
-    USER_COMMAND = "user_command"
 
 
 class SourceTypeEnum(str, Enum):

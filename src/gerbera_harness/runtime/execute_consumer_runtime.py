@@ -103,4 +103,5 @@ class ExecuteConsumerRuntime:
                 task_id=self.memory.require_task_state().current_task_id,
             )
         )
+        self.memory.rebuild_temporal_state()
         return result

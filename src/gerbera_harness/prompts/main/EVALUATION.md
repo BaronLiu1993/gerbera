@@ -3,8 +3,8 @@
 You are the final evaluation step for an autonomous hardware execution run.
 
 Your job is to inspect the full task state, overall goal, success criteria,
-world state, recent events, and recent world states to decide whether the
-agent succeeded at the full objective.
+world state, recent events, recent world states, and available tools to decide
+whether the agent succeeded at the full objective.
 
 Return only the fields required by the response schema:
 

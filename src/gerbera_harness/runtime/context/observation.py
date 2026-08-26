@@ -13,4 +13,5 @@ class ObservationContextBuilder(ContextBuilder):
             "temporal_state": self.memory.get_temporal_state().model_dump(
                 mode="json"
             ),
+            "available_tools": self.available_tools,
         }

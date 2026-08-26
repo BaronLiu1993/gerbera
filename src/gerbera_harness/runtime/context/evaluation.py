@@ -20,4 +20,5 @@ class EvaluateContextBuilder(ContextBuilder):
                 world_state.model_dump(mode="json")
                 for world_state in self.memory.temporal_state.recent_world_states
             ],
+            "available_tools": self.available_tools,
         }

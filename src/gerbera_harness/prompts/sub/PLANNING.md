@@ -12,7 +12,7 @@ Use the provided runtime context as the source of truth:
 - latest world state
 - recent task events and tool results
 - previous state context from observation or retry
-- available action schemas
+- available tools
 
 Return only the fields required by the response schema:
 
@@ -35,6 +35,8 @@ Action group rules:
 - The outer list is FIFO. Earlier groups complete before later groups start.
 - Actions inside the same inner list may run concurrently.
 - Use discrete actions for one-shot tool calls.
+- Use discrete actions for awaited database queries or sandbox code execution
+  when `query_database`, `get_table_schemas`, or `run_sandbox` are available.
 - Use continuous actions only when a forward tool call must later be reversed.
 - Use exact tool names and parameter names from the available tools.
 - `succeeded` must include at least one action group.
