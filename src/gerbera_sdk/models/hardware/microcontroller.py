@@ -71,19 +71,4 @@ class Microcontroller:
         self,
         connections: list[Connection],
     ) -> None:
-        connection_names = {connection.name for connection in self.connections}
-
-        for connection in connections:
-            if connection.name in connection_names:
-                raise ValueError(
-                    f"Connection name already exists on board {self.id}: "
-                    f"{connection.name}"
-                )
-
-            used_pins = self.get_used_pins()
-            for pin in connection.pins.values():
-                if pin in used_pins:
-                    raise ValueError(f"Pin already in use on board {self.id}: {pin}")
-                
-            connection.microcontroller_id = self.id
-            self.connections.append(connection)
+        self.connections.extend(connections)

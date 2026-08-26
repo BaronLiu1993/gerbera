@@ -10,6 +10,7 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.validation import validate_hardware_system
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
@@ -26,6 +27,9 @@ class GerberaRuntime:
         install_dependencies: bool = True,
         flash_firmware: bool = True,
     ) -> None:
+        GerberaRuntime.validate_hardware(hardware_system)
+        GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
+
         if install_dependencies:
             GerberaRuntime.install_dependencies(hardware_system)
 
@@ -41,7 +45,8 @@ class GerberaRuntime:
         database_password: str,
         **transport_kwargs,
     ) -> None:
-        GerberaRuntime.validate_unique_connection_names(hardware_system)
+        GerberaRuntime.validate_hardware(hardware_system)
+        GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
 
         database = GerberaRuntime.runtime_database(
             host=database_host,
@@ -98,26 +103,21 @@ class GerberaRuntime:
         app.run(transport=transport, **transport_kwargs)
 
     @staticmethod
-    def validate_unique_connection_names(
+    def validate_hardware(
         hardware_system: HardwareSystem,
     ) -> None:
-        connection_owners: dict[str, str] = {}
+        error = validate_hardware_system(hardware_system)
+        if error is not None:
+            raise ValueError(error)
 
+    @staticmethod
+    def bind_connection_microcontroller_ids(
+        hardware_system: HardwareSystem,
+    ) -> None:
         for microcontroller in hardware_system.microcontrollers:
+            microcontroller_id = microcontroller.id
             for connection in microcontroller.connections:
-                normalized_name = connection.name.strip().lower()
-                if not normalized_name:
-                    raise ValueError("Connection name cannot be empty")
-
-                existing_owner = connection_owners.get(normalized_name)
-                if existing_owner is not None:
-                    raise ValueError(
-                        f"Connection name must be globally unique: "
-                        f"{connection.name}. Used by microcontrollers "
-                        f"{existing_owner} and {microcontroller.id}"
-                    )
-
-                connection_owners[normalized_name] = microcontroller.id
+                connection.microcontroller_id = microcontroller_id
 
     @staticmethod
     def register_connection_states(

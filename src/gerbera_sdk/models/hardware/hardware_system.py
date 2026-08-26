@@ -33,37 +33,7 @@ class HardwareSystem:
         return libraries
 
     def add_microcontrollers(self, microcontrollers: list[Microcontroller]) -> None:
-        existing_ids = {microcontroller.id for microcontroller in self.microcontrollers}
-        seen_ids: set[str] = set()
-
-        for microcontroller in microcontrollers:
-            if microcontroller.id in seen_ids:
-                raise ValueError(f"Duplicate microcontroller in input: {microcontroller.id}")
-
-            if microcontroller.id in existing_ids:
-                raise ValueError(
-                    f"Microcontroller already exists in hardware system {self.id}: "
-                    f"{microcontroller.id}"
-                )
-
-            seen_ids.add(microcontroller.id)
-            self.microcontrollers.append(microcontroller)
+        self.microcontrollers.extend(microcontrollers)
 
     def add_cameras(self, cameras: list[Camera]) -> None:
-        existing_ids = {camera.camera_id for camera in self.cameras}
-        seen_ids: set[str] = set()
-
-        for camera in cameras:
-            if camera.camera_id in seen_ids:
-                raise ValueError(
-                    f"Duplicate camera in input: {camera.camera_id}"
-                )
-
-            if camera.camera_id in existing_ids:
-                raise ValueError(
-                    f"Camera already exists in hardware system {self.id}: "
-                    f"{camera.camera_id}"
-                )
-
-            seen_ids.add(camera.camera_id)
-            self.cameras.append(camera)
+        self.cameras.extend(cameras)
