@@ -1,5 +1,3 @@
-# Server runtime registers MCP tools and wires hardware events into the app.
-
 from dataclasses import dataclass
 from inspect import Parameter, Signature
 import time
@@ -165,21 +163,21 @@ class ServerRuntime:
 
     # Connection command dispatch and MCP tool generation.
 
-    def read_latest_event_value(
-        self,
-        event_key: tuple[str, str, str],
-        previous_value: dict[str, str] | None,
-    ) -> dict[str, str] | None:
-        deadline = time.monotonic() + self.event_read_timeout_seconds
-        while time.monotonic() < deadline:
-            event = self.event_bus.get_event(*event_key)
-            latest_value = event.read_latest()
-            if latest_value is not None and latest_value is not previous_value:
-                return latest_value
+    # def read_latest_event_value(
+    #     self,
+    #     event_key: tuple[str, str, str],
+    #     previous_value: dict[str, str] | None,
+    # ) -> dict[str, str] | None:
+    #     deadline = time.monotonic() + self.event_read_timeout_seconds
+    #     while time.monotonic() < deadline:
+    #         event = self.event_bus.get_event(*event_key)
+    #         latest_value = event.read_latest()
+    #         if latest_value is not None and latest_value is not previous_value:
+    #             return latest_value
 
-            time.sleep(self.event_read_poll_seconds)
+    #         time.sleep(self.event_read_poll_seconds)
 
-        return None
+    #     return None
 
     def send_connection_command(
         self,
@@ -325,8 +323,44 @@ class ServerRuntime:
                 f" Collected data is stored in table " f"`{connection.event_name}`."
             )
 
+        joint_configuration = None
+        if self.movement_runtime:
+            joint_configuration = self.movement_runtime.joint_motor_mapping.get(
+                connection.name
+            )
+            if joint_configuration is not None:
+                description += (
+                    f" Controls movement joint "
+                    f"{joint_configuration['joint_name']}."
+                    f" Joint type: {joint_configuration['joint_type']}."
+                    f" Axis: {joint_configuration['axis']}."
+                )
+                if "lower_rad" in joint_configuration:
+                    description += (
+                        f" Valid range: "
+                        f"{joint_configuration['lower_rad']} to "
+                        f"{joint_configuration['upper_rad']} radians."
+                    )
+                if "lower_m" in joint_configuration:
+                    description += (
+                        f" Valid range: "
+                        f"{joint_configuration['lower_m']} to "
+                        f"{joint_configuration['upper_m']} meters."
+                    )
+
         action = command.method.strip().lower()
-        tool_name = f"{action}_{connection.name}"
+        action_connection_name = connection.name
+
+        if joint_configuration is not None:
+            action_connection_name = f"{connection.name}_{joint_configuration['joint_name']}"
+
+        # TODO: Validate final MCP tool-name collisions explicitly. Movement
+        # validation rejects duplicate joint names, but a generated name could
+        # still collide with a non-movement tool name.
+        tool_name = f"{action}_{action_connection_name}"
+
+        # Stable hardware state identifier; separate from action, tool name,
+        # and event bus keys.
         state_key = CommandCompiler.state_keys(connection)[0]
         tool_function = self.build_tool_function(
             connection,

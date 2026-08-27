@@ -14,46 +14,51 @@ from gerbera_sdk.models.hardware.movement_system import (
 @dataclass
 class MovementRuntime:
     hardware_system: HardwareSystem
-    movement_limitations: dict[str, dict[str, object] | None] = field(
+    joint_motor_mapping: dict[str, dict[str, object]] = field(
         default_factory=dict
     )
 
-    def get_joint_movement_limitation(self, joint_name: str):
-        if joint_name not in self.movement_limitations:
-            raise KeyError("Joint does not exist in the configuration")
-        return self.movement_limitations[joint_name]
-
-    def set_movement_limitations(self) -> None:
+    def register_movement_limitations(self) -> None:
         joints = self.hardware_system.movement_system.joints
-        self.movement_limitations = {}
 
         for joint in joints:
+            if isinstance(joint, FixedJoint):
+                continue
+
+            motor_connection_name = joint.motor_connection.name
+            if motor_connection_name in self.joint_motor_mapping:
+                raise KeyError(
+                    "Movement joint motor mapping already exists: "
+                    f"{motor_connection_name}"
+                )
+
             if isinstance(joint, RevoluteJoint):
-                self.movement_limitations[joint.joint_name] = {
+                self.joint_motor_mapping[motor_connection_name] = {
                     "joint_type": joint.joint_type,
+                    "joint_name": joint.joint_name,
                     "axis": joint.axis,
                     "lower_rad": joint.lower_rad,
                     "upper_rad": joint.upper_rad,
-                    "motor_connection": joint.motor_connection.name,
+                    "motor_connection": motor_connection_name,
                 }
             elif isinstance(joint, PrismaticJoint):
-                self.movement_limitations[joint.joint_name] = {
+                self.joint_motor_mapping[motor_connection_name] = {
                     "joint_type": joint.joint_type,
+                    "joint_name": joint.joint_name,
                     "axis": joint.axis,
                     "lower_m": joint.lower_m,
                     "upper_m": joint.upper_m,
-                    "motor_connection": joint.motor_connection.name,
+                    "motor_connection": motor_connection_name,
                 }
             elif isinstance(joint, ContinuousJoint):
-                self.movement_limitations[joint.joint_name] = {
+                self.joint_motor_mapping[motor_connection_name] = {
                     "joint_type": joint.joint_type,
+                    "joint_name": joint.joint_name,
                     "axis": joint.axis,
-                    "motor_connection": joint.motor_connection.name,
+                    "motor_connection": motor_connection_name,
                 }
-            elif isinstance(joint, FixedJoint):
-                self.movement_limitations[joint.joint_name] = None
             else:
-                raise TypeError(f"Unsupported movement joint: {type(joint)}")
+                raise TypeError(f"Unsupported movable joint: {type(joint)}")
 
     def get_movement_system(self) -> dict[str, Any]:
         movement_system = self.hardware_system.movement_system
@@ -92,7 +97,9 @@ class MovementRuntime:
             "parent_to_joint_xyz_m": joint.parent_to_joint_xyz_m,
             "parent_to_joint_rpy_rad": joint.parent_to_joint_rpy_rad,
             "description": joint.description,
-            "configuration": self.get_joint_movement_limitation(
-                joint.joint_name
+            "configuration": (
+                None
+                if isinstance(joint, FixedJoint)
+                else self.joint_motor_mapping[joint.motor_connection.name]
             ),
         }
