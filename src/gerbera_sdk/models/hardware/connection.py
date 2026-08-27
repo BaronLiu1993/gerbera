@@ -11,7 +11,7 @@ class Connection:
     name: str
     component_type: str
     pins: dict[Pin, str]
-    microcontroller_id: str = ""
+    microcontroller_id: str | None = None
     description: str = ""
     stream: bool = False
     database: Optional[Database] = None
@@ -28,6 +28,11 @@ class Connection:
 
     @property
     def event_name(self) -> str:
+        if self.microcontroller_id is None:
+            raise RuntimeError(
+                f"Connection is not bound to a microcontroller: {self.name}"
+            )
+
         return build_connection_event_name(
             component_type=self.component_type,
             microcontroller_id=self.microcontroller_id,

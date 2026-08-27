@@ -5,13 +5,16 @@ from gerbera_sdk.inference import Model
 from gerbera_sdk.models.hardware.camera import Camera
 from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.movement import MovementSystem
 
 @dataclass
 class HardwareSystem:
+    name: str
     description: str = ""
     microcontrollers: list[Microcontroller] = field(default_factory=list)
     cameras: list[Camera] = field(default_factory=list)
     models: list[Model] = field(default_factory=list)
+    movement_system: MovementSystem | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def _get_required_microcontroller_libraries(self) -> list[str]:
@@ -31,9 +34,3 @@ class HardwareSystem:
                     libraries.append(library)
                     normalized_library_names.add(normalized_library)
         return libraries
-
-    def add_microcontrollers(self, microcontrollers: list[Microcontroller]) -> None:
-        self.microcontrollers.extend(microcontrollers)
-
-    def add_cameras(self, cameras: list[Camera]) -> None:
-        self.cameras.extend(cameras)

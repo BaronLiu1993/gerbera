@@ -10,6 +10,7 @@ from gerbera_sdk.models.hardware.connection import Connection
 
 @dataclass
 class Microcontroller:
+    name: str
     port: str
     fqbn: str
     baud_rate: int = 115200
@@ -20,15 +21,6 @@ class Microcontroller:
     @property
     def id(self) -> str:
         return self.get_microcontroller_id_from_config()
-
-    def get_used_pins(self) -> set[str]:
-        used_pins: set[str] = set()
-
-        for existing_connection in self.connections:
-            for pin in existing_connection.pins.values():
-                used_pins.add(pin)
-
-        return used_pins
 
     def get_microcontroller_id_from_config(self) -> str | None:
 
@@ -66,9 +58,3 @@ class Microcontroller:
                     libraries.append(library)
                     normalized_library_names.add(normalized_install_name)
         return libraries
-
-    def add_connections(
-        self,
-        connections: list[Connection],
-    ) -> None:
-        self.connections.extend(connections)
