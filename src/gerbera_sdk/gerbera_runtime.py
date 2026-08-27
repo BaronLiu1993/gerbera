@@ -62,6 +62,7 @@ class GerberaRuntime:
         movement_runtime = None
         if hardware_system.movement_system is not None:
             movement_runtime = MovementRuntime(hardware_system)
+            movement_runtime.set_movement_limitations()
         GerberaRuntime.register_connection_states(
             hardware_system=hardware_system,
             hardware_runtime=hardware_runtime,
