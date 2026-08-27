@@ -1,7 +1,15 @@
+from collections import deque
+
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.hardware.movement_system import MovementSystem
+from gerbera_sdk.models.hardware.movement_system import BaseJoint, MovementSystem
+
+JOINT_MOTOR_COMPONENT_TYPES = {
+    "revolute": {"sg90", "mg996r"},
+    "prismatic": {},
+    "continuous": {"dcmotor"},
+}
 
 
 def validate_hardware_system(hardware_system: HardwareSystem) -> str | None:
@@ -85,8 +93,9 @@ def validate_movement_system(movement_system: MovementSystem) -> str | None:
     if not base_link_name:
         return "Movement base link name cannot be empty"
 
-    link_names = {base_link_name}
+    normalized_link_names = {base_link_name.lower()}
     joint_names: set[str] = set()
+    link_names: set[str] = {base_link_name}
     child_links: set[str] = set()
     adjacency: dict[str, list[str]] = {base_link_name: []}
     incoming_edge_counts: dict[str, int] = {base_link_name: 0}
@@ -99,6 +108,8 @@ def validate_movement_system(movement_system: MovementSystem) -> str | None:
         normalized_joint_name = joint_name.lower()
         if normalized_joint_name in joint_names:
             return f"Duplicate movement joint name: {joint.joint_name}"
+        if normalized_joint_name in normalized_link_names:
+            return f"Movement joint name conflicts with link name: {joint_name}"
         joint_names.add(normalized_joint_name)
 
         parent_link = joint.parent_link.name.strip()
@@ -107,6 +118,20 @@ def validate_movement_system(movement_system: MovementSystem) -> str | None:
             return f"Movement joint {joint_name} parent link name cannot be empty"
         if not child_link:
             return f"Movement joint {joint_name} child link name cannot be empty"
+
+        normalized_parent_link = parent_link.lower()
+        normalized_child_link = child_link.lower()
+        for link_name, normalized_link_name in (
+            (parent_link, normalized_parent_link),
+            (child_link, normalized_child_link),
+        ):
+            if normalized_link_name in joint_names:
+                return f"Movement link name conflicts with joint name: {link_name}"
+            normalized_link_names.add(normalized_link_name)
+
+        error = validate_movement_joint_motor(joint, joint_name)
+        if error is not None:
+            return error
 
         link_names.add(parent_link)
         link_names.add(child_link)
@@ -128,32 +153,86 @@ def validate_movement_system(movement_system: MovementSystem) -> str | None:
         adjacency[parent_link].append(child_link)
         incoming_edge_counts[child_link] += 1
 
-    topological_queue = [
+    error = validate_movement_dag(
+        link_names=link_names,
+        adjacency=adjacency,
+        incoming_edge_counts=incoming_edge_counts,
+    )
+    if error is not None:
+        return error
+
+    return validate_movement_reachability(
+        base_link_name=base_link_name,
+        link_names=link_names,
+        adjacency=adjacency,
+    )
+
+
+def validate_movement_joint_motor(
+    joint: BaseJoint,
+    joint_name: str,
+) -> str | None:
+    motor_connection = getattr(joint, "motor_connection", None)
+    if motor_connection is None:
+        return None
+
+    joint_type = joint.joint_type
+    if joint_type not in JOINT_MOTOR_COMPONENT_TYPES:
+        return f"Movement joint {joint_name} has invalid joint type: {joint_type}"
+
+    component_type = motor_connection.component_type.strip().lower()
+    valid_component_types = JOINT_MOTOR_COMPONENT_TYPES[joint_type]
+    if component_type not in valid_component_types:
+        return (
+            f"Movement joint {joint_name} has incompatible motor "
+            f"component type: {motor_connection.component_type}"
+        )
+
+    return None
+
+
+def validate_movement_dag(
+    *,
+    link_names: set[str],
+    adjacency: dict[str, list[str]],
+    incoming_edge_counts: dict[str, int],
+) -> str | None:
+    remaining_incoming_edge_counts = incoming_edge_counts.copy()
+    topological_queue = deque(
         link_name
-        for link_name, incoming_count in incoming_edge_counts.items()
+        for link_name, incoming_count in remaining_incoming_edge_counts.items()
         if incoming_count == 0
-    ]
-    visited_in_topological_order: set[str] = set()
+    )
+    visited: set[str] = set()
 
     while topological_queue:
-        link_name = topological_queue.pop(0)
-        if link_name in visited_in_topological_order:
+        link_name = topological_queue.popleft()
+        if link_name in visited:
             continue
 
-        visited_in_topological_order.add(link_name)
+        visited.add(link_name)
         for child_link in adjacency.get(link_name, []):
-            incoming_edge_counts[child_link] -= 1
-            if incoming_edge_counts[child_link] == 0:
+            remaining_incoming_edge_counts[child_link] -= 1
+            if remaining_incoming_edge_counts[child_link] == 0:
                 topological_queue.append(child_link)
 
-    if len(visited_in_topological_order) != len(link_names):
+    if len(visited) != len(link_names):
         return "Movement system contains a cycle"
 
+    return None
+
+
+def validate_movement_reachability(
+    *,
+    base_link_name: str,
+    link_names: set[str],
+    adjacency: dict[str, list[str]],
+) -> str | None:
     visited: set[str] = set()
-    queue = [base_link_name]
+    queue = deque([base_link_name])
 
     while queue:
-        link_name = queue.pop(0)
+        link_name = queue.popleft()
         if link_name in visited:
             continue
 

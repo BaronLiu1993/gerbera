@@ -3,6 +3,7 @@ from typing import Literal
 from gerbera_sdk.models.hardware.connection import Connection
 
 Axis = Literal["x", "y", "z"]
+JointType = Literal["revolute", "prismatic", "continuous", "fixed"]
 
 @dataclass
 class Link:
@@ -27,10 +28,12 @@ class BaseJoint:
     # pitch is the rotation around Y axis and the yaw is the
     # rotation around Z axis.
     description: str = ""
+    joint_type: JointType = field(init=False)
 
 
 @dataclass
 class RevoluteJoint(BaseJoint):
+    joint_type: Literal["revolute"] = field(default="revolute", init=False)
     axis: Axis
     lower_rad: float
     upper_rad: float
@@ -39,6 +42,7 @@ class RevoluteJoint(BaseJoint):
 
 @dataclass
 class PrismaticJoint(BaseJoint):
+    joint_type: Literal["prismatic"] = field(default="prismatic", init=False)
     axis: Axis
     lower_m: float
     upper_m: float
@@ -47,12 +51,14 @@ class PrismaticJoint(BaseJoint):
 
 @dataclass
 class ContinuousJoint(BaseJoint):
+    joint_type: Literal["continuous"] = field(default="continuous", init=False)
     axis: Axis
     motor_connection: Connection  # match with the motor
 
 
 @dataclass
 class FixedJoint(BaseJoint):
+    joint_type: Literal["fixed"] = field(default="fixed", init=False)
     # TODO: Add a sensor/camera attachment model later. A sensor should be able
     # to attach to a link with a local xyz/rpy offset so its pose moves with
     # that part of the robot.
