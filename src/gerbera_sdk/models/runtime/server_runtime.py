@@ -34,6 +34,7 @@ from gerbera_sdk.models.runtime.hardware_runtime import (
     ConnectionState,
     HardwareRuntime,
 )
+from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference import (
     Inference,
@@ -54,6 +55,7 @@ class ServerRuntime:
     event_listener: EventListener
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
+    movement_runtime: MovementRuntime | None = None
     event_read_timeout_seconds: float = 1.0
     event_read_poll_seconds: float = 0.02
 
@@ -64,6 +66,8 @@ class ServerRuntime:
         self.register_event_catalog_tool()
         self.register_state_memory_tool()
         self.register_environment_state_tool()
+        if self.movement_runtime is not None:
+            self.register_movement_system_tool()
 
     @staticmethod
     def model_catalog_type(model: Inference) -> ModelCatalogType:
@@ -807,5 +811,17 @@ class ServerRuntime:
             ),
             annotations=ToolAnnotations(
                 title="Get current environment state",
+            ),
+        )
+
+    def register_movement_system_tool(self) -> None:
+        self.register_tool(
+            name="get_current_movement_system",
+            description="Read the configured movement system.",
+            tool_function=self.movement_runtime.get_movement_system,
+            annotations=ToolAnnotations(
+                title="Get current movement system",
+                readOnlyHint=True,
+                openWorldHint=False,
             ),
         )

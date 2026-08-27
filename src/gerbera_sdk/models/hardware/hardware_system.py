@@ -17,7 +17,7 @@ class HardwareSystem:
     movement_system: MovementSystem | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def _get_required_microcontroller_libraries(self) -> list[str]:
+    def get_required_microcontroller_libraries(self) -> list[str]:
         libraries: list[str] = []
         normalized_library_names: set[str] = set()
 

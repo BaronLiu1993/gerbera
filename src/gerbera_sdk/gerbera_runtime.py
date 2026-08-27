@@ -18,6 +18,7 @@ from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 
 
 class GerberaRuntime:
@@ -58,6 +59,9 @@ class GerberaRuntime:
         event_worker = EventWorker(database=database)
         environment_runtime = EnvironmentRuntime(hardware_system)
         hardware_runtime = HardwareRuntime()
+        movement_runtime = None
+        if hardware_system.movement_system is not None:
+            movement_runtime = MovementRuntime(hardware_system)
         GerberaRuntime.register_connection_states(
             hardware_system=hardware_system,
             hardware_runtime=hardware_runtime,
@@ -80,6 +84,7 @@ class GerberaRuntime:
             event_listener=event_listener,
             event_bus=event_bus,
             hardware_runtime=hardware_runtime,
+            movement_runtime=movement_runtime,
         )
         app = FastMCP(
             hardware_system.description,
@@ -96,6 +101,7 @@ class GerberaRuntime:
             event_listener=event_listener,
             reaction_bus=reaction_bus,
             hardware_runtime=hardware_runtime,
+            movement_runtime=movement_runtime,
         )
 
         server_runtime.register_events()
@@ -146,7 +152,7 @@ class GerberaRuntime:
 
     @staticmethod
     def install_dependencies(hardware_system: HardwareSystem) -> None:
-        for package_name in hardware_system._get_required_microcontroller_libraries():
+        for package_name in hardware_system.get_required_microcontroller_libraries():
             subprocess.run(
                 ["arduino-cli", "core", "install", package_name],
                 check=True,

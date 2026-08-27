@@ -11,6 +11,7 @@ from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 
 
 @dataclass
@@ -22,12 +23,17 @@ class RuntimeLifecycle:
     event_listener: EventListener
     event_bus: EventBus
     hardware_runtime: HardwareRuntime
+    movement_runtime: MovementRuntime | None = None
 
     @asynccontextmanager
     async def __call__(
         self,
         server: FastMCP,
     ) -> AsyncGenerator[dict[str, object], None]:
+        movement_runtime = None
+        if self.movement_runtime is not None:
+            movement_runtime = self.movement_runtime
+
         with self._start_resources():
             yield {
                 "board_runtime": self.board_runtime,
@@ -35,6 +41,7 @@ class RuntimeLifecycle:
                 "event_worker": self.event_worker,
                 "environment_runtime": self.environment_runtime,
                 "hardware_runtime": self.hardware_runtime,
+                "movement_runtime": movement_runtime,
             }
 
     def _start_resources(
