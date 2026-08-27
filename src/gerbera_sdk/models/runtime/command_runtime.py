@@ -1,5 +1,7 @@
 from mcp.types import ToolAnnotations
 
+import math
+
 from gerbera_sdk.firmware.firmware_schema import CommandSpec
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.connection import Connection
@@ -31,6 +33,17 @@ class CommandCompiler:
                 f"Unsupported state field for {component_type}: {field_name}"
             )
         return units[field_name]
+
+    @staticmethod
+    def state_value(
+        component_type: str,
+        field_name: str,
+        value: str,
+    ) -> str:
+        if component_type in {"sg90", "mg996r"} and field_name == "angle":
+            return str(math.radians(float(value)))
+
+        return value
 
     @staticmethod
     def state_field(
@@ -141,9 +154,32 @@ class CommandCompiler:
                     f"must be <= {param_spec.max}"
                 )
 
-            parts.append(f"{key}:{numeric_value}")
+            command_value = CommandCompiler.command_parameter_value(
+                connection=connection,
+                action=normalized_action,
+                key=key,
+                value=numeric_value,
+            )
+            parts.append(f"{key}:{command_value}")
 
         return ",".join(parts)
+
+    @staticmethod
+    def command_parameter_value(
+        *,
+        connection: Connection,
+        action: str,
+        key: str,
+        value: float,
+    ) -> float:
+        if (
+            connection.component_type in {"sg90", "mg996r"}
+            and action == "WRITE"
+            and key == "angle"
+        ):
+            return math.degrees(value)
+
+        return value
 
     @staticmethod
     def parse_response(response: str) -> dict[str, str]:

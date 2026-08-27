@@ -157,12 +157,21 @@ class EventListener:
             microcontroller_id,
             event_name,
         )
-        handler.perform_work(payload)
         # TODO: route error payloads into command results instead of hardware state.
         if "error" in payload:
             return
 
-        payload_field, value = next(iter(payload.items()))
+        runtime_payload = {
+            field: CommandCompiler.state_value(
+                handler.component_type,
+                field,
+                value,
+            )
+            for field, value in payload.items()
+        }
+        handler.perform_work(runtime_payload)
+
+        payload_field, value = next(iter(runtime_payload.items()))
         state_key = CommandCompiler.state_key(
             handler.component_type,
             handler.connection_name,

@@ -1,4 +1,5 @@
 from mcp.types import ToolAnnotations
+import math
 
 from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
@@ -28,8 +29,8 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
                     "angle": ParameterSpec(
                         required=True,
                         min=0,
-                        max=180,
-                        description="Servo angle in degrees.",
+                        max=math.pi,
+                        description="Servo angle in radians.",
                     ),
                 },
             )
@@ -50,7 +51,7 @@ class SG90FirmwareBuilder(BaseFirmwareBuilder):
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
         return {
-            "units": {"angle": "degrees"},
+            "units": {"angle": "radians"},
         }
 
     def build_definitions(self, connection: Connection) -> str:
