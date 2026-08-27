@@ -5,7 +5,7 @@ from gerbera_sdk.inference import Model
 from gerbera_sdk.models.hardware.camera import Camera
 from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.hardware.movement import MovementSystem
+from gerbera_sdk.models.hardware.movement_system import MovementSystem
 
 @dataclass
 class HardwareSystem:
