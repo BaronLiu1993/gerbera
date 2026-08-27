@@ -58,10 +58,7 @@ class ExecuteProducerRuntime:
                 observation = await ObservationRuntime(
                     model=self.model,
                     memory=self.memory,
-                    # Tool calls go straight through the consumer for now.
-                    # Reintroduce a producer wrapper here only if the producer
-                    # needs to enforce permissions, retries, or routing.
-                    call_tool=self.execute_consumer.call_tool,
+                    call_tool=self.execute_consumer.call_read_only_tool,
                     context_builder=ObservationContextBuilder(
                         memory=self.memory,
                         available_tools=read_only_tools,
@@ -105,10 +102,7 @@ class ExecuteProducerRuntime:
                 review = await ReviewRuntime(
                     model=self.model,
                     memory=self.memory,
-                    # Tool calls go straight through the consumer for now.
-                    # Reintroduce a producer wrapper here only if the producer
-                    # needs to enforce permissions, retries, or routing.
-                    call_tool=self.execute_consumer.call_tool,
+                    call_tool=self.execute_consumer.call_read_only_tool,
                     context_builder=ReviewContextBuilder(
                         memory=self.memory,
                         available_tools=read_only_tools,

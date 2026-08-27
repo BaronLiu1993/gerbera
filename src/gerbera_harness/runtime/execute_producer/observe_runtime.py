@@ -50,31 +50,49 @@ class ObservationRuntime:
         hardware_state: dict[str, Any],
     ) -> None:
         task_id = self.memory.require_task_state().current_task_id
+        previous_world_state = self.memory.world_state
         world_state = WorldStateSchema(
             session_id=self.memory.session_id,
             environment_state=environment_state,
             hardware_state=hardware_state,
-            sources=[],
-        )
-        environment_event = EventSchema(
-            session_id=self.memory.session_id,
-            event_type=EventTypeEnum.WORLD_STATE_UPDATED,
-            source_type=SourceTypeEnum.MCP_TOOL,
-            source_name="get_current_environment_state",
-            payload=environment_state,
-            task_id=task_id,
-        )
-        hardware_event = EventSchema(
-            session_id=self.memory.session_id,
-            event_type=EventTypeEnum.WORLD_STATE_UPDATED,
-            source_type=SourceTypeEnum.MCP_TOOL,
-            source_name="get_current_hardware_state",
-            payload=hardware_state,
-            task_id=task_id,
+            sources=[
+                "observe_runtime:get_current_environment_state",
+                "observe_runtime:get_current_hardware_state",
+            ],
         )
 
-        self.memory.insert_event(environment_event)
-        self.memory.insert_event(hardware_event)
+        if previous_world_state.environment_state != environment_state:
+            self.memory.insert_event(
+                EventSchema(
+                    session_id=self.memory.session_id,
+                    event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+                    source_type=SourceTypeEnum.MCP_TOOL,
+                    source_name="get_current_environment_state",
+                    payload={
+                        "source_runtime": "observe_runtime",
+                        "state_kind": "environment",
+                        "state": environment_state,
+                    },
+                    task_id=task_id,
+                )
+            )
+
+        if previous_world_state.hardware_state != hardware_state:
+            self.memory.insert_event(
+                EventSchema(
+                    session_id=self.memory.session_id,
+                    event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+                    source_type=SourceTypeEnum.MCP_TOOL,
+                    source_name="get_current_hardware_state",
+                    payload={
+                        "source_runtime": "observe_runtime",
+                        "state_kind": "hardware",
+                        "state": hardware_state,
+                    },
+                    task_id=task_id,
+                )
+            )
+
         self.memory.define_world_state(world_state)
         self.memory.rebuild_temporal_state()
 

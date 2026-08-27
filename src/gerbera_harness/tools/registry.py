@@ -17,6 +17,9 @@ class LocalToolRegistry:
     def list_tools(self) -> list[ToolSpec]:
         return [tool.spec for tool in self.tools.values()]
 
+    def has(self, name: str) -> bool:
+        return name in self.tools
+
     async def call_tool(
         self,
         name: str,

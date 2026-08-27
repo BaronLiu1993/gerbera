@@ -20,6 +20,7 @@ from gerbera_harness.tools.client import ToolClient
 class ExecuteConsumerRuntime:
     tool_client: ToolClient
     memory: Memory
+    tool_timeout_seconds: float = 30.0
 
     # Run the whole thing
     async def execute_actions(
@@ -88,20 +89,89 @@ class ExecuteConsumerRuntime:
         self,
         tool_name: str,
         arguments: dict[str, Any],
+        *,
+        read_only_required: bool = False,
     ) -> Any:
-        result = await self.tool_client.call_tool(tool_name, arguments)
+        if read_only_required:
+            await self.require_read_only_tool(tool_name)
+
+        try:
+            result = await asyncio.wait_for(
+                self.tool_client.call_tool(tool_name, arguments),
+                timeout=self.tool_timeout_seconds,
+            )
+        except TimeoutError:
+            self.insert_tool_call_event(
+                tool_name=tool_name,
+                payload={
+                    "status": "timeout",
+                    "arguments": arguments,
+                    "error_type": "TimeoutError",
+                    "error_message": (
+                        f"Tool call timed out after "
+                        f"{self.tool_timeout_seconds} seconds"
+                    ),
+                },
+            )
+            raise
+        except Exception as exc:
+            self.insert_tool_call_event(
+                tool_name=tool_name,
+                payload={
+                    "status": "failed",
+                    "arguments": arguments,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
+            raise
+
+        self.insert_tool_call_event(
+            tool_name=tool_name,
+            payload={
+                "status": "success",
+                "arguments": arguments,
+                "result": result,
+            },
+        )
+        return result
+
+    async def call_read_only_tool(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> Any:
+        return await self.call_tool(
+            tool_name,
+            arguments,
+            read_only_required=True,
+        )
+
+    async def require_read_only_tool(self, tool_name: str) -> None:
+        for tool in await self.tool_client.list_tools():
+            if tool.name == tool_name:
+                if tool.read_only is True:
+                    return
+                raise PermissionError(
+                    f"Tool is not available in read-only runtime: {tool_name}"
+                )
+
+        raise ValueError(f"Tool is not available: {tool_name}")
+
+    def insert_tool_call_event(
+        self,
+        *,
+        tool_name: str,
+        payload: dict[str, Any],
+    ) -> None:
         self.memory.insert_event(
             EventSchema(
                 session_id=self.memory.session_id,
                 event_type=EventTypeEnum.TOOL_CALL,
                 source_type=SourceTypeEnum.MCP_TOOL,
                 source_name=tool_name,
-                payload={
-                    "arguments": arguments,
-                    "result": result,
-                },
+                payload=payload,
                 task_id=self.memory.require_task_state().current_task_id,
             )
         )
         self.memory.rebuild_temporal_state()
-        return result
