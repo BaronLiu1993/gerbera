@@ -17,12 +17,13 @@ class Microcontroller:
     description: Optional[str] = None
     connections: list[Connection] = field(default_factory=list)
     config_path: Path = Path("config.json")
+    hardware_system_id: str | None = None
 
     @property
     def id(self) -> str:
         return self.get_microcontroller_id_from_config()
 
-    def get_microcontroller_id_from_config(self) -> str | None:
+    def get_microcontroller_id_from_config(self) -> str:
 
         if not self.config_path.exists():
             raise FileNotFoundError("Config.json Not Found")
@@ -37,7 +38,12 @@ class Microcontroller:
         for device in registry.values():
             device_port = device.get("address")
             if device_port == self.port:
-                return device.get("id")
+                device_id = device.get("id")
+                if not device_id:
+                    raise ValueError(
+                        "Microcontroller id is missing from config.json"
+                    )
+                return device_id
 
         raise ValueError(
             f"No device in config.json['devices'] matched port {self.port}"

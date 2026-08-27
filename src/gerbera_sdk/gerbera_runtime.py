@@ -28,8 +28,8 @@ class GerberaRuntime:
         install_dependencies: bool = True,
         flash_firmware: bool = True,
     ) -> None:
-        GerberaRuntime.validate_hardware(hardware_system)
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
+        GerberaRuntime.validate_hardware(hardware_system)
 
         if install_dependencies:
             GerberaRuntime.install_dependencies(hardware_system)
@@ -46,8 +46,8 @@ class GerberaRuntime:
         database_password: str,
         **transport_kwargs,
     ) -> None:
-        GerberaRuntime.validate_hardware(hardware_system)
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
+        GerberaRuntime.validate_hardware(hardware_system)
 
         database = GerberaRuntime.runtime_database(
             host=database_host,
@@ -121,7 +121,9 @@ class GerberaRuntime:
     def bind_connection_microcontroller_ids(
         hardware_system: HardwareSystem,
     ) -> None:
+        hardware_system_id = hardware_system.id
         for microcontroller in hardware_system.microcontrollers:
+            microcontroller.hardware_system_id = hardware_system_id
             microcontroller_id = microcontroller.id
             for connection in microcontroller.connections:
                 connection.microcontroller_id = microcontroller_id

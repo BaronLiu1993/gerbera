@@ -13,12 +13,23 @@ JOINT_MOTOR_COMPONENT_TYPES = {
 
 
 def validate_hardware_system(hardware_system: HardwareSystem) -> str | None:
+    hardware_system_id = (hardware_system.id or "").strip()
+    if not hardware_system_id:
+        return "Hardware system id cannot be empty"
+
     microcontroller_ids: set[str] = set()
     camera_ids: set[str] = set()
     connection_owners: dict[str, str] = {}
 
     for microcontroller in hardware_system.microcontrollers:
         microcontroller_id = microcontroller.id
+        if not microcontroller_id:
+            return f"Microcontroller id cannot be empty: {microcontroller.name}"
+        if microcontroller.hardware_system_id != hardware_system_id:
+            return (
+                f"Microcontroller {microcontroller_id} is not bound to "
+                f"hardware system {hardware_system_id}"
+            )
         if microcontroller_id in microcontroller_ids:
             return f"Duplicate microcontroller id: {microcontroller_id}"
         microcontroller_ids.add(microcontroller_id)
@@ -51,13 +62,14 @@ def validate_hardware_system(hardware_system: HardwareSystem) -> str | None:
 def validate_microcontroller(microcontroller: Microcontroller) -> str | None:
     connection_names: set[str] = set()
     used_pins: set[str] = set()
+    microcontroller_id = microcontroller.id
 
     for connection in microcontroller.connections:
         error = validate_connection_and_pins(
             connection=connection,
             connection_names=connection_names,
             used_pins=used_pins,
-            microcontroller_id=microcontroller.id,
+            microcontroller_id=microcontroller_id,
         )
         if error is not None:
             return error
@@ -75,6 +87,12 @@ def validate_connection_and_pins(
     normalized_name = connection.name.strip().lower()
     if not normalized_name:
         return "Connection name cannot be empty"
+
+    if connection.microcontroller_id != microcontroller_id:
+        return (
+            f"Connection {connection.name} is not bound to "
+            f"microcontroller {microcontroller_id}"
+        )
 
     if normalized_name in connection_names:
         return f"Duplicate connection name on board {microcontroller_id}: {connection.name}"

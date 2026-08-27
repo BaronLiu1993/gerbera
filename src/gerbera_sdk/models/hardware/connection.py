@@ -11,8 +11,8 @@ class Connection:
     name: str
     component_type: str
     pins: dict[Pin, str]
+    description: str
     microcontroller_id: str | None = None
-    description: str = ""
     stream: bool = False
     database: Optional[Database] = None
     actions: dict[
