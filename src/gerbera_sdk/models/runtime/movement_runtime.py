@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, ClassVar
+import xml.etree.ElementTree as ET
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.movement_system import (
@@ -14,9 +16,103 @@ from gerbera_sdk.models.hardware.movement_system import (
 @dataclass
 class MovementRuntime:
     hardware_system: HardwareSystem
-    joint_motor_mapping: dict[str, dict[str, object]] = field(
-        default_factory=dict
-    )
+    joint_motor_mapping: dict[str, dict[str, object]] = field(default_factory=dict)
+    urdf_file_path: Path = Path(".gerbera/schematics/movement.urdf")
+    urdf_axis_by_name: ClassVar[dict[str, str]] = {
+        "x": "1 0 0",
+        "y": "0 1 0",
+        "z": "0 0 1",
+    }
+
+    def to_urdf(
+        self,
+    ) -> None:
+        path = self.urdf_file_path
+        movement_system = self.hardware_system.movement_system
+        robot = ET.Element(
+            "robot",
+            {
+                "name": self.hardware_system.name,
+            },
+        )
+        link_names = {movement_system.base_link.name}
+
+        for joint in movement_system.joints:
+            link_names.add(joint.parent_link.name)
+            link_names.add(joint.child_link.name)
+
+        for link_name in sorted(link_names):
+            ET.SubElement(robot, "link", {"name": link_name})
+
+        for joint in movement_system.joints:
+            joint_element = ET.SubElement(
+                robot,
+                "joint",
+                {
+                    "name": joint.joint_name,
+                    "type": joint.joint_type,
+                },
+            )
+            ET.SubElement(
+                joint_element,
+                "parent",
+                {"link": joint.parent_link.name},
+            )
+            ET.SubElement(
+                joint_element,
+                "child",
+                {"link": joint.child_link.name},
+            )
+            ET.SubElement(
+                joint_element,
+                "origin",
+                {
+                    "xyz": " ".join(
+                        str(value) for value in joint.parent_to_joint_xyz_m
+                    ),
+                    "rpy": " ".join(
+                        str(value) for value in joint.parent_to_joint_rpy_rad
+                    ),
+                },
+            )
+
+            if isinstance(
+                joint,
+                (RevoluteJoint, PrismaticJoint, ContinuousJoint),
+            ):
+                ET.SubElement(
+                    joint_element,
+                    "axis",
+                    {"xyz": self.urdf_axis_by_name[joint.axis]},
+                )
+
+            if isinstance(joint, RevoluteJoint):
+                ET.SubElement(
+                    joint_element,
+                    "limit",
+                    {
+                        "lower": str(joint.lower_rad),
+                        "upper": str(joint.upper_rad),
+                        "effort": "0",
+                        "velocity": "0",
+                    },
+                )
+            elif isinstance(joint, PrismaticJoint):
+                ET.SubElement(
+                    joint_element,
+                    "limit",
+                    {
+                        "lower": str(joint.lower_m),
+                        "upper": str(joint.upper_m),
+                        "effort": "0",
+                        "velocity": "0",
+                    },
+                )
+
+        ET.indent(robot)
+        urdf = ET.tostring(robot, encoding="unicode")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(urdf)
 
     def register_movement_limitations(self) -> None:
         joints = self.hardware_system.movement_system.joints
@@ -103,3 +199,9 @@ class MovementRuntime:
                 else self.joint_motor_mapping[joint.motor_connection.name]
             ),
         }
+
+    def solve_forward_kinematics():
+        pass
+
+    def solve_inverse_kinematics():
+        pass
