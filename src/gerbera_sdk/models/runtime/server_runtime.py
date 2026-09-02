@@ -59,9 +59,10 @@ class ServerRuntime:
 
     def register_tools(self) -> None:
         self.register_hardware_tools()
+        self.register_movement_tools()
         # Reaction MCP tools are disabled until reaction execution moves to harness.
         # self.register_reaction_tools()
-        self.register_event_catalog_tool()
+        # self.register_event_catalog_tool()
         self.register_state_memory_tool()
         self.register_environment_state_tool()
 
@@ -71,9 +72,7 @@ class ServerRuntime:
             if isinstance(model, model_class):
                 return model_type
 
-        raise ValueError(
-            f"Unsupported inference model type: {type(model).__name__}"
-        )
+        raise ValueError(f"Unsupported inference model type: {type(model).__name__}")
 
     # Event registration and catalog helpers.
 
@@ -327,7 +326,9 @@ class ServerRuntime:
         action_connection_name = connection.name
 
         if joint_configuration is not None:
-            action_connection_name = f"{connection.name}_{joint_configuration['joint_name']}"
+            action_connection_name = (
+                f"{connection.name}_{joint_configuration['joint_name']}"
+            )
 
         # TODO: Validate final MCP tool-name collisions explicitly. Movement
         # validation rejects duplicate joint names, but a generated name could
@@ -588,9 +589,7 @@ class ServerRuntime:
 
     def register_inference_tools(self) -> None:
         registered_models: dict[str, tuple[str, Inference]] = {}
-        for model_id, inference in (
-            self.environment_runtime.model_inferences.items()
-        ):
+        for model_id, inference in self.environment_runtime.model_inferences.items():
             if inference.name in registered_models:
                 raise ValueError(
                     f"Inference model name must be unique: {inference.name}"
@@ -642,6 +641,73 @@ class ServerRuntime:
             self.register_object_detection_tools(model_id, model)
         else:
             self.register_vision_language_model_tools(model_id, model)
+
+    def register_movement_tools(self) -> None:
+        if self.movement_runtime is None:
+            return
+
+        def solve_forward_kinematics(
+            movement_system_name: str,
+            target_link_name: str,
+        ) -> dict[str, object]:
+            return self.movement_runtime.solve_forward_kinematics(
+                movement_system_name=movement_system_name,
+                target_link_name=target_link_name,
+            )
+
+        def solve_inverse_kinematics(
+            movement_system_name: str,
+            target_link_name: str,
+            target_position_m: Annotated[
+                list[float],
+                Field(min_length=3, max_length=3),
+            ],
+            target_orientation_rpy_rad: Annotated[
+                list[float],
+                Field(min_length=3, max_length=3),
+            ],
+        ) -> dict[str, float]:
+            return self.movement_runtime.solve_inverse_kinematics(
+                movement_system_name=movement_system_name,
+                target_link_name=target_link_name,
+                target_position_m=(
+                    target_position_m[0],
+                    target_position_m[1],
+                    target_position_m[2],
+                ),
+                target_orientation_rpy_rad=(
+                    target_orientation_rpy_rad[0],
+                    target_orientation_rpy_rad[1],
+                    target_orientation_rpy_rad[2],
+                ),
+            )
+
+        self.register_tool(
+            name="solve_forward_kinematics",
+            description=(
+                "Compute the current pose of a target link in a registered "
+                "movement system from the runtime joint positions."
+            ),
+            tool_function=solve_forward_kinematics,
+            annotations=ToolAnnotations(
+                title="Solve forward kinematics",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self.register_tool(
+            name="solve_inverse_kinematics",
+            description=(
+                "Compute joint positions for a target link to reach a target "
+                "position and roll-pitch-yaw orientation."
+            ),
+            tool_function=solve_inverse_kinematics,
+            annotations=ToolAnnotations(
+                title="Solve inverse kinematics",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
 
     def register_object_detection_tools(
         self,
@@ -800,9 +866,7 @@ class ServerRuntime:
     def register_state_memory_tool(self) -> None:
         self.register_tool(
             name="get_current_hardware_state",
-            description=(
-                "Read the current hardware state memory."
-            ),
+            description=("Read the current hardware state memory."),
             tool_function=self.hardware_runtime.get_state_store,
             annotations=ToolAnnotations(
                 title="Get current hardware state",
@@ -812,9 +876,7 @@ class ServerRuntime:
     def register_environment_state_tool(self) -> None:
         self.register_tool(
             name="get_current_environment_state",
-            description=(
-                "Read the current environment state from model outputs."
-            ),
+            description=("Read the current environment state from model outputs."),
             tool_function=(
                 self.environment_runtime.model_output_store.get_environment_state
             ),

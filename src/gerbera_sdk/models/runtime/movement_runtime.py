@@ -40,6 +40,29 @@ class MovementRuntime:
         }
     )
 
+    def reset_motors_to_standard_position(self) -> None:
+        results: dict[str, dict[str, float]] = {}
+
+        for movement_system_name, movement_system in (
+            self.movement_system_registry.items()
+        ):
+            joint_positions: dict[str, float] = {}
+
+            for joint in movement_system.joint_by_name.values():
+                if isinstance(joint, FixedJoint):
+                    continue
+
+                connection = joint.motor_connection
+                response = connection.perform_action("WRITE", {"angle": 0.0})
+                if not response.get("success"):
+                    raise RuntimeError(
+                        f"Failed to reset movement joint: {joint.name}"
+                    )
+                movement_system.joint_positions[joint.name] = 0.0
+                joint_positions[joint.name] = 0.0
+
+            results[movement_system_name] = joint_positions
+
     def solve_forward_kinematics(
         self,
         movement_system_name: str,
@@ -113,7 +136,7 @@ class MovementRuntime:
             joint_positions = {}
             joint_by_name = {}
             for joint in movement_system.joints:
-                joint_positions[joint.name] = 0
+                joint_positions[joint.name] = None
                 joint_by_name[joint.name] = joint
             joint_path_by_target_link = self.define_paths_from_base_link(
                 movement_system.base_link, movement_system.joints

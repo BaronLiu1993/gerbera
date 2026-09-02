@@ -30,10 +30,6 @@ class RuntimeLifecycle:
         self,
         server: FastMCP,
     ) -> AsyncGenerator[dict[str, object], None]:
-        movement_runtime = None
-        if self.movement_runtime is not None:
-            movement_runtime = self.movement_runtime
-
         with self._start_resources():
             yield {
                 "board_runtime": self.board_runtime,
@@ -41,7 +37,7 @@ class RuntimeLifecycle:
                 "event_worker": self.event_worker,
                 "environment_runtime": self.environment_runtime,
                 "hardware_runtime": self.hardware_runtime,
-                "movement_runtime": movement_runtime,
+                "movement_runtime": self.movement_runtime,
             }
 
     def _start_resources(
@@ -51,6 +47,9 @@ class RuntimeLifecycle:
         try:
             self.board_runtime.start()
             cleanup.callback(self.board_runtime.close)
+
+            if self.movement_runtime is not None:
+                self.movement_runtime.reset_motors_to_standard_position()
 
             self.camera_runtime.start_cameras()
             cleanup.callback(self.camera_runtime.clean_up_cameras)
