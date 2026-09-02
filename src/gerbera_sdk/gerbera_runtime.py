@@ -60,10 +60,9 @@ class GerberaRuntime:
         environment_runtime = EnvironmentRuntime(hardware_system)
         hardware_runtime = HardwareRuntime()
         movement_runtime = None
-        if hardware_system.movement_system is not None:
+        if hardware_system.movement_systems:
             movement_runtime = MovementRuntime(hardware_system)
-            movement_runtime.register_movement_limitations()
-            movement_runtime.to_urdf()
+            movement_runtime.register_movement_system()
         GerberaRuntime.register_connection_states(
             hardware_system=hardware_system,
             hardware_runtime=hardware_runtime,

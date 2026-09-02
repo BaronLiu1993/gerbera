@@ -64,8 +64,6 @@ class ServerRuntime:
         self.register_event_catalog_tool()
         self.register_state_memory_tool()
         self.register_environment_state_tool()
-        if self.movement_runtime is not None:
-            self.register_movement_system_tool()
 
     @staticmethod
     def model_catalog_type(model: Inference) -> ModelCatalogType:
@@ -324,29 +322,6 @@ class ServerRuntime:
             )
 
         joint_configuration = None
-        if self.movement_runtime:
-            joint_configuration = self.movement_runtime.joint_motor_mapping.get(
-                connection.name
-            )
-            if joint_configuration is not None:
-                description += (
-                    f" Controls movement joint "
-                    f"{joint_configuration['joint_name']}."
-                    f" Joint type: {joint_configuration['joint_type']}."
-                    f" Axis: {joint_configuration['axis']}."
-                )
-                if "lower_rad" in joint_configuration:
-                    description += (
-                        f" Valid range: "
-                        f"{joint_configuration['lower_rad']} to "
-                        f"{joint_configuration['upper_rad']} radians."
-                    )
-                if "lower_m" in joint_configuration:
-                    description += (
-                        f" Valid range: "
-                        f"{joint_configuration['lower_m']} to "
-                        f"{joint_configuration['upper_m']} meters."
-                    )
 
         action = command.method.strip().lower()
         action_connection_name = connection.name
@@ -845,17 +820,5 @@ class ServerRuntime:
             ),
             annotations=ToolAnnotations(
                 title="Get current environment state",
-            ),
-        )
-
-    def register_movement_system_tool(self) -> None:
-        self.register_tool(
-            name="get_current_movement_system",
-            description="Read the configured movement system.",
-            tool_function=self.movement_runtime.get_movement_system,
-            annotations=ToolAnnotations(
-                title="Get current movement system",
-                readOnlyHint=True,
-                openWorldHint=False,
             ),
         )

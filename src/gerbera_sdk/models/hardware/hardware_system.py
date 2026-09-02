@@ -11,10 +11,10 @@ from gerbera_sdk.models.hardware.movement_system import MovementSystem
 class HardwareSystem:
     name: str
     description: str = ""
+    movement_systems: list[MovementSystem] = field(default_factory=list)
     microcontrollers: list[Microcontroller] = field(default_factory=list)
     cameras: list[Camera] = field(default_factory=list)
     models: list[Model] = field(default_factory=list)
-    movement_system: MovementSystem | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def get_required_microcontroller_libraries(self) -> list[str]:
