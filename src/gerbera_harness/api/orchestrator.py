@@ -6,6 +6,7 @@ from gerbera_harness.infrastructure.model import Model, ModelProviderEnum
 from gerbera_harness.memory import (
     EventStateSchema,
     Memory,
+    PhysicalConfigurationStateSchema,
     TemporalStateSchema,
     WorldStateSchema,
 )
@@ -49,13 +50,12 @@ class Orchestrator:
         memory = Memory(
             session_id=session.session_id,
             world_state=WorldStateSchema(session_id=session.session_id),
-            temporal_state=TemporalStateSchema(
-                session_id=session.session_id,
-                current_hardware_configuration={},
-            ),
+            temporal_state=TemporalStateSchema(session_id=session.session_id),
             task_state=None,
             events_state=EventStateSchema(session_id=session.session_id),
-            physical_configuration=None,
+            physical_configuration=PhysicalConfigurationStateSchema(
+                session_id=session.session_id,
+            ),
         )
         runtime_model = Model(
             model_provider=ModelProviderEnum(provider),

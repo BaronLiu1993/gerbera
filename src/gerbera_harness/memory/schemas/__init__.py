@@ -4,12 +4,7 @@ from gerbera_harness.memory.schemas.events import (
     EventTypeEnum,
     SourceTypeEnum,
 )
-from gerbera_harness.memory.schemas.physical import (
-    PhysicalComponentEnum,
-    PhysicalConfigurationStateSchema,
-    PhysicalEdgeSchema,
-    PhysicalNodeSchema,
-)
+from gerbera_harness.memory.schemas.physical import PhysicalConfigurationStateSchema
 from gerbera_harness.runtime.schemas.execute import (
     ActionTypeEnum,
     ContinuousExecuteSchema,
@@ -36,10 +31,7 @@ __all__ = [
     "EventTypeEnum",
     "ExecuteActionParameterSchema",
     "ParameterTypeSchema",
-    "PhysicalComponentEnum",
     "PhysicalConfigurationStateSchema",
-    "PhysicalEdgeSchema",
-    "PhysicalNodeSchema",
     "SourceTypeEnum",
     "TaskSchema",
     "TaskStateSchema",

@@ -32,14 +32,20 @@ class Memory:
     ) -> None:
         self.physical_configuration = physical_configuration
 
-    def update_movement_system_configuration(
+    def update_hardware_state_by_name(
+        self,
+        hardware_state_by_name: dict[str, object],
+    ) -> None:
+        self.physical_configuration.hardware_state_by_name = hardware_state_by_name
+
+    def update_joint_state_by_movement_system(
         self,
         movement_system_name: str,
-        movement_system_context: dict[str, object],
+        joint_state: dict[str, object],
     ) -> None:
-        self.physical_configuration.movement_system_configuration[
+        self.physical_configuration.joint_state_by_movement_system[
             movement_system_name
-        ] = movement_system_context
+        ] = joint_state
 
     def initialise_tasks(
         self,
@@ -154,9 +160,7 @@ class Memory:
     def get_temporal_state(self) -> TemporalStateSchema:
         return self.temporal_state
 
-    # build the hardware config later
     def rebuild_temporal_state(self, window_size: int = 20) -> None:
-        # self.temporal_state.current_hardware_configuration =
         task_state = self.require_task_state()
         events = self.events_state.events
         self.temporal_state.recent_events = events[-window_size:]
@@ -184,4 +188,11 @@ class Memory:
         self.temporal_state.recent_world_states.append(self.world_state)
         self.temporal_state.recent_world_states = (
             self.temporal_state.recent_world_states[-window_size:]
+        )
+
+        self.temporal_state.recent_physical_configurations.append(
+            self.physical_configuration.model_copy(deep=True)
+        )
+        self.temporal_state.recent_physical_configurations = (
+            self.temporal_state.recent_physical_configurations[-window_size:]
         )

@@ -51,14 +51,12 @@ class ObservationRuntime:
     ) -> None:
         task_id = self.memory.require_task_state().current_task_id
         previous_world_state = self.memory.world_state
+        previous_hardware_state = (
+            self.memory.physical_configuration.hardware_state_by_name
+        )
         world_state = WorldStateSchema(
             session_id=self.memory.session_id,
             environment_state=environment_state,
-            hardware_state=hardware_state,
-            sources=[
-                "observe_runtime:get_current_environment_state",
-                "observe_runtime:get_current_hardware_state",
-            ],
         )
 
         if previous_world_state.environment_state != environment_state:
@@ -77,11 +75,11 @@ class ObservationRuntime:
                 )
             )
 
-        if previous_world_state.hardware_state != hardware_state:
+        if previous_hardware_state != hardware_state:
             self.memory.insert_event(
                 EventSchema(
                     session_id=self.memory.session_id,
-                    event_type=EventTypeEnum.WORLD_STATE_UPDATED,
+                    event_type=EventTypeEnum.PHYSICAL_CONFIGURATION_UPDATED,
                     source_type=SourceTypeEnum.MCP_TOOL,
                     source_name="get_current_hardware_state",
                     payload={
@@ -94,6 +92,7 @@ class ObservationRuntime:
             )
 
         self.memory.define_world_state(world_state)
+        self.memory.update_hardware_state_by_name(hardware_state)
         self.memory.rebuild_temporal_state()
 
     def update_memory_with_plan(self, agent_payload: dict[str, Any]) -> None:

@@ -11,6 +11,7 @@ from gerbera_harness.runtime.schemas.base import HarnessSchema
 class EventTypeEnum(str, Enum):
     SENSOR_READING = "sensor_reading"
     WORLD_STATE_UPDATED = "world_state_updated"
+    PHYSICAL_CONFIGURATION_UPDATED = "physical_configuration_updated"
 
     TASK_STARTED = "task_started"
     TASK_COMPLETED = "task_completed"

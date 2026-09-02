@@ -10,6 +10,9 @@ class ObservationContextBuilder(ContextBuilder):
             "current_task": self.build_current_task_anchor(),
             "task_state": self.memory.get_tasks_state().model_dump(mode="json"),
             "world_state": self.memory.world_state.model_dump(mode="json"),
+            "physical_configuration": (
+                self.memory.physical_configuration.model_dump(mode="json")
+            ),
             "temporal_state": self.memory.get_temporal_state().model_dump(
                 mode="json"
             ),

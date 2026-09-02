@@ -13,7 +13,10 @@ class TaskDecompositionContextBuilder(ContextBuilder):
         return {
             "session_id": self.memory.session_id,
             "environment_state": await self.get_current_environment_state(),
-            "hardware_state": await self.get_current_hardware_state(),
+            "physical_configuration": {
+                "hardware_state_by_name": await self.get_current_hardware_state(),
+                "joint_state_by_movement_system": {},
+            },
         }
 
     async def get_current_environment_state(self) -> dict[str, Any]:
