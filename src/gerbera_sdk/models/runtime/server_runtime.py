@@ -649,12 +649,8 @@ class ServerRuntime:
         def list_movement_systems() -> list[str]:
             return self.movement_runtime.list_movement_systems()
 
-        def get_movement_system_context(
-            movement_system_name: str,
-        ) -> dict[str, object]:
-            return self.movement_runtime.get_movement_system_context(
-                movement_system_name=movement_system_name,
-            )
+        def get_current_movement_state() -> dict[str, object]:
+            return self.movement_runtime.get_movement_context()
 
         def solve_forward_kinematics(
             movement_system_name: str,
@@ -703,14 +699,14 @@ class ServerRuntime:
             ),
         )
         self.register_tool(
-            name="get_movement_system_context",
+            name="get_current_movement_state",
             description=(
-                "Read links, joints, limits, target links, motor connections, "
-                "and current joint positions for a registered movement system."
+                "Read current movement system state, joint definitions, links, "
+                "target links, motor connections, limits, and joint positions."
             ),
-            tool_function=get_movement_system_context,
+            tool_function=get_current_movement_state,
             annotations=ToolAnnotations(
-                title="Get movement system context",
+                title="Get current movement state",
                 readOnlyHint=True,
                 openWorldHint=False,
             ),
