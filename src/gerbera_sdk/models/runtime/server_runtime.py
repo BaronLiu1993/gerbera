@@ -646,6 +646,16 @@ class ServerRuntime:
         if self.movement_runtime is None:
             return
 
+        def list_movement_systems() -> list[str]:
+            return self.movement_runtime.list_movement_systems()
+
+        def get_movement_system_context(
+            movement_system_name: str,
+        ) -> dict[str, object]:
+            return self.movement_runtime.get_movement_system_context(
+                movement_system_name=movement_system_name,
+            )
+
         def solve_forward_kinematics(
             movement_system_name: str,
             target_link_name: str,
@@ -682,6 +692,29 @@ class ServerRuntime:
                 ),
             )
 
+        self.register_tool(
+            name="list_movement_systems",
+            description="List registered movement system names.",
+            tool_function=list_movement_systems,
+            annotations=ToolAnnotations(
+                title="List movement systems",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self.register_tool(
+            name="get_movement_system_context",
+            description=(
+                "Read links, joints, limits, target links, motor connections, "
+                "and current joint positions for a registered movement system."
+            ),
+            tool_function=get_movement_system_context,
+            annotations=ToolAnnotations(
+                title="Get movement system context",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
         self.register_tool(
             name="solve_forward_kinematics",
             description=(
