@@ -22,14 +22,25 @@ class Memory:
     temporal_state: TemporalStateSchema
     task_state: TaskStateSchema | None
     events_state: EventStateSchema
-    physical_configuration: PhysicalConfigurationStateSchema | None # temporarily is none
+    physical_configuration: PhysicalConfigurationStateSchema
 
     def define_world_state(self, world_state: WorldStateSchema) -> None:
         self.world_state = world_state
 
-    def define_physical_configuration(self):
-        pass
-    
+    def define_initial_physical_configuration(
+        self, physical_configuration: PhysicalConfigurationStateSchema
+    ) -> None:
+        self.physical_configuration = physical_configuration
+
+    def update_movement_system_configuration(
+        self,
+        movement_system_name: str,
+        movement_system_context: dict[str, object],
+    ) -> None:
+        self.physical_configuration.movement_system_configuration[
+            movement_system_name
+        ] = movement_system_context
+
     def initialise_tasks(
         self,
         tasks: list[TaskSchema],
@@ -55,10 +66,7 @@ class Memory:
 
     def has_remaining_tasks(self) -> bool:
         task_state = self.require_task_state()
-        return any(
-            task.status is TaskStatusEnum.PENDING
-            for task in task_state.tasks
-        )
+        return any(task.status is TaskStatusEnum.PENDING for task in task_state.tasks)
 
     def advance_to_next_task(self) -> None:
         task_state = self.require_task_state()
@@ -115,7 +123,7 @@ class Memory:
                 return task
         raise RuntimeError(f"Current task not found: {current_task_id}")
 
-    # get all tasks 
+    # get all tasks
     def get_tasks_state(self) -> TaskStateSchema:
         return self.require_task_state()
 
@@ -128,26 +136,20 @@ class Memory:
         return list(self.events_state.events)
 
     def get_events_by_task_id(self, task_id: str) -> list[EventSchema]:
-        return list(
-            self.temporal_state.task_event_traces.get(task_id, [])
-        )
+        return list(self.temporal_state.task_event_traces.get(task_id, []))
 
     def get_current_task_events(self) -> list[EventSchema]:
         task = self.get_current_task_state()
         return self.get_events_by_task_id(task.task_id)
 
     def get_events_by_source(self, source_name: str) -> list[EventSchema]:
-        return list(
-            self.temporal_state.source_event_traces.get(source_name, [])
-        )
+        return list(self.temporal_state.source_event_traces.get(source_name, []))
 
     def get_events_by_type(
         self,
         event_type: EventTypeEnum,
     ) -> list[EventSchema]:
-        return list(
-            self.temporal_state.event_type_traces.get(event_type.value, [])
-        )
+        return list(self.temporal_state.event_type_traces.get(event_type.value, []))
 
     def get_temporal_state(self) -> TemporalStateSchema:
         return self.temporal_state
@@ -169,16 +171,13 @@ class Memory:
             event_type_traces.setdefault(event.event_type.value, []).append(event)
 
         self.temporal_state.task_event_traces = {
-            key: value[-window_size:]
-            for key, value in task_event_traces.items()
+            key: value[-window_size:] for key, value in task_event_traces.items()
         }
         self.temporal_state.source_event_traces = {
-            key: value[-window_size:]
-            for key, value in source_event_traces.items()
+            key: value[-window_size:] for key, value in source_event_traces.items()
         }
         self.temporal_state.event_type_traces = {
-            key: value[-window_size:]
-            for key, value in event_type_traces.items()
+            key: value[-window_size:] for key, value in event_type_traces.items()
         }
 
         # Adding and reconstruct the world states
