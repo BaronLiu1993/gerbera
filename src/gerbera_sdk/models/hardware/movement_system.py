@@ -13,7 +13,7 @@ class Link:
 
 @dataclass
 class BaseJoint:
-    joint_name: str
+    name: str
 
     # The edge that connects it.
     parent_link: Link  # the key to the link of the parent
@@ -75,5 +75,6 @@ Joint = (
 
 @dataclass
 class MovementSystem:
+    name: str
     base_link: Link
     joints: list[Joint] = field(default_factory=list)
