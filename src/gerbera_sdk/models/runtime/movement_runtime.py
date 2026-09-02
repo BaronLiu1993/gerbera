@@ -251,3 +251,58 @@ class MovementRuntime:
                 "velocity": "0",
             },
         )
+
+    def list_movement_systems(self) -> list[str]:
+        return sorted(self.movement_system_registry)
+
+    def get_movement_system_context(
+        self,
+        movement_system_name: str,
+    ) -> dict[str, object]:
+        registry = self.movement_system_registry[movement_system_name]
+        movement_system = registry.movement_system
+        link_names = {movement_system.base_link.name}
+        joints: dict[str, dict[str, object]] = {}
+
+        for joint in movement_system.joints:
+            link_names.add(joint.parent_link.name)
+            link_names.add(joint.child_link.name)
+
+            joint_context: dict[str, object] = {
+                "joint_type": joint.joint_type,
+                "parent_link": joint.parent_link.name,
+                "child_link": joint.child_link.name,
+                "parent_to_joint_xyz_m": list(joint.parent_to_joint_xyz_m),
+                "parent_to_joint_rpy_rad": list(joint.parent_to_joint_rpy_rad),
+                "description": joint.description,
+                "current_position": registry.joint_positions.get(joint.name),
+            }
+
+            if isinstance(joint, (RevoluteJoint, PrismaticJoint, ContinuousJoint)):
+                joint_context["axis"] = joint.axis
+                joint_context["motor_connection"] = joint.motor_connection.name
+
+            if isinstance(joint, RevoluteJoint):
+                joint_context["limits"] = {
+                    "lower": joint.lower_rad,
+                    "upper": joint.upper_rad,
+                    "unit": "radians",
+                }
+            elif isinstance(joint, PrismaticJoint):
+                joint_context["limits"] = {
+                    "lower": joint.lower_m,
+                    "upper": joint.upper_m,
+                    "unit": "meters",
+                }
+            else:
+                joint_context["limits"] = None
+
+            joints[joint.name] = joint_context
+
+        return {
+            "name": movement_system.name,
+            "base_link": movement_system.base_link.name,
+            "links": sorted(link_names),
+            "target_links": sorted(registry.joint_path_by_target_link),
+            "joints": joints,
+        }
