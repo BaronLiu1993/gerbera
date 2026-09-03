@@ -38,13 +38,14 @@ from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 class ExecuteProducerRuntime:
     model: Model
     memory: Memory
-    context: str
+    task_goal: str
     execute_consumer: ExecuteConsumerRuntime
     state_machine: StateMachine
     observation_iteration_context: list[ObservationIterationContext] = field(
         default_factory=list
     )
     max_retries: int = 5
+    prev_state_context: str # observation starts with the context from the task decomposition state
 
     async def submit_action_groups(
         self,
@@ -83,7 +84,6 @@ class ExecuteProducerRuntime:
                             memory=self.memory,
                             available_tools=read_only_tools,
                         ),
-                        prev_state_context=self.context,
                         prev_iteration_context=self.observation_iteration_context,
                         current_iteration=iteration_index + 1,
                         max_iterations=self.max_retries,
@@ -115,7 +115,7 @@ class ExecuteProducerRuntime:
                         observation_review.decision
                         is ObservationDecision.SUCCEEDED
                     ):
-                        self.context = observation_review.context
+                        state_context = observation_review.context
                         self.state_machine.perform_transition(
                             ExecuteLoopStateEnum.PLAN
                         )
@@ -136,7 +136,7 @@ class ExecuteProducerRuntime:
                     planning = await PlanningRuntime(
                         model=self.model,
                         memory=self.memory,
-                        prev_state_context=self.context,
+                        prev_state_context=state_context,
                         context_builder=PlanningContextBuilder(
                             memory=self.memory,
                             available_tools=available_tools,
@@ -153,8 +153,9 @@ class ExecuteProducerRuntime:
                         action_groups = planning.actions
                         await self.submit_action_groups(action_groups)
 
-                    self.context = planning.context
+                    state_context = planning.context
                     self.state_machine.perform_transition(ExecuteLoopStateEnum.REVIEW)
+                    break
             elif self.state_machine.current_state is ExecuteLoopStateEnum.REVIEW:
                 review = await ReviewRuntime(
                     model=self.model,
@@ -164,9 +165,8 @@ class ExecuteProducerRuntime:
                         memory=self.memory,
                         available_tools=read_only_tools,
                     ),
-                    prev_state_context=self.context,
+                    prev_state_context=state_context,
                 ).run_review()
-                self.context = review.context
                 return review
             else:
                 raise ValueError("Unsupported State")

@@ -126,7 +126,7 @@ class AgentRuntime:
                 result = await ExecuteProducerRuntime(
                     model=self.model,
                     memory=self.memory,
-                    context=current_task.task_goal,
+                    task_goal=current_task.task_goal,
                     execute_consumer=self.execute_consumer,
                     state_machine=StateMachine(),
                 ).produce_action_groups()

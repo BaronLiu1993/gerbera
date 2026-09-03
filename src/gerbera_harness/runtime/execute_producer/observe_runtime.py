@@ -43,7 +43,7 @@ class ObservationRuntime:
     call_tool: Callable[[str, dict[str, Any]], Awaitable[Any]]
     context_builder: ObservationContextBuilder
     review_context_builder: ObservationReviewContextBuilder
-    prev_state_context: str
+    prev_state_context: str # this will be context from initialisation phase
     max_iterations: int
     prev_iteration_context: list[ObservationIterationContext] = field(
         default_factory=list
