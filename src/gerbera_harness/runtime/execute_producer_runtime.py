@@ -121,7 +121,6 @@ class ExecuteProducerRuntime:
                         )
                         break
                     elif observation_review.decision is ObservationDecision.RETRY:
-                        self.context = observation_review.context
                         continue
                     else:
                         raise ValueError(
