@@ -105,6 +105,7 @@ class ReviewRuntime:
             task_id=task_id,
         )
         self.memory.insert_event(review_event)
+        self.memory.rebuild_temporal_state()
 
     async def run_review(self) -> ExecuteProducerResult:
         client = self.model.get_agent_client()

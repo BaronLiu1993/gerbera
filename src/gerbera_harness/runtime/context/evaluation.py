@@ -30,6 +30,9 @@ class EvaluateContextBuilder(ContextBuilder):
                     self.memory.temporal_state.recent_physical_configurations
                 )
             ],
+            "task_summaries_by_task_id": (
+                self.memory.temporal_state.task_summaries_by_task_id
+            ),
             "recent_physical_updates": [
                 event.model_dump(mode="json")
                 for event in self.memory.get_events_by_type(

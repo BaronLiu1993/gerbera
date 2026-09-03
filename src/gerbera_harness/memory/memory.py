@@ -168,11 +168,16 @@ class Memory:
         task_event_traces: dict[str, list[EventSchema]] = {}
         source_event_traces: dict[str, list[EventSchema]] = {}
         event_type_traces: dict[str, list[EventSchema]] = {}
+        task_summaries_by_task_id: dict[str, list[dict[str, object]]] = {}
 
         for event in events:
             task_event_traces.setdefault(event.task_id, []).append(event)
             source_event_traces.setdefault(event.source_name, []).append(event)
             event_type_traces.setdefault(event.event_type.value, []).append(event)
+            if event.event_type is EventTypeEnum.REVIEW_CREATED:
+                task_summaries_by_task_id.setdefault(event.task_id, []).append(
+                    event.payload
+                )
 
         self.temporal_state.task_event_traces = {
             key: value[-window_size:] for key, value in task_event_traces.items()
@@ -182,6 +187,10 @@ class Memory:
         }
         self.temporal_state.event_type_traces = {
             key: value[-window_size:] for key, value in event_type_traces.items()
+        }
+        self.temporal_state.task_summaries_by_task_id = {
+            key: value[-window_size:]
+            for key, value in task_summaries_by_task_id.items()
         }
 
         # Adding and reconstruct the world states

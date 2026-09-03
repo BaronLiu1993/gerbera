@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from pydantic import Field
 
@@ -20,4 +21,7 @@ class TemporalStateSchema(HarnessSchema):
     task_event_traces: dict[str, list[EventSchema]] = Field(default_factory=dict)
     source_event_traces: dict[str, list[EventSchema]] = Field(default_factory=dict)
     event_type_traces: dict[str, list[EventSchema]] = Field(default_factory=dict)
+    task_summaries_by_task_id: dict[str, list[dict[str, Any]]] = Field(
+        default_factory=dict
+    )
     temporal_memory_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
