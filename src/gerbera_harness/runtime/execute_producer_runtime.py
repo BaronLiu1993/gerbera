@@ -1,15 +1,19 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
 from gerbera_harness.runtime.context import (
     ObservationContextBuilder,
+    ObservationReviewContextBuilder,
     PlanningContextBuilder,
     ReviewContextBuilder,
 )
 from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
 from gerbera_harness.runtime.execute_producer.observe_runtime import (
     ObservationRuntime,
+)
+from gerbera_harness.runtime.execute_producer.schemas.observe import (
+    ObservationIterationContext,
 )
 from gerbera_harness.runtime.execute_producer.planning_runtime import (
     PlanningRuntime,
@@ -35,6 +39,9 @@ class ExecuteProducerRuntime:
     context: str
     execute_consumer: ExecuteConsumerRuntime
     state_machine: StateMachine
+    observation_iteration_context: list[ObservationIterationContext] = field(
+        default_factory=list
+    )
 
     async def submit_action_groups(
         self,
@@ -55,7 +62,7 @@ class ExecuteProducerRuntime:
 
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
-                observation = await ObservationRuntime(
+                observation_runtime = ObservationRuntime(
                     model=self.model,
                     memory=self.memory,
                     call_tool=self.execute_consumer.call_read_only_tool,
@@ -63,18 +70,40 @@ class ExecuteProducerRuntime:
                         memory=self.memory,
                         available_tools=read_only_tools,
                     ),
-                    prev_state_context=self.context,
-                ).run_observation()
+                    review_context_builder=ObservationReviewContextBuilder(
+                        memory=self.memory,
+                        available_tools=read_only_tools,
+                    ),
+                    prev_iteration_context=self.observation_iteration_context,
+                )
+                observation = await observation_runtime.run_observation()
 
-                if observation.decision is ObservationDecision.FAIL:
+                if observation.actions:
+                    await self.submit_action_groups(observation.actions)
+
+                observation_review = (
+                    await observation_runtime.run_observation_review(
+                        observation
+                    )
+                )
+                if observation_review.decision is ObservationDecision.FAIL:
                     return ExecuteProducerResult(
                         decision=ExecuteProducerDecision.FAIL,
-                        context=observation.context,
+                        context=observation_review.context,
                     )
-
-                await self.submit_action_groups(observation.actions)
-                self.context = observation.context
-                self.state_machine.perform_transition(ExecuteLoopStateEnum.PLAN)
+                elif (
+                    observation_review.decision
+                    is ObservationDecision.SUCCEEDED
+                ):
+                    self.context = observation_review.context
+                    self.state_machine.perform_transition(
+                        ExecuteLoopStateEnum.PLAN
+                    )
+                elif observation_review.decision is ObservationDecision.RETRY:
+                    self.context = observation_review.context
+                    continue
+                else:
+                    raise ValueError("Unsupported observation review decision")
             elif self.state_machine.current_state is ExecuteLoopStateEnum.PLAN:
                 planning = await PlanningRuntime(
                     model=self.model,
