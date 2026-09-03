@@ -98,7 +98,7 @@ class ReviewRuntime:
         task_id = self.memory.require_task_state().current_task_id
         review_event = EventSchema(
             session_id=self.memory.session_id,
-            event_type=EventTypeEnum.OBSERVATION_CREATED,
+            event_type=EventTypeEnum.REVIEW_CREATED,
             source_type=SourceTypeEnum.AGENT,
             source_name="review_runtime",
             payload=agent_payload,

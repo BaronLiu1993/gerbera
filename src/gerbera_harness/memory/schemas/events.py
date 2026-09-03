@@ -22,6 +22,7 @@ class EventTypeEnum(str, Enum):
     PLAN_CREATED = "plan_created"
     PLAN_INVALIDATED = "plan_invalidated"
     REPLAN_REQUESTED = "replan_requested"
+    REVIEW_CREATED = "review_created"
 
     TOOL_CALL = "tool_call"
 
