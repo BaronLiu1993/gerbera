@@ -42,6 +42,7 @@ class ObservationIterationRole(str, Enum):
 
 
 class ObservationIterationContext(HarnessSchema):
+    iteration: int
     role: Literal[
         ObservationIterationRole.TOOL,
         ObservationIterationRole.REVIEW,

@@ -70,7 +70,7 @@ class ExecuteProducerRuntime:
 
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
-                for _ in range(self.max_retries):
+                for iteration_index in range(self.max_retries):
                     observation_runtime = ObservationRuntime(
                         model=self.model,
                         memory=self.memory,
@@ -83,7 +83,10 @@ class ExecuteProducerRuntime:
                             memory=self.memory,
                             available_tools=read_only_tools,
                         ),
+                        prev_state_context=self.context,
                         prev_iteration_context=self.observation_iteration_context,
+                        current_iteration=iteration_index + 1,
+                        max_iterations=self.max_retries,
                     )
                     observation = await observation_runtime.run_observation()
 

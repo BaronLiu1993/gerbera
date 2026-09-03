@@ -12,6 +12,8 @@ Use the provided runtime context as the source of truth:
 - task success criteria
 - known world state
 - recent events
+- previous state context from before this observation session
+- current observation iteration and retry limit
 - previous iteration context from this observation session only
 - available tools
 

@@ -43,9 +43,12 @@ class ObservationRuntime:
     call_tool: Callable[[str, dict[str, Any]], Awaitable[Any]]
     context_builder: ObservationContextBuilder
     review_context_builder: ObservationReviewContextBuilder
+    prev_state_context: str
+    max_iterations: int
     prev_iteration_context: list[ObservationIterationContext] = field(
         default_factory=list
     )
+    current_iteration: int = 1
 
     async def get_current_environment_state(self) -> dict[str, Any]:
         return await self.call_tool(
@@ -116,6 +119,7 @@ class ObservationRuntime:
         content: dict[str, Any],
     ) -> ObservationIterationContext:
         iteration_context = ObservationIterationContext(
+            iteration=self.current_iteration,
             role=role,
             content=content,
         )
@@ -167,6 +171,11 @@ class ObservationRuntime:
                 self.review_context_builder.build_runtime_context()
             ),
             "observation_result": observation.model_dump(mode="json"),
+            "prev_state_context": self.prev_state_context,
+            "iteration": {
+                "current": self.current_iteration,
+                "max": self.max_iterations,
+            },
             "prev_iteration_context": [
                 item.model_dump(mode="json")
                 for item in self.prev_iteration_context
@@ -192,6 +201,11 @@ class ObservationRuntime:
         client = self.model.get_agent_client()
         context = {
             "observation_context": self.context_builder.build_runtime_context(),
+            "prev_state_context": self.prev_state_context,
+            "iteration": {
+                "current": self.current_iteration,
+                "max": self.max_iterations,
+            },
             "prev_iteration_context": [
                 item.model_dump(mode="json")
                 for item in self.prev_iteration_context

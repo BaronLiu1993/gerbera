@@ -12,6 +12,8 @@ Use the provided runtime context as the source of truth:
 - latest observation result
 - latest world state
 - latest physical configuration
+- previous state context from before this observation session
+- current observation iteration and retry limit
 - previous iteration context from this observation session only, including
   tool results
 - available read-only tools
