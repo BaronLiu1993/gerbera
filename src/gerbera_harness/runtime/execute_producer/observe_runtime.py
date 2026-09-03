@@ -128,7 +128,7 @@ class ObservationRuntime:
     ) -> None:
         task_id = self.memory.require_task_state().current_task_id
         iteration_context = self.append_iteration_context(
-            role=ObservationIterationRole.PLAN,
+            role=ObservationIterationRole.OBSERVATION_PLAN,
             content=agent_payload,
         )
         observe_event = EventSchema(

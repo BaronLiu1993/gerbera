@@ -12,8 +12,8 @@ Use the provided runtime context as the source of truth:
 - latest observation result
 - latest world state
 - latest physical configuration
-- recent tool calls and tool results
-- previous iteration context from this observation session only
+- previous iteration context from this observation session only, including
+  tool results
 - available read-only tools
 
 Return only the fields required by the response schema:

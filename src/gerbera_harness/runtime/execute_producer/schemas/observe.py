@@ -14,7 +14,10 @@ class ObservationDecision(str, Enum):
 
 
 class ObservationResult(HarnessSchema):
-    actions: list[list[ActionExecuteSchema]] = Field(max_length=0)
+    actions: list[list[ActionExecuteSchema]] = Field(
+        min_length=1,
+        max_length=10,
+    )
 
 
 observation_result_adapter = TypeAdapter(ObservationResult)
@@ -35,14 +38,14 @@ observation_review_result_adapter = TypeAdapter(ObservationReviewResult)
 class ObservationIterationRole(str, Enum):
     TOOL = "tool"
     REVIEW = "review"
-    PLAN = "plan"
+    OBSERVATION_PLAN = "observation_plan"
 
 
 class ObservationIterationContext(HarnessSchema):
     role: Literal[
         ObservationIterationRole.TOOL,
         ObservationIterationRole.REVIEW,
-        ObservationIterationRole.PLAN,
+        ObservationIterationRole.OBSERVATION_PLAN,
     ]
     content: dict[str, Any]
 

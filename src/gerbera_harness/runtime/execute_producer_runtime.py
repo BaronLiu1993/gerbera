@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 from gerbera_harness.infrastructure.model import Model
 from gerbera_harness.memory import Memory
@@ -14,6 +15,7 @@ from gerbera_harness.runtime.execute_producer.observe_runtime import (
 )
 from gerbera_harness.runtime.execute_producer.schemas.observe import (
     ObservationIterationContext,
+    ObservationIterationRole,
 )
 from gerbera_harness.runtime.execute_producer.planning_runtime import (
     PlanningRuntime,
@@ -47,8 +49,13 @@ class ExecuteProducerRuntime:
     async def submit_action_groups(
         self,
         action_groups: list[list[ActionExecuteSchema]],
-    ) -> None:
-        await self.execute_consumer.execute_actions(action_groups=action_groups)
+        *,
+        read_only_required: bool = False,
+    ) -> list[dict[str, Any]]:
+        return await self.execute_consumer.execute_actions(
+            action_groups=action_groups,
+            read_only_required=read_only_required,
+        )
 
     async def produce_action_groups(self) -> ExecuteProducerResult:
         available_tools = [
@@ -81,7 +88,15 @@ class ExecuteProducerRuntime:
                     observation = await observation_runtime.run_observation()
 
                     if observation.actions:
-                        await self.submit_action_groups(observation.actions)
+                        tool_results = await self.submit_action_groups(
+                            observation.actions,
+                            read_only_required=True,
+                        )
+                        for tool_result in tool_results:
+                            observation_runtime.append_iteration_context(
+                                role=ObservationIterationRole.TOOL,
+                                content=tool_result,
+                            )
 
                     observation_review = (
                         await observation_runtime.run_observation_review(
@@ -101,11 +116,19 @@ class ExecuteProducerRuntime:
                         self.state_machine.perform_transition(
                             ExecuteLoopStateEnum.PLAN
                         )
+                        break
                     elif observation_review.decision is ObservationDecision.RETRY:
                         self.context = observation_review.context
                         continue
                     else:
-                        raise ValueError("Unsupported observation review decision")
+                        raise ValueError(
+                            "Unsupported observation review decision"
+                        )
+                else:
+                    return ExecuteProducerResult(
+                        decision=ExecuteProducerDecision.FAIL,
+                        context="observation exceeded max retries",
+                    )
             elif self.state_machine.current_state is ExecuteLoopStateEnum.PLAN:
                 for _ in range(self.max_retries):
                     planning = await PlanningRuntime(
