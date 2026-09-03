@@ -7,6 +7,7 @@ from gerbera_harness.runtime.context import (
     ObservationContextBuilder,
     ObservationReviewContextBuilder,
     PlanningContextBuilder,
+    PlanningReviewContextBuilder,
     ReviewContextBuilder,
 )
 from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
@@ -40,7 +41,6 @@ from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 class ExecuteProducerRuntime:
     model: Model
     memory: Memory
-    task_goal: str
     execute_consumer: ExecuteConsumerRuntime
     state_machine: StateMachine
     observation_iteration_context: list[ObservationIterationContext] = field(
@@ -50,7 +50,6 @@ class ExecuteProducerRuntime:
         default_factory=list
     )
     max_retries: int = 5
-    prev_state_context: str = "" # passes in the task description
 
     async def submit_action_groups(
         self,
@@ -64,6 +63,7 @@ class ExecuteProducerRuntime:
         )
 
     async def produce_action_groups(self) -> ExecuteProducerResult:
+        prev_state_context = ""
         available_tools = [
             tool.model_dump()
             for tool in await self.execute_consumer.tool_client.list_tools()
@@ -89,7 +89,7 @@ class ExecuteProducerRuntime:
                             memory=self.memory,
                             available_tools=read_only_tools,
                         ),
-                        prev_state_context=self.prev_state_context,
+                        prev_state_context=prev_state_context,
                         prev_iteration_context=self.observation_iteration_context,
                         current_iteration=iteration_index + 1,
                         max_iterations=self.max_retries,
@@ -121,7 +121,7 @@ class ExecuteProducerRuntime:
                         observation_review.decision
                         is ObservationDecision.SUCCEEDED
                     ):
-                        self.prev_state_context = observation_review.context
+                        prev_state_context = observation_review.context
                         self.state_machine.perform_transition(
                             ExecuteLoopStateEnum.PLAN
                         )
@@ -142,8 +142,12 @@ class ExecuteProducerRuntime:
                     planning_runtime = PlanningRuntime(
                         model=self.model,
                         memory=self.memory,
-                        prev_state_context=self.prev_state_context,
+                        prev_state_context=prev_state_context,
                         context_builder=PlanningContextBuilder(
+                            memory=self.memory,
+                            available_tools=available_tools,
+                        ),
+                        review_context_builder=PlanningReviewContextBuilder(
                             memory=self.memory,
                             available_tools=available_tools,
                         ),
@@ -178,7 +182,7 @@ class ExecuteProducerRuntime:
                                     content=tool_result,
                                 )
 
-                        self.prev_state_context = planning_review.context
+                        prev_state_context = planning_review.context
                         self.state_machine.perform_transition(
                             ExecuteLoopStateEnum.REVIEW
                         )
@@ -187,7 +191,7 @@ class ExecuteProducerRuntime:
                         planning_review.decision
                         is PlanningReviewDecision.REVISE
                     ):
-                        self.prev_state_context = planning_review.context
+                        prev_state_context = planning_review.context
                         continue
                     else:
                         raise ValueError("Unsupported planning review decision")
@@ -205,7 +209,7 @@ class ExecuteProducerRuntime:
                         memory=self.memory,
                         available_tools=read_only_tools,
                     ),
-                    prev_state_context=self.prev_state_context,
+                    prev_state_context=prev_state_context,
                 ).run_review()
                 return review
             else:

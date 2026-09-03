@@ -34,13 +34,13 @@ class AgentRuntime:
     tool_client: ToolClient
     execute_consumer: ExecuteConsumerRuntime
     user_prompt: str
-    previous_context: str = ""
-    max_task_recovery_attempts: int = 5
-    max_agent_retries: int = 5
+    previous_phase_context: str = ""
+    max_task_execution_attempts: int = 5
+    max_task_decomposition_retries: int = 5
 
-    def task_recovery_exhausted(self) -> bool:
+    def task_execution_attempts_exhausted(self) -> bool:
         current_task = self.memory.get_current_task_state()
-        return current_task.attempts >= self.max_task_recovery_attempts
+        return current_task.attempts >= self.max_task_execution_attempts
 
     def fail_current_task(self, message: str) -> ExecutionResultSchema:
         self.memory.fail_task()
@@ -75,7 +75,7 @@ class AgentRuntime:
                         message=evaluation_result.context,
                     )
                 if evaluation_result.decision is EvaluationDecisionEnum.CONTINUE:
-                    self.previous_context = evaluation_result.context
+                    self.previous_phase_context = evaluation_result.context
                     self.session.perform_transition(
                         LoopStateEnum.TASK_DECOMPOSITION
                     )
@@ -93,7 +93,7 @@ class AgentRuntime:
             memory=self.memory,
             tool_client=self.tool_client,
             user_prompt=self.user_prompt,
-            previous_context=self.previous_context,
+            previous_context=self.previous_phase_context,
         ).run_task_decomposition(
             source_urls=source_urls
         )  # we will pass in the source_urls eventually
@@ -102,7 +102,7 @@ class AgentRuntime:
             # Previous context is only for the next decomposition pass. Once a
             # new task list is accepted, clear it so later runs are not treated
             # like the same replan.
-            self.previous_context = ""
+            self.previous_phase_context = ""
             self.session.perform_transition(LoopStateEnum.EXECUTION)
             return
 
@@ -118,7 +118,7 @@ class AgentRuntime:
                 current_task = self.memory.get_current_task_state()
                 # Task attempts count failed/replan recovery cycles, not the
                 # first execution pass.
-                if self.task_recovery_exhausted():
+                if self.task_execution_attempts_exhausted():
                     return self.fail_current_task(
                         "current task exceeded recovery attempts"
                     )
@@ -126,15 +126,14 @@ class AgentRuntime:
                 result = await ExecuteProducerRuntime(
                     model=self.model,
                     memory=self.memory,
-                    task_goal=current_task.task_goal,
                     execute_consumer=self.execute_consumer,
                     state_machine=StateMachine(),
                 ).produce_action_groups()
 
                 if result.decision is ExecuteProducerDecision.REPLAN_ACTIONS:
                     self.memory.increment_current_task_attempts()
-                    if self.task_recovery_exhausted():
-                        self.previous_context = result.context
+                    if self.task_execution_attempts_exhausted():
+                        self.previous_phase_context = result.context
                         return self.fail_current_task(
                             "current task exceeded action replan attempts"
                         )
@@ -143,7 +142,10 @@ class AgentRuntime:
                     continue
 
                 elif result.decision is ExecuteProducerDecision.REDECOMPOSE_TASKS:
-                    if self.session.current_agent_retries >= self.max_agent_retries:
+                    if (
+                        self.session.current_agent_retries
+                        >= self.max_task_decomposition_retries
+                    ):
                         # Leave memory/session as-is for audit. At this point
                         # the agent exhausted full redecomposition attempts, so
                         # callers can inspect the current task, events, and
@@ -159,7 +161,7 @@ class AgentRuntime:
                     # later if we need full task-list history after redecompose.
                     self.memory.clear_task_state()
                     self.session.increment_current_agent_retries()
-                    self.previous_context = result.context
+                    self.previous_phase_context = result.context
                     self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
                     return ExecutionResultSchema(
                         decision=ExecutionDecisionEnum.CONTINUE,
@@ -168,7 +170,7 @@ class AgentRuntime:
 
                 elif result.decision is ExecuteProducerDecision.FAIL:
                     self.memory.increment_current_task_attempts()
-                    if self.task_recovery_exhausted():
+                    if self.task_execution_attempts_exhausted():
                         return self.fail_current_task(
                             "current task failed after recovery attempts"
                         )

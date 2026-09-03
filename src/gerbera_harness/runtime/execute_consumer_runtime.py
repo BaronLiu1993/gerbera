@@ -155,36 +155,10 @@ class ExecuteConsumerRuntime:
         if read_only_required:
             await self.require_read_only_tool(tool_name)
 
-        try:
-            result = await asyncio.wait_for(
-                self.tool_client.call_tool(tool_name, arguments),
-                timeout=self.tool_timeout_seconds,
-            )
-        except TimeoutError:
-            self.insert_tool_call_event(
-                tool_name=tool_name,
-                payload={
-                    "status": "timeout",
-                    "arguments": arguments,
-                    "error_type": "TimeoutError",
-                    "error_message": (
-                        f"Tool call timed out after "
-                        f"{self.tool_timeout_seconds} seconds"
-                    ),
-                },
-            )
-            raise
-        except Exception as exc:
-            self.insert_tool_call_event(
-                tool_name=tool_name,
-                payload={
-                    "status": "failed",
-                    "arguments": arguments,
-                    "error_type": type(exc).__name__,
-                    "error_message": str(exc),
-                },
-            )
-            raise
+        result = await asyncio.wait_for(
+            self.tool_client.call_tool(tool_name, arguments),
+            timeout=self.tool_timeout_seconds,
+        )
 
         self.insert_tool_call_event(
             tool_name=tool_name,

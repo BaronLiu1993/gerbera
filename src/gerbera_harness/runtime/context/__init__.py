@@ -16,6 +16,9 @@ from gerbera_harness.runtime.context.observation_review import (
 from gerbera_harness.runtime.context.planning import (
     PlanningContextBuilder,
 )
+from gerbera_harness.runtime.context.planning_review import (
+    PlanningReviewContextBuilder,
+)
 from gerbera_harness.runtime.context.review import (
     ReviewContextBuilder,
 )
@@ -27,5 +30,6 @@ __all__ = [
     "ObservationContextBuilder",
     "ObservationReviewContextBuilder",
     "PlanningContextBuilder",
+    "PlanningReviewContextBuilder",
     "ReviewContextBuilder",
 ]

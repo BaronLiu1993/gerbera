@@ -10,7 +10,10 @@ from gerbera_harness.memory import (
     SourceTypeEnum,
 )
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
-from gerbera_harness.runtime.context import PlanningContextBuilder
+from gerbera_harness.runtime.context import (
+    PlanningContextBuilder,
+    PlanningReviewContextBuilder,
+)
 from gerbera_harness.runtime.execute_producer.schemas import (
     PlanningIterationContext,
     PlanningIterationRole,
@@ -30,6 +33,7 @@ class PlanningRuntime:
     memory: Memory
     prev_state_context: str
     context_builder: PlanningContextBuilder
+    review_context_builder: PlanningReviewContextBuilder
     max_iterations: int
     prev_iteration_context: list[PlanningIterationContext] = field(
         default_factory=list
@@ -118,7 +122,9 @@ class PlanningRuntime:
     ) -> PlanningReviewResult:
         client = self.model.get_agent_client()
         context = {
-            "planning_context": self.context_builder.build_runtime_context(),
+            "planning_context": (
+                self.review_context_builder.build_runtime_context()
+            ),
             "planning_result": planning_result.model_dump(mode="json"),
             "prev_state_context": self.prev_state_context,
             "iteration": {

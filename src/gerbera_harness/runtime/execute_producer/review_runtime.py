@@ -29,7 +29,7 @@ class ReviewRuntime:
     memory: Memory
     call_tool: Callable[[str, dict[str, Any]], Awaitable[Any]]
     context_builder: ReviewContextBuilder
-    prev_state_context: str  # what do we want to gain from observing that checks if it was done
+    prev_state_context: str
 
     async def get_current_environment_state(self) -> dict[str, Any]:
         return await self.call_tool(
