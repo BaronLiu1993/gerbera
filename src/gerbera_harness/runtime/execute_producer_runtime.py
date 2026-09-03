@@ -29,7 +29,9 @@ from gerbera_harness.runtime.execute_producer.schemas import (
     ExecuteProducerDecision,
     ExecuteProducerResult,
     ObservationDecision,
-    PlanningDecision,
+    PlanningIterationContext,
+    PlanningIterationRole,
+    PlanningReviewDecision,
 )
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 
@@ -44,8 +46,11 @@ class ExecuteProducerRuntime:
     observation_iteration_context: list[ObservationIterationContext] = field(
         default_factory=list
     )
+    planning_iteration_context: list[PlanningIterationContext] = field(
+        default_factory=list
+    )
     max_retries: int = 5
-    prev_state_context: str # observation starts with the context from the task decomposition state
+    prev_state_context: str = "" # passes in the task description
 
     async def submit_action_groups(
         self,
@@ -84,6 +89,7 @@ class ExecuteProducerRuntime:
                             memory=self.memory,
                             available_tools=read_only_tools,
                         ),
+                        prev_state_context=self.prev_state_context,
                         prev_iteration_context=self.observation_iteration_context,
                         current_iteration=iteration_index + 1,
                         max_iterations=self.max_retries,
@@ -115,7 +121,7 @@ class ExecuteProducerRuntime:
                         observation_review.decision
                         is ObservationDecision.SUCCEEDED
                     ):
-                        state_context = observation_review.context
+                        self.prev_state_context = observation_review.context
                         self.state_machine.perform_transition(
                             ExecuteLoopStateEnum.PLAN
                         )
@@ -132,30 +138,64 @@ class ExecuteProducerRuntime:
                         context="observation exceeded max retries",
                     )
             elif self.state_machine.current_state is ExecuteLoopStateEnum.PLAN:
-                for _ in range(self.max_retries):
-                    planning = await PlanningRuntime(
+                for iteration_index in range(self.max_retries):
+                    planning_runtime = PlanningRuntime(
                         model=self.model,
                         memory=self.memory,
-                        prev_state_context=state_context,
+                        prev_state_context=self.prev_state_context,
                         context_builder=PlanningContextBuilder(
                             memory=self.memory,
                             available_tools=available_tools,
                         ),
-                    ).run_planning()
+                        prev_iteration_context=self.planning_iteration_context,
+                        current_iteration=iteration_index + 1,
+                        max_iterations=self.max_retries,
+                    )
+                    planning = await planning_runtime.run_planning()
+                    planning_review = await planning_runtime.run_planning_review(
+                        planning
+                    )
 
-                    if planning.decision is PlanningDecision.FAIL:
+                    if (
+                        planning_review.decision
+                        is PlanningReviewDecision.FAIL
+                    ):
                         return ExecuteProducerResult(
                             decision=ExecuteProducerDecision.FAIL,
-                            context=planning.context,
+                            context=planning_review.context,
                         )
+                    elif (
+                        planning_review.decision
+                        is PlanningReviewDecision.APPROVED
+                    ):
+                        if planning.actions:
+                            tool_results = await self.submit_action_groups(
+                                planning.actions
+                            )
+                            for tool_result in tool_results:
+                                planning_runtime.append_iteration_context(
+                                    role=PlanningIterationRole.TOOL,
+                                    content=tool_result,
+                                )
 
-                    if planning.decision is PlanningDecision.SUCCEEDED:
-                        action_groups = planning.actions
-                        await self.submit_action_groups(action_groups)
-
-                    state_context = planning.context
-                    self.state_machine.perform_transition(ExecuteLoopStateEnum.REVIEW)
-                    break
+                        self.prev_state_context = planning_review.context
+                        self.state_machine.perform_transition(
+                            ExecuteLoopStateEnum.REVIEW
+                        )
+                        break
+                    elif (
+                        planning_review.decision
+                        is PlanningReviewDecision.REVISE
+                    ):
+                        self.prev_state_context = planning_review.context
+                        continue
+                    else:
+                        raise ValueError("Unsupported planning review decision")
+                else:
+                    return ExecuteProducerResult(
+                        decision=ExecuteProducerDecision.FAIL,
+                        context="planning exceeded max retries",
+                    )
             elif self.state_machine.current_state is ExecuteLoopStateEnum.REVIEW:
                 review = await ReviewRuntime(
                     model=self.model,
@@ -165,7 +205,7 @@ class ExecuteProducerRuntime:
                         memory=self.memory,
                         available_tools=read_only_tools,
                     ),
-                    prev_state_context=state_context,
+                    prev_state_context=self.prev_state_context,
                 ).run_review()
                 return review
             else:

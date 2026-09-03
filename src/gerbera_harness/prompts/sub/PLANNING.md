@@ -12,23 +12,15 @@ Use the provided runtime context as the source of truth:
 - latest world state
 - recent task events and tool results
 - previous state context from observation or retry
+- current planning iteration and retry limit
+- previous iteration context from this planning session only, including plan
+  review feedback and tool results
 - available tools
 
 Return only the fields required by the response schema:
 
-- `decision`: one of `succeeded`, `already_completed`, or `fail`
-- `context`: concise handoff context explaining the plan and assumptions
+- `plan`: raw text describing what you intend to do and why
 - `actions`: a list of action groups
-
-Decision rules:
-
-- `succeeded`: you produced executable action groups that should run before
-  review.
-- `already_completed`: the current task appears already complete from the
-  provided context. Return no actions. Review will verify this before the task
-  is marked complete.
-- `fail`: you cannot produce a useful or safe executable plan from the current
-  context. Return no actions.
 
 Action group rules:
 
@@ -39,8 +31,9 @@ Action group rules:
   when `query_database`, `get_table_schemas`, or `run_sandbox` are available.
 - Use continuous actions only when a forward tool call must later be reversed.
 - Use exact tool names and parameter names from the available tools.
-- `succeeded` must include at least one action group.
-- `already_completed` and `fail` must include an empty `actions` list.
+- Return an empty `actions` list only when the current task appears already
+  complete or no useful executable plan can be produced from the current
+  context.
 
 Do not emit review, observation, task decomposition, or evaluation instructions.
 Do not invent capabilities, tool names, parameters, physical state, or sensor

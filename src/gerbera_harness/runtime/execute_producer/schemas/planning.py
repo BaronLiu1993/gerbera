@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field
 from pydantic import TypeAdapter
@@ -8,35 +8,49 @@ from gerbera_harness.runtime.schemas.base import HarnessSchema
 from gerbera_harness.runtime.schemas.execute import ActionExecuteSchema
 
 
-# Keep observe/planning/review decisions separate even when values overlap.
-# Each state can grow domain-specific outcomes without changing the others.
-class PlanningDecision(str, Enum):
-    SUCCEEDED = "succeeded"
-    ALREADY_COMPLETED = "already_completed"
+class PlanningResult(HarnessSchema):
+    plan: str
+    actions: list[list[ActionExecuteSchema]] = Field(
+        default_factory=list,
+        max_length=10,
+    )
+
+
+planning_result_adapter = TypeAdapter(PlanningResult)
+
+
+class PlanningReviewDecision(str, Enum):
+    APPROVED = "approved"
+    REVISE = "revise"
     FAIL = "fail"
 
 
-class SucceededPlanningResult(HarnessSchema):
-    decision: Literal[PlanningDecision.SUCCEEDED]
+class PlanningReviewResult(HarnessSchema):
+    decision: Literal[
+        PlanningReviewDecision.APPROVED,
+        PlanningReviewDecision.REVISE,
+        PlanningReviewDecision.FAIL,
+    ]
     context: str
-    actions: list[list[ActionExecuteSchema]] = Field(min_length=1)
 
 
-class AlreadyCompletedPlanningResult(HarnessSchema):
-    decision: Literal[PlanningDecision.ALREADY_COMPLETED]
-    context: str
-    actions: list[list[ActionExecuteSchema]] = Field(max_length=0)
+planning_review_result_adapter = TypeAdapter(PlanningReviewResult)
 
 
-class FailedPlanningResult(HarnessSchema):
-    decision: Literal[PlanningDecision.FAIL]
-    context: str
-    actions: list[list[ActionExecuteSchema]] = Field(max_length=0)
+class PlanningIterationRole(str, Enum):
+    PLAN = "plan"
+    TOOL = "tool"
+    REVIEW = "review"
 
 
-PlanningResult = (
-    SucceededPlanningResult
-    | AlreadyCompletedPlanningResult
-    | FailedPlanningResult
-)
-planning_result_adapter = TypeAdapter(PlanningResult)
+class PlanningIterationContext(HarnessSchema):
+    iteration: int
+    role: Literal[
+        PlanningIterationRole.PLAN,
+        PlanningIterationRole.TOOL,
+        PlanningIterationRole.REVIEW,
+    ]
+    content: dict[str, Any]
+
+
+planning_iteration_context_adapter = TypeAdapter(PlanningIterationContext)
