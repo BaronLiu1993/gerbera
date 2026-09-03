@@ -42,6 +42,7 @@ class ExecuteProducerRuntime:
     observation_iteration_context: list[ObservationIterationContext] = field(
         default_factory=list
     )
+    max_retries: int = 5
 
     async def submit_action_groups(
         self,
@@ -62,71 +63,73 @@ class ExecuteProducerRuntime:
 
         while True:
             if self.state_machine.current_state is ExecuteLoopStateEnum.OBSERVE:
-                observation_runtime = ObservationRuntime(
-                    model=self.model,
-                    memory=self.memory,
-                    call_tool=self.execute_consumer.call_read_only_tool,
-                    context_builder=ObservationContextBuilder(
+                for _ in range(self.max_retries):
+                    observation_runtime = ObservationRuntime(
+                        model=self.model,
                         memory=self.memory,
-                        available_tools=read_only_tools,
-                    ),
-                    review_context_builder=ObservationReviewContextBuilder(
-                        memory=self.memory,
-                        available_tools=read_only_tools,
-                    ),
-                    prev_iteration_context=self.observation_iteration_context,
-                )
-                observation = await observation_runtime.run_observation()
+                        call_tool=self.execute_consumer.call_read_only_tool,
+                        context_builder=ObservationContextBuilder(
+                            memory=self.memory,
+                            available_tools=read_only_tools,
+                        ),
+                        review_context_builder=ObservationReviewContextBuilder(
+                            memory=self.memory,
+                            available_tools=read_only_tools,
+                        ),
+                        prev_iteration_context=self.observation_iteration_context,
+                    )
+                    observation = await observation_runtime.run_observation()
 
-                if observation.actions:
-                    await self.submit_action_groups(observation.actions)
+                    if observation.actions:
+                        await self.submit_action_groups(observation.actions)
 
-                observation_review = (
-                    await observation_runtime.run_observation_review(
-                        observation
+                    observation_review = (
+                        await observation_runtime.run_observation_review(
+                            observation
+                        )
                     )
-                )
-                if observation_review.decision is ObservationDecision.FAIL:
-                    return ExecuteProducerResult(
-                        decision=ExecuteProducerDecision.FAIL,
-                        context=observation_review.context,
-                    )
-                elif (
-                    observation_review.decision
-                    is ObservationDecision.SUCCEEDED
-                ):
-                    self.context = observation_review.context
-                    self.state_machine.perform_transition(
-                        ExecuteLoopStateEnum.PLAN
-                    )
-                elif observation_review.decision is ObservationDecision.RETRY:
-                    self.context = observation_review.context
-                    continue
-                else:
-                    raise ValueError("Unsupported observation review decision")
+                    if observation_review.decision is ObservationDecision.FAIL:
+                        return ExecuteProducerResult(
+                            decision=ExecuteProducerDecision.FAIL,
+                            context=observation_review.context,
+                        )
+                    elif (
+                        observation_review.decision
+                        is ObservationDecision.SUCCEEDED
+                    ):
+                        self.context = observation_review.context
+                        self.state_machine.perform_transition(
+                            ExecuteLoopStateEnum.PLAN
+                        )
+                    elif observation_review.decision is ObservationDecision.RETRY:
+                        self.context = observation_review.context
+                        continue
+                    else:
+                        raise ValueError("Unsupported observation review decision")
             elif self.state_machine.current_state is ExecuteLoopStateEnum.PLAN:
-                planning = await PlanningRuntime(
-                    model=self.model,
-                    memory=self.memory,
-                    prev_state_context=self.context,
-                    context_builder=PlanningContextBuilder(
+                for _ in range(self.max_retries):
+                    planning = await PlanningRuntime(
+                        model=self.model,
                         memory=self.memory,
-                        available_tools=available_tools,
-                    ),
-                ).run_planning()
+                        prev_state_context=self.context,
+                        context_builder=PlanningContextBuilder(
+                            memory=self.memory,
+                            available_tools=available_tools,
+                        ),
+                    ).run_planning()
 
-                if planning.decision is PlanningDecision.FAIL:
-                    return ExecuteProducerResult(
-                        decision=ExecuteProducerDecision.FAIL,
-                        context=planning.context,
-                    )
+                    if planning.decision is PlanningDecision.FAIL:
+                        return ExecuteProducerResult(
+                            decision=ExecuteProducerDecision.FAIL,
+                            context=planning.context,
+                        )
 
-                if planning.decision is PlanningDecision.SUCCEEDED:
-                    action_groups = planning.actions
-                    await self.submit_action_groups(action_groups)
+                    if planning.decision is PlanningDecision.SUCCEEDED:
+                        action_groups = planning.actions
+                        await self.submit_action_groups(action_groups)
 
-                self.context = planning.context
-                self.state_machine.perform_transition(ExecuteLoopStateEnum.REVIEW)
+                    self.context = planning.context
+                    self.state_machine.perform_transition(ExecuteLoopStateEnum.REVIEW)
             elif self.state_machine.current_state is ExecuteLoopStateEnum.REVIEW:
                 review = await ReviewRuntime(
                     model=self.model,
