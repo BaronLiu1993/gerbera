@@ -596,6 +596,7 @@ class ServerRuntime:
             )
 
     def register_inference_tools(self) -> None:
+        self.environment_runtime.register_model_inferences()
         registered_models: dict[str, tuple[str, Inference]] = {}
         for model_id, inference in self.environment_runtime.model_inferences.items():
             if inference.name in registered_models:
@@ -620,16 +621,20 @@ class ServerRuntime:
             def turn_on_inference(
                 prompt: Annotated[str, Field(min_length=1)],
             ) -> None:
-                self.environment_runtime.turn_on_model(
-                    model_id,
+                self.environment_runtime.turn_on_model_stream(
+                    model_id=model_id,
                     prompt=prompt,
                 )
         else:
             def turn_on_inference() -> None:
-                self.environment_runtime.turn_on_model(model_id)
+                self.environment_runtime.turn_on_model_stream(
+                    model_id=model_id,
+                )
 
         def turn_off_inference() -> None:
-            self.environment_runtime.turn_off_model(model_id)
+            self.environment_runtime.turn_off_model_stream(
+                model_id=model_id,
+            )
 
         self.register_tool(
             name=f"turn_on_{model.name}",
@@ -768,7 +773,11 @@ class ServerRuntime:
         def predict_with_model(
             camera_ids: Annotated[list[str], Field(min_length=1)],
         ) -> list[dict[str, object]]:
-            results = self.environment_runtime.single_inference(model_id, camera_ids)
+            results = self.environment_runtime.single_inference(
+                model_id=model_id,
+                inference_type="object_detection",
+                inference_input=camera_ids,
+            )
             serialized_results: list[dict[str, object]] = []
             for result in results:
                 serialized_results.append(
@@ -814,14 +823,14 @@ class ServerRuntime:
             return self.environment_runtime.read_model_output(
                 model_id,
                 camera_id,
-                output_field="scene_objects",
+                inference_type="object_detection",
             )
 
         def read_scene_analysis(camera_id: str) -> str:
             result = self.environment_runtime.read_model_output(
                 model_id,
                 camera_id,
-                output_field="scene_analysis",
+                inference_type="analysis",
             )
             if not isinstance(result, str):
                 raise TypeError("Scene analysis output must be text")
@@ -832,8 +841,9 @@ class ServerRuntime:
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> VisionLanguageModelFrameEnvironment:
             return self.environment_runtime.single_inference(
-                model_id,
-                frames,
+                model_id=model_id,
+                inference_type="object_detection",
+                inference_input=frames,
                 prompt=prompt,
             )
 
@@ -841,11 +851,15 @@ class ServerRuntime:
             prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> str:
-            return self.environment_runtime.analyze_scene(
-                model_id,
-                frames,
+            result = self.environment_runtime.single_inference(
+                model_id=model_id,
+                inference_type="analysis",
+                inference_input=frames,
                 prompt=prompt,
             )
+            if not isinstance(result, str):
+                raise TypeError("Scene analysis output must be text")
+            return result
 
         self.register_tool(
             name=f"read_scene_objects_{model.name}",

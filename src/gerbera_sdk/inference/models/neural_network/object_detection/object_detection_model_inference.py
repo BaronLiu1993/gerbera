@@ -44,6 +44,16 @@ class ObjectDetectionModel:
     model_type: str = "object_detection_neural_network"
     output_field: str = "detected_objects"
 
+    def model_output_keys(self) -> dict[str, dict[str, str]]:
+        return {
+            "object_detection": {
+                camera.camera_id: (
+                    f"{camera.name}.{self.name}.{self.model_type}.object_detection"
+                )
+                for camera in self.subscribed_cameras
+            }
+        }
+
     def create_inference(
         self,
         model_output_writer: ModelOutputWriter,
@@ -64,6 +74,7 @@ class ObjectDetectionModel:
             name=self.name,
             description=self.description,
             subscribed_cameras=self.subscribed_cameras,
+            model_output_keys=self.model_output_keys(),
             model_id=self.model_id,
             model_type=self.model_type,
             output_field=self.output_field,
@@ -87,6 +98,7 @@ class ObjectDetectionModelInference:
     model_type: str = "object_detection"
     output_field: str = "detected_objects"
     subscribed_cameras: list[Camera] = field(default_factory=list)
+    model_output_keys: dict[str, dict[str, str]] = field(default_factory=dict)
     interval_seconds: float = 0.2
     _lock: threading.Lock = field(
         default_factory=threading.Lock,
@@ -204,12 +216,9 @@ class ObjectDetectionModelInference:
                 if camera.latest_frame is not None:
                     perception_state = self.predict(camera.camera_id)
                     self.model_session.model_output_writer.write_model_output(
-                        key=(
-                            f"{camera.name}."
-                            f"{self.name}."
-                            f"{self.model_type}."
-                            f"{self.output_field}"
-                        ),
+                        key=self.model_output_keys["object_detection"][
+                            camera.camera_id
+                        ],
                         model_output=perception_state,
                     )
 

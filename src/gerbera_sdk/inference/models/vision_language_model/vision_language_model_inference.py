@@ -65,6 +65,22 @@ class VisionLanguageModel(StrictSchema):
     interval_seconds: float = Field(default=5.0, gt=0)
     output_field: str = "scene"
 
+    def model_output_keys(self) -> dict[str, dict[str, str]]:
+        return {
+            "object_detection": {
+                camera.camera_id: (
+                    f"{camera.name}.{self.name}.{self.model_type}.scene_objects"
+                )
+                for camera in self.subscribed_cameras
+            },
+            "analysis": {
+                camera.camera_id: (
+                    f"{camera.name}.{self.name}.{self.model_type}.scene_analysis"
+                )
+                for camera in self.subscribed_cameras
+            },
+        }
+
     def create_inference(
         self,
         model_output_writer: ModelOutputWriter,
@@ -101,6 +117,7 @@ class VisionLanguageModel(StrictSchema):
             description=self.description,
             user_prompt=self.user_prompt,
             subscribed_cameras=self.subscribed_cameras,
+            model_output_keys=self.model_output_keys(),
             interval_seconds=self.interval_seconds,
             model_id=self.model_id,
             model_type=self.model_type,
@@ -129,6 +146,7 @@ class VisionLanguageModelInference:
     scene_analysis_output_field: str = "scene_analysis"
     user_prompt: str = Field(min_length=1)
     subscribed_cameras: list[Camera] = field(default_factory=list)
+    model_output_keys: dict[str, dict[str, str]] = field(default_factory=dict)
     interval_seconds: float = 5.0
     _lock: threading.Lock = field(
         default_factory=threading.Lock,
@@ -233,12 +251,9 @@ class VisionLanguageModelInference:
 
                 for camera in cameras:
                     self.model_session.model_output_writer.write_model_output(
-                        key=(
-                            f"{camera.name}."
-                            f"{self.name}."
-                            f"{self.model_type}."
-                            f"{self.scene_objects_output_field}"
-                        ),
+                        key=self.model_output_keys["object_detection"][
+                            camera.camera_id
+                        ],
                         model_output=model_output,
                     )
 
