@@ -15,6 +15,10 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_ad
     VISION_LANGUAGE_MODEL_REGISTRY,
     VisionLanguageModelAdapters,
 )
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_scene_analysis_adapter import (
+    VISION_LANGUAGE_SCENE_ANALYSIS_REGISTRY,
+    VisionLanguageSceneAnalysisAdapters,
+)
 from gerbera_sdk.inference.model_types import (
     VisionLanguageModelProviderEnum,
 )
@@ -70,10 +74,19 @@ class VisionLanguageModel(StrictSchema):
             max_tokens=self.max_tokens,
             timeout_seconds=self.timeout_seconds,
         )
+        scene_analysis_model_object = VISION_LANGUAGE_SCENE_ANALYSIS_REGISTRY[
+            self.model_provider
+        ](
+            api_key=self.api_key,
+            model=self.model_name,
+            max_tokens=self.max_tokens,
+            timeout_seconds=self.timeout_seconds,
+        )
 
         return VisionLanguageModelInference(
             model_session=VLMSession(
                 model=vision_language_model_object,
+                scene_analysis_model=scene_analysis_model_object,
                 model_output_store=model_output_store,
             ),
             name=self.name,
@@ -90,6 +103,7 @@ class VisionLanguageModel(StrictSchema):
 @dataclass
 class VLMSession:
     model: VisionLanguageModelAdapters
+    scene_analysis_model: VisionLanguageSceneAnalysisAdapters
     model_output_store: ModelOutputStore
     _thread: threading.Thread | None = None
     _stop_event: threading.Event | None = None
@@ -103,6 +117,8 @@ class VisionLanguageModelInference:
     model_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     model_type: str = "vision_language_model"
     output_field: str = "scene"
+    scene_objects_output_field: str = "scene_objects"
+    scene_analysis_output_field: str = "scene_analysis"
     user_prompt: str = Field(min_length=1)
     subscribed_cameras: list[Camera] = field(default_factory=list)
     interval_seconds: float = 5.0
@@ -213,7 +229,7 @@ class VisionLanguageModelInference:
                             f"{camera.name}."
                             f"{self.name}."
                             f"{self.model_type}."
-                            f"{self.output_field}"
+                            f"{self.scene_objects_output_field}"
                         ),
                         model_output=model_output,
                     )
@@ -244,3 +260,25 @@ class VisionLanguageModelInference:
                 ),
             )
             return VisionLanguageModelFrameEnvironment.model_validate(output)
+
+    def analyze_scene(
+        self,
+        base64_frames: list[str],
+        prompt: str,
+    ) -> str:
+        if not base64_frames:
+            raise ValueError("At least one frame is required for inference")
+
+        with self._prediction_lock:
+            valid_frame_input = [
+                self.model_session.scene_analysis_model.convert_to_valid_input(
+                    frame
+                )
+                for frame in base64_frames
+            ]
+
+            return self.model_session.scene_analysis_model.analyze_scene(
+                model_input=valid_frame_input,
+                system_prompt=self.system_prompt,
+                user_prompt=prompt,
+            )

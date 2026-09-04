@@ -9,8 +9,7 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_sc
     VisionLanguageModelFrameEnvironment,
 )
 
-# Will contain more in the future
-ModelOutput = Union[PerceptionStateModel, VisionLanguageModelFrameEnvironment]
+ModelOutput = Union[PerceptionStateModel, VisionLanguageModelFrameEnvironment, str]
 
 
 @dataclass
@@ -61,6 +60,8 @@ class ModelOutputStore:
                 key: (
                     None
                     if model_output is None
+                    else model_output
+                    if isinstance(model_output, str)
                     else model_output.model_dump(
                         mode="json",
                         exclude={"frame"},

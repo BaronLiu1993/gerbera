@@ -43,3 +43,7 @@ class ModelCatalogEntry(StrictSchema):
     turn_off_tool: str
     read_tool: str # read the stream
     single_inference_tool: str # single inference
+    scene_objects_read_tool: str | None = None
+    scene_objects_tool: str | None = None
+    scene_analysis_read_tool: str | None = None
+    scene_analysis_tool: str | None = None

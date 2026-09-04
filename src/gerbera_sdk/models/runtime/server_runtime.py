@@ -801,12 +801,26 @@ class ServerRuntime:
         model_id: str,
         model: Inference,
     ) -> None:
-        def read_model_output(
+        def read_scene_objects(
             camera_id: str,
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.environment_runtime.read_model_output(model_id, camera_id)
+            return self.environment_runtime.read_model_output(
+                model_id,
+                camera_id,
+                output_field="scene_objects",
+            )
 
-        def predict_with_model(
+        def read_scene_analysis(camera_id: str) -> str:
+            result = self.environment_runtime.read_model_output(
+                model_id,
+                camera_id,
+                output_field="scene_analysis",
+            )
+            if not isinstance(result, str):
+                raise TypeError("Scene analysis output must be text")
+            return result
+
+        def capture_scene_objects(
             prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> VisionLanguageModelFrameEnvironment:
@@ -816,28 +830,65 @@ class ServerRuntime:
                 prompt=prompt,
             )
 
+        def analyse_scene(
+            prompt: Annotated[str, Field(min_length=1)],
+            frames: Annotated[list[str], Field(min_length=1)],
+        ) -> str:
+            return self.environment_runtime.analyze_scene(
+                model_id,
+                frames,
+                prompt=prompt,
+            )
+
         self.register_tool(
-            name=f"read_{model.name}",
+            name=f"read_scene_objects_{model.name}",
             description=(
-                f"Read the latest continuous inference output from "
+                f"Read the latest scene-object output from "
                 f"{model.name} for a subscribed camera ID."
             ),
-            tool_function=read_model_output,
+            tool_function=read_scene_objects,
             annotations=ToolAnnotations(
-                title=f"Read latest inference from {model.name}",
+                title=f"Read latest scene objects from {model.name}",
                 readOnlyHint=True,
                 openWorldHint=False,
             ),
         )
         self.register_tool(
-            name=f"capture_scene_{model.name}",
+            name=f"read_scene_analysis_{model.name}",
             description=(
-                f"{model.description} Provide a prompt and one or more Base64 "
-                "image strings."
+                f"Read the latest scene-analysis output from "
+                f"{model.name} for a subscribed camera ID."
             ),
-            tool_function=predict_with_model,
+            tool_function=read_scene_analysis,
             annotations=ToolAnnotations(
-                title=f"Capture scene with {model.name}",
+                title=f"Read latest scene analysis from {model.name}",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self.register_tool(
+            name=f"capture_scene_objects_{model.name}",
+            description=(
+                f"{model.description} Provide a prompt and one or more "
+                "Base64 image strings. Returns structured objects, pixel "
+                "locations, and depth estimates."
+            ),
+            tool_function=capture_scene_objects,
+            annotations=ToolAnnotations(
+                title=f"Capture scene objects with {model.name}",
+                readOnlyHint=True,
+                openWorldHint=True,
+            ),
+        )
+        self.register_tool(
+            name=f"analyse_scene_{model.name}",
+            description=(
+                f"{model.description} Provide a prompt and one or more "
+                "Base64 image strings. Returns plain text scene analysis."
+            ),
+            tool_function=analyse_scene,
+            annotations=ToolAnnotations(
+                title=f"Analyse scene with {model.name}",
                 readOnlyHint=True,
                 openWorldHint=True,
             ),
@@ -868,8 +919,36 @@ class ServerRuntime:
                         is_running=model.is_running,
                         turn_on_tool=f"turn_on_{model.name}",
                         turn_off_tool=f"turn_off_{model.name}",
-                        read_tool=f"read_{model.name}",
-                        single_inference_tool=f"capture_scene_{model.name}",
+                        read_tool=(
+                            f"read_scene_objects_{model.name}"
+                            if isinstance(model, VisionLanguageModelInference)
+                            else f"read_{model.name}"
+                        ),
+                        single_inference_tool=(
+                            f"capture_scene_objects_{model.name}"
+                            if isinstance(model, VisionLanguageModelInference)
+                            else f"perform_single_{model.name}"
+                        ),
+                        scene_objects_read_tool=(
+                            f"read_scene_objects_{model.name}"
+                            if isinstance(model, VisionLanguageModelInference)
+                            else None
+                        ),
+                        scene_objects_tool=(
+                            f"capture_scene_objects_{model.name}"
+                            if isinstance(model, VisionLanguageModelInference)
+                            else None
+                        ),
+                        scene_analysis_read_tool=(
+                            f"read_scene_analysis_{model.name}"
+                            if isinstance(model, VisionLanguageModelInference)
+                            else None
+                        ),
+                        scene_analysis_tool=(
+                            f"analyse_scene_{model.name}"
+                            if isinstance(model, VisionLanguageModelInference)
+                            else None
+                        ),
                     )
                 )
             return catalog

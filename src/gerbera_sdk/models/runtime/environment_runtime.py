@@ -25,16 +25,35 @@ class EnvironmentRuntime:
     @cached_property
     def model_output_store(self) -> ModelOutputStore:
         store = ModelOutputStore()
-        keys = [
-            (
-                f"{camera.name}."
-                f"{model.name}."
-                f"{model.model_type}."
-                f"{model.output_field}"
-            )
-            for model in self.hardware_system.models
-            for camera in model.subscribed_cameras
-        ]
+        keys: list[str] = []
+        for model in self.hardware_system.models:
+            for camera in model.subscribed_cameras:
+                if model.model_type == "vision_language_model":
+                    keys.append(
+                        (
+                            f"{camera.name}."
+                            f"{model.name}."
+                            f"{model.model_type}."
+                            "scene_objects"
+                        )
+                    )
+                    keys.append(
+                        (
+                            f"{camera.name}."
+                            f"{model.name}."
+                            f"{model.model_type}."
+                            "scene_analysis"
+                        )
+                    )
+                    continue
+                keys.append(
+                    (
+                        f"{camera.name}."
+                        f"{model.name}."
+                        f"{model.model_type}."
+                        f"{model.output_field}"
+                    )
+                )
         store.register(keys)
         return store
 
@@ -45,29 +64,60 @@ class EnvironmentRuntime:
             for model in self.hardware_system.models
         }
 
-    def read_model_output(self, model_id: str, camera_id: str) -> object:
+    def read_model_output(
+        self,
+        model_id: str,
+        camera_id: str,
+        output_field: str | None = None,
+    ) -> object:
         for model in self.hardware_system.models:
             if model.model_id != model_id:
                 continue
             for camera in model.subscribed_cameras:
                 if camera.camera_id != camera_id:
                     continue
+                selected_output_field = output_field or model.output_field
+                if model.model_type == "vision_language_model":
+                    selected_output_field = output_field or "scene_objects"
                 return self.model_output_store.read_model_output(
                     (
                         f"{camera.name}."
                         f"{model.name}."
                         f"{model.model_type}."
-                        f"{model.output_field}"
+                        f"{selected_output_field}"
                     )
                 )
 
         raise RuntimeError(f"Model output is not registered: {camera_id}, {model_id}")
 
+    def write_model_output_for_subscribed_cameras(
+        self,
+        model_id: str,
+        output_field: str,
+        model_output: object,
+    ) -> None:
+        for model in self.hardware_system.models:
+            if model.model_id != model_id:
+                continue
+            for camera in model.subscribed_cameras:
+                self.model_output_store.write_model_output(
+                    key=(
+                        f"{camera.name}."
+                        f"{model.name}."
+                        f"{model.model_type}."
+                        f"{output_field}"
+                    ),
+                    model_output=model_output,
+                )
+            return
+
+        raise RuntimeError(f"Model output is not registered: {model_id}")
+
     def single_inference(
         self,
         model_id: str,
         inference_input: str | list[str],
-        prompt: str,
+        prompt: str | None = None,
     ) -> (
         list[PerceptionStateModel]
         | VisionLanguageModelFrameEnvironment
@@ -92,6 +142,10 @@ class EnvironmentRuntime:
             return inference.predict_many(inference_input)
 
         if isinstance(inference, VisionLanguageModelInference):
+            if prompt is None:
+                raise ValueError(
+                    "Vision language model inference requires a prompt"
+                )
             if not isinstance(inference_input, list) or not all(
                 isinstance(frame, str) for frame in inference_input
             ):
@@ -99,11 +153,41 @@ class EnvironmentRuntime:
                     "Vision language model inference requires a list of "
                     "Base64 image strings"
                 )
-            return inference.predict(inference_input, prompt=prompt)
+            result = inference.predict(inference_input, prompt=prompt)
+            self.write_model_output_for_subscribed_cameras(
+                model_id=model_id,
+                output_field=inference.scene_objects_output_field,
+                model_output=result,
+            )
+            return result
 
         raise TypeError(f"Unsupported inference type: {type(inference).__name__}")
 
-    def turn_on_model(self, model_id: str, prompt: str) -> None:
+    def analyze_scene(
+        self,
+        model_id: str,
+        frames: list[str],
+        prompt: str,
+    ) -> str:
+        inference = self.model_inferences[model_id]
+        if not isinstance(inference, VisionLanguageModelInference):
+            raise TypeError(
+                "Scene analysis requires a vision language model inference"
+            )
+        if not all(isinstance(frame, str) for frame in frames):
+            raise TypeError(
+                "Scene analysis requires a list of Base64 image strings"
+            )
+
+        result = inference.analyze_scene(frames, prompt=prompt)
+        self.write_model_output_for_subscribed_cameras(
+            model_id=model_id,
+            output_field=inference.scene_analysis_output_field,
+            model_output=result,
+        )
+        return result
+
+    def turn_on_model(self, model_id: str, prompt: str | None = None) -> None:
         with self._lock:
             inference = self.model_inferences[model_id]
             if inference.is_running:
