@@ -41,5 +41,5 @@ class ModelCatalogEntry(StrictSchema):
     is_running: bool
     turn_on_tool: str
     turn_off_tool: str
-    read_tool: str
-    single_inference_tool: str
+    read_tool: str # read the stream
+    single_inference_tool: str # single inference

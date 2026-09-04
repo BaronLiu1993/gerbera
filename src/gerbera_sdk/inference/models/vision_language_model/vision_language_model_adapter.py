@@ -156,7 +156,9 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
             for content in output.get("content", []):
                 if content.get("type") == "output_text":
                     return self._parse_json_output(content["text"])
-        raise RuntimeError("OpenAI response did not contain structured output")
+        raise RuntimeError(
+            "OpenAI response did not contain output_text structured output"
+        )
 
 
 class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
@@ -165,9 +167,10 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         frame: str,
     ) -> dict[str, object]:
         return {
-            "type": "image",
-            "data": frame,
-            "mime_type": "image/jpeg",
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": frame,
+            },
         }
 
     def predict(
@@ -178,35 +181,45 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         output_schema: dict[str, object],
     ) -> dict[str, object]:
         response = httpx.post(
-            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            (
+                "https://generativelanguage.googleapis.com/v1beta/"
+                f"models/{self.model}:generateContent"
+            ),
             headers={
                 "x-goog-api-key": self.api_key,
                 "Content-Type": "application/json",
             },
             json={
-                "model": self.model,
-                "system_instruction": system_prompt,
-                "response_format": {
-                    "type": "text",
-                    "mime_type": "application/json",
-                    "schema": output_schema,
+                "system_instruction": {
+                    "parts": [{"text": system_prompt}],
                 },
-                "input": [
-                    *model_input,
-                    {"type": "text", "text": user_prompt},
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            *model_input,
+                            {"text": user_prompt},
+                        ],
+                    }
                 ],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseSchema": output_schema,
+                },
             },
             timeout=self.timeout_seconds,
         )
         response.raise_for_status()
         payload = response.json()
-        for step in payload.get("steps", []):
-            if step.get("type") != "model_output":
-                continue
-            for content in step.get("content", []):
-                if content.get("type") == "text":
-                    return self._parse_json_output(content["text"])
-        raise RuntimeError("Google response did not contain structured output")
+        for candidate in payload.get("candidates", []):
+            content = candidate.get("content", {})
+            for part in content.get("parts", []):
+                text = part.get("text")
+                if text is not None:
+                    return self._parse_json_output(text)
+        raise RuntimeError(
+            "Google response did not contain candidate text structured output"
+        )
 
 
 VisionLanguageModelAdapters: TypeAlias = (
