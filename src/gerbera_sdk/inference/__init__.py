@@ -4,11 +4,6 @@ from gerbera_sdk.inference.frame import (
     BoundingBox,
     Frame,
 )
-from gerbera_sdk.inference.model_output_store import (
-    ModelOutput,
-    ModelOutputStore,
-    ModelOutputStoreKey,
-)
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
     AnthropicVisionLanguageModelAdapter,
     GoogleVisionLanguageModelAdapter,
@@ -58,9 +53,6 @@ __all__ = [
     "GoogleVisionLanguageModelAdapter",
     "Inference",
     "Model",
-    "ModelOutput",
-    "ModelOutputStore",
-    "ModelOutputStoreKey",
     "VisionLanguageModelProviderEnum",
     "ObjectDetectionModelProviderEnum",
     "OBJECT_DETECTION_MODEL_REGISTRY",

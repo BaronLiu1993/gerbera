@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 from functools import cached_property
+from typing import Any, TypeAlias, Union
 import threading
 
 from gerbera_sdk.inference import (
     Inference,
-    ModelOutputStore,
     ObjectDetectionModelInference,
     PerceptionStateModel,
     VisionLanguageModelFrameEnvironment,
@@ -12,40 +12,32 @@ from gerbera_sdk.inference import (
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
+ModelOutput: TypeAlias = Union[
+    PerceptionStateModel,
+    VisionLanguageModelFrameEnvironment,
+    str,
+]
+
 
 @dataclass
 class EnvironmentRuntime:
     hardware_system: HardwareSystem
+    model_outputs: dict[str, ModelOutput | None] = field(default_factory=dict)
     _lock: threading.Lock = field(
         default_factory=threading.Lock,
         init=False,
         repr=False,
     )
+    _model_output_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+    )
 
-    @cached_property
-    def model_output_store(self) -> ModelOutputStore:
-        store = ModelOutputStore()
+    def register_model_output_keys(self) -> None:
         keys: list[str] = []
         for model in self.hardware_system.models:
             for camera in model.subscribed_cameras:
-                if model.model_type == "vision_language_model":
-                    keys.append(
-                        (
-                            f"{camera.name}."
-                            f"{model.name}."
-                            f"{model.model_type}."
-                            "scene_objects"
-                        )
-                    )
-                    keys.append(
-                        (
-                            f"{camera.name}."
-                            f"{model.name}."
-                            f"{model.model_type}."
-                            "scene_analysis"
-                        )
-                    )
-                    continue
                 keys.append(
                     (
                         f"{camera.name}."
@@ -54,15 +46,64 @@ class EnvironmentRuntime:
                         f"{model.output_field}"
                     )
                 )
-        store.register(keys)
-        return store
+        self.register_model_outputs(keys)
 
     @cached_property
     def model_inferences(self) -> dict[str, Inference]:
+        self.register_model_output_keys()
         return {
-            model.model_id: model.create_inference(self.model_output_store)
+            model.model_id: model.create_inference(self)
             for model in self.hardware_system.models
         }
+
+    def require_registered_model_output(self, key: str) -> None:
+        if key not in self.model_outputs:
+            raise KeyError(f"Model output is not registered: {key}")
+
+    def register_model_outputs(self, keys: list[str]) -> None:
+        with self._model_output_lock:
+            for key in dict.fromkeys(keys):
+                self.model_outputs.setdefault(key, None)
+
+    def write_model_output(
+        self,
+        key: str,
+        model_output: ModelOutput,
+    ) -> None:
+        with self._model_output_lock:
+            self.require_registered_model_output(key)
+            self.model_outputs[key] = model_output
+
+    def read_model_output_by_key(
+        self,
+        key: str,
+    ) -> ModelOutput:
+        with self._model_output_lock:
+            self.require_registered_model_output(key)
+            model_output = self.model_outputs[key]
+            if model_output is None:
+                raise RuntimeError(
+                    f"Registered model has not produced an output: {key}"
+                )
+
+            return model_output
+
+    def get_environment_state(self) -> dict[str, Any]:
+        self.register_model_output_keys()
+        with self._model_output_lock:
+            return {
+                key: (
+                    None
+                    if model_output is None
+                    else model_output
+                    if isinstance(model_output, str)
+                    else model_output.model_dump(
+                        mode="json",
+                        exclude={"frame"},
+                    )
+                )
+                for key, model_output in self.model_outputs.items()
+            }
 
     def read_model_output(
         self,
@@ -70,6 +111,7 @@ class EnvironmentRuntime:
         camera_id: str,
         output_field: str | None = None,
     ) -> object:
+        self.register_model_output_keys()
         for model in self.hardware_system.models:
             if model.model_id != model_id:
                 continue
@@ -79,7 +121,7 @@ class EnvironmentRuntime:
                 selected_output_field = output_field or model.output_field
                 if model.model_type == "vision_language_model":
                     selected_output_field = output_field or "scene_objects"
-                return self.model_output_store.read_model_output(
+                return self.read_model_output_by_key(
                     (
                         f"{camera.name}."
                         f"{model.name}."
@@ -100,7 +142,7 @@ class EnvironmentRuntime:
             if model.model_id != model_id:
                 continue
             for camera in model.subscribed_cameras:
-                self.model_output_store.write_model_output(
+                self.write_model_output(
                     key=(
                         f"{camera.name}."
                         f"{model.name}."

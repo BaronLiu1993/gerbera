@@ -1007,9 +1007,7 @@ class ServerRuntime:
         self.register_tool(
             name="get_current_environment_state",
             description=("Read the current environment state from model outputs."),
-            tool_function=(
-                self.environment_runtime.model_output_store.get_environment_state
-            ),
+            tool_function=self.environment_runtime.get_environment_state,
             annotations=ToolAnnotations(
                 title="Get current environment state",
             ),

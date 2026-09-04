@@ -70,13 +70,13 @@ async def inference(request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 
-async def ingest_runtime_event(request):
-    try:
-        body = await request.json()
-        event = orchestrator.ingest_runtime_event(body)
-        return JSONResponse({"event": event}, status_code=200)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+# async def ingest_runtime_event(request):
+#     try:
+#         body = await request.json()
+#         event = orchestrator.ingest_runtime_event(body)
+#         return JSONResponse({"event": event}, status_code=200)
+#     except Exception as e:
+#         return JSONResponse({"error": str(e)}, status_code=400)
 
 async def health_check(request):
     return JSONResponse({"status": "healthy"}, status_code=200)

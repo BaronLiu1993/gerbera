@@ -1,13 +1,12 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 from pydantic import Field, InstanceOf
 import threading
 import uuid
 
 from gerbera_sdk.inference.frame import Frame
-from gerbera_sdk.inference.model_output_store import ModelOutputStore
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_schema import (
     VisionLanguageModelFrameEnvironment,
 )
@@ -36,6 +35,15 @@ VISION_LANGUAGE_MODEL_VALID_NAME = {
 }
 
 
+class ModelOutputWriter(Protocol):
+    def write_model_output(
+        self,
+        key: str,
+        model_output: object,
+    ) -> None:
+        pass
+
+
 class VisionLanguageModel(StrictSchema):
     # We need these
     model_type: Literal["vision_language_model"] = "vision_language_model"
@@ -59,7 +67,7 @@ class VisionLanguageModel(StrictSchema):
 
     def create_inference(
         self,
-        model_output_store: ModelOutputStore,
+        model_output_writer: ModelOutputWriter,
     ) -> "VisionLanguageModelInference":
         if self.model_name not in VISION_LANGUAGE_MODEL_VALID_NAME[self.model_provider]:
             raise RuntimeError(
@@ -87,7 +95,7 @@ class VisionLanguageModel(StrictSchema):
             model_session=VLMSession(
                 model=vision_language_model_object,
                 scene_analysis_model=scene_analysis_model_object,
-                model_output_store=model_output_store,
+                model_output_writer=model_output_writer,
             ),
             name=self.name,
             description=self.description,
@@ -104,7 +112,7 @@ class VisionLanguageModel(StrictSchema):
 class VLMSession:
     model: VisionLanguageModelAdapters
     scene_analysis_model: VisionLanguageSceneAnalysisAdapters
-    model_output_store: ModelOutputStore
+    model_output_writer: ModelOutputWriter
     _thread: threading.Thread | None = None
     _stop_event: threading.Event | None = None
 
@@ -224,7 +232,7 @@ class VisionLanguageModelInference:
                 )
 
                 for camera in cameras:
-                    self.model_session.model_output_store.write_model_output(
+                    self.model_session.model_output_writer.write_model_output(
                         key=(
                             f"{camera.name}."
                             f"{self.name}."

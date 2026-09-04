@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, Protocol
 
 from pydantic import Field, InstanceOf
 import threading
 import uuid
 
-from gerbera_sdk.inference.model_output_store import ModelOutputStore
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionModelAdapters,
@@ -17,6 +16,15 @@ from gerbera_sdk.inference.model_types import (
     ObjectDetectionModelProviderEnum,
 )
 from gerbera_sdk.models.hardware.camera import Camera
+
+
+class ModelOutputWriter(Protocol):
+    def write_model_output(
+        self,
+        key: str,
+        model_output: object,
+    ) -> None:
+        pass
 
 
 @dataclass
@@ -38,7 +46,7 @@ class ObjectDetectionModel:
 
     def create_inference(
         self,
-        model_output_store: ModelOutputStore,
+        model_output_writer: ModelOutputWriter,
     ) -> "ObjectDetectionModelInference":
         adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
         object_detection_model = adapter_class(
@@ -51,7 +59,7 @@ class ObjectDetectionModel:
         return ObjectDetectionModelInference(
             model_session=ObjectDetectionSession(
                 model=object_detection_model,
-                model_output_store=model_output_store,
+                model_output_writer=model_output_writer,
             ),
             name=self.name,
             description=self.description,
@@ -65,7 +73,7 @@ class ObjectDetectionModel:
 @dataclass
 class ObjectDetectionSession:
     model: ObjectDetectionModelAdapters
-    model_output_store: ModelOutputStore
+    model_output_writer: ModelOutputWriter
     _thread: threading.Thread | None = None
     _stop_event: threading.Event | None = None
 
@@ -195,7 +203,7 @@ class ObjectDetectionModelInference:
             for camera in self.subscribed_cameras:
                 if camera.latest_frame is not None:
                     perception_state = self.predict(camera.camera_id)
-                    self.model_session.model_output_store.write_model_output(
+                    self.model_session.model_output_writer.write_model_output(
                         key=(
                             f"{camera.name}."
                             f"{self.name}."
