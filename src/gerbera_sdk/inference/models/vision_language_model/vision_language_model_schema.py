@@ -12,8 +12,9 @@ class VisionLanguageModelFrameObject(StrictSchema):
     object_name: str
     description: str
     bounding_box: BoundingBox
-    center_x_coordinate: float = Field(ge=0.0, le=1.0)
-    center_y_coordinate: float = Field(ge=0.0, le=1.0)
+    center_x_coordinate_pixels: float = Field(ge=0.0)
+    center_y_coordinate_pixels: float = Field(ge=0.0)
+    depth_cm: float = Field(ge=0.0)
 
 
 class VisionLanguageModelFrameEnvironment(StrictSchema):

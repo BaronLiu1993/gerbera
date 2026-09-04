@@ -67,6 +67,7 @@ class EnvironmentRuntime:
         self,
         model_id: str,
         inference_input: str | list[str],
+        prompt: str,
     ) -> (
         list[PerceptionStateModel]
         | VisionLanguageModelFrameEnvironment
@@ -98,14 +99,21 @@ class EnvironmentRuntime:
                     "Vision language model inference requires a list of "
                     "Base64 image strings"
                 )
-            return inference.predict(inference_input)
+            return inference.predict(inference_input, prompt=prompt)
 
         raise TypeError(f"Unsupported inference type: {type(inference).__name__}")
 
-    def turn_on_model(self, model_id: str) -> None:
+    def turn_on_model(self, model_id: str, prompt: str) -> None:
         with self._lock:
             inference = self.model_inferences[model_id]
             if inference.is_running:
+                return
+            if isinstance(inference, VisionLanguageModelInference):
+                if prompt is None:
+                    raise ValueError(
+                        "Vision language model prediction loop requires a prompt"
+                    )
+                inference.turn_on_prediction_loop(prompt=prompt)
                 return
             inference.turn_on_prediction_loop()
 
@@ -123,6 +131,10 @@ class EnvironmentRuntime:
                 for inference in self.model_inferences.values():
                     if inference.is_running:
                         continue
+                    if isinstance(inference, VisionLanguageModelInference):
+                        raise ValueError(
+                            "Vision language model prediction loop requires a prompt"
+                        )
                     inference.turn_on_prediction_loop()
                     started.append(inference)
             except Exception:

@@ -25,7 +25,18 @@ relative to the image identified by its `frame_index`:
   `0.0 <= ymin < ymax <= 1.0`.
 - Never return a zero-area box or use all-zero coordinates as a placeholder.
 - Estimate the tightest box that encloses the visible portion of the object.
-- `center_x_coordinate` must be `(xmin + xmax) / 2`.
-- `center_y_coordinate` must be `(ymin + ymax) / 2`.
+
+Every detected object must also include image-center coordinates in pixels:
+
+- `center_x_coordinate_pixels` is the object center x position in image pixels.
+- `center_y_coordinate_pixels` is the object center y position in image pixels.
+- Pixel origin `(0, 0)` is the top-left corner of the image.
+- `x` increases from left to right and `y` increases from top to bottom.
+
+Every detected object must include depth:
+
+- `depth_cm` is your best estimated distance from the camera to the object in
+  centimeters.
+- Always provide `depth_cm`; do not return null.
 
 Return only data that conforms to the supplied JSON schema.

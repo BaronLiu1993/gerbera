@@ -37,6 +37,7 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
+    VisionLanguageModelInference,
     VisionLanguageModelFrameEnvironment,
 )
 
@@ -607,8 +608,18 @@ class ServerRuntime:
         model_id: str,
         model: Inference,
     ) -> None:
-        def turn_on_inference() -> None:
-            self.environment_runtime.turn_on_model(model_id)
+        if isinstance(model, VisionLanguageModelInference):
+
+            def turn_on_inference(
+                prompt: Annotated[str, Field(min_length=1)],
+            ) -> None:
+                self.environment_runtime.turn_on_model(
+                    model_id,
+                    prompt=prompt,
+                )
+        else:
+            def turn_on_inference() -> None:
+                self.environment_runtime.turn_on_model(model_id)
 
         def turn_off_inference() -> None:
             self.environment_runtime.turn_off_model(model_id)
@@ -796,9 +807,14 @@ class ServerRuntime:
             return self.environment_runtime.read_model_output(model_id, camera_id)
 
         def predict_with_model(
+            prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.environment_runtime.single_inference(model_id, frames)
+            return self.environment_runtime.single_inference(
+                model_id,
+                frames,
+                prompt=prompt,
+            )
 
         self.register_tool(
             name=f"read_{model.name}",
@@ -814,13 +830,14 @@ class ServerRuntime:
             ),
         )
         self.register_tool(
-            name=f"perform_single_{model.name}",
+            name=f"capture_scene_{model.name}",
             description=(
-                f"{model.description} Provide one or more Base64 image strings."
+                f"{model.description} Provide a prompt and one or more Base64 "
+                "image strings."
             ),
             tool_function=predict_with_model,
             annotations=ToolAnnotations(
-                title=f"Perform one-shot inference with {model.name}",
+                title=f"Capture scene with {model.name}",
                 readOnlyHint=True,
                 openWorldHint=True,
             ),
@@ -852,7 +869,7 @@ class ServerRuntime:
                         turn_on_tool=f"turn_on_{model.name}",
                         turn_off_tool=f"turn_off_{model.name}",
                         read_tool=f"read_{model.name}",
-                        single_inference_tool=f"perform_single_{model.name}",
+                        single_inference_tool=f"capture_scene_{model.name}",
                     )
                 )
             return catalog

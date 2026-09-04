@@ -128,9 +128,16 @@ class VisionLanguageModelInference:
 
     @property
     def system_prompt(self) -> str:
-        return VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH.read_text().strip()
+        base_prompt = VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH.read_text().strip()
+        return "\n\n".join(
+            [
+                base_prompt,
+                "## Configured model instructions",
+                self.user_prompt.strip(),
+            ]
+        )
 
-    def turn_on_prediction_loop(self) -> None:
+    def turn_on_prediction_loop(self, prompt: str) -> None:
         with self._lock:
             if (
                 self.model_session._thread is not None
@@ -143,6 +150,7 @@ class VisionLanguageModelInference:
             stop_event = threading.Event()
             thread = threading.Thread(
                 target=self.prediction_loop,
+                args=(prompt,),
                 name=f"vision-language-model-{self.name}",
                 daemon=False,
             )
@@ -177,7 +185,7 @@ class VisionLanguageModelInference:
             self.model_session._stop_event = None
             self.model_session._thread = None
 
-    def prediction_loop(self) -> None:
+    def prediction_loop(self, prompt: str) -> None:
         stop_event = self.model_session._stop_event
         if stop_event is None:
             raise RuntimeError(
@@ -195,7 +203,8 @@ class VisionLanguageModelInference:
 
             if cameras:
                 model_output = self.predict(
-                    [frame.to_base64_string() for frame in frames]
+                    [frame.to_base64_string() for frame in frames],
+                    prompt=prompt,
                 )
 
                 for camera in cameras:
@@ -215,6 +224,7 @@ class VisionLanguageModelInference:
     def predict(
         self,
         base64_frames: list[str],
+        prompt: str,
     ) -> VisionLanguageModelFrameEnvironment:
         if not base64_frames:
             raise ValueError("At least one frame is required for inference")
@@ -228,7 +238,7 @@ class VisionLanguageModelInference:
             output = self.model_session.model.predict(
                 model_input=valid_frame_input,
                 system_prompt=self.system_prompt,
-                user_prompt=self.user_prompt,
+                user_prompt=prompt,
                 output_schema=(
                     VisionLanguageModelFrameEnvironment.model_json_schema()
                 ),
