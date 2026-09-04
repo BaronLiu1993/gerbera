@@ -33,7 +33,7 @@ class ObjectDetectionModel:
     iou_threshold: float = 0.45
     max_detections: int = 300
     description: str = ""
-    model_type: str = "vision_language_model"
+    model_type: str = "object_detection_neural_network"
     output_field: str = "detected_objects"
 
     def create_inference(
@@ -147,14 +147,14 @@ class ObjectDetectionModelInference:
             self.model_session._stop_event = None
             self.model_session._thread = None
 
-    def _get_subscribed_camera(self, camera_id: str) -> Camera:
+    def get_subscribed_camera(self, camera_id: str) -> Camera:
         for subscribed_camera in self.subscribed_cameras:
             if subscribed_camera.camera_id == camera_id:
                 return subscribed_camera
 
         raise RuntimeError(f"Camera is not subscribed: {camera_id}")
 
-    def _predict_for_camera(self, camera: Camera) -> PerceptionStateModel:
+    def predict_for_camera(self, camera: Camera) -> PerceptionStateModel:
         frame = camera.latest_frame
         if frame is None:
             raise RuntimeError(f"Camera has no frame: {camera.camera_id}")
@@ -168,9 +168,9 @@ class ObjectDetectionModelInference:
         )
 
     def predict(self, camera_id: str) -> PerceptionStateModel:
-        camera = self._get_subscribed_camera(camera_id)
+        camera = self.get_subscribed_camera(camera_id)
         with self._prediction_lock:
-            return self._predict_for_camera(camera)
+            return self.predict_for_camera(camera)
 
     def predict_many(
         self,
@@ -180,11 +180,11 @@ class ObjectDetectionModelInference:
             raise ValueError("At least one camera ID is required for inference")
 
         cameras = [
-            self._get_subscribed_camera(camera_id)
+            self.get_subscribed_camera(camera_id)
             for camera_id in camera_ids
         ]
         with self._prediction_lock:
-            return [self._predict_for_camera(camera) for camera in cameras]
+            return [self.predict_for_camera(camera) for camera in cameras]
 
     def prediction_loop(self) -> None:
         stop_event = self.model_session._stop_event
