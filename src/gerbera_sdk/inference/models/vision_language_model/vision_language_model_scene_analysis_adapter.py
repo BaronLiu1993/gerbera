@@ -1,4 +1,3 @@
-import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeAlias
@@ -9,20 +8,11 @@ from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
 
 
 @dataclass
-class VisionLanguageSceneObjectsAdapter(ABC):
+class VisionLanguageSceneAnalysisAdapter(ABC):
     api_key: str
     model: str
     max_tokens: int
     timeout_seconds: float
-
-    @staticmethod
-    def _parse_json_output(output_text: str) -> dict[str, object]:
-        output = json.loads(output_text)
-        if not isinstance(output, dict):
-            raise RuntimeError(
-                "Vision language model output must be a JSON object"
-            )
-        return output
 
     @abstractmethod
     def convert_to_valid_input(
@@ -32,18 +22,17 @@ class VisionLanguageSceneObjectsAdapter(ABC):
         pass
 
     @abstractmethod
-    def predict(
+    def analyze_scene(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
-        output_schema: dict[str, object],
-    ) -> dict[str, object]:
+    ) -> str:
         pass
 
 
-class AnthropicVisionLanguageSceneObjectsAdapter(
-    VisionLanguageSceneObjectsAdapter
+class AnthropicVisionLanguageSceneAnalysisAdapter(
+    VisionLanguageSceneAnalysisAdapter
 ):
     def convert_to_valid_input(
         self,
@@ -58,13 +47,12 @@ class AnthropicVisionLanguageSceneObjectsAdapter(
             },
         }
 
-    def predict(
+    def analyze_scene(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
-        output_schema: dict[str, object],
-    ) -> dict[str, object]:
+    ) -> str:
         response = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -76,12 +64,6 @@ class AnthropicVisionLanguageSceneObjectsAdapter(
                 "model": self.model,
                 "max_tokens": self.max_tokens,
                 "system": system_prompt,
-                "output_config": {
-                    "format": {
-                        "type": "json_schema",
-                        "schema": output_schema,
-                    }
-                },
                 "messages": [
                     {
                         "role": "user",
@@ -96,10 +78,12 @@ class AnthropicVisionLanguageSceneObjectsAdapter(
         )
         response.raise_for_status()
         payload = response.json()
-        return self._parse_json_output(payload["content"][0]["text"])
+        return payload["content"][0]["text"]
 
 
-class OpenAIVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter):
+class OpenAIVisionLanguageSceneAnalysisAdapter(
+    VisionLanguageSceneAnalysisAdapter
+):
     def convert_to_valid_input(
         self,
         frame: str,
@@ -109,13 +93,12 @@ class OpenAIVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter)
             "image_url": f"data:image/jpeg;base64,{frame}",
         }
 
-    def predict(
+    def analyze_scene(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
-        output_schema: dict[str, object],
-    ) -> dict[str, object]:
+    ) -> str:
         response = httpx.post(
             "https://api.openai.com/v1/responses",
             headers={
@@ -125,14 +108,6 @@ class OpenAIVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter)
             json={
                 "model": self.model,
                 "instructions": system_prompt,
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "vision_language_model_frame_environment",
-                        "schema": output_schema,
-                        "strict": True,
-                    }
-                },
                 "input": [
                     {
                         "role": "user",
@@ -145,25 +120,18 @@ class OpenAIVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter)
             },
             timeout=self.timeout_seconds,
         )
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise httpx.HTTPStatusError(
-                f"{exc}\nOpenAI response: {response.text}",
-                request=exc.request,
-                response=exc.response,
-            ) from exc
+        response.raise_for_status()
         payload = response.json()
         for output in payload.get("output", []):
             for content in output.get("content", []):
                 if content.get("type") == "output_text":
-                    return self._parse_json_output(content["text"])
-        raise RuntimeError(
-            "OpenAI response did not contain output_text structured output"
-        )
+                    return content["text"]
+        raise RuntimeError("OpenAI response did not contain output_text")
 
 
-class GoogleVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter):
+class GoogleVisionLanguageSceneAnalysisAdapter(
+    VisionLanguageSceneAnalysisAdapter
+):
     def convert_to_valid_input(
         self,
         frame: str,
@@ -175,13 +143,12 @@ class GoogleVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter)
             },
         }
 
-    def predict(
+    def analyze_scene(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
-        output_schema: dict[str, object],
-    ) -> dict[str, object]:
+    ) -> str:
         response = httpx.post(
             (
                 "https://generativelanguage.googleapis.com/v1beta/"
@@ -204,10 +171,6 @@ class GoogleVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter)
                         ],
                     }
                 ],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseSchema": output_schema,
-                },
             },
             timeout=self.timeout_seconds,
         )
@@ -218,33 +181,20 @@ class GoogleVisionLanguageSceneObjectsAdapter(VisionLanguageSceneObjectsAdapter)
             for part in content.get("parts", []):
                 text = part.get("text")
                 if text is not None:
-                    return self._parse_json_output(text)
-        raise RuntimeError(
-            "Google response did not contain candidate text structured output"
-        )
+                    return text
+        raise RuntimeError("Google response did not contain candidate text")
 
 
-VisionLanguageSceneObjectsAdapters: TypeAlias = (
-    AnthropicVisionLanguageSceneObjectsAdapter
-    | OpenAIVisionLanguageSceneObjectsAdapter
-    | GoogleVisionLanguageSceneObjectsAdapter
+VisionLanguageSceneAnalysisAdapters: TypeAlias = (
+    AnthropicVisionLanguageSceneAnalysisAdapter
+    | OpenAIVisionLanguageSceneAnalysisAdapter
+    | GoogleVisionLanguageSceneAnalysisAdapter
 )
 
-VISION_LANGUAGE_SCENE_OBJECTS_REGISTRY = {
+VISION_LANGUAGE_SCENE_ANALYSIS_REGISTRY = {
     VisionLanguageModelProviderEnum.ANTHROPIC: (
-        AnthropicVisionLanguageSceneObjectsAdapter
+        AnthropicVisionLanguageSceneAnalysisAdapter
     ),
-    VisionLanguageModelProviderEnum.OPENAI: OpenAIVisionLanguageSceneObjectsAdapter,
-    VisionLanguageModelProviderEnum.GOOGLE: GoogleVisionLanguageSceneObjectsAdapter,
+    VisionLanguageModelProviderEnum.OPENAI: OpenAIVisionLanguageSceneAnalysisAdapter,
+    VisionLanguageModelProviderEnum.GOOGLE: GoogleVisionLanguageSceneAnalysisAdapter,
 }
-
-VisionLanguageModelAdapter = VisionLanguageSceneObjectsAdapter
-VisionLanguageModelAdapters = VisionLanguageSceneObjectsAdapters
-VISION_LANGUAGE_MODEL_REGISTRY = VISION_LANGUAGE_SCENE_OBJECTS_REGISTRY
-
-AnthropicVisionLanguageModelObjectDetection = (
-    AnthropicVisionLanguageSceneObjectsAdapter
-)
-AnthropicVisionLanguageModelAdapter = AnthropicVisionLanguageSceneObjectsAdapter
-OpenAIVisionLanguageModelAdapter = OpenAIVisionLanguageSceneObjectsAdapter
-GoogleVisionLanguageModelAdapter = GoogleVisionLanguageSceneObjectsAdapter
