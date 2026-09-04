@@ -70,6 +70,13 @@ async def inference(request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 
+async def ingest_runtime_event(request):
+    try:
+        body = await request.json()
+        event = orchestrator.ingest_runtime_event(body)
+        return JSONResponse({"event": event}, status_code=200)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 async def health_check(request):
     return JSONResponse({"status": "healthy"}, status_code=200)
@@ -78,6 +85,7 @@ async def health_check(request):
 routes = [
     Route("/health", endpoint=health_check, methods=["GET"]),
     Route("/inference", endpoint=inference, methods=["POST"]),
+    Route("/runtime-events", endpoint=ingest_runtime_event, methods=["POST"]),
 ]
 
 app = Starlette(debug=True, routes=routes)

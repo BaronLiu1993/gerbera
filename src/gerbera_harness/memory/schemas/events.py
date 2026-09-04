@@ -25,6 +25,7 @@ class EventTypeEnum(str, Enum):
     REVIEW_CREATED = "review_created"
 
     TOOL_CALL = "tool_call"
+    RUNTIME_EVENT = "runtime_event"
 
 
 class SourceTypeEnum(str, Enum):
@@ -33,6 +34,7 @@ class SourceTypeEnum(str, Enum):
     AGENT = "agent"
     USER = "user"
     SYSTEM = "system"
+    RUNTIME = "runtime"
 
 
 class EventSchema(HarnessSchema):

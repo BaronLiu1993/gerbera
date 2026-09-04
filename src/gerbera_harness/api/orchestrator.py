@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from gerbera_harness.infrastructure.event_consumer import EventConsumer
 from gerbera_harness.runtime.agent_runtime import AgentRuntime
 from gerbera_harness.runtime.session import Session
 from gerbera_harness.infrastructure.model import Model, ModelProviderEnum
@@ -19,6 +20,7 @@ from gerbera_harness.tools.registry import LocalToolRegistry
 class Orchestrator:
     local_tool_registry: LocalToolRegistry
     sessions: dict[str, AgentRuntime] = field(default_factory=dict)
+    event_consumer: EventConsumer = field(default_factory=EventConsumer)
 
     def initialise_agent_runtimes(
         self,
@@ -36,6 +38,7 @@ class Orchestrator:
             model=model,
         )
         self.sessions[runtime.session.session_id] = runtime
+        self.event_consumer.register_memory(runtime.memory)
         return runtime
 
     def build_agent_runtime(
