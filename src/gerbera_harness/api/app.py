@@ -28,7 +28,11 @@ api_key = os.environ["API_KEY"]
 mcp_url = os.environ["MCP_URL"]
 
 database = DatabaseGateway(
-    host=host, port=port, db_name=db_name, user=user, password=password
+    host=host,
+    port=port,
+    db_name=db_name,
+    read_user=user,
+    read_password=password,
 )
 
 sandbox = SandboxGateway()

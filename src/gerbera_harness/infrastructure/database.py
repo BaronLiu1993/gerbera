@@ -1,18 +1,14 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
-from functools import cached_property
 from typing import Any
 from uuid import UUID
 
-from psycopg_pool import AsyncConnectionPool
+from psycopg import AsyncConnection
 
 JsonPrimitive = str | int | float | bool | None
 
 
-# Create this object with the read only user role credentials only
-# Connect with read only database users ONLY
-# Create sql gateway user and then the main one has the main gerbera user for writing tables
 @dataclass
 class DatabaseGateway:
     host: str
@@ -20,15 +16,10 @@ class DatabaseGateway:
     db_name: str
     read_user: str
     read_password: str
-    write_user: str
-    write_password: str
     timeout: float = 30.0
-    min_size: int = 5
-    max_size: int = 20
 
-    @cached_property
-    def read_connection_pool(self):
-        conninfo = (
+    def read_dsn(self) -> str:
+        return (
             f"dbname={self.db_name} "
             f"user={self.read_user} "
             f"password={self.read_password} "
@@ -36,48 +27,14 @@ class DatabaseGateway:
             f"port={self.port}"
         )
 
-        return AsyncConnectionPool(
-            conninfo=conninfo,
-            timeout=self.timeout,
-            min_size=self.min_size,
-            max_size=self.max_size,
-            open=False,
-        )
-
-    # @cached_property
-    # def write_connection_pool(self):
-    #     conninfo = (
-    #         f"dbname={self.db_name} "
-    #         f"user={self.write_user} "
-    #         f"password={self.write_password} "
-    #         f"host={self.host} "
-    #         f"port={self.port}"
-    #     )
-
-    #     return AsyncConnectionPool(
-    #         conninfo=conninfo,
-    #         timeout=self.timeout,
-    #         min_size=self.min_size,
-    #         max_size=self.max_size,
-    #         open=False,
-    #     )
-
-    # async def write_to_memory(self) -> None:
-    #     await self.write_connection_pool.open()
-    #     async with self.write_connection_pool as conn:
-    #         async with conn.transaction():
-    #             await conn.execute("SET LOCAL statement_timeout = '10s'")
-    #             async with conn.cursor() as cur:
-    #                 await cur.execute()
-
-    # No need to check queries, we have DB level user permissioning with read roles
     async def execute_query(
         self,
         query: str,
     ) -> list[dict[str, Any]]:
-        await self.read_connection_pool.open()
-
-        async with self.read_connection_pool.connection() as conn:
+        async with await AsyncConnection.connect(
+            self.read_dsn(),
+            connect_timeout=self.timeout,
+        ) as conn:
             async with conn.transaction():
                 await conn.execute("SET TRANSACTION READ ONLY")
                 await conn.execute("SET LOCAL statement_timeout = '10s'")
@@ -103,9 +60,10 @@ class DatabaseGateway:
         if not table_names:
             return []
 
-        await self.connection_pool.open()
-
-        async with self.connection_pool.connection() as conn:
+        async with await AsyncConnection.connect(
+            self.read_dsn(),
+            connect_timeout=self.timeout,
+        ) as conn:
             async with conn.transaction():
                 await conn.execute("SET TRANSACTION READ ONLY")
                 await conn.execute("SET LOCAL statement_timeout = '10s'")
