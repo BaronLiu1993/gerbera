@@ -61,10 +61,9 @@ class ServerRuntime:
     def register_tools(self) -> None:
         self.register_hardware_tools()
         self.register_movement_tools()
-        # Reaction MCP tools are disabled until reaction execution moves to harness.
-        # self.register_reaction_tools()
-        # self.register_event_catalog_tool()
-        self.register_state_memory_tool()
+        self.register_reaction_tools()
+        self.register_reaction_catalog_tool()
+        self.register_hardware_state_tool()
         self.register_environment_state_tool()
 
     @staticmethod
@@ -161,23 +160,18 @@ class ServerRuntime:
 
     # Connection command dispatch and MCP tool generation.
 
-    # def read_latest_event_value(
-    #     self,
-    #     event_key: tuple[str, str, str],
-    #     previous_value: dict[str, str] | None,
-    # ) -> dict[str, str] | None:
-    #     deadline = time.monotonic() + self.event_read_timeout_seconds
-    #     while time.monotonic() < deadline:
-    #         event = self.event_bus.get_event(*event_key)
-    #         latest_value = event.read_latest()
-    #         if latest_value is not None and latest_value is not previous_value:
-    #             return latest_value
+    def send_read_command(
+        self,
+        event_key: tuple[str, str, str],
+    ) -> dict[str, object]:
+        try:
+            event = self.event_bus.get_event(*event_key)
+            latest_value = event.read_latest()
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+        return {"success": True, "value": latest_value}
 
-    #         time.sleep(self.event_read_poll_seconds)
-
-    #     return None
-
-    def send_connection_command(
+    def send_write_command(
         self,
         microcontroller: Microcontroller,
         connection: Connection,
@@ -211,7 +205,7 @@ class ServerRuntime:
         def action_function(
             params: dict[str, object],
         ) -> dict[str, object]:
-            return self.send_connection_command(
+            return self.send_write_command(
                 microcontroller=microcontroller,
                 connection=connection,
                 action=action,
@@ -226,6 +220,19 @@ class ServerRuntime:
         command: CommandSpec,
     ) -> Callable[..., dict[str, object]]:
         action = command.method.strip().upper()
+        if action == "READ":
+
+            def read_tool_function() -> dict[str, object]:
+                return self.send_read_command(
+                    (
+                        "MCP",
+                        connection.microcontroller_id,
+                        connection.event_name,
+                    )
+                )
+
+            return read_tool_function
+
         if not command.params:
 
             def tool_function() -> dict[str, object]:
@@ -968,27 +975,25 @@ class ServerRuntime:
             ),
         )
 
-    # Reaction and event catalog tools.
+    def register_reaction_catalog_tool(self) -> None:
+        def list_reaction_events() -> EventCatalog:
+            return self.get_event_catalog()
 
-    # def register_event_catalog_tool(self) -> None:
-    #     def list_reaction_events() -> EventCatalog:
-    #         return self.get_event_catalog()
+        self.register_tool(
+            name="list_reaction_events",
+            description=(
+                "List the registered hardware events that can be used "
+                "when creating reactions."
+            ),
+            tool_function=list_reaction_events,
+            annotations=ToolAnnotations(
+                title="List events available for reactions",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
 
-    #     self.register_tool(
-    #         name="list_reaction_events",
-    #         description=(
-    #             "List the registered hardware events that can be used "
-    #             "when creating reactions."
-    #         ),
-    #         tool_function=list_reaction_events,
-    #         annotations=ToolAnnotations(
-    #             title="List events available for reactions",
-    #             readOnlyHint=True,
-    #             openWorldHint=False,
-    #         ),
-    #     )
-
-    def register_state_memory_tool(self) -> None:
+    def register_hardware_state_tool(self) -> None:
         self.register_tool(
             name="get_current_hardware_state",
             description=("Read the current hardware state memory."),
