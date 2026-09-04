@@ -19,8 +19,8 @@ load_dotenv()
 host = os.environ["GERBERA_DATABASE_HOST"]
 port = os.environ["GERBERA_DATABASE_PORT"]
 db_name = os.environ["GERBERA_DATABASE_NAME"]
-user = os.environ["GERBERA_READER_USER"]
-password = os.environ["GERBERA_READER_PASSWORD"]
+read_user = os.environ["GERBERA_READER_USER"]
+read_password = os.environ["GERBERA_READER_PASSWORD"]
 
 # From runtime
 provider = os.environ["PROVIDER"]
@@ -31,8 +31,8 @@ database = DatabaseGateway(
     host=host,
     port=port,
     db_name=db_name,
-    read_user=user,
-    read_password=password,
+    read_user=read_user,
+    read_password=read_password,
 )
 
 sandbox = SandboxGateway()
