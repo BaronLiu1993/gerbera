@@ -61,9 +61,6 @@ class RuntimeLifecycle:
 
             self.event_listener.create_listeners()
             cleanup.callback(self.event_listener.stop_listeners)
-
-            self.environment_runtime.turn_on_all_model_streams()
-            cleanup.callback(self.environment_runtime.turn_off_all_model_streams)
         except Exception:
             cleanup.close()
             raise
