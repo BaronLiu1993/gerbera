@@ -10,8 +10,22 @@ class StrictSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def hash_event_key(event_key: tuple[str, str, str]) -> str:
-    return hashlib.sha256("|".join(event_key).encode()).hexdigest()
+def build_event_key(
+    event_type: str,
+    microcontroller_id: str,
+    event_name: str,
+) -> str:
+    return f"{event_type}.{microcontroller_id}.{event_name}"
+
+
+def parse_event_key(event_key: str) -> tuple[str, str, str]:
+    event_type, remainder = event_key.split(".", 1)
+    microcontroller_id, event_name = remainder.rsplit(".", 1)
+    return event_type, microcontroller_id, event_name
+
+
+def hash_event_key(event_key: str) -> str:
+    return hashlib.sha256(event_key.encode()).hexdigest()
 
 
 def build_connection_event_name(

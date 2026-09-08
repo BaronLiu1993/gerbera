@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from functools import cached_property
 import threading
 
 from gerbera_sdk.events.buffer import Buffer
-from gerbera_sdk.events.event_worker import EventWorker
 
 
 @dataclass
@@ -16,28 +14,14 @@ class Event:
     component_type: str
     streamable: bool
     table_name: str
-    event_worker: EventWorker
+    buffer: Buffer
+    event_key: str
     latest_val: dict[str, str] | None = None
     lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
         repr=False,
     )
-
-    @cached_property
-    def buffer(self) -> Buffer:
-        return Buffer(
-            table_name=self.table_name,
-            event_worker=self.event_worker,
-        )
-
-    @cached_property
-    def event_key(self):
-        return (
-            self.event_type,
-            self.microcontroller_id,
-            self.event_name,
-        )
 
     def perform_work(self, payload: dict[str, str]) -> None:
         normalized_payload = dict(payload)

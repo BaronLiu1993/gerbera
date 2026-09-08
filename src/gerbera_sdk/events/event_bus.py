@@ -2,18 +2,13 @@ from dataclasses import dataclass, field
 import uuid
 
 from gerbera_sdk.events.event import Event
-
-EventMetadata = dict[str, str | bool]
-EventCatalog = dict[
-    str,
-    dict[str, dict[str, EventMetadata]],
-]
+from gerbera_sdk.utils import build_event_key
 
 
 # Add an event and, we dispatch a predefined event here
 @dataclass
 class EventBus:
-    events: dict[tuple[str, str, str], Event] = field(default_factory=dict)
+    events: dict[str, Event] = field(default_factory=dict)
 
     def write_event(
         self,
@@ -22,7 +17,7 @@ class EventBus:
         event_name: str,
         event: Event,
     ) -> None:
-        event_key = (event_type, microcontroller_id, event_name)
+        event_key = build_event_key(event_type, microcontroller_id, event_name)
         if event_key in self.events:
             raise RuntimeError("Event already exists")
 
@@ -34,7 +29,7 @@ class EventBus:
         microcontroller_id: str,
         event_name: str,
     ) -> Event:
-        event_key = (event_type, microcontroller_id, event_name)
+        event_key = build_event_key(event_type, microcontroller_id, event_name)
         if event_key not in self.events:
             raise RuntimeError("Event does not exist")
 
