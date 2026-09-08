@@ -18,7 +18,7 @@ reactions/                  Event reactions, conditions, callbacks, and latest v
 This folder owns:
 
 - parsing incoming serial event lines
-- routing by `(event_type, microcontroller_id, event_name)`
+- routing by `<event_type>.<microcontroller_id>.<event_name>`
 - buffering stream payloads
 - flushing partial stream buffers
 - queueing stream batches for the database

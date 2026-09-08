@@ -10,16 +10,16 @@ agent runtime. Those systems publish values into the reaction engine.
 
 ```text
 event value
-→ ReactionBus finds the reaction registered for the EventKey
+→ ReactionBus finds the reaction registered for the event key
 → ReactionCondition evaluates the value
 → the ReactionCallback runs when the condition matches
 → the callback result is returned to the publisher
 ```
 
-An `EventKey` is:
+An event key is:
 
 ```python
-(event_type, microcontroller_id, event_name)
+"<event_type>.<microcontroller_id>.<event_name>"
 ```
 
 ## Basic usage
@@ -35,7 +35,7 @@ from gerbera_sdk.events.reactions import (
     ReactionCondition,
 )
 
-event_key = ("STREAM", "board-1", "temperature")
+event_key = "STREAM.board-1.temperature"
 reaction_bus = ReactionBus()
 
 
@@ -55,9 +55,9 @@ reaction = Reaction(
 )
 
 reaction_bus.register_reaction(
-    event_type=event_key[0],
-    microcontroller_id=event_key[1],
-    event_name=event_key[2],
+    event_type="STREAM",
+    microcontroller_id="board-1",
+    event_name="temperature",
     reaction=reaction,
 )
 result = asyncio.run(
@@ -152,7 +152,12 @@ what result to return.
 
 ```python
 result = asyncio.run(
-    reaction_bus.update_reaction_value(*event_key, {"value": 32})
+    reaction_bus.update_reaction_value(
+        "STREAM",
+        "board-1",
+        "temperature",
+        {"value": 32},
+    )
 )
 ```
 

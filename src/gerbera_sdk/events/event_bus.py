@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import uuid
 
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.utils import build_event_key
+from gerbera_sdk.utils import build_hashable_key
 
 
 # Add an event and, we dispatch a predefined event here
@@ -17,7 +17,7 @@ class EventBus:
         event_name: str,
         event: Event,
     ) -> None:
-        event_key = build_event_key(event_type, microcontroller_id, event_name)
+        event_key = build_hashable_key(event_type, microcontroller_id, event_name)
         if event_key in self.events:
             raise RuntimeError("Event already exists")
 
@@ -29,7 +29,7 @@ class EventBus:
         microcontroller_id: str,
         event_name: str,
     ) -> Event:
-        event_key = build_event_key(event_type, microcontroller_id, event_name)
+        event_key = build_hashable_key(event_type, microcontroller_id, event_name)
         if event_key not in self.events:
             raise RuntimeError("Event does not exist")
 

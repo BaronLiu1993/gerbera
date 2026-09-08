@@ -5,17 +5,11 @@ from pydantic import BaseModel, ConfigDict
 
 MAX_EVENT_NAME_LENGTH = 63
 
-
 class StrictSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-
-def build_event_key(
-    event_type: str,
-    microcontroller_id: str,
-    event_name: str,
-) -> str:
-    return f"{event_type}.{microcontroller_id}.{event_name}"
+def build_hashable_key(*parts: object) -> str:
+    return ".".join(str(part) for part in parts)
 
 
 def parse_event_key(event_key: str) -> tuple[str, str, str]:
