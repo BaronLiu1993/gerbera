@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from gerbera_sdk.models.hardware.database import Database
-from gerbera_sdk.models.hardware.pin import Pin
 from gerbera_sdk.utils import build_connection_event_name
 
 
@@ -10,7 +9,7 @@ from gerbera_sdk.utils import build_connection_event_name
 class Connection:
     name: str
     component_type: str
-    pins: dict[Pin, str]
+    pins: dict[str, str]
     description: str
     microcontroller_id: str | None = None
     stream: bool = False

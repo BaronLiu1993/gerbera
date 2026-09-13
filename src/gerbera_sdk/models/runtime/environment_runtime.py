@@ -24,12 +24,13 @@ class EnvironmentRuntime:
     model_outputs: dict[str, ModelOutput | None] = field(default_factory=dict)
     # this holds the model object that will be registered and the
     model_inferences: dict[str, Inference] = field(default_factory=dict)
-    # harness_url: str = "" later for sending up data to the harness as a websocket connection
+    harness_url: str = ""  # optional parameter
     lock: threading.Lock = field(
         default_factory=threading.Lock,
         init=False,
         repr=False,
     )
+
 
     # each model has their own keys that they can perform and that will differentiate them e.g. scene_analysis, object detection
     def register_models(self) -> None:
