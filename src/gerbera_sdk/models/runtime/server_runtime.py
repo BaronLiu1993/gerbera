@@ -28,7 +28,7 @@ from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import (
     ConnectionState,
     HardwareRuntime,
@@ -52,7 +52,7 @@ class ServerRuntime:
     event_worker: EventWorker
     app: FastMCP
     camera_runtime: CameraRuntime
-    environment_runtime: EnvironmentRuntime
+    model_runtime: ModelRuntime
     event_listener: EventListener
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
@@ -618,9 +618,9 @@ class ServerRuntime:
             )
 
     def register_inference_tools(self) -> None:
-        self.environment_runtime.register_model_inferences()
+        self.model_runtime.register_model_inferences()
         registered_models: dict[str, tuple[str, Inference]] = {}
-        for model_id, inference in self.environment_runtime.model_inferences.items():
+        for model_id, inference in self.model_runtime.model_inferences.items():
             if inference.name in registered_models:
                 raise ValueError(
                     f"Inference model name must be unique: {inference.name}"
@@ -643,18 +643,18 @@ class ServerRuntime:
             def turn_on_inference(
                 prompt: Annotated[str, Field(min_length=1)],
             ) -> None:
-                self.environment_runtime.turn_on_model_stream(
+                self.model_runtime.turn_on_model_stream(
                     model_id=model_id,
                     prompt=prompt,
                 )
         else:
             def turn_on_inference() -> None:
-                self.environment_runtime.turn_on_model_stream(
+                self.model_runtime.turn_on_model_stream(
                     model_id=model_id,
                 )
 
         def turn_off_inference() -> None:
-            self.environment_runtime.turn_off_model_stream(
+            self.model_runtime.turn_off_model_stream(
                 model_id=model_id,
             )
 
@@ -789,13 +789,13 @@ class ServerRuntime:
         model: ObjectDetectionModelInference,
     ) -> None:
         def read_model_output(camera_id: str) -> dict[str, object]:
-            result = self.environment_runtime.read_model_output(model_id, camera_id)
+            result = self.model_runtime.read_model_output(model_id, camera_id)
             return result.model_dump(mode="json", exclude={"frame"})
 
         def predict_with_model(
             camera_ids: Annotated[list[str], Field(min_length=1)],
         ) -> list[dict[str, object]]:
-            results = self.environment_runtime.single_inference(
+            results = self.model_runtime.single_inference(
                 model_id=model_id,
                 inference_type="object_detection",
                 inference_input=camera_ids,
@@ -842,14 +842,14 @@ class ServerRuntime:
         def read_scene_objects(
             camera_id: str,
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.environment_runtime.read_model_output(
+            return self.model_runtime.read_model_output(
                 model_id,
                 camera_id,
                 inference_type="object_detection",
             )
 
         def read_scene_analysis(camera_id: str) -> str:
-            result = self.environment_runtime.read_model_output(
+            result = self.model_runtime.read_model_output(
                 model_id,
                 camera_id,
                 inference_type="analysis",
@@ -862,7 +862,7 @@ class ServerRuntime:
             prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.environment_runtime.single_inference(
+            return self.model_runtime.single_inference(
                 model_id=model_id,
                 inference_type="object_detection",
                 inference_input=frames,
@@ -873,7 +873,7 @@ class ServerRuntime:
             prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> str:
-            result = self.environment_runtime.single_inference(
+            result = self.model_runtime.single_inference(
                 model_id=model_id,
                 inference_type="analysis",
                 inference_input=frames,
@@ -1045,7 +1045,7 @@ class ServerRuntime:
         self.register_tool(
             name="get_current_environment_state",
             description=("Read the current environment state from model outputs."),
-            tool_function=self.environment_runtime.get_environment_state,
+            tool_function=self.model_runtime.get_model_state,
             annotations=ToolAnnotations(
                 title="Get current environment state",
             ),

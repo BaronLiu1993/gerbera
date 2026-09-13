@@ -9,7 +9,7 @@ from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 
@@ -19,7 +19,7 @@ class RuntimeLifecycle:
     board_runtime: BoardRuntime
     camera_runtime: CameraRuntime
     event_worker: EventWorker
-    environment_runtime: EnvironmentRuntime
+    model_runtime: ModelRuntime
     event_listener: EventListener
     event_bus: EventBus
     hardware_runtime: HardwareRuntime
@@ -35,7 +35,7 @@ class RuntimeLifecycle:
                 "board_runtime": self.board_runtime,
                 "camera_runtime": self.camera_runtime,
                 "event_worker": self.event_worker,
-                "environment_runtime": self.environment_runtime,
+                "model_runtime": self.model_runtime,
                 "hardware_runtime": self.hardware_runtime,
                 "movement_runtime": self.movement_runtime,
             }

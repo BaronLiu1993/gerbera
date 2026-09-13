@@ -14,7 +14,7 @@ from gerbera_sdk.models.hardware.validation import validate_hardware_system
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.environment_runtime import EnvironmentRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
@@ -57,7 +57,7 @@ class GerberaRuntime:
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker(database=database)
-        environment_runtime = EnvironmentRuntime(hardware_system)
+        model_runtime = ModelRuntime(hardware_system)
         hardware_runtime = HardwareRuntime()
         movement_runtime = None
         if hardware_system.movement_systems:
@@ -82,7 +82,7 @@ class GerberaRuntime:
             board_runtime=board_runtime,
             camera_runtime=camera_runtime,
             event_worker=event_worker,
-            environment_runtime=environment_runtime,
+            model_runtime=model_runtime,
             event_listener=event_listener,
             event_bus=event_bus,
             hardware_runtime=hardware_runtime,
@@ -99,7 +99,7 @@ class GerberaRuntime:
             event_worker=event_worker,
             app=app,
             camera_runtime=camera_runtime,
-            environment_runtime=environment_runtime,
+            model_runtime=model_runtime,
             event_listener=event_listener,
             reaction_bus=reaction_bus,
             hardware_runtime=hardware_runtime,

@@ -19,7 +19,7 @@ ModelOutput: TypeAlias = Union[
 
 
 @dataclass
-class EnvironmentRuntime:
+class ModelRuntime:
     hardware_system: HardwareSystem
     model_outputs: dict[str, ModelOutput | None] = field(default_factory=dict)
     # this holds the model object that will be registered and the
@@ -30,7 +30,6 @@ class EnvironmentRuntime:
         init=False,
         repr=False,
     )
-
 
     # each model has their own keys that they can perform and that will differentiate them e.g. scene_analysis, object detection
     def register_models(self) -> None:
@@ -98,7 +97,7 @@ class EnvironmentRuntime:
             exclude={"frame"},
         )
 
-    def get_environment_state(self) -> dict[str, Any]:
+    def get_model_state(self) -> dict[str, Any]:
         with self.lock:
             return {
                 key: self.serialize_model_output(model_output)
@@ -111,7 +110,7 @@ class EnvironmentRuntime:
         inference_type: InferenceType,
         inference_input: str | list[str],
         prompt: str | None = None,
-    ) -> InferenceStrategyResult:
+    ):
         inference = self.model_inferences[model_id]
         for strategy in SINGLE_INFERENCE_STRATEGIES:
             if strategy.supports(

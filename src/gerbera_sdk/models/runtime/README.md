@@ -23,7 +23,9 @@ It is not responsible for:
 ```text
 server_runtime.py       MCP tools, events, listeners, and command dispatch.
 board_runtime.py        Per-process board transport pool and lifecycle.
+camera_runtime.py       Per-process camera transport, latest-frame cache, and lifecycle.
 command_runtime.py      Command compilation and response parsing.
+model_runtime.py        Model inference registration, output state, and lifecycle.
 ```
 
 ## Ownership
