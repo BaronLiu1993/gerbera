@@ -24,17 +24,12 @@ class Microcontroller:
         return self.get_microcontroller_id_from_config()
 
     def get_microcontroller_id_from_config(self) -> str:
-
         if not self.config_path.exists():
             raise FileNotFoundError("Config.json Not Found")
-
         config = json.loads(self.config_path.read_text())
-
         registry = config.get("devices")
-
         if not registry:
             raise ValueError("Devices is Not Found in Config.json")
-
         for device in registry.values():
             device_port = device.get("address")
             if device_port == self.port:
@@ -50,7 +45,7 @@ class Microcontroller:
         )
 
     
-    def _get_required_connection_libraries(self) -> list[LibrarySpec]:
+    def get_required_connection_libraries(self) -> list[LibrarySpec]:
         libraries: list[LibrarySpec] = []
         normalized_library_names: set[str] = set()
 

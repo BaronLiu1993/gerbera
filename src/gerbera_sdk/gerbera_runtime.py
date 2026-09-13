@@ -164,7 +164,7 @@ class GerberaRuntime:
 
         installed_libraries: set[str] = set()
         for microcontroller in hardware_system.microcontrollers:
-            for library in microcontroller._get_required_connection_libraries():
+            for library in microcontroller.get_required_connection_libraries():
                 install_name = library.install.strip()
                 normalized_name = install_name.lower()
                 if not install_name or normalized_name in installed_libraries:
