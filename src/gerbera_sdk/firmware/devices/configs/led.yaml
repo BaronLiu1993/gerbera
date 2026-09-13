@@ -6,7 +6,8 @@ capabilities:
 libraries: []
 
 pins:
-  out: OUTPUT
+  out:
+    mode: OUTPUT
 
 state:
   units:
@@ -14,6 +15,7 @@ state:
 
 commands:
   - method: WRITE
+    enabled_when: always
     description: Set the LED state.
     params:
       state:

@@ -7,7 +7,9 @@ libraries:
   - include: Servo.h
     install: Servo
 
-pins: {}
+pins:
+  signal:
+    mode: OUTPUT
 
 state:
   units:
@@ -15,6 +17,7 @@ state:
 
 commands:
   - method: WRITE
+    enabled_when: always
     description: Set servo angle.
     params:
       angle:

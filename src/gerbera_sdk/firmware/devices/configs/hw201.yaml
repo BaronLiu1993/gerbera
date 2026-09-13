@@ -6,7 +6,8 @@ capabilities:
 libraries: []
 
 pins:
-  out: INPUT
+  out:
+    mode: INPUT
 
 state:
   units:
@@ -15,7 +16,9 @@ state:
 
 commands:
   - method: READ
+    enabled_when: always
     description: Read the current digital sensor value.
+    params: {}
     annotations:
       title: Read current value from {connection.name}
       readOnlyHint: true
@@ -25,6 +28,7 @@ commands:
     description: Set continuous HW201 streaming. Use state 1 for on and 0 for off.
     params:
       state:
+        required: true
         min: 0
         max: 1
         description: 1 turns continuous HW201 streaming on; 0 turns it off.

@@ -6,8 +6,10 @@ capabilities:
 libraries: []
 
 pins:
-  trig: OUTPUT
-  echo: INPUT
+  trig:
+    mode: OUTPUT
+  echo:
+    mode: INPUT
 
 state:
   units:
@@ -16,7 +18,9 @@ state:
 
 commands:
   - method: READ
+    enabled_when: always
     description: Read distance from the HC-SR04 ultrasonic sensor.
+    params: {}
     annotations:
       title: Read current distance from {connection.name}
       readOnlyHint: true
@@ -26,6 +30,7 @@ commands:
     description: Set continuous HC-SR04 streaming. Use state 1 for on and 0 for off.
     params:
       state:
+        required: true
         min: 0
         max: 1
         description: 1 turns continuous HC-SR04 streaming on; 0 turns it off.

@@ -6,12 +6,11 @@ from gerbera_sdk.firmware.firmware_schema import ColumnType, PinMode
 
 @dataclass(frozen=True)
 class CapabilityConfig:
-    streaming: bool = False
+    streaming: bool
 
     @classmethod
-    def from_data(cls, data: dict[str, Any] | None) -> "CapabilityConfig":
-        data = data or {}
-        return cls(streaming=bool(data.get("streaming", False)))
+    def from_data(cls, data: dict[str, Any]) -> "CapabilityConfig":
+        return cls(streaming=data["streaming"])
 
 
 @dataclass(frozen=True)
@@ -21,24 +20,23 @@ class LibraryConfig:
 
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> "LibraryConfig":
-        return cls(include=str(data["include"]), install=str(data["install"]))
+        return cls(include=data["include"], install=data["install"])
 
 
 @dataclass(frozen=True)
 class ParameterConfig:
-    required: bool = True
-    description: str = ""
+    required: bool
+    description: str
     min: int | float | None = None
     max: int | float | None = None
 
     @classmethod
-    def from_data(cls, data: dict[str, Any] | None) -> "ParameterConfig":
-        data = data or {}
+    def from_data(cls, data: dict[str, Any]) -> "ParameterConfig":
         return cls(
-            required=bool(data.get("required", True)),
-            description=str(data.get("description", "")),
-            min=data.get("min"),
-            max=data.get("max"),
+            required=data["required"],
+            description=data["description"],
+            min=data["min"],
+            max=data["max"],
         )
 
 
@@ -51,9 +49,9 @@ class AnnotationConfig:
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> "AnnotationConfig":
         return cls(
-            title=str(data["title"]),
-            read_only_hint=bool(data["readOnlyHint"]),
-            open_world_hint=bool(data["openWorldHint"]),
+            title=data["title"],
+            read_only_hint=data["readOnlyHint"],
+            open_world_hint=data["openWorldHint"],
         )
 
 
@@ -61,38 +59,43 @@ class AnnotationConfig:
 class CommandConfig:
     method: str
     description: str
-    params: dict[str, ParameterConfig] = field(default_factory=dict)
-    annotations: AnnotationConfig | None = None
-    enabled_when: str = "always"
+    params: dict[str, ParameterConfig]
+    annotations: AnnotationConfig
+    enabled_when: str
 
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> "CommandConfig":
         params = {
             name: ParameterConfig.from_data(param_data)
-            for name, param_data in (data.get("params") or {}).items()
+            for name, param_data in data["params"].items()
         }
-        annotation_data = data.get("annotations")
         return cls(
-            method=str(data["method"]),
-            description=str(data.get("description", "")),
+            method=data["method"],
+            description=data["description"],
             params=params,
-            annotations=(
-                AnnotationConfig.from_data(annotation_data)
-                if annotation_data
-                else None
-            ),
-            enabled_when=str(data.get("enabled_when", "always")),
+            annotations=AnnotationConfig.from_data(data["annotations"]),
+            enabled_when=data["enabled_when"],
         )
 
 
 @dataclass(frozen=True)
 class StateConfig:
-    units: dict[str, str | None] = field(default_factory=dict)
+    units: dict[str, str | None]
 
     @classmethod
-    def from_data(cls, data: dict[str, Any] | None) -> "StateConfig":
-        data = data or {}
-        return cls(units=dict(data.get("units") or {}))
+    def from_data(cls, data: dict[str, Any]) -> "StateConfig":
+        return cls(units=data["units"])
+
+
+@dataclass(frozen=True)
+class PinConfig:
+    mode: PinMode
+
+    @classmethod
+    def from_data(cls, data: dict[str, Any]) -> "PinConfig":
+        return cls(
+            mode=PinMode(data["mode"]),
+        )
 
 
 @dataclass(frozen=True)
@@ -107,7 +110,7 @@ class ColumnConfig:
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> "ColumnConfig":
         return cls(
-            type=ColumnType(str(data["type"])),
+            type=ColumnType(data["type"]),
             idx=bool(data.get("idx", False)),
             primary_key=bool(data.get("primary_key", False)),
             nullable=bool(data.get("nullable", True)),
@@ -118,15 +121,14 @@ class ColumnConfig:
 
 @dataclass(frozen=True)
 class StreamConfig:
-    schema: dict[str, ColumnConfig] = field(default_factory=dict)
+    schema: dict[str, ColumnConfig]
 
     @classmethod
-    def from_data(cls, data: dict[str, Any] | None) -> "StreamConfig":
-        data = data or {}
+    def from_data(cls, data: dict[str, Any]) -> "StreamConfig":
         return cls(
             schema={
                 name: ColumnConfig.from_data(column_data)
-                for name, column_data in (data.get("schema") or {}).items()
+                for name, column_data in data["schema"].items()
             }
         )
 
@@ -141,8 +143,7 @@ class FirmwareConfig:
     handlers: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_data(cls, data: dict[str, Any] | None) -> "FirmwareConfig":
-        data = data or {}
+    def from_data(cls, data: dict[str, Any]) -> "FirmwareConfig":
         return cls(
             definitions=str(data.get("definitions") or ""),
             definitions_when_streaming=str(
@@ -162,7 +163,7 @@ class DeviceConfig:
     component_type: str
     capabilities: CapabilityConfig
     libraries: tuple[LibraryConfig, ...]
-    pins: dict[str, PinMode]
+    pins: dict[str, PinConfig]
     state: StateConfig
     commands: tuple[CommandConfig, ...]
     firmware: FirmwareConfig
@@ -171,21 +172,21 @@ class DeviceConfig:
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> "DeviceConfig":
         return cls(
-            component_type=str(data["component_type"]),
-            capabilities=CapabilityConfig.from_data(data.get("capabilities")),
+            component_type=data["component_type"],
+            capabilities=CapabilityConfig.from_data(data["capabilities"]),
             libraries=tuple(
                 LibraryConfig.from_data(library_data)
-                for library_data in data.get("libraries", [])
+                for library_data in data["libraries"]
             ),
             pins={
-                name: PinMode(str(mode))
-                for name, mode in (data.get("pins") or {}).items()
+                name: PinConfig.from_data(pin_data)
+                for name, pin_data in data["pins"].items()
             },
-            state=StateConfig.from_data(data.get("state")),
+            state=StateConfig.from_data(data["state"]),
             commands=tuple(
                 CommandConfig.from_data(command_data)
-                for command_data in data.get("commands", [])
+                for command_data in data["commands"]
             ),
-            firmware=FirmwareConfig.from_data(data.get("firmware")),
-            stream=StreamConfig.from_data(data.get("stream")),
+            firmware=FirmwareConfig.from_data(data["firmware"]),
+            stream=StreamConfig.from_data(data["stream"]),
         )

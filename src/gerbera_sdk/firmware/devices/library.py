@@ -1,6 +1,4 @@
 from importlib import resources
-import re
-from typing import Any
 
 from mcp.types import ToolAnnotations
 import yaml
@@ -20,9 +18,6 @@ from gerbera_sdk.firmware.firmware_schema import (
 from gerbera_sdk.models.hardware.connection import Connection
 
 
-PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_.]*)\}")
-
-
 class ConfigFirmwareBuilder(BaseFirmwareBuilder):
     def __init__(self, config: DeviceConfig) -> None:
         self.config = config
@@ -35,9 +30,10 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         ]
 
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:
+        self._validate_required_pins(connection)
         return [
-            PinModeSpec(pin=connection.pins[name], mode=mode)
-            for name, mode in self.config.pins.items()
+            PinModeSpec(pin=connection.pins[name], mode=pin.mode)
+            for name, pin in self.config.pins.items()
         ]
 
     def required_commands(self, connection: Connection) -> list[CommandSpec]:
@@ -52,13 +48,8 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         connection: Connection,
         command: CommandSpec,
     ) -> ToolAnnotations:
+        self._validate_required_pins(connection)
         command_config = self._command_config(command.method, connection)
-        if command_config.annotations is None:
-            raise ValueError(
-                f"Missing annotations for {self.config.component_type} "
-                f"command: {command.method}"
-            )
-
         annotations = command_config.annotations
         return ToolAnnotations(
             title=self._render(annotations.title, connection),
@@ -84,24 +75,34 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         }
 
     def build_definitions(self, connection: Connection) -> str:
+        self._validate_required_pins(connection)
         definitions = [self.config.firmware.definitions]
         if connection.stream_enabled:
             definitions.append(self.config.firmware.definitions_when_streaming)
         return self._render_blocks(definitions, connection)
 
     def build_setup_lines(self, connection: Connection) -> list[str]:
+        self._validate_required_pins(connection)
         lines = list(self.config.firmware.setup)
         if connection.stream_enabled:
             lines.extend(self.config.firmware.setup_when_streaming)
         return [self._indent_setup_line(self._render(line, connection)) for line in lines]
 
     def build_stream_lines(self, connection: Connection) -> list[str]:
+        self._validate_required_pins(connection)
         if not connection.stream_enabled:
             return []
+        if not self.supports_streaming:
+            raise ValueError(
+                f"{connection.component_type} does not support streaming"
+            )
 
         stream_loop = self.config.firmware.stream_loop_when_streaming
         if not stream_loop:
-            return []
+            raise ValueError(
+                "Missing stream loop for streaming device: "
+                f"{self.config.component_type}"
+            )
 
         return [
             self._indent_loop_line(line)
@@ -109,14 +110,13 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         ]
 
     def build_handler(self, connection: Connection) -> str:
+        self._validate_required_pins(connection)
         handler_name = "streaming" if connection.stream_enabled else "default"
         template = self.config.firmware.handlers.get(handler_name)
         if template is None:
-            template = self.config.firmware.handlers.get("default")
-
-        if template is None:
             raise ValueError(
-                f"Missing firmware handler for {self.config.component_type}"
+                f"Missing {handler_name} firmware handler for "
+                f"{self.config.component_type}"
             )
 
         return self._render(template, connection)
@@ -153,6 +153,19 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             },
         )
 
+    def _validate_required_pins(self, connection: Connection) -> None:
+        missing_pins = [
+            pin_name
+            for pin_name in self.config.pins
+            if pin_name not in connection.pins
+        ]
+        if missing_pins:
+            missing = ", ".join(missing_pins)
+            raise ValueError(
+                f"Missing required pin(s) for {self.config.component_type}: "
+                f"{missing}"
+            )
+
     @staticmethod
     def _command_enabled(
         command: CommandConfig,
@@ -177,30 +190,23 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         return "\n\n".join(rendered)
 
     def _render(self, template: str, connection: Connection) -> str:
-        def replace(match: re.Match[str]) -> str:
-            name = match.group(1)
-            value = self._placeholder_value(name, connection)
-            if value is None:
-                return match.group(0)
-            return str(value)
+        rendered = template.replace("{component_type}", self.config.component_type)
+        rendered = rendered.replace("{connection.name}", connection.name)
+        rendered = rendered.replace("{connection.event_name}", connection.event_name)
 
-        return PLACEHOLDER_RE.sub(replace, template)
+        for pin_name in self.config.pins:
+            rendered = rendered.replace(
+                f"{{pins.{pin_name}}}",
+                connection.pins[pin_name],
+            )
 
-    def _placeholder_value(
-        self,
-        name: str,
-        connection: Connection,
-    ) -> Any:
-        if name == "component_type":
-            return self.config.component_type
+        if "{connection." in rendered or "{pins." in rendered:
+            raise ValueError(
+                f"Unsupported firmware template placeholder for "
+                f"{self.config.component_type}"
+            )
 
-        if name.startswith("connection."):
-            return getattr(connection, name.removeprefix("connection."), None)
-
-        if name.startswith("pins."):
-            return connection.pins[name.removeprefix("pins.")]
-
-        return None
+        return rendered
 
     @staticmethod
     def _indent_setup_line(line: str) -> str:
@@ -226,7 +232,7 @@ def load_device_config(component_type: str) -> DeviceConfig:
         raise ValueError(f"Unsupported component type: {component_type}")
 
     with config_ref.open("r", encoding="utf-8") as config_file:
-        data = yaml.safe_load(config_file) or {}
+        data = yaml.safe_load(config_file)
 
     config = DeviceConfig.from_data(data)
     if config.component_type != component_type:

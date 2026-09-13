@@ -6,9 +6,12 @@ capabilities:
 libraries: []
 
 pins:
-  in1: OUTPUT
-  in2: OUTPUT
-  enable: OUTPUT
+  in1:
+    mode: OUTPUT
+  in2:
+    mode: OUTPUT
+  enable:
+    mode: OUTPUT
 
 state:
   units:
@@ -16,6 +19,7 @@ state:
 
 commands:
   - method: WRITE
+    enabled_when: always
     description: Set brushed DC motor direction and speed. Use direction 1 for forward, -1 for reverse, and 0 for stop.
     params:
       direction:
