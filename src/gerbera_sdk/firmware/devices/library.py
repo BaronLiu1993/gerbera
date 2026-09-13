@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from importlib import resources
 
 from mcp.types import ToolAnnotations
@@ -18,10 +19,13 @@ from gerbera_sdk.firmware.firmware_schema import (
 from gerbera_sdk.models.hardware.connection import Connection
 
 
+@dataclass(frozen=True)
 class ConfigFirmwareBuilder(BaseFirmwareBuilder):
-    def __init__(self, config: DeviceConfig) -> None:
-        self.config = config
-        self.supports_streaming = config.capabilities.streaming
+    config: DeviceConfig
+
+    @property
+    def supports_streaming(self) -> bool:
+        return self.config.capabilities.streaming
 
     def required_libraries(self) -> list[LibrarySpec]:
         return [
@@ -30,7 +34,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         ]
 
     def pin_modes(self, connection: Connection) -> list[PinModeSpec]:
-        self._validate_required_pins(connection)
+        self.validate_required_pins(connection)
         return [
             PinModeSpec(pin=connection.pins[name], mode=pin.mode)
             for name, pin in self.config.pins.items()
@@ -38,9 +42,9 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
 
     def required_commands(self, connection: Connection) -> list[CommandSpec]:
         return [
-            self._command_spec(command)
+            self.command_spec(command)
             for command in self.config.commands
-            if self._command_enabled(command, connection)
+            if self.command_enabled(command, connection)
         ]
 
     def annotations(
@@ -48,11 +52,11 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         connection: Connection,
         command: CommandSpec,
     ) -> ToolAnnotations:
-        self._validate_required_pins(connection)
-        command_config = self._command_config(command.method, connection)
+        self.validate_required_pins(connection)
+        command_config = self.command_config(command.method, connection)
         annotations = command_config.annotations
         return ToolAnnotations(
-            title=self._render(annotations.title, connection),
+            title=self.render(annotations.title, connection),
             readOnlyHint=annotations.read_only_hint,
             openWorldHint=annotations.open_world_hint,
         )
@@ -75,21 +79,21 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         }
 
     def build_definitions(self, connection: Connection) -> str:
-        self._validate_required_pins(connection)
+        self.validate_required_pins(connection)
         definitions = [self.config.firmware.definitions]
         if connection.stream_enabled:
             definitions.append(self.config.firmware.definitions_when_streaming)
-        return self._render_blocks(definitions, connection)
+        return self.render_blocks(definitions, connection)
 
     def build_setup_lines(self, connection: Connection) -> list[str]:
-        self._validate_required_pins(connection)
+        self.validate_required_pins(connection)
         lines = list(self.config.firmware.setup)
         if connection.stream_enabled:
             lines.extend(self.config.firmware.setup_when_streaming)
-        return [self._indent_setup_line(self._render(line, connection)) for line in lines]
+        return [self.indent_setup_line(self.render(line, connection)) for line in lines]
 
     def build_stream_lines(self, connection: Connection) -> list[str]:
-        self._validate_required_pins(connection)
+        self.validate_required_pins(connection)
         if not connection.stream_enabled:
             return []
         if not self.supports_streaming:
@@ -105,12 +109,12 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             )
 
         return [
-            self._indent_loop_line(line)
-            for line in self._render(stream_loop, connection).splitlines()
+            self.indent_loop_line(line)
+            for line in self.render(stream_loop, connection).splitlines()
         ]
 
     def build_handler(self, connection: Connection) -> str:
-        self._validate_required_pins(connection)
+        self.validate_required_pins(connection)
         handler_name = "streaming" if connection.stream_enabled else "default"
         template = self.config.firmware.handlers.get(handler_name)
         if template is None:
@@ -119,9 +123,9 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
                 f"{self.config.component_type}"
             )
 
-        return self._render(template, connection)
+        return self.render(template, connection)
 
-    def _command_config(
+    def command_config(
         self,
         method: str,
         connection: Connection,
@@ -130,7 +134,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         for command in self.config.commands:
             if (
                 command.method.strip().upper() == normalized_method
-                and self._command_enabled(command, connection)
+                and self.command_enabled(command, connection)
             ):
                 return command
 
@@ -138,7 +142,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             f"Unsupported {self.config.component_type} command: {method}"
         )
 
-    def _command_spec(self, command: CommandConfig) -> CommandSpec:
+    def command_spec(self, command: CommandConfig) -> CommandSpec:
         return CommandSpec(
             method=command.method,
             description=command.description,
@@ -153,7 +157,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             },
         )
 
-    def _validate_required_pins(self, connection: Connection) -> None:
+    def validate_required_pins(self, connection: Connection) -> None:
         missing_pins = [
             pin_name
             for pin_name in self.config.pins
@@ -167,7 +171,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             )
 
     @staticmethod
-    def _command_enabled(
+    def command_enabled(
         command: CommandConfig,
         connection: Connection,
     ) -> bool:
@@ -177,19 +181,19 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             return connection.stream_enabled
         raise ValueError(f"Unsupported command condition: {command.enabled_when}")
 
-    def _render_blocks(
+    def render_blocks(
         self,
         blocks: list[str],
         connection: Connection,
     ) -> str:
         rendered = [
-            self._render(block, connection).strip()
+            self.render(block, connection).strip()
             for block in blocks
             if block.strip()
         ]
         return "\n\n".join(rendered)
 
-    def _render(self, template: str, connection: Connection) -> str:
+    def render(self, template: str, connection: Connection) -> str:
         rendered = template.replace("{component_type}", self.config.component_type)
         rendered = rendered.replace("{connection.name}", connection.name)
         rendered = rendered.replace("{connection.event_name}", connection.event_name)
@@ -209,7 +213,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         return rendered
 
     @staticmethod
-    def _indent_setup_line(line: str) -> str:
+    def indent_setup_line(line: str) -> str:
         if not line:
             return line
         if line.startswith("  "):
@@ -217,7 +221,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
         return f"  {line}"
 
     @staticmethod
-    def _indent_loop_line(line: str) -> str:
+    def indent_loop_line(line: str) -> str:
         if not line:
             return line
         return f"  {line}"
