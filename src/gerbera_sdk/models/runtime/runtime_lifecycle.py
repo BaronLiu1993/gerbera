@@ -51,8 +51,8 @@ class RuntimeLifecycle:
             if self.movement_runtime is not None:
                 self.movement_runtime.reset_motors_to_standard_position()
 
-            self.camera_runtime.start_cameras()
-            cleanup.callback(self.camera_runtime.clean_up_cameras)
+            self.camera_runtime.start()
+            cleanup.callback(self.camera_runtime.close)
 
             self.event_worker.start()
             cleanup.callback(self.event_worker.stop)

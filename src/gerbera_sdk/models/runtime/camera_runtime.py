@@ -53,19 +53,21 @@ class CameraRuntime:
             timestamp=datetime.datetime.now(),
         )
 
-    # does not need lock idempotent
-    def register_cameras(self) -> None:
+    def build_camera_sessions(self) -> list[str]:
+        camera_keys: list[str] = []
         for camera in self.hardware_system.cameras:
             if camera.camera_id not in self.camera_registry:
                 self.camera_registry[camera.camera_id] = CameraSession(camera=camera)
                 self.latest_frames[camera.camera_id] = None
+            camera_keys.append(camera.camera_id)
+        return camera_keys
 
-    # does not need lock, it is idempotent
-    def start_cameras(self) -> None:
-        self.register_cameras()
+    def start(self) -> None:
+        with self.lock:
+            camera_keys = self.build_camera_sessions()
+
         started_camera_keys: list[str] = []
         try:
-            camera_keys = list(self.camera_registry)
             for camera_key in camera_keys:
                 self.turn_on_camera_stream(camera_key)
                 started_camera_keys.append(camera_key)
@@ -73,6 +75,9 @@ class CameraRuntime:
             for camera_key in started_camera_keys:
                 self.turn_off_camera_stream(camera_key)
             raise ValueError(f"Failed to Start Cameras {exc}")
+
+    def start_cameras(self) -> None:
+        self.start()
 
     def get_camera_session(self, camera_key: str) -> CameraSession:
         with self.lock:
@@ -205,7 +210,7 @@ class CameraRuntime:
             camera_session.stop_event = None
             camera_session.thread = None
 
-    def clean_up_cameras(self) -> None:
+    def close(self) -> None:
         with self.lock:
             camera_keys = [
                 camera_key
