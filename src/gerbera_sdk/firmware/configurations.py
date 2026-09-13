@@ -1,20 +1,16 @@
 from dataclasses import dataclass
 
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
-from gerbera_sdk.firmware.devices.dcmotor import DCMotorFirmwareBuilder
-from gerbera_sdk.firmware.devices.hw201 import HW201FirmwareBuilder
-from gerbera_sdk.firmware.devices.hcsr04 import HCSR04FirmwareBuilder
-from gerbera_sdk.firmware.devices.ky033 import KY033FirmwareBuilder
-from gerbera_sdk.firmware.devices.led import LEDFirmwareBuilder
-from gerbera_sdk.firmware.devices.mg996r import MG996RFirmwareBuilder
-from gerbera_sdk.firmware.devices.sg90 import SG90FirmwareBuilder
+from gerbera_sdk.firmware.devices.library import (
+    ConfigFirmwareBuilder,
+    load_device_config,
+)
 
 
 # Mapping of the Device Name and the Builder
 @dataclass(frozen=True)
 class DeviceDefinition:
     component_type: str
-    builder_type: type[BaseFirmwareBuilder]
 
 
 @dataclass(frozen=True)
@@ -35,17 +31,17 @@ class DeviceRegistry:
         if definition is None:
             raise ValueError(f"Unsupported component type: {component_type}")
 
-        return definition.builder_type()
+        return ConfigFirmwareBuilder(load_device_config(definition.component_type))
 
 
 DEVICE_DEFINITIONS = (
-    DeviceDefinition("dcmotor", DCMotorFirmwareBuilder),
-    DeviceDefinition("hcsr04", HCSR04FirmwareBuilder),
-    DeviceDefinition("hw201", HW201FirmwareBuilder),
-    DeviceDefinition("ky033", KY033FirmwareBuilder),
-    DeviceDefinition("led", LEDFirmwareBuilder),
-    DeviceDefinition("mg996r", MG996RFirmwareBuilder),
-    DeviceDefinition("sg90", SG90FirmwareBuilder),
+    DeviceDefinition("dcmotor"),
+    DeviceDefinition("hcsr04"),
+    DeviceDefinition("hw201"),
+    DeviceDefinition("ky033"),
+    DeviceDefinition("led"),
+    DeviceDefinition("mg996r"),
+    DeviceDefinition("sg90"),
 )
 
 DEVICE_REGISTRY = DeviceRegistry(DEVICE_DEFINITIONS)

@@ -18,15 +18,6 @@ from gerbera_sdk.inference.model_types import (
 from gerbera_sdk.models.hardware.camera import Camera
 
 
-class ModelOutputWriter(Protocol):
-    def write_model_output(
-        self,
-        key: str,
-        model_output: object,
-    ) -> None:
-        pass
-
-
 @dataclass
 class ObjectDetectionModel:
     model_name: ObjectDetectionModelProviderEnum
@@ -36,27 +27,16 @@ class ObjectDetectionModel:
         )
     name: str = Field(min_length=1)
     model_source: str = Field(min_length=1)
-    subscribed_cameras: list[InstanceOf[Camera]] = Field(min_length=1)
+    subscribed_camera: Camera
     confidence_threshold: float = 0.25
     iou_threshold: float = 0.45
     max_detections: int = 300
     description: str = ""
     model_type: str = "object_detection_neural_network"
-    output_field: str = "detected_objects"
-
-    def model_output_keys(self) -> dict[str, dict[str, str]]:
-        return {
-            "object_detection": {
-                camera.camera_id: (
-                    f"{camera.name}.{self.name}.{self.model_type}.object_detection"
-                )
-                for camera in self.subscribed_cameras
-            }
-        }
+    model_operations: list[Literal["object_detection"]] = ["object_detection"]
 
     def create_inference(
         self,
-        model_output_writer: ModelOutputWriter,
     ) -> "ObjectDetectionModelInference":
         adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
         object_detection_model = adapter_class(
@@ -69,7 +49,6 @@ class ObjectDetectionModel:
         return ObjectDetectionModelInference(
             model_session=ObjectDetectionSession(
                 model=object_detection_model,
-                model_output_writer=model_output_writer,
             ),
             name=self.name,
             description=self.description,
@@ -84,7 +63,6 @@ class ObjectDetectionModel:
 @dataclass
 class ObjectDetectionSession:
     model: ObjectDetectionModelAdapters
-    model_output_writer: ModelOutputWriter
     _thread: threading.Thread | None = None
     _stop_event: threading.Event | None = None
 

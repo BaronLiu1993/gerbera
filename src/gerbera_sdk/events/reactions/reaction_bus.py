@@ -3,12 +3,13 @@ from collections.abc import Mapping
 
 from gerbera_sdk.events.reactions.reaction import Reaction
 from gerbera_sdk.events.reactions.reaction_condition import parse_reaction_value
+from gerbera_sdk.utils import build_hashable_key
 
 
 @dataclass
 class ReactionBus:
-    reaction_bus: dict[tuple[str, str, str], Reaction] = field(default_factory=dict)
-    latest_values: dict[tuple[str, str, str], float | None] = field(
+    reaction_bus: dict[str, Reaction] = field(default_factory=dict)
+    latest_values: dict[str, float | None] = field(
         default_factory=dict
     )
 
@@ -19,11 +20,7 @@ class ReactionBus:
         event_name: str,
         reaction: Reaction,
     ) -> None:
-        reaction_key = (
-            event_type,
-            microcontroller_id,
-            event_name,
-        )
+        reaction_key = build_hashable_key(event_type, microcontroller_id, event_name)
 
         if reaction_key in self.reaction_bus:
             raise ValueError(f"Reaction already registered for event: {reaction_key}")
@@ -37,11 +34,7 @@ class ReactionBus:
         microcontroller_id: str,
         event_name: str,
     ) -> Reaction:
-        reaction_key = (
-            event_type,
-            microcontroller_id,
-            event_name,
-        )
+        reaction_key = build_hashable_key(event_type, microcontroller_id, event_name)
         try:
             reaction = self.reaction_bus.pop(reaction_key)
         except KeyError as exc:
@@ -52,12 +45,12 @@ class ReactionBus:
         self.latest_values.pop(reaction_key, None)
         return reaction
 
-    def get_reaction(self, reaction_key: tuple[str, str, str]) -> Reaction | None:
+    def get_reaction(self, reaction_key: str) -> Reaction | None:
         return self.reaction_bus.get(reaction_key)
 
     async def emit_evaluation_event(
         self,
-        reaction_key: tuple[str, str, str],
+        reaction_key: str,
         latest_value: float,
     ) -> object | None:
         reaction = self.reaction_bus.get(reaction_key)
@@ -75,11 +68,7 @@ class ReactionBus:
         event_name: str,
         payload: Mapping[str, object],
     ) -> object | None:
-        reaction_key = (
-            event_type,
-            microcontroller_id,
-            event_name,
-        )
+        reaction_key = build_hashable_key(event_type, microcontroller_id, event_name)
 
         reaction = self.reaction_bus.get(reaction_key)
         if reaction is None or len(payload) != 1:

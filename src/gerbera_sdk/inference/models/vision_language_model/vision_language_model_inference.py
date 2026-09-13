@@ -58,28 +58,15 @@ class VisionLanguageModel(StrictSchema):
     timeout_seconds: float = 120.0
     max_tokens: int = 1024
 
-    subscribed_cameras: list[InstanceOf[Camera]] = Field(min_length=1)
-
+    subscribed_camera: Camera
     # optional
     description: str = ""
+    model_type: str = "vision_language_model"
+    model_operations: list[Literal["object_detection"], Literal["scene_analysis"]] = [
+        "object_detection",
+        "scene_analysis",
+    ]
     interval_seconds: float = Field(default=5.0, gt=0)
-    output_field: str = "scene"
-
-    def model_output_keys(self) -> dict[str, dict[str, str]]:
-        return {
-            "object_detection": {
-                camera.camera_id: (
-                    f"{camera.name}.{self.name}.{self.model_type}.scene_objects"
-                )
-                for camera in self.subscribed_cameras
-            },
-            "analysis": {
-                camera.camera_id: (
-                    f"{camera.name}.{self.name}.{self.model_type}.scene_analysis"
-                )
-                for camera in self.subscribed_cameras
-            },
-        }
 
     def create_inference(
         self,
@@ -116,12 +103,11 @@ class VisionLanguageModel(StrictSchema):
             name=self.name,
             description=self.description,
             user_prompt=self.user_prompt,
-            subscribed_cameras=self.subscribed_cameras,
+            subscribed_camera=self.camera,
             model_output_keys=self.model_output_keys(),
             interval_seconds=self.interval_seconds,
             model_id=self.model_id,
             model_type=self.model_type,
-            output_field=self.output_field,
         )
 
 
@@ -148,25 +134,6 @@ class VisionLanguageModelInference:
     subscribed_cameras: list[Camera] = field(default_factory=list)
     model_output_keys: dict[str, dict[str, str]] = field(default_factory=dict)
     interval_seconds: float = 5.0
-    _lock: threading.Lock = field(
-        default_factory=threading.Lock,
-        init=False,
-        repr=False,
-    )
-    _prediction_lock: threading.Lock = field(
-        default_factory=threading.Lock,
-        init=False,
-        repr=False,
-    )
-
-    @property
-    def is_running(self) -> bool:
-        with self._lock:
-            thread = self.model_session._thread
-            stop_event = self.model_session._stop_event
-            if (thread is None) != (stop_event is None):
-                raise RuntimeError("Vision language model thread state is invalid")
-            return thread is not None
 
     @property
     def system_prompt(self) -> str:
@@ -213,9 +180,7 @@ class VisionLanguageModelInference:
             stop_event = self.model_session._stop_event
             thread = self.model_session._thread
             if stop_event is None or thread is None:
-                raise RuntimeError(
-                    f"Vision language model is not running: {self.name}"
-                )
+                raise RuntimeError(f"Vision language model is not running: {self.name}")
 
             stop_event.set()
             thread.join(timeout=5.0)
@@ -278,9 +243,7 @@ class VisionLanguageModelInference:
                 model_input=valid_frame_input,
                 system_prompt=self.system_prompt,
                 user_prompt=prompt,
-                output_schema=(
-                    VisionLanguageModelFrameEnvironment.model_json_schema()
-                ),
+                output_schema=(VisionLanguageModelFrameEnvironment.model_json_schema()),
             )
             return VisionLanguageModelFrameEnvironment.model_validate(output)
 
@@ -294,9 +257,7 @@ class VisionLanguageModelInference:
 
         with self._prediction_lock:
             valid_frame_input = [
-                self.model_session.scene_analysis_model.convert_to_valid_input(
-                    frame
-                )
+                self.model_session.scene_analysis_model.convert_to_valid_input(frame)
                 for frame in base64_frames
             ]
 

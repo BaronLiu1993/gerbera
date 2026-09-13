@@ -7,15 +7,9 @@ from gerbera_sdk.inference import (
     PerceptionStateModel,
     VisionLanguageModelFrameEnvironment,
 )
-from gerbera_sdk.inference.inference_strategy import (
-    InferenceType,
-    InferenceStrategyResult,
-    MODEL_STREAM_STRATEGIES,
-    ModelStreamAction,
-    ModelStreamStrategy,
-    SINGLE_INFERENCE_STRATEGIES,
-)
+
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.utils import build_hashable_key
 
 ModelOutput: TypeAlias = Union[
     PerceptionStateModel,
@@ -28,90 +22,64 @@ ModelOutput: TypeAlias = Union[
 class EnvironmentRuntime:
     hardware_system: HardwareSystem
     model_outputs: dict[str, ModelOutput | None] = field(default_factory=dict)
+    # this holds the model object that will be registered and the
     model_inferences: dict[str, Inference] = field(default_factory=dict)
-    harness_url: str = ""
-    _lock: threading.Lock = field(
+    # harness_url: str = "" later for sending up data to the harness as a websocket connection
+    lock: threading.Lock = field(
         default_factory=threading.Lock,
         init=False,
         repr=False,
     )
 
-    def register_model_inferences(self) -> None:
-        model_outputs: dict[str, ModelOutput | None] = {}
-        model_inferences: dict[str, Inference] = {}
-
+    # each model has their own keys that they can perform and that will differentiate them e.g. scene_analysis, object detection
+    def register_models(self) -> None:
         for model in self.hardware_system.models:
-            for model_output_keys in model.model_output_keys().values():
-                for key in model_output_keys.values():
-                    model_outputs.setdefault(key, None)
-            model_inferences[model.model_id] = model.create_inference(self)
-
-        with self._lock:
-            self.model_outputs = model_outputs
-            self.model_inferences = model_inferences
-
-    def require_registered_model_output(self, key: str) -> None:
-        if key not in self.model_outputs:
-            raise KeyError(f"Model output is not registered: {key}")
+            for operation in model.model_operations:
+                key = build_hashable_key(
+                    model.model_name,
+                    model.model_type,
+                    model.subscribed_camera.camera_id,
+                    operation,
+                )
+                self.model_outputs[key] = None
+            self.model_inferences[model.model_id] = model.create_inference(self)
 
     # read, write methods
     def write_model_output(
         self,
-        key: str,
+        model_name: str,
+        model_type: str,
+        camera_id: str,
+        operation: str,
         model_output: ModelOutput,
     ) -> None:
-        with self._lock:
-            self.require_registered_model_output(key)
-            self.model_outputs[key] = model_output
-
-    def read_model_output_by_key(
-        self,
-        key: str,
-    ) -> ModelOutput | None:
-        with self._lock:
-            self.require_registered_model_output(key)
-            model_output = self.model_outputs[key]
-            return model_output
+        key = build_hashable_key(
+            model_name,
+            model_type,
+            camera_id,
+            operation,
+        )
+        with self.lock:
+            if key in self.model_outputs:
+                self.model_outputs[key] = model_output
 
     def read_model_output(
         self,
-        model_id: str,
+        model_name: str,
+        model_type: str,
         camera_id: str,
-        inference_type: InferenceType = "object_detection",
-    ) -> ModelOutput:
-        model = next(
-            (
-                model
-                for model in self.hardware_system.models
-                if model.model_id == model_id
-            ),
-            None,
+        operation: str,
+    ) -> ModelOutput | None:
+        key = build_hashable_key(
+            model_name,
+            model_type,
+            camera_id,
+            operation,
         )
-        if model is None:
-            raise RuntimeError(f"Model output is not registered: {model_id}")
-
-        camera = next(
-            (
-                camera
-                for camera in model.subscribed_cameras
-                if camera.camera_id == camera_id
-            ),
-            None,
-        )
-        if camera is None:
-            raise RuntimeError(
-                f"Camera is not subscribed to model: {model_id}.{camera_id}"
-            )
-
-        model_output = self.read_model_output_by_key(
-            model.model_output_keys()[inference_type][camera.camera_id]
-        )
-        if model_output is None:
-            raise RuntimeError(
-                "Model output has not been produced yet: "
-                f"{model_id}.{camera_id}"
-            )
-        return model_output
+        with self.lock:
+            if key in self.model_outputs:
+                model_output = self.model_outputs[key]
+                return model_output
 
     # Get the entire state
     # Handle literal frames, None, or if it is just a string right now
@@ -119,41 +87,22 @@ class EnvironmentRuntime:
         self,
         model_output: ModelOutput | None,
     ) -> Any:
-        if model_output is None:
+        if isinstance(model_output, None):
             return None
         if isinstance(model_output, str):
             return model_output
+
         return model_output.model_dump(
             mode="json",
             exclude={"frame"},
         )
 
     def get_environment_state(self) -> dict[str, Any]:
-        with self._lock:
+        with self.lock:
             return {
                 key: self.serialize_model_output(model_output)
                 for key, model_output in self.model_outputs.items()
             }
-
-    def write_model_output_for_subscribed_cameras(
-        self,
-        model_id: str,
-        inference_type: InferenceType,
-        model_output: object,
-    ) -> None:
-        for model in self.hardware_system.models:
-            if model.model_id != model_id:
-                continue
-
-            model_output_keys = model.model_output_keys()[inference_type]
-            for camera in model.subscribed_cameras:
-                self.write_model_output(
-                    key=model_output_keys[camera.camera_id],
-                    model_output=model_output,
-                )
-            return
-
-        raise RuntimeError(f"Model output is not registered: {model_id}")
 
     def single_inference(
         self,
@@ -196,17 +145,7 @@ class EnvironmentRuntime:
                 return strategy
         raise TypeError(f"Unsupported inference type: {type(inference).__name__}")
 
-    def turn_on_model_stream(
-        self,
-        model_id: str,
-        prompt: str | None = None,
-    ) -> None:
-        self._model_stream(model_id=model_id, action="on", prompt=prompt)
-
-    def turn_off_model_stream(self, model_id: str) -> None:
-        self._model_stream(model_id=model_id, action="off")
-
-    def _model_stream(
+    def model_stream(
         self,
         model_id: str,
         action: ModelStreamAction,
@@ -219,33 +158,3 @@ class EnvironmentRuntime:
             action=action,
             prompt=prompt,
         )
-
-    def turn_on_all_model_streams(self) -> None:
-        self._apply_model_streams(action="on")
-
-    def turn_off_all_model_streams(self) -> None:
-        self._apply_model_streams(action="off")
-
-    def _apply_model_streams(self, action: ModelStreamAction) -> None:
-        with self._lock:
-            inferences = list(self.model_inferences.values())
-
-        started: list[Inference] = []
-        try:
-            for inference in inferences:
-                strategy = self.require_model_stream_strategy(inference)
-                if action == "on" and strategy.requires_prompt_to_turn_on:
-                    continue
-
-                was_running = inference.is_running
-                strategy.run(
-                    inference=inference,
-                    action=action,
-                    prompt=None,
-                )
-                if action == "on" and not was_running and inference.is_running:
-                    started.append(inference)
-        except Exception:
-            for inference in reversed(started):
-                inference.turn_off_prediction_loop()
-            raise

@@ -1,0 +1,89 @@
+component_type: dcmotor
+
+capabilities:
+  streaming: false
+
+libraries: []
+
+pins:
+  in1: OUTPUT
+  in2: OUTPUT
+  enable: OUTPUT
+
+state:
+  units:
+    motor_state: null
+
+commands:
+  - method: WRITE
+    description: Set brushed DC motor direction and speed. Use direction 1 for forward, -1 for reverse, and 0 for stop.
+    params:
+      direction:
+        required: true
+        min: -1
+        max: 1
+        description: 1 drives forward; -1 drives reverse; 0 stops.
+      speed:
+        required: false
+        min: 0
+        max: 255
+        description: PWM speed from 0 to 255.
+    annotations:
+      title: Set {connection.name} motor motion
+      readOnlyHint: false
+      openWorldHint: false
+
+firmware:
+  handlers:
+    default: |
+      void handle_{connection.name}(const String& input) {
+        String directionValue = parameterValue(input, "direction");
+        String speedValue = parameterValue(input, "speed");
+        int speed = 255;
+
+        if (directionValue.length() == 0) {
+          Serial.println("MCP,{connection.event_name},error:invalid_arg");
+          return;
+        }
+
+        float direction = directionValue.toFloat();
+
+        if (speedValue.length() > 0) {
+          speed = speedValue.toInt();
+          if (speed < 0) {
+            speed = 0;
+          }
+          if (speed > 255) {
+            speed = 255;
+          }
+        }
+
+        if (direction == 1) {
+          digitalWrite({pins.in1}, HIGH);
+          digitalWrite({pins.in2}, LOW);
+          analogWrite({pins.enable}, speed);
+          Serial.println("MCP,{connection.event_name},motor_state:1");
+          return;
+        }
+
+        if (direction == -1) {
+          digitalWrite({pins.in1}, LOW);
+          digitalWrite({pins.in2}, HIGH);
+          analogWrite({pins.enable}, speed);
+          Serial.println("MCP,{connection.event_name},motor_state:-1");
+          return;
+        }
+
+        if (direction == 0) {
+          digitalWrite({pins.in1}, LOW);
+          digitalWrite({pins.in2}, LOW);
+          analogWrite({pins.enable}, 0);
+          Serial.println("MCP,{connection.event_name},motor_state:0");
+          return;
+        }
+
+        Serial.println("MCP,{connection.event_name},error:invalid_direction");
+      }
+
+stream:
+  schema: {}

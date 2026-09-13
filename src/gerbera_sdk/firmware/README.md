@@ -8,7 +8,7 @@ The firmware folder owns Arduino sketch generation, parsing code, command routin
 configurations.py       Registry for supported devices and microcontroller packages.
 firmware_generator.py   Assembles complete Arduino sketches.
 flash.py                Compiles/uploads generated sketches.
-devices/                Per-component firmware builders.
+devices/                Config-driven firmware device library and YAML configs.
 ```
 
 Each microcontroller gets one firmware root in the project-local Gerbera
@@ -26,7 +26,7 @@ workspace:
 
 This folder owns:
 
-- mapping `component_type` to a firmware builder
+- mapping `component_type` to a firmware config-backed builder
 - generated Arduino includes
 - generated global definitions
 - generated handlers
@@ -51,6 +51,10 @@ flowchart TD
     B --> F[build device handlers]
     B --> G[build setup]
     B --> H[build loop]
+    E --> J[load device YAML configs]
+    F --> J
+    G --> J
+    H --> J
     C --> I[Arduino sketch]
     D --> I
     E --> I
@@ -58,6 +62,18 @@ flowchart TD
     G --> I
     H --> I
 ```
+
+## Device Configs
+
+Each supported component has one complete YAML config under:
+
+```text
+devices/configs/<component_type>.yaml
+```
+
+Configs are intentionally self-contained. They do not inherit from, include, or
+reference other component configs. The generic device library loads each config
+and renders its firmware templates for a concrete connection.
 
 ## Wire Protocol
 

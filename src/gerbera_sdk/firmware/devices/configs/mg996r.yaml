@@ -1,0 +1,52 @@
+component_type: mg996r
+
+capabilities:
+  streaming: false
+
+libraries:
+  - include: Servo.h
+    install: Servo
+
+pins: {}
+
+state:
+  units:
+    angle: radians
+
+commands:
+  - method: WRITE
+    description: Set servo angle.
+    params:
+      angle:
+        required: true
+        min: 0
+        max: 3.141592653589793
+        description: Servo angle in radians.
+    annotations:
+      title: Set {connection.name} MG996R servo angle
+      readOnlyHint: false
+      openWorldHint: false
+
+firmware:
+  definitions: |
+    Servo {connection.name}_servo;
+  setup:
+    - "{connection.name}_servo.attach({pins.signal});"
+  handlers:
+    default: |
+      void handle_{connection.name}(const String& input) {
+        String angleValue = parameterValue(input, "angle");
+
+        if (angleValue.length() == 0) {
+          Serial.println("MCP,{connection.event_name},error:invalid_arg");
+          return;
+        }
+
+        int angle = angleValue.toInt();
+        {connection.name}_servo.write(angle);
+        Serial.print("MCP,{connection.event_name},angle:");
+        Serial.println(angle);
+      }
+
+stream:
+  schema: {}

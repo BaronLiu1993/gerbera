@@ -7,12 +7,13 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from gerbera_sdk.events.buffer import Buffer
 from gerbera_sdk.firmware.firmware_schema import (
     CommandSpec,
     ParameterSpec,
 )
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.events.event_bus import EventBus, EventCatalog, EventMetadata
+from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.inference.model_types import (
@@ -34,6 +35,7 @@ from gerbera_sdk.models.runtime.hardware_runtime import (
 )
 from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.utils import build_hashable_key, parse_event_key
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
@@ -81,6 +83,11 @@ class ServerRuntime:
         microcontroller: Microcontroller,
         connection: Connection,
     ) -> None:
+        event_key = build_hashable_key(
+            "MCP",
+            microcontroller.id,
+            connection.event_name,
+        )
         event = Event(
             event_type="MCP",
             microcontroller_id=microcontroller.id,
@@ -89,7 +96,11 @@ class ServerRuntime:
             component_type=connection.component_type,
             streamable=False,
             table_name=connection.event_name,
-            event_worker=self.event_worker,
+            buffer=Buffer(
+                table_name=connection.event_name,
+                event_worker=self.event_worker,
+            ),
+            event_key=event_key,
             latest_val=None,
         )
         self.event_bus.write_event(
@@ -107,6 +118,11 @@ class ServerRuntime:
         if not connection.stream_enabled:
             return
 
+        event_key = build_hashable_key(
+            "STREAM",
+            microcontroller.id,
+            connection.event_name,
+        )
         event = Event(
             event_type="STREAM",
             microcontroller_id=microcontroller.id,
@@ -115,7 +131,11 @@ class ServerRuntime:
             component_type=connection.component_type,
             streamable=True,
             table_name=connection.event_name,
-            event_worker=self.event_worker,
+            buffer=Buffer(
+                table_name=connection.event_name,
+                event_worker=self.event_worker,
+            ),
+            event_key=event_key,
             latest_val=None,
         )
         self.event_bus.write_event(
@@ -131,18 +151,20 @@ class ServerRuntime:
                 self.register_mcp_event(microcontroller, connection)
                 self.register_stream_event(microcontroller, connection)
 
-    def get_event_catalog(self) -> EventCatalog:
+    def get_event_catalog(
+        self,
+    ) -> dict[str, dict[str, dict[str, dict[str, object]]]]:
         connections: dict[tuple[str, str], Connection] = {}
         for microcontroller in self.hardware_system.microcontrollers:
             for connection in microcontroller.connections:
                 key = (microcontroller.id, connection.event_name)
                 connections[key] = connection
-        catalog: EventCatalog = {}
+        catalog: dict[str, dict[str, dict[str, dict[str, object]]]] = {}
 
         for event_key, event in self.event_bus.events.items():
-            event_type, microcontroller_id, event_name = event_key
+            event_type, microcontroller_id, event_name = parse_event_key(event_key)
             connection = connections[(microcontroller_id, event_name)]
-            metadata: EventMetadata = {
+            metadata: dict[str, object] = {
                 "event_type": event_type,
                 "microcontroller_id": microcontroller_id,
                 "event_name": event_name,
@@ -162,10 +184,10 @@ class ServerRuntime:
 
     def send_read_command(
         self,
-        event_key: tuple[str, str, str],
+        event_key: str,
     ) -> dict[str, object]:
         try:
-            event = self.event_bus.get_event(*event_key)
+            event = self.event_bus.get_event(*parse_event_key(event_key))
             latest_value = event.read_latest()
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -224,7 +246,7 @@ class ServerRuntime:
 
             def read_tool_function() -> dict[str, object]:
                 return self.send_read_command(
-                    (
+                    build_hashable_key(
                         "MCP",
                         connection.microcontroller_id,
                         connection.event_name,
@@ -990,7 +1012,9 @@ class ServerRuntime:
         )
 
     def register_reaction_catalog_tool(self) -> None:
-        def list_reaction_events() -> EventCatalog:
+        def list_reaction_events() -> (
+            dict[str, dict[str, dict[str, dict[str, object]]]]
+        ):
             return self.get_event_catalog()
 
         self.register_tool(
