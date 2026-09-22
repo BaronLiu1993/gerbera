@@ -27,7 +27,7 @@ class BaseJoint:
     # Where the joint is, roll is rotation around X axis,
     # pitch is the rotation around Y axis and the yaw is the
     # rotation around Z axis.
-    description: str = ""
+    description: str = field(default="", kw_only=True)
     joint_type: JointType = field(init=False)
 
 
