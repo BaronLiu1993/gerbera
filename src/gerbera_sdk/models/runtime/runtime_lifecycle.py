@@ -53,6 +53,8 @@ class RuntimeLifecycle:
 
             self.camera_runtime.start()
             cleanup.callback(self.camera_runtime.close)
+            cleanup.callback(self.model_runtime.turn_off_all_model_streams)
+            self.model_runtime.turn_on_all_model_streams()
 
             self.event_worker.start()
             cleanup.callback(self.event_worker.stop)
