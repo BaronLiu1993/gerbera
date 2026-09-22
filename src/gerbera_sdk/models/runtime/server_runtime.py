@@ -17,7 +17,6 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.inference.model_types import (
-    MODEL_CATALOG_TYPE_REGISTRY,
     ModelCatalogEntry,
     ModelCatalogType,
     SubscribedCameraCatalogEntry,
@@ -70,10 +69,10 @@ class ServerRuntime:
 
     @staticmethod
     def model_catalog_type(model: Inference) -> ModelCatalogType:
-        for model_class, model_type in MODEL_CATALOG_TYPE_REGISTRY.items():
-            if isinstance(model, model_class):
-                return model_type
-
+        if isinstance(model, ObjectDetectionModelInference):
+            return "object_detection"
+        if isinstance(model, VisionLanguageModelInference):
+            return "vision_language_model"
         raise ValueError(f"Unsupported inference model type: {type(model).__name__}")
 
     # Event registration and catalog helpers.
@@ -618,7 +617,7 @@ class ServerRuntime:
             )
 
     def register_inference_tools(self) -> None:
-        self.model_runtime.register_model_inferences()
+        self.model_runtime.register_models()
         registered_models: dict[str, tuple[str, Inference]] = {}
         for model_id, inference in self.model_runtime.model_inferences.items():
             if inference.name in registered_models:
@@ -845,14 +844,14 @@ class ServerRuntime:
             return self.model_runtime.read_model_output(
                 model_id,
                 camera_id,
-                inference_type="object_detection",
+                inference_type="locate_object",
             )
 
         def read_scene_analysis(camera_id: str) -> str:
             result = self.model_runtime.read_model_output(
                 model_id,
                 camera_id,
-                inference_type="analysis",
+                inference_type="scene_analysis",
             )
             if not isinstance(result, str):
                 raise TypeError("Scene analysis output must be text")
@@ -864,7 +863,7 @@ class ServerRuntime:
         ) -> VisionLanguageModelFrameEnvironment:
             return self.model_runtime.single_inference(
                 model_id=model_id,
-                inference_type="object_detection",
+                inference_type="locate_object",
                 inference_input=frames,
                 prompt=prompt,
             )
@@ -875,7 +874,7 @@ class ServerRuntime:
         ) -> str:
             result = self.model_runtime.single_inference(
                 model_id=model_id,
-                inference_type="analysis",
+                inference_type="scene_analysis",
                 inference_input=frames,
                 prompt=prompt,
             )
@@ -959,7 +958,7 @@ class ServerRuntime:
                         description=model.description,
                         model_type=self.model_catalog_type(model),
                         subscribed_cameras=cameras,
-                        is_running=model.is_running,
+                        is_running=self.model_runtime.is_model_running(model_id),
                         turn_on_tool=f"turn_on_{model.name}",
                         turn_off_tool=f"turn_off_{model.name}",
                         read_tool=(

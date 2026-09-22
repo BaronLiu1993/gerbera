@@ -1,10 +1,13 @@
-from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from __future__ import annotations
 
-from pydantic import Field, InstanceOf
+from dataclasses import dataclass, field
 import threading
+from typing import Any, Literal
 import uuid
 
+from pydantic import Field
+
+from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionModelAdapters,
@@ -12,19 +15,14 @@ from gerbera_sdk.inference.models.neural_network.object_detection.object_detecti
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
     PerceptionStateModel,
 )
-from gerbera_sdk.inference.model_types import (
-    ObjectDetectionModelProviderEnum,
-)
+from gerbera_sdk.inference.model_types import ObjectDetectionModelProviderEnum
 from gerbera_sdk.models.hardware.camera import Camera
+from gerbera_sdk.utils import StrictSchema, build_hashable_key
 
 
-@dataclass
-class ObjectDetectionModel:
+class ObjectDetectionModel(StrictSchema):
     model_name: ObjectDetectionModelProviderEnum
-    model_id: str = field(
-            default_factory=lambda: str(uuid.uuid4()),
-            init=False,
-        )
+    model_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = Field(min_length=1)
     model_source: str = Field(min_length=1)
     subscribed_camera: Camera
@@ -32,57 +30,62 @@ class ObjectDetectionModel:
     iou_threshold: float = 0.45
     max_detections: int = 300
     description: str = ""
-    model_type: str = "object_detection_neural_network"
-    model_operations: list[Literal["object_detection"]] = ["object_detection"]
+    model_type: Literal["object_detection"] = "object_detection"
+    model_operations: tuple[Literal["object_detection"], ...] = (
+        "object_detection",
+    )
+    interval_seconds: float = Field(default=0.2, gt=0)
+
+    def model_output_keys(self) -> dict[str, dict[str, str]]:
+        camera_id = self.subscribed_camera.camera_id
+        return {
+            "object_detection": {
+                camera_id: build_hashable_key(
+                    self.model_id,
+                    camera_id,
+                    "object_detection",
+                )
+            }
+        }
 
     def create_inference(
         self,
+        model_output_writer: Any,
+        camera_runtime: Any,
     ) -> "ObjectDetectionModelInference":
         adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
-        object_detection_model = adapter_class(
+        adapter = adapter_class(
             model_source=self.model_source,
             confidence_threshold=self.confidence_threshold,
             iou_threshold=self.iou_threshold,
             max_detections=self.max_detections,
         )
-
         return ObjectDetectionModelInference(
-            model_session=ObjectDetectionSession(
-                model=object_detection_model,
-            ),
+            model=adapter,
+            model_output_writer=model_output_writer,
+            camera_runtime=camera_runtime,
             name=self.name,
             description=self.description,
-            subscribed_cameras=self.subscribed_cameras,
+            subscribed_camera=self.subscribed_camera,
             model_output_keys=self.model_output_keys(),
+            interval_seconds=self.interval_seconds,
             model_id=self.model_id,
             model_type=self.model_type,
-            output_field=self.output_field,
         )
 
 
 @dataclass
-class ObjectDetectionSession:
-    model: ObjectDetectionModelAdapters
-    _thread: threading.Thread | None = None
-    _stop_event: threading.Event | None = None
-
-
-@dataclass
 class ObjectDetectionModelInference:
-    model_session: ObjectDetectionSession
+    model: ObjectDetectionModelAdapters
+    model_output_writer: Any
+    camera_runtime: Any
     name: str
     description: str
+    subscribed_camera: Camera
     model_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     model_type: str = "object_detection"
-    output_field: str = "detected_objects"
-    subscribed_cameras: list[Camera] = field(default_factory=list)
     model_output_keys: dict[str, dict[str, str]] = field(default_factory=dict)
     interval_seconds: float = 0.2
-    _lock: threading.Lock = field(
-        default_factory=threading.Lock,
-        init=False,
-        repr=False,
-    )
     _prediction_lock: threading.Lock = field(
         default_factory=threading.Lock,
         init=False,
@@ -90,114 +93,42 @@ class ObjectDetectionModelInference:
     )
 
     @property
-    def is_running(self) -> bool:
-        with self._lock:
-            thread = self.model_session._thread
-            stop_event = self.model_session._stop_event
-            if (thread is None) != (stop_event is None):
-                raise RuntimeError("Object detection thread state is invalid")
-            return thread is not None
+    def subscribed_cameras(self) -> list[Camera]:
+        return [self.subscribed_camera]
 
-    def turn_on_prediction_loop(self) -> None:
-        with self._lock:
-            if (
-                self.model_session._thread is not None
-                or self.model_session._stop_event is not None
-            ):
-                raise RuntimeError(
-                    f"Object detection is already running: {self.name}"
-                )
-
-            stop_event = threading.Event()
-            thread = threading.Thread(
-                target=self.prediction_loop,
-                name=f"object-detection-{self.name}",
-                daemon=False,
-            )
-            self.model_session._stop_event = stop_event
-            self.model_session._thread = thread
-
-            try:
-                thread.start()
-            except RuntimeError as exc:
-                self.model_session._stop_event = None
-                self.model_session._thread = None
-                raise RuntimeError(
-                    f"Could Not Start Object Detection Thread {self.name}"
-                ) from exc
-
-    def turn_off_prediction_loop(self) -> None:
-        with self._lock:
-            stop_event = self.model_session._stop_event
-            thread = self.model_session._thread
-            if stop_event is None or thread is None:
-                raise RuntimeError(
-                    f"Object detection is not running: {self.name}"
-                )
-
-            stop_event.set()
-            thread.join(timeout=5.0)
-            if thread.is_alive():
-                raise RuntimeError(
-                    f"Object detection thread did not stop: {self.name}"
-                )
-
-            self.model_session._stop_event = None
-            self.model_session._thread = None
-
-    def get_subscribed_camera(self, camera_id: str) -> Camera:
-        for subscribed_camera in self.subscribed_cameras:
-            if subscribed_camera.camera_id == camera_id:
-                return subscribed_camera
-
-        raise RuntimeError(f"Camera is not subscribed: {camera_id}")
-
-    def predict_for_camera(self, camera: Camera) -> PerceptionStateModel:
-        frame = camera.latest_frame
-        if frame is None:
-            raise RuntimeError(f"Camera has no frame: {camera.camera_id}")
-
-        perception_objects = self.model_session.model.detect(frame)
+    def predict_for_frame(
+        self,
+        camera: Camera,
+        frame: Frame,
+    ) -> PerceptionStateModel:
         return PerceptionStateModel(
             camera_id=camera.camera_id,
             frame=frame,
             model_name=self.name,
-            perception_objects=perception_objects,
+            perception_objects=self.model.detect(frame),
         )
 
     def predict(self, camera_id: str) -> PerceptionStateModel:
-        camera = self.get_subscribed_camera(camera_id)
+        if camera_id != self.subscribed_camera.camera_id:
+            raise RuntimeError(f"Camera is not subscribed: {camera_id}")
+        frame = self.camera_runtime.get_latest_frame(camera_id)
         with self._prediction_lock:
-            return self.predict_for_camera(camera)
+            return self.predict_for_frame(self.subscribed_camera, frame)
 
-    def predict_many(
-        self,
-        camera_ids: list[str],
-    ) -> list[PerceptionStateModel]:
+    def predict_many(self, camera_ids: list[str]) -> list[PerceptionStateModel]:
         if not camera_ids:
             raise ValueError("At least one camera ID is required for inference")
+        return [self.predict(camera_id) for camera_id in camera_ids]
 
-        cameras = [
-            self.get_subscribed_camera(camera_id)
-            for camera_id in camera_ids
-        ]
+    def predict_latest_frame(self) -> None:
+        camera_id = self.subscribed_camera.camera_id
+        with self.camera_runtime.lock:
+            frame = self.camera_runtime.latest_frames.get(camera_id)
+        if frame is None:
+            return
         with self._prediction_lock:
-            return [self.predict_for_camera(camera) for camera in cameras]
-
-    def prediction_loop(self) -> None:
-        stop_event = self.model_session._stop_event
-        if stop_event is None:
-            raise RuntimeError("Object detection prediction loop has no stop event")
-
-        while not stop_event.is_set():
-            for camera in self.subscribed_cameras:
-                if camera.latest_frame is not None:
-                    perception_state = self.predict(camera.camera_id)
-                    self.model_session.model_output_writer.write_model_output(
-                        key=self.model_output_keys["object_detection"][
-                            camera.camera_id
-                        ],
-                        model_output=perception_state,
-                    )
-
-            stop_event.wait(self.interval_seconds)
+            result = self.predict_for_frame(self.subscribed_camera, frame)
+        self.model_output_writer.write_model_output(
+            key=self.model_output_keys["object_detection"][camera_id],
+            model_output=result,
+        )

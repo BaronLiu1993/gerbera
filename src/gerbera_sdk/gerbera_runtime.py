@@ -57,7 +57,10 @@ class GerberaRuntime:
         board_runtime = BoardRuntime(hardware_system)
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker(database=database)
-        model_runtime = ModelRuntime(hardware_system)
+        model_runtime = ModelRuntime(
+            hardware_system=hardware_system,
+            camera_runtime=camera_runtime,
+        )
         hardware_runtime = HardwareRuntime()
         movement_runtime = None
         if hardware_system.movement_systems:

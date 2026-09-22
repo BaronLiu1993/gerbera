@@ -1,4 +1,6 @@
-from typing import TypeAlias
+from __future__ import annotations
+
+from typing_extensions import TypeAlias
 
 from gerbera_sdk.inference.frame import (
     BoundingBox,
