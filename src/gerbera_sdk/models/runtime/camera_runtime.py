@@ -20,11 +20,14 @@ class CameraSession:
     camera: Camera
     stop_event: threading.Event | None = None
     thread: threading.Thread | None = None
+    first_frame_ready: threading.Event = field(default_factory=threading.Event)
+    startup_error: Exception | None = None
 
 
 @dataclass
 class CameraRuntime:
     hardware_system: HardwareSystem
+    startup_timeout_seconds: float = 5.0
     camera_registry: dict[str, CameraSession] = field(default_factory=dict)
     latest_frames: dict[str, Frame | None] = field(default_factory=dict)
     lock: threading.RLock = field(
@@ -71,13 +74,34 @@ class CameraRuntime:
             for camera_key in camera_keys:
                 self.turn_on_camera_stream(camera_key)
                 started_camera_keys.append(camera_key)
-        except Exception as exc:
+            for camera_key in started_camera_keys:
+                self.wait_for_first_frame(camera_key)
+        except Exception:
             for camera_key in started_camera_keys:
                 self.turn_off_camera_stream(camera_key)
-            raise ValueError(f"Failed to Start Cameras {exc}")
+            raise
 
-    def start_cameras(self) -> None:
-        self.start()
+    def wait_for_first_frame(self, camera_key: str) -> None:
+        camera_session = self.get_camera_session(camera_key)
+        if not camera_session.first_frame_ready.wait(
+            timeout=self.startup_timeout_seconds
+        ):
+            raise TimeoutError(
+                f"Camera did not capture a frame within "
+                f"{self.startup_timeout_seconds} seconds: {camera_key}"
+            )
+
+        with self.lock:
+            startup_error = camera_session.startup_error
+            latest_frame = self.latest_frames[camera_key]
+        if startup_error is not None:
+            raise RuntimeError(
+                f"Camera failed before capturing its first frame: {camera_key}"
+            ) from startup_error
+        if latest_frame is None:
+            raise RuntimeError(
+                f"Camera reported readiness without a frame: {camera_key}"
+            )
 
     def get_camera_session(self, camera_key: str) -> CameraSession:
         with self.lock:
@@ -125,8 +149,9 @@ class CameraRuntime:
             raise RuntimeError(f"Camera is not running: {camera_key}")
 
         camera_address = self.get_camera_address(camera.source)
-        capture = cv2.VideoCapture(camera_address)
+        capture = None
         try:
+            capture = cv2.VideoCapture(camera_address)
             if not capture.isOpened():
                 raise RuntimeError(f"Could not open camera: {camera_key}")
 
@@ -134,38 +159,29 @@ class CameraRuntime:
                 latest_frame = self.capture_frame(capture, camera_key)
                 with self.lock:
                     self.latest_frames[camera.camera_id] = latest_frame
+                    camera_session.first_frame_ready.set()
+        except Exception as exc:
+            with self.lock:
+                captured_frame = (
+                    self.latest_frames[camera.camera_id] is not None
+                )
+                camera_session.startup_error = exc
+                camera_session.first_frame_ready.set()
+            if captured_frame:
+                raise
         finally:
-            capture.release()
+            if capture is not None:
+                capture.release()
 
     def get_latest_frame(self, camera_key: str) -> Frame:
         self.get_camera_session(camera_key)
         with self.lock:
-            latest_frame = self.latest_frames.get(camera_key)
-
+            latest_frame = self.latest_frames[camera_key]
         if latest_frame is None:
-            raise RuntimeError(f"Camera has not captured a frame yet: {camera_key}")
-
+            raise RuntimeError(
+                f"Camera has not captured a frame yet: {camera_key}"
+            )
         return latest_frame
-
-    def get_latest_frames(
-        self,
-        camera_key: str,
-        count: int = 1,
-        interval_seconds: float = 0.0,
-    ) -> list[Frame]:
-        if count < 1:
-            raise ValueError("count must be at least 1")
-
-        if interval_seconds < 0:
-            raise ValueError("interval_seconds cannot be negative")
-
-        frames: list[Frame] = []
-        for frame_index in range(count):
-            frames.append(self.get_latest_frame(camera_key))
-            if interval_seconds > 0 and frame_index < count - 1:
-                time.sleep(interval_seconds)
-
-        return frames
 
     def turn_on_camera_stream(
         self,
@@ -183,6 +199,8 @@ class CameraRuntime:
         with self.lock:
             if camera_session.thread is not None:
                 raise RuntimeError(f"Camera is already running: {camera_key}")
+            camera_session.first_frame_ready.clear()
+            camera_session.startup_error = None
             camera_session.stop_event = stop_event
             camera_session.thread = thread
             try:
@@ -205,6 +223,8 @@ class CameraRuntime:
 
         stop_event.set()
         thread.join(timeout=5.0)
+        if thread.is_alive():
+            raise RuntimeError(f"Camera stream did not stop: {camera_key}")
 
         with self.lock:
             camera_session.stop_event = None
