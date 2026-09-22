@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Literal
 
-from gerbera_sdk.utils import StrictSchema
+from gerbera_sdk.utils import StrictSchema, build_hashable_key
 
 
 class VisionLanguageModelProviderEnum(Enum):
@@ -16,6 +16,19 @@ class ObjectDetectionModelProviderEnum(Enum):
 
 
 ModelCatalogType = Literal["object_detection", "vision_language_model"]
+
+
+def build_model_output_keys(
+    model_id: str,
+    camera_id: str,
+    operations: tuple[str, ...],
+) -> dict[str, dict[str, str]]:
+    return {
+        operation: {
+            camera_id: build_hashable_key(model_id, camera_id, operation),
+        }
+        for operation in operations
+    }
 
 
 class SubscribedCameraCatalogEntry(StrictSchema):
