@@ -8,10 +8,13 @@ from pydantic import TypeAdapter, ValidationError
 import pytest
 
 from gerbera_sdk.inference import (
+    AnthropicVisionLanguageModelAdapter,
     BoundingBox,
     Frame,
+    GoogleVisionLanguageModelAdapter,
     Model,
     ObjectDetectionModel,
+    ObjectDetectionModelInference,
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionModelProviderEnum,
     OpenAIVisionLanguageModelAdapter,
@@ -73,6 +76,15 @@ class RecordingVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         return "A workbench"
 
 
+class RecordingObjectDetectionAdapter:
+    def __init__(self) -> None:
+        self.frames: list[Frame] = []
+
+    def detect(self, frame: Frame) -> list:
+        self.frames.append(frame)
+        return []
+
+
 def test_yolov5_adapter_loads_weights_from_project_models(
     monkeypatch,
 ) -> None:
@@ -98,6 +110,27 @@ def test_object_detection_registry_contains_yolov5_adapter() -> None:
         ]
         is Yolov5ModelAdapter
     )
+
+
+def test_object_detection_inference_predicts_the_supplied_frame() -> None:
+    frame = Frame(
+        timestamp=datetime.now(),
+        image=np.zeros((2, 2, 3), dtype=np.uint8),
+    )
+    adapter = RecordingObjectDetectionAdapter()
+    inference = ObjectDetectionModelInference(
+        model=adapter,
+        name="detector",
+        description="Test detector",
+        subscribed_camera=TEST_CAMERA,
+    )
+
+    result = inference.predict(frame)
+
+    assert adapter.frames == [frame]
+    assert result.camera_id == TEST_CAMERA.camera_id
+    assert result.frame is frame
+    assert result.perception_objects == []
 
 
 @pytest.mark.parametrize(
@@ -211,6 +244,41 @@ def test_vision_language_model_requires_at_least_one_frame() -> None:
 
     with pytest.raises(ValueError, match="At least one frame"):
         inference.predict([], prompt="Describe the frames")
+
+
+def test_vision_language_model_runs_scene_analysis() -> None:
+    inference = VisionLanguageModelInference(
+        model=RecordingVisionLanguageModelAdapter(),
+        name="vision",
+        description="Test vision model",
+        user_prompt="Describe the frame",
+        subscribed_camera=TEST_CAMERA,
+    )
+
+    result = inference.predict(
+        ["encoded-frame"],
+        prompt="Describe the scene",
+        operation="scene_analysis",
+    )
+
+    assert result == "A workbench"
+
+
+def test_vision_language_model_rejects_an_unknown_operation() -> None:
+    inference = VisionLanguageModelInference(
+        model=RecordingVisionLanguageModelAdapter(),
+        name="vision",
+        description="Test vision model",
+        user_prompt="Describe the frame",
+        subscribed_camera=TEST_CAMERA,
+    )
+
+    with pytest.raises(RuntimeError, match="Unsupported vision language"):
+        inference.predict(
+            ["encoded-frame"],
+            prompt="Describe the scene",
+            operation="unsupported",
+        )
 
 
 def test_vision_language_model_converts_each_frame_to_base64() -> None:
@@ -401,3 +469,106 @@ def test_openai_adapter_expands_multiple_images_into_content(
         {"type": "input_text", "text": "What changed?"},
         *images,
     ]
+
+
+@pytest.mark.parametrize(
+    ("adapter", "expected_input"),
+    [
+        (
+            AnthropicVisionLanguageModelAdapter("key", "model"),
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": "AA==",
+                },
+            },
+        ),
+        (
+            GoogleVisionLanguageModelAdapter("key", "model"),
+            {
+                "inline_data": {
+                    "mime_type": "image/jpeg",
+                    "data": "AA==",
+                }
+            },
+        ),
+    ],
+)
+def test_provider_adapters_format_base64_input(
+    adapter: VisionLanguageModelAdapter,
+    expected_input: dict[str, object],
+) -> None:
+    assert adapter.convert_to_valid_input("AA==") == expected_input
+
+
+@pytest.mark.parametrize(
+    ("adapter", "response_json", "expected"),
+    [
+        (
+            AnthropicVisionLanguageModelAdapter("key", "model"),
+            {"content": [{"text": "Anthropic scene"}]},
+            "Anthropic scene",
+        ),
+        (
+            GoogleVisionLanguageModelAdapter("key", "model"),
+            {
+                "candidates": [
+                    {"content": {"parts": [{"text": "Google scene"}]}}
+                ]
+            },
+            "Google scene",
+        ),
+    ],
+)
+def test_provider_scene_analysis_returns_text(
+    monkeypatch,
+    adapter: VisionLanguageModelAdapter,
+    response_json: dict[str, object],
+    expected: str,
+) -> None:
+    response = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://provider.test"),
+        json=response_json,
+    )
+    monkeypatch.setattr(
+        "gerbera_sdk.inference.models.vision_language_model."
+        "vision_language_model_adapter.httpx.post",
+        lambda *args, **kwargs: response,
+    )
+
+    result = adapter.analyze_scene(
+        model_input=[],
+        system_prompt="system",
+        user_prompt="user",
+    )
+
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    [
+        AnthropicVisionLanguageModelAdapter("key", "model"),
+        GoogleVisionLanguageModelAdapter("key", "model"),
+    ],
+)
+def test_provider_scene_analysis_rejects_missing_text(
+    monkeypatch,
+    adapter: VisionLanguageModelAdapter,
+) -> None:
+    response = httpx.Response(
+        200,
+        request=httpx.Request("POST", "https://provider.test"),
+        json={},
+    )
+    monkeypatch.setattr(
+        "gerbera_sdk.inference.models.vision_language_model."
+        "vision_language_model_adapter.httpx.post",
+        lambda *args, **kwargs: response,
+    )
+
+    with pytest.raises(RuntimeError, match="did not contain"):
+        adapter.analyze_scene([], "system", "user")
