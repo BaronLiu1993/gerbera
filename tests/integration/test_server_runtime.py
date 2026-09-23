@@ -18,6 +18,7 @@ from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 
 
@@ -305,17 +306,26 @@ def test_scene_analysis_tool_hard_fails_on_non_text_output() -> None:
         app.tools["analyse_scene_observer"]("Describe", ["frame"])
 
 
-def test_environment_state_tool_exposes_model_memory() -> None:
-    model_runtime = SimpleNamespace(
-        model_inferences={},
-        get_model_state=lambda: {"model-key": None},
+def test_state_tools_register_runtime_bound_methods() -> None:
+    hardware_runtime = HardwareRuntime(
+        state_store={"hardware-key": None},
+    )
+    model_runtime = ModelRuntime(
+        hardware_system=SimpleNamespace(models=[]),
+        camera_runtime=SimpleNamespace(),
+        model_outputs={"model-key": None},
     )
     runtime, app = make_server(
+        hardware_runtime=hardware_runtime,
         model_runtime=model_runtime,
     )
 
+    runtime.register_hardware_state_tool()
     runtime.register_environment_state_tool()
 
+    assert app.tools["get_current_hardware_state"]() == {
+        "hardware-key": None
+    }
     assert app.tools["get_current_environment_state"]() == {
         "model-key": None
     }
