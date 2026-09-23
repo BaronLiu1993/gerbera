@@ -22,11 +22,9 @@ def build_model_output_keys(
     model_id: str,
     camera_id: str,
     operations: tuple[str, ...],
-) -> dict[str, dict[str, str]]:
+) -> dict[str, str]:
     return {
-        operation: {
-            camera_id: build_hashable_key(model_id, camera_id, operation),
-        }
+        operation: build_hashable_key(model_id, camera_id, operation)
         for operation in operations
     }
 
@@ -41,7 +39,7 @@ class ModelCatalogEntry(StrictSchema):
     name: str
     description: str
     model_type: ModelCatalogType
-    subscribed_cameras: list[SubscribedCameraCatalogEntry]
+    subscribed_camera: SubscribedCameraCatalogEntry
     is_running: bool
     turn_on_tool: str
     turn_off_tool: str

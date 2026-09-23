@@ -49,7 +49,7 @@ class VisionLanguageModel(StrictSchema):
     )
     interval_seconds: float = Field(default=5.0, gt=0)
 
-    def model_output_keys(self) -> dict[str, dict[str, str]]:
+    def model_output_keys(self) -> dict[str, str]:
         return build_model_output_keys(
             self.model_id,
             self.subscribed_camera.camera_id,
@@ -85,7 +85,7 @@ class VisionLanguageModelInference:
     subscribed_camera: Camera
     model_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     model_type: str = "vision_language_model"
-    model_output_keys: dict[str, dict[str, str]] = field(default_factory=dict)
+    model_output_keys: dict[str, str] = field(default_factory=dict)
     interval_seconds: float = 5.0
     _prediction_lock: threading.Lock = field(
         default_factory=threading.Lock,

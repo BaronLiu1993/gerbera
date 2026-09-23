@@ -13,6 +13,8 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_in
     VisionLanguageModelInference,
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 
 
@@ -45,7 +47,7 @@ class ModelConfig:
         self.model_id = inference.model_id
         self.inference = inference
 
-    def model_output_keys(self) -> dict[str, dict[str, str]]:
+    def model_output_keys(self) -> dict[str, str]:
         return self.inference.model_output_keys
 
     def create_inference(self):
@@ -75,9 +77,7 @@ def make_object_detection(camera: Camera) -> ObjectDetectionModelInference:
         description="Detect objects",
         subscribed_camera=camera,
         model_id="detector-id",
-        model_output_keys={
-            "object_detection": {camera.camera_id: "detection-key"}
-        },
+        model_output_keys={"object_detection": "detection-key"},
         interval_seconds=0.01,
     )
 
@@ -91,19 +91,28 @@ def make_vision(camera: Camera) -> VisionLanguageModelInference:
         subscribed_camera=camera,
         model_id="vision-id",
         model_output_keys={
-            "locate_object": {camera.camera_id: "objects-key"},
-            "scene_analysis": {camera.camera_id: "analysis-key"},
+            "locate_object": "objects-key",
+            "scene_analysis": "analysis-key",
         },
         interval_seconds=0.01,
     )
 
 
 def make_runtime(*inferences) -> ModelRuntime:
-    source = SimpleNamespace(
-        models=[ModelConfig(inference) for inference in inferences]
+    cameras = {
+        inference.subscribed_camera.camera_id: inference.subscribed_camera
+        for inference in inferences
+    }
+    hardware_system = HardwareSystem(
+        name="test",
+        cameras=list(cameras.values()),
+        models=[ModelConfig(inference) for inference in inferences],
     )
-    frames = SimpleNamespace(get_latest_frame=lambda camera_key: make_frame())
-    runtime = ModelRuntime(source, frames)
+    camera_runtime = CameraRuntime(hardware_system)
+    camera_runtime.build_camera_sessions()
+    for camera_id in cameras:
+        camera_runtime.latest_frames[camera_id] = make_frame()
+    runtime = ModelRuntime(hardware_system, camera_runtime)
     runtime.register_models()
     return runtime
 
@@ -126,8 +135,12 @@ def test_register_models_rejects_duplicate_model_ids() -> None:
     camera = make_camera()
     first = make_object_detection(camera)
     second = make_object_detection(camera)
-    source = SimpleNamespace(models=[ModelConfig(first), ModelConfig(second)])
-    runtime = ModelRuntime(source, SimpleNamespace())
+    hardware_system = HardwareSystem(
+        name="test",
+        cameras=[camera],
+        models=[ModelConfig(first), ModelConfig(second)],
+    )
+    runtime = ModelRuntime(hardware_system, CameraRuntime(hardware_system))
 
     with pytest.raises(ValueError, match="Duplicate model ID"):
         runtime.register_models()
@@ -149,105 +162,55 @@ def test_read_fails_before_output_is_produced() -> None:
     runtime = make_runtime(inference)
 
     with pytest.raises(RuntimeError, match="has not been produced yet"):
-        runtime.read_model_output(
-            inference.model_id,
-            camera.camera_id,
-            "object_detection",
-        )
+        runtime.read_model_output(inference.model_id, "object_detection")
 
 
-def test_single_object_detection_uses_latest_frame() -> None:
+def test_object_detection_uses_its_subscribed_camera() -> None:
     camera = make_camera()
     inference = make_object_detection(camera)
     runtime = make_runtime(inference)
 
-    result = runtime.single_inference(
-        inference.model_id,
-        "object_detection",
-        camera.camera_id,
-    )
+    result = runtime.perform_object_detection(inference.model_id)
 
     assert result.camera_id == camera.camera_id
 
 
-@pytest.mark.parametrize(
-    ("inference_input", "message"),
-    [
-        ([], "At least one camera ID"),
-        (["different-camera"], "Camera is not subscribed"),
-    ],
-)
-def test_single_object_detection_rejects_invalid_camera_inputs(
-    inference_input: list[str],
-    message: str,
-) -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-
-    with pytest.raises((ValueError, RuntimeError), match=message):
-        runtime.single_inference(
-            inference.model_id,
-            "object_detection",
-            inference_input,
-        )
-
-
-def test_single_vlm_outputs_are_persisted_by_operation() -> None:
+def test_vlm_operations_persist_their_outputs() -> None:
     camera = make_camera()
     inference = make_vision(camera)
     runtime = make_runtime(inference)
 
-    objects = runtime.single_inference(
+    objects = runtime.locate_objects(
         inference.model_id,
-        "locate_object",
         ["encoded-frame"],
-        prompt="Locate objects",
+        "Locate objects",
     )
-    analysis = runtime.single_inference(
+    analysis = runtime.analyze_scene(
         inference.model_id,
-        "scene_analysis",
         ["encoded-frame"],
-        prompt="Describe the scene",
+        "Describe the scene",
     )
 
-    assert runtime.read_model_output(
-        inference.model_id,
-        camera.camera_id,
-        "locate_object",
-    ) is objects
-    assert runtime.read_model_output(
-        inference.model_id,
-        camera.camera_id,
-        "scene_analysis",
-    ) == analysis
+    assert runtime.read_model_output(inference.model_id, "locate_object") is objects
+    assert (
+        runtime.read_model_output(inference.model_id, "scene_analysis")
+        == analysis
+    )
 
 
 @pytest.mark.parametrize(
-    ("operation", "inference_input", "prompt", "message"),
-    [
-        ("object_detection", ["frame"], "prompt", "Unsupported vision"),
-        ("locate_object", "frame", "prompt", "list of Base64"),
-        ("locate_object", ["frame"], None, "requires a prompt"),
-    ],
+    "operation",
+    ["locate_objects", "analyze_scene"],
 )
-def test_single_vlm_rejects_invalid_operation_contracts(
+def test_vlm_operations_reject_empty_frame_batches(
     operation: str,
-    inference_input: str | list[str],
-    prompt: str | None,
-    message: str,
 ) -> None:
     camera = make_camera()
     inference = make_vision(camera)
     runtime = make_runtime(inference)
 
-    with pytest.raises((TypeError, ValueError), match=message):
-        runtime.single_inference(
-            inference.model_id,
-            operation,
-            inference_input,
-            prompt=prompt,
-        )
+    with pytest.raises(ValueError, match="At least one frame"):
+        getattr(runtime, operation)(inference.model_id, [], "prompt")
 
 
 def test_model_stream_lifecycle_fails_on_duplicate_operations() -> None:

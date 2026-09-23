@@ -617,7 +617,10 @@ class ServerRuntime:
     def register_inference_tools(self) -> None:
         self.model_runtime.register_models()
         registered_models: dict[str, tuple[str, Inference]] = {}
-        for model_id, inference in self.model_runtime.model_inferences.items():
+        for model_id, registered_model in (
+            self.model_runtime.registered_models.items()
+        ):
+            inference = registered_model.inference
             if inference.name in registered_models:
                 raise ValueError(
                     f"Inference model name must be unique: {inference.name}"
@@ -785,30 +788,22 @@ class ServerRuntime:
         model_id: str,
         model: ObjectDetectionModelInference,
     ) -> None:
-        def read_model_output(camera_id: str) -> dict[str, object]:
-            result = self.model_runtime.read_model_output(model_id, camera_id)
+        def read_model_output() -> dict[str, object]:
+            result = self.model_runtime.read_model_output(
+                model_id,
+                "object_detection",
+            )
             return result.model_dump(mode="json", exclude={"frame"})
 
-        def predict_with_model(
-            camera_ids: Annotated[list[str], Field(min_length=1)],
-        ) -> list[dict[str, object]]:
-            results = self.model_runtime.single_inference(
-                model_id=model_id,
-                inference_type="object_detection",
-                inference_input=camera_ids,
-            )
-            serialized_results: list[dict[str, object]] = []
-            for result in results:
-                serialized_results.append(
-                    result.model_dump(mode="json", exclude={"frame"})
-                )
-            return serialized_results
+        def predict_with_model() -> dict[str, object]:
+            result = self.model_runtime.perform_object_detection(model_id)
+            return result.model_dump(mode="json", exclude={"frame"})
 
         self.register_tool(
             name=f"read_{model.name}",
             description=(
                 f"Read the latest continuous inference output from "
-                f"{model.name} for a subscribed camera ID."
+                f"{model.name} for its subscribed camera."
             ),
             tool_function=read_model_output,
             annotations=ToolAnnotations(
@@ -820,8 +815,8 @@ class ServerRuntime:
         self.register_tool(
             name=f"perform_single_{model.name}",
             description=(
-                f"{model.description} Provide one or more IDs of subscribed "
-                "cameras with current frames."
+                f"{model.description} Uses the current frame from the model's "
+                "subscribed camera."
             ),
             tool_function=predict_with_model,
             annotations=ToolAnnotations(
@@ -834,35 +829,27 @@ class ServerRuntime:
     def register_vision_language_model_tools(
         self,
         model_id: str,
-        model: Inference,
+        model: VisionLanguageModelInference,
     ) -> None:
-        def read_scene_objects(
-            camera_id: str,
-        ) -> VisionLanguageModelFrameEnvironment:
+        def read_scene_objects() -> VisionLanguageModelFrameEnvironment:
             return self.model_runtime.read_model_output(
                 model_id,
-                camera_id,
-                inference_type="locate_object",
+                "locate_object",
             )
 
-        def read_scene_analysis(camera_id: str) -> str:
-            result = self.model_runtime.read_model_output(
+        def read_scene_analysis() -> str:
+            return self.model_runtime.read_model_output(
                 model_id,
-                camera_id,
-                inference_type="scene_analysis",
+                "scene_analysis",
             )
-            if not isinstance(result, str):
-                raise TypeError("Scene analysis output must be text")
-            return result
 
         def capture_scene_objects(
             prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> VisionLanguageModelFrameEnvironment:
-            return self.model_runtime.single_inference(
+            return self.model_runtime.locate_objects(
                 model_id=model_id,
-                inference_type="locate_object",
-                inference_input=frames,
+                frames=frames,
                 prompt=prompt,
             )
 
@@ -870,21 +857,17 @@ class ServerRuntime:
             prompt: Annotated[str, Field(min_length=1)],
             frames: Annotated[list[str], Field(min_length=1)],
         ) -> str:
-            result = self.model_runtime.single_inference(
+            return self.model_runtime.analyze_scene(
                 model_id=model_id,
-                inference_type="scene_analysis",
-                inference_input=frames,
+                frames=frames,
                 prompt=prompt,
             )
-            if not isinstance(result, str):
-                raise TypeError("Scene analysis output must be text")
-            return result
 
         self.register_tool(
             name=f"read_scene_objects_{model.name}",
             description=(
                 f"Read the latest scene-object output from "
-                f"{model.name} for a subscribed camera ID."
+                f"{model.name} for its subscribed camera."
             ),
             tool_function=read_scene_objects,
             annotations=ToolAnnotations(
@@ -897,7 +880,7 @@ class ServerRuntime:
             name=f"read_scene_analysis_{model.name}",
             description=(
                 f"Read the latest scene-analysis output from "
-                f"{model.name} for a subscribed camera ID."
+                f"{model.name} for its subscribed camera."
             ),
             tool_function=read_scene_analysis,
             annotations=ToolAnnotations(
@@ -939,23 +922,26 @@ class ServerRuntime:
         registered_models: dict[str, tuple[str, Inference]],
     ) -> None:
         def list_configured_models() -> list[ModelCatalogEntry]:
+            with self.model_runtime.lock:
+                running_model_ids = {
+                    model_id
+                    for model_id, stream in self.model_runtime.model_streams.items()
+                    if stream.thread.is_alive()
+                }
             catalog: list[ModelCatalogEntry] = []
             for model_id, model in registered_models.values():
                 camera = model.subscribed_camera
-                cameras = [
-                    SubscribedCameraCatalogEntry(
-                        camera_id=camera.camera_id,
-                        name=camera.name,
-                    )
-                ]
                 catalog.append(
                     ModelCatalogEntry(
                         model_id=model_id,
                         name=model.name,
                         description=model.description,
                         model_type=self.model_catalog_type(model),
-                        subscribed_cameras=cameras,
-                        is_running=self.model_runtime.is_model_running(model_id),
+                        subscribed_camera=SubscribedCameraCatalogEntry(
+                            camera_id=camera.camera_id,
+                            name=camera.name,
+                        ),
+                        is_running=model_id in running_model_ids,
                         turn_on_tool=f"turn_on_{model.name}",
                         turn_off_tool=f"turn_off_{model.name}",
                         read_tool=(
@@ -996,7 +982,7 @@ class ServerRuntime:
             name="list_configured_models",
             description=(
                 "List configured inference models, their model IDs, "
-                "subscribed camera IDs, current running state, and exact "
+                "subscribed camera, current running state, and exact "
                 "lifecycle, read, and single-inference tool names."
             ),
             tool_function=list_configured_models,

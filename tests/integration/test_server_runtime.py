@@ -17,6 +17,7 @@ from gerbera_sdk.inference import (
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
@@ -98,7 +99,7 @@ def make_server(
         ),
         app=app,
         camera_runtime=camera_runtime or SimpleNamespace(),
-        model_runtime=model_runtime or SimpleNamespace(model_inferences={}),
+        model_runtime=model_runtime or SimpleNamespace(registered_models={}),
         event_listener=SimpleNamespace(),
         reaction_bus=ReactionBus(),
         hardware_runtime=hardware_runtime or HardwareRuntime(),
@@ -202,33 +203,25 @@ def test_object_detection_tools_bridge_server_and_model_runtime() -> None:
     )
     calls: list[dict[str, object]] = []
 
-    def single_inference(**kwargs):
-        calls.append(kwargs)
-        return [output]
+    def perform_object_detection(model_id: str):
+        calls.append({"model_id": model_id})
+        return output
 
     model_runtime = SimpleNamespace(
-        single_inference=single_inference,
-        read_model_output=lambda model_id, camera_id: output,
+        perform_object_detection=perform_object_detection,
+        read_model_output=lambda model_id, output_name: output,
     )
     runtime, app = make_server(model_runtime=model_runtime)
 
     runtime.register_object_detection_tools(inference.model_id, inference)
-    result = app.tools["perform_single_detector"]([camera.camera_id])
+    result = app.tools["perform_single_detector"]()
 
-    assert calls == [
-        {
-            "model_id": inference.model_id,
-            "inference_type": "object_detection",
-            "inference_input": [camera.camera_id],
-        }
-    ]
-    assert result == [
-        {
-            "camera_id": camera.camera_id,
-            "model_name": inference.name,
-            "perception_objects": [],
-        }
-    ]
+    assert calls == [{"model_id": inference.model_id}]
+    assert result == {
+        "camera_id": camera.camera_id,
+        "model_name": inference.name,
+        "perception_objects": [],
+    }
 
 
 def test_vision_language_tools_route_each_operation() -> None:
@@ -248,16 +241,21 @@ def test_vision_language_tools_route_each_operation() -> None:
     )
     calls: list[dict[str, object]] = []
 
-    def single_inference(**kwargs):
+    def locate_objects(**kwargs):
         calls.append(kwargs)
-        if kwargs["inference_type"] == "scene_analysis":
-            return "A workshop"
         return objects
+
+    def analyze_scene(**kwargs):
+        calls.append(kwargs)
+        return "A workshop"
 
     runtime, app = make_server(
         model_runtime=SimpleNamespace(
-            single_inference=single_inference,
-            read_model_output=lambda *args, **kwargs: objects,
+            locate_objects=locate_objects,
+            analyze_scene=analyze_scene,
+            read_model_output=lambda model_id, output_name: (
+                "A workshop" if output_name == "scene_analysis" else objects
+            ),
         )
     )
 
@@ -276,9 +274,17 @@ def test_vision_language_tools_route_each_operation() -> None:
 
     assert captured is objects
     assert analysis == "A workshop"
-    assert [call["inference_type"] for call in calls] == [
-        "locate_object",
-        "scene_analysis",
+    assert calls == [
+        {
+            "model_id": inference.model_id,
+            "frames": ["frame"],
+            "prompt": "Locate tools",
+        },
+        {
+            "model_id": inference.model_id,
+            "frames": ["frame"],
+            "prompt": "Describe",
+        },
     ]
 
 
@@ -291,18 +297,19 @@ def test_scene_analysis_tool_hard_fails_on_non_text_output() -> None:
         user_prompt="Observe",
         subscribed_camera=camera,
     )
+
+    def analyze_scene(**kwargs):
+        raise TypeError("Scene analysis inference returned an invalid output")
+
     runtime, app = make_server(
-        model_runtime=SimpleNamespace(
-            single_inference=lambda **kwargs: object(),
-            read_model_output=lambda *args, **kwargs: object(),
-        )
+        model_runtime=SimpleNamespace(analyze_scene=analyze_scene)
     )
     runtime.register_vision_language_model_tools(
         inference.model_id,
         inference,
     )
 
-    with pytest.raises(TypeError, match="must be text"):
+    with pytest.raises(TypeError, match="invalid output"):
         app.tools["analyse_scene_observer"]("Describe", ["frame"])
 
 
@@ -310,9 +317,10 @@ def test_state_tools_register_runtime_bound_methods() -> None:
     hardware_runtime = HardwareRuntime(
         state_store={"hardware-key": None},
     )
+    hardware_system = HardwareSystem(name="test")
     model_runtime = ModelRuntime(
-        hardware_system=SimpleNamespace(models=[]),
-        camera_runtime=SimpleNamespace(),
+        hardware_system=hardware_system,
+        camera_runtime=CameraRuntime(hardware_system),
         model_outputs={"model-key": None},
     )
     runtime, app = make_server(
