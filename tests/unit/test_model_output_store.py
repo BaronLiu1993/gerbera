@@ -133,6 +133,16 @@ def test_register_models_rejects_duplicate_model_ids() -> None:
         runtime.register_models()
 
 
+def test_register_models_rejects_registration_while_streaming() -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
+    runtime.model_streams[inference.model_id] = SimpleNamespace()
+
+    with pytest.raises(RuntimeError, match="streams are active"):
+        runtime.register_models()
+
+
 def test_read_fails_before_output_is_produced() -> None:
     camera = make_camera()
     inference = make_object_detection(camera)
@@ -158,6 +168,29 @@ def test_single_object_detection_uses_latest_frame() -> None:
     )
 
     assert result.camera_id == camera.camera_id
+
+
+@pytest.mark.parametrize(
+    ("inference_input", "message"),
+    [
+        ([], "At least one camera ID"),
+        (["different-camera"], "Camera is not subscribed"),
+    ],
+)
+def test_single_object_detection_rejects_invalid_camera_inputs(
+    inference_input: list[str],
+    message: str,
+) -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
+
+    with pytest.raises((ValueError, RuntimeError), match=message):
+        runtime.single_inference(
+            inference.model_id,
+            "object_detection",
+            inference_input,
+        )
 
 
 def test_single_vlm_outputs_are_persisted_by_operation() -> None:
@@ -190,6 +223,33 @@ def test_single_vlm_outputs_are_persisted_by_operation() -> None:
     ) == analysis
 
 
+@pytest.mark.parametrize(
+    ("operation", "inference_input", "prompt", "message"),
+    [
+        ("object_detection", ["frame"], "prompt", "Unsupported vision"),
+        ("locate_object", "frame", "prompt", "list of Base64"),
+        ("locate_object", ["frame"], None, "requires a prompt"),
+    ],
+)
+def test_single_vlm_rejects_invalid_operation_contracts(
+    operation: str,
+    inference_input: str | list[str],
+    prompt: str | None,
+    message: str,
+) -> None:
+    camera = make_camera()
+    inference = make_vision(camera)
+    runtime = make_runtime(inference)
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        runtime.single_inference(
+            inference.model_id,
+            operation,
+            inference_input,
+            prompt=prompt,
+        )
+
+
 def test_model_stream_lifecycle_fails_on_duplicate_operations() -> None:
     camera = make_camera()
     inference = make_object_detection(camera)
@@ -202,6 +262,52 @@ def test_model_stream_lifecycle_fails_on_duplicate_operations() -> None:
     runtime.turn_off_model_stream(inference.model_id)
     with pytest.raises(RuntimeError, match="not running"):
         runtime.turn_off_model_stream(inference.model_id)
+
+
+def test_turn_off_model_stream_rejects_worker_that_does_not_stop() -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
+    stop_event = SimpleNamespace(set=lambda: None)
+    runtime.model_streams[inference.model_id] = SimpleNamespace(
+        stop_event=stop_event,
+        thread=SimpleNamespace(
+            join=lambda timeout: None,
+            is_alive=lambda: True,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="did not stop"):
+        runtime.turn_off_model_stream(inference.model_id)
+
+
+def test_turn_on_all_model_streams_rolls_back_started_models(
+    monkeypatch,
+) -> None:
+    camera = make_camera()
+    first = make_object_detection(camera)
+    second = make_vision(camera)
+    runtime = make_runtime(first, second)
+    started: list[str] = []
+    stopped: list[str] = []
+
+    def start(model_id: str, prompt: str | None = None) -> None:
+        if model_id == second.model_id:
+            raise RuntimeError("second model failed")
+        started.append(model_id)
+
+    monkeypatch.setattr(runtime, "turn_on_model_stream", start)
+    monkeypatch.setattr(
+        runtime,
+        "turn_off_model_stream",
+        lambda model_id: stopped.append(model_id),
+    )
+
+    with pytest.raises(RuntimeError, match="second model failed"):
+        runtime.turn_on_all_model_streams()
+
+    assert started == [first.model_id]
+    assert stopped == [first.model_id]
 
 
 def test_turn_on_all_model_streams_uses_configured_vlm_prompt() -> None:

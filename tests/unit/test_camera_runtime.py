@@ -137,7 +137,7 @@ def test_start_propagates_camera_capture_failure(monkeypatch) -> None:
     assert capture.released
 
 
-def test_capture_frames_reads_from_running_camera_stream(
+def test_capture_frames_reads_requested_batch(
     monkeypatch,
 ) -> None:
     camera = _camera()
@@ -167,7 +167,10 @@ def test_capture_frames_reads_from_running_camera_stream(
     )
 
     assert len(frames) == 3
-    assert all(np.array_equal(frame.image, camera.latest_frame.image) for frame in frames)
+    assert all(
+        np.array_equal(frame.image, camera.latest_frame.image)
+        for frame in frames
+    )
     assert sleep_calls == [0.25, 0.25]
 
 
@@ -276,6 +279,30 @@ def test_wait_for_first_frame_propagates_capture_failure() -> None:
     assert exc.value.__cause__ is failure
 
 
+def test_wait_for_first_frame_times_out() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera]),
+        startup_timeout_seconds=0.0,
+    )
+    runtime.build_camera_sessions()
+
+    with pytest.raises(TimeoutError, match="did not capture"):
+        runtime.wait_for_first_frame(camera.camera_id)
+
+
+def test_wait_for_first_frame_rejects_ready_session_without_frame() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    runtime.build_camera_sessions()
+    runtime.get_camera_session(camera.camera_id).first_frame_ready.set()
+
+    with pytest.raises(RuntimeError, match="readiness without a frame"):
+        runtime.wait_for_first_frame(camera.camera_id)
+
+
 def test_turn_off_camera_stream_rejects_live_thread_after_timeout() -> None:
     camera = _camera()
     runtime = CameraRuntime(
@@ -294,6 +321,25 @@ def test_turn_off_camera_stream_rejects_live_thread_after_timeout() -> None:
 
     assert session.stop_event.is_set()
     assert session.thread is not None
+
+
+def test_turn_off_camera_stream_clears_a_stopped_session() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    runtime.build_camera_sessions()
+    session = runtime.get_camera_session(camera.camera_id)
+    session.stop_event = threading.Event()
+    session.thread = SimpleNamespace(
+        join=lambda timeout: None,
+        is_alive=lambda: False,
+    )
+
+    runtime.turn_off_camera_stream(camera.camera_id)
+
+    assert session.stop_event is None
+    assert session.thread is None
 
 
 def test_clean_up_cameras_stops_streams_and_clears_registry(

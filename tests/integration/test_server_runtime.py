@@ -1,38 +1,30 @@
-import asyncio
 from datetime import datetime
 from types import SimpleNamespace
 
-from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 import numpy as np
 import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
-    VisionLanguageModelFrameEnvironment,
-)
 from gerbera_sdk.inference import (
     Frame,
     ObjectDetectionModelInference,
     PerceptionStateModel,
+    VisionLanguageModelFrameEnvironment,
+    VisionLanguageModelInference,
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime as _ServerRuntime
-from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.state_runtime import StateRuntime
+from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 
 
 class FakeApp:
     def __init__(self) -> None:
         self.tools = {}
         self.annotations = {}
-        self.metadata = {}
 
     def tool(
         self,
@@ -44,838 +36,323 @@ class FakeApp:
         def register(function):
             self.tools[name] = function
             self.annotations[name] = annotations
-            self.metadata[name] = meta
             return function
 
         return register
 
 
-class FakeSerialConnection:
-    def __init__(self) -> None:
-        self.commands = []
-        self.on_write = lambda: None
-
-    def write(self, command: str) -> None:
-        self.commands.append(command)
-        self.on_write()
+class ObjectDetectionAdapter:
+    def detect(self, frame: Frame) -> list:
+        return []
 
 
-def _database() -> Database:
-    return Database("localhost", 5432, "user", "password", "gerbera")
+class VisionLanguageAdapter:
+    def convert_to_valid_input(self, frame: str) -> dict[str, str]:
+        return {"frame": frame}
 
-
-def _event_worker() -> EventWorker:
-    return EventWorker(database=_database())
-
-
-def ServerRuntime(**dependencies) -> _ServerRuntime:
-    dependencies.setdefault("reaction_bus", ReactionBus())
-    dependencies.setdefault("event_listener", SimpleNamespace())
-    dependencies.setdefault("state_runtime", StateRuntime())
-    return _ServerRuntime(**dependencies)
-
-
-def test_server_registers_camera_capture_tool() -> None:
-    camera = Camera(
-        camera_id="local-camera",
-        name="local_camera",
-        description="Built-in camera",
-        source=DeviceCameraSource(device_index=0),
-    )
-    captured_batches = []
-    frames = [
-        SimpleNamespace(to_base64_string=lambda: "first-base64"),
-        SimpleNamespace(to_base64_string=lambda: "second-base64"),
-    ]
-    camera_runtime = SimpleNamespace(
-        capture_frames=lambda **kwargs: (
-            captured_batches.append(kwargs) or frames
-        ),
-    )
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(cameras=[camera]),
-        board_runtime=object(),
-        event_bus=EventBus(),
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=camera_runtime,
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-
-    runtime.register_hardware_tools()
-    result = app.tools["capture_frames_from_local_camera"](3, 0.25)
-
-    assert captured_batches == [
-        {
-            "camera_key": "local-camera",
-            "image_count": 3,
-            "interval_seconds": 0.25,
+    def predict(self, **kwargs) -> dict[str, object]:
+        return {
+            "environment_name": "workshop",
+            "description": "A workshop",
+            "objects": [],
         }
-    ]
-    assert result == ["first-base64", "second-base64"]
-    assert set(app.tools) == {"capture_frames_from_local_camera"}
+
+    def analyze_scene(self, **kwargs) -> str:
+        return "A workshop"
 
 
-def test_fastmcp_camera_capture_schema_exposes_batch_controls() -> None:
-    camera = Camera(
-        camera_id="local-camera",
+def make_camera() -> Camera:
+    return Camera(
+        camera_id="camera-1",
         name="local_camera",
         description="Built-in camera",
         source=DeviceCameraSource(device_index=0),
     )
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(cameras=[camera]),
-        board_runtime=object(),
-        event_bus=EventBus(),
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(capture_frames=lambda **kwargs: []),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-
-    runtime.register_hardware_tools()
-    tool = asyncio.run(app.get_tool("capture_frames_from_local_camera"))
-    properties = tool.parameters["properties"]
-
-    assert properties["image_count"] == {
-        "default": 1,
-        "maximum": 20,
-        "minimum": 1,
-        "type": "integer",
-    }
-    assert properties["interval_seconds"] == {
-        "default": 0.0,
-        "maximum": 60.0,
-        "minimum": 0.0,
-        "type": "number",
-    }
-    assert tool.annotations == ToolAnnotations(
-        title="Capture frames from local_camera",
-        readOnlyHint=True,
-        openWorldHint=False,
-    )
-    assert asyncio.run(app.get_tool("turn_on_local_camera_stream")) is None
-    assert asyncio.run(app.get_tool("turn_off_local_camera_stream")) is None
 
 
-def test_server_registers_model_base64_prediction_as_a_tool() -> None:
-    prediction = VisionLanguageModelFrameEnvironment(
-        environment_name="workshop",
-        description="A workbench",
-        objects=[],
-    )
-    received_frames = []
-    received_model_ids = []
-    read_calls = []
-    model = SimpleNamespace(
-        name="openai-vision-language-model",
-        description="Analyze supplied images.",
-        predict=lambda frames: (
-            received_frames.append(frames) or prediction
-        ),
-    )
-    event_bus = EventBus()
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(models=[SimpleNamespace()]),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(
-            model_inferences={"vision-id": model},
-            single_inference=lambda model_id, frames: (
-                received_model_ids.append(model_id)
-                or model.predict(frames)
-            ),
-            read_model_output=lambda model_id, camera_id: (
-                read_calls.append((model_id, camera_id)) or prediction
-            ),
-            turn_on_model=lambda model_id: (
-                model.turn_on_prediction_loop()
-            ),
-            turn_off_model=lambda model_id: (
-                model.turn_off_prediction_loop()
-            ),
-        ),
-    )
-
-    runtime.register_hardware_tools()
-    result = app.tools["perform_single_openai-vision-language-model"](
-        ["first-base64", "second-base64"]
-    )
-    latest_result = app.tools["read_openai-vision-language-model"](
-        "camera-id"
-    )
-
-    assert received_frames == [["first-base64", "second-base64"]]
-    assert received_model_ids == ["vision-id"]
-    assert result is prediction
-    assert read_calls == [("vision-id", "camera-id")]
-    assert latest_result is prediction
-    assert app.annotations[
-        "perform_single_openai-vision-language-model"
-    ].openWorldHint is True
-    assert app.annotations[
-        "read_openai-vision-language-model"
-    ].readOnlyHint is True
-    assert app.metadata["turn_on_openai-vision-language-model"] is None
-    assert app.metadata["turn_off_openai-vision-language-model"] is None
-
-
-def test_server_registers_single_object_detection_as_a_tool() -> None:
-    camera = Camera(
-        camera_id="camera-id",
-        name="local_camera",
-        description="Local camera",
-        source=DeviceCameraSource(device_index=0),
-    )
-    frame = Frame(
+def make_frame() -> Frame:
+    return Frame(
         timestamp=datetime.now(),
         image=np.zeros((2, 2, 3), dtype=np.uint8),
     )
-    prediction = PerceptionStateModel(
-        camera_id="camera-id",
-        frame=frame,
-        model_name="local_object_detection_model",
-        perception_objects=[],
-    )
-    inference = ObjectDetectionModelInference(
-        model_session=SimpleNamespace(_thread=None, _stop_event=None),
-        name="local_object_detection_model",
-        description="Detect parts.",
-        subscribed_cameras=[camera],
-    )
-    received_calls = []
-    event_bus = EventBus()
+
+
+def make_server(
+    *,
+    hardware_system: HardwareSystem | None = None,
+    camera_runtime=None,
+    model_runtime=None,
+    event_bus=None,
+    event_worker=None,
+    hardware_runtime=None,
+) -> tuple[ServerRuntime, FakeApp]:
     app = FakeApp()
     runtime = ServerRuntime(
-        hardware_system=HardwareSystem(models=[SimpleNamespace()]),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(
-            model_inferences={"detector-id": inference},
-            single_inference=lambda model_id, camera_ids: (
-                received_calls.append((model_id, camera_ids))
-                or [prediction]
-            ),
-            read_model_output=lambda model_id, camera_id: prediction,
-            turn_on_model=lambda model_id: None,
-            turn_off_model=lambda model_id: None,
+        hardware_system=hardware_system or HardwareSystem(name="test"),
+        board_runtime=SimpleNamespace(),
+        event_bus=event_bus or EventBus(),
+        event_worker=event_worker or SimpleNamespace(
+            write_to_db=lambda table_name, batch: None,
+            wait_until_idle=lambda: None,
         ),
-    )
-
-    runtime.register_hardware_tools()
-    result = app.tools["perform_single_local_object_detection_model"](
-        ["camera-id"]
-    )
-    latest_result = app.tools["read_local_object_detection_model"](
-        "camera-id"
-    )
-    catalog = app.tools["list_configured_models"]()
-
-    assert received_calls == [("detector-id", ["camera-id"])]
-    expected_result = {
-        "camera_id": "camera-id",
-        "model_name": "local_object_detection_model",
-        "perception_objects": [],
-    }
-    assert result == [expected_result]
-    assert latest_result == expected_result
-    assert [entry.model_dump() for entry in catalog] == [
-        {
-            "model_id": "detector-id",
-            "name": "local_object_detection_model",
-            "description": "Detect parts.",
-            "model_type": "object_detection",
-            "subscribed_cameras": [
-                {
-                    "camera_id": "camera-id",
-                    "name": "local_camera",
-                }
-            ],
-            "is_running": False,
-            "turn_on_tool": "turn_on_local_object_detection_model",
-            "turn_off_tool": "turn_off_local_object_detection_model",
-            "read_tool": "read_local_object_detection_model",
-            "single_inference_tool": (
-                "perform_single_local_object_detection_model"
-            ),
-        }
-    ]
-
-
-def test_fastmcp_object_detection_tool_uses_camera_id_input() -> None:
-    inference = ObjectDetectionModelInference(
-        model_session=SimpleNamespace(_thread=None, _stop_event=None),
-        name="part-detector",
-        description="Detect parts.",
-    )
-    event_bus = EventBus()
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(models=[SimpleNamespace()]),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
         app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(
-            model_inferences={"detector-id": inference},
-            single_inference=lambda model_id, camera_id: None,
-            read_model_output=lambda model_id, camera_id: None,
-            turn_on_model=lambda model_id: None,
-            turn_off_model=lambda model_id: None,
-        ),
+        camera_runtime=camera_runtime or SimpleNamespace(),
+        model_runtime=model_runtime or SimpleNamespace(model_inferences={}),
+        event_listener=SimpleNamespace(),
+        reaction_bus=ReactionBus(),
+        hardware_runtime=hardware_runtime or HardwareRuntime(),
     )
-
-    runtime.register_hardware_tools()
-    tool = asyncio.run(app.get_tool("perform_single_part-detector"))
-    turn_on_tool = asyncio.run(app.get_tool("turn_on_part-detector"))
-
-    assert tool.parameters["properties"] == {
-        "camera_ids": {
-            "items": {"type": "string"},
-            "minItems": 1,
-            "type": "array",
-        }
-    }
-    assert tool.annotations == ToolAnnotations(
-        title="Perform one-shot inference with part-detector",
-        readOnlyHint=True,
-        openWorldHint=False,
-    )
-    assert turn_on_tool.meta is None
+    return runtime, app
 
 
-def test_server_registers_lifecycle_tools_for_every_configured_model() -> None:
-    calls = []
-    vision_inference = SimpleNamespace(
-        name="workspace-vlm",
-        description="Observe the workspace.",
-        predict=lambda frames: None,
-        turn_on_prediction_loop=lambda: calls.append("vlm.on"),
-        turn_off_prediction_loop=lambda: calls.append("vlm.off"),
+def test_camera_tool_forwards_batch_controls_and_serializes_frames() -> None:
+    camera = make_camera()
+    calls: list[dict[str, object]] = []
+    camera_runtime = SimpleNamespace(
+        capture_frames=lambda **kwargs: (
+            calls.append(kwargs)
+            or [
+                SimpleNamespace(to_base64_string=lambda: "first"),
+                SimpleNamespace(to_base64_string=lambda: "second"),
+            ]
+        )
     )
-    object_detection_inference = SimpleNamespace(
-        name="part-detector",
-        description="Detect parts.",
-        predict=lambda frames: None,
-        turn_on_prediction_loop=lambda: calls.append("detector.on"),
-        turn_off_prediction_loop=lambda: calls.append("detector.off"),
-    )
-    hardware_system = HardwareSystem(
-        models=[SimpleNamespace(), SimpleNamespace()]
-    )
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=hardware_system,
-        board_runtime=object(),
-        event_bus=EventBus(),
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(
-            model_inferences={
-                "vision-id": vision_inference,
-                "detector-id": object_detection_inference,
-            },
-            turn_on_model=lambda model_id: (
-                {
-                    "vision-id": vision_inference,
-                    "detector-id": object_detection_inference,
-                }[model_id].turn_on_prediction_loop()
-            ),
-            turn_off_model=lambda model_id: (
-                {
-                    "vision-id": vision_inference,
-                    "detector-id": object_detection_inference,
-                }[model_id].turn_off_prediction_loop()
-            ),
-        ),
+    runtime, app = make_server(
+        hardware_system=HardwareSystem(name="test", cameras=[camera]),
+        camera_runtime=camera_runtime,
     )
 
-    runtime.register_hardware_tools()
-
-    app.tools["turn_on_workspace-vlm"]()
-    app.tools["turn_on_part-detector"]()
-    app.tools["turn_off_workspace-vlm"]()
-    app.tools["turn_off_part-detector"]()
+    runtime.register_camera_tools()
+    result = app.tools["capture_frames_from_local_camera"](2, 0.25)
 
     assert calls == [
-        "vlm.on",
-        "detector.on",
-        "vlm.off",
-        "detector.off",
+        {
+            "camera_key": camera.camera_id,
+            "image_count": 2,
+            "interval_seconds": 0.25,
+        }
     ]
-
-
-def test_server_does_not_register_camera_lifecycle_tools() -> None:
-    event_bus = EventBus()
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
+    assert result == ["first", "second"]
+    assert app.annotations["capture_frames_from_local_camera"] == (
+        ToolAnnotations(
+            title="Capture frames from local_camera",
+            readOnlyHint=True,
+            openWorldHint=False,
+        )
     )
 
-    runtime.register_hardware_tools()
 
-    assert {
-        "capture_frames_from_local_camera",
-        "turn_on_local_camera_stream",
-        "turn_off_local_camera_stream",
-    }.isdisjoint(app.tools)
-
-
-def test_server_registers_tools_that_execute_through_the_board_runtime(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
-    board = Microcontroller(port="/dev/board-1", fqbn="arduino:avr:uno")
-    board.add_connections([Connection("status_led", "led", {"out": "13"})])
-    hardware_system = HardwareSystem(microcontrollers=[board])
-    serial_connection = FakeSerialConnection()
-    board_runtime = SimpleNamespace(
-        serial_pool={"board-1": serial_connection},
-        get_serial_connection=lambda microcontroller: serial_connection,
+@pytest.mark.parametrize("stream", [False, True])
+def test_event_registration_respects_explicit_stream_flag(stream: bool) -> None:
+    connection = Connection(
+        name="sensor",
+        component_type="hw201",
+        pins={"out": "7"},
+        description="Infrared sensor",
+        microcontroller_id="board-1",
+        stream=stream,
     )
+    board = SimpleNamespace(id="board-1", connections=[connection])
     event_bus = EventBus()
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=hardware_system,
-        board_runtime=board_runtime,
+    runtime, _ = make_server(
+        hardware_system=HardwareSystem(
+            name="test",
+            microcontrollers=[board],
+        ),
         event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
     )
 
     runtime.register_events()
-    runtime.register_hardware_tools()
-    event = event_bus.get_event(
-        "MCP",
-        board.id,
-        board.connections[0].event_name,
-    )
-    serial_connection.on_write = lambda: event.perform_work({"state": "1"})
-    response = app.tools["turn_on_status_led"]()
 
-    assert response == {"success": True}
-    assert serial_connection.commands == ["WRITE,status_led,state:1.0"]
-    assert set(app.tools) == {
-        "write_status_led",
-        "turn_on_status_led",
-        "turn_off_status_led",
-    }
-    assert app.annotations["write_status_led"] == ToolAnnotations(
-        title="Set status_led LED state",
-        readOnlyHint=False,
-        openWorldHint=False,
-    )
-
-
-def test_mcp_tool_updates_connection_state(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
-    board = Microcontroller(port="/dev/board-1", fqbn="arduino:avr:uno")
-    board.add_connections([Connection("status_led", "led", {"out": "13"})])
-    hardware_system = HardwareSystem(microcontrollers=[board])
-    serial_connection = FakeSerialConnection()
-    board_runtime = SimpleNamespace(
-        serial_pool={"board-1": serial_connection},
-        get_serial_connection=lambda microcontroller: serial_connection,
-    )
-    event_bus = EventBus()
-    state_runtime = StateRuntime()
-    connection = board.connections[0]
-    state_runtime.register_state_store(connection.name, connection.component_type)
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=hardware_system,
-        board_runtime=board_runtime,
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-        state_runtime=state_runtime,
-    )
-
-    runtime.register_events()
-    runtime.register_hardware_tools()
-    event = event_bus.get_event(
+    assert event_bus.get_event(
         "MCP",
         board.id,
         connection.event_name,
+    ).streamable is False
+    if stream:
+        assert event_bus.get_event(
+            "STREAM",
+            board.id,
+            connection.event_name,
+        ).streamable is True
+    else:
+        with pytest.raises(RuntimeError, match="does not exist"):
+            event_bus.get_event(
+                "STREAM",
+                board.id,
+                connection.event_name,
+            )
+
+
+def test_object_detection_tools_bridge_server_and_model_runtime() -> None:
+    camera = make_camera()
+    inference = ObjectDetectionModelInference(
+        model=ObjectDetectionAdapter(),
+        name="detector",
+        description="Detect objects",
+        subscribed_camera=camera,
+        model_id="detector-id",
     )
-    serial_connection.on_write = lambda: event.perform_work({"state": "1"})
-
-    app.tools["turn_on_status_led"]()
-
-    state = state_runtime.state_store[(connection.name, connection.component_type)]
-    assert state is not None
-    assert state.value == "1"
-    assert state.unit == "BOOLEAN"
-
-
-def test_streaming_sensor_exposes_only_read_and_stream_controls(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
-    database = Database(
-        "localhost",
-        5432,
-        "user",
-        "password",
-        "gerbera",
+    output = PerceptionStateModel(
+        camera_id=camera.camera_id,
+        frame=make_frame(),
+        model_name=inference.name,
+        perception_objects=[],
     )
-    sensor = Connection(
-        "ir_sensor",
-        "hw201",
-        {"out": "7"},
-        database=database,
+    calls: list[dict[str, object]] = []
+
+    def single_inference(**kwargs):
+        calls.append(kwargs)
+        return [output]
+
+    model_runtime = SimpleNamespace(
+        single_inference=single_inference,
+        read_model_output=lambda model_id, camera_id: output,
     )
-    board = Microcontroller(
-        port="/dev/board-1",
-        fqbn="arduino:avr:uno",
-    )
-    board.add_connections([sensor])
-    event_bus = EventBus()
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(microcontrollers=[board]),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
+    runtime, app = make_server(model_runtime=model_runtime)
 
-    runtime.register_hardware_tools()
+    runtime.register_object_detection_tools(inference.model_id, inference)
+    result = app.tools["perform_single_detector"]([camera.camera_id])
 
-    assert set(app.tools) == {
-        "read_ir_sensor",
-        "turn_on_ir_sensor_stream",
-        "turn_off_ir_sensor_stream",
-    }
-    assert app.annotations["read_ir_sensor"].readOnlyHint is True
-    assert app.metadata["turn_on_ir_sensor_stream"] is None
-    assert app.metadata["turn_off_ir_sensor_stream"] is None
-
-
-def test_server_registers_command_spec_as_mcp_tool_schema() -> None:
-    connection = Connection("motor", "sg90", {"signal": "7"})
-    command = CommandCompiler.command_specs(connection)[0]
-    captured_params = []
-    connection.register_action(
-        "WRITE",
-        lambda params: captured_params.append(params) or params,
-    )
-
-    event_bus = EventBus()
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=object(),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-    runtime.register_connection_tool(
-        connection,
-        command,
-        CommandCompiler.command_annotations(connection, command),
-    )
-
-    tool = asyncio.run(app.get_tool("write_motor"))
-    assert tool.description == "Set servo angle."
-    assert tool.meta == {"key": "sg90.motor.angle"}
-    assert tool.annotations == ToolAnnotations(
-        title="Set motor servo angle",
-        readOnlyHint=False,
-        openWorldHint=False,
-    )
-    assert tool.parameters == {
-        "additionalProperties": False,
-        "properties": {
-            "angle": {
-                "description": "Servo angle in degrees.",
-                "maximum": 180,
-                "minimum": 0,
-                "type": "number",
-            }
-        },
-        "required": ["angle"],
-        "type": "object",
-    }
-
-    asyncio.run(tool.run({"angle": 90}))
-    assert captured_params == [{"angle": 90}]
-
-    with pytest.raises(ValueError, match="less than or equal to 180"):
-        asyncio.run(tool.run({"angle": 181}))
-
-
-def test_server_preserves_required_and_optional_registry_parameters() -> None:
-    connection = Connection(
-        "motor",
-        "dcmotor",
-        {"in1": "5", "in2": "6", "enable": "9"},
-    )
-    command = CommandCompiler.command_specs(connection)[0]
-    captured_params = []
-    connection.register_action(
-        "WRITE",
-        lambda params: captured_params.append(params) or params,
-    )
-
-    event_bus = EventBus()
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=object(),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-    runtime.register_connection_tool(
-        connection,
-        command,
-        CommandCompiler.command_annotations(connection, command),
-    )
-
-    tool = asyncio.run(app.get_tool("write_motor"))
-    assert tool.parameters["required"] == ["direction"]
-    assert set(tool.parameters["properties"]) == {"direction", "speed"}
-
-    asyncio.run(tool.run({"direction": 0}))
-    asyncio.run(tool.run({"direction": 1, "speed": 120}))
-    assert captured_params == [
-        {"direction": 0},
-        {"direction": 1, "speed": 120},
+    assert calls == [
+        {
+            "model_id": inference.model_id,
+            "inference_type": "object_detection",
+            "inference_input": [camera.camera_id],
+        }
+    ]
+    assert result == [
+        {
+            "camera_id": camera.camera_id,
+            "model_name": inference.name,
+            "perception_objects": [],
+        }
     ]
 
 
-def test_server_exposes_registered_events_as_nested_catalog(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
-    database = Database("localhost", 5432, "user", "password", "gerbera")
-    connection = Connection(
-        "front_distance",
-        "hcsr04",
-        {"trigger": "7", "echo": "8"},
-        description="Distance readings from the front sensor.",
-        database=database,
+def test_vision_language_tools_route_each_operation() -> None:
+    camera = make_camera()
+    inference = VisionLanguageModelInference(
+        model=VisionLanguageAdapter(),
+        name="observer",
+        description="Observe scenes",
+        user_prompt="Observe",
+        subscribed_camera=camera,
+        model_id="observer-id",
     )
-    board = Microcontroller(
-        port="/dev/board-1",
-        fqbn="arduino:avr:uno",
+    objects = VisionLanguageModelFrameEnvironment(
+        environment_name="workshop",
+        description="A workshop",
+        objects=[],
     )
-    board.add_connections([connection])
-    event_bus = EventBus()
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(microcontrollers=[board]),
-        board_runtime=object(),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-    runtime.register_events()
+    calls: list[dict[str, object]] = []
 
-    runtime.register_event_catalog_tool()
+    def single_inference(**kwargs):
+        calls.append(kwargs)
+        if kwargs["inference_type"] == "scene_analysis":
+            return "A workshop"
+        return objects
 
-    tool = asyncio.run(app.get_tool("list_reaction_events"))
-    assert tool.annotations.readOnlyHint is True
-    result = asyncio.run(tool.run({}))
-    catalog = result.structured_content
-    expected_metadata = {
-        "event_type": "MCP",
-        "microcontroller_id": "board-1",
-        "event_name": connection.event_name,
-        "connection_name": "front_distance",
-        "component_type": "hcsr04",
-        "description": "Distance readings from the front sensor.",
-        "streamable": False,
-    }
-    assert catalog["MCP"]["board-1"][connection.event_name] == (
-        expected_metadata
-    )
-
-    expected_metadata["event_type"] = "STREAM"
-    expected_metadata["streamable"] = True
-    assert catalog["STREAM"]["board-1"][connection.event_name] == (
-        expected_metadata
-    )
-
-
-def test_server_exposes_state_memory_tool() -> None:
-    state_runtime = StateRuntime()
-    state_runtime.register_state_store("status_led", "led")
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(),
-        board_runtime=object(),
-        event_bus=EventBus(),
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-        state_runtime=state_runtime,
-    )
-
-    runtime.register_state_memory_tool()
-
-    assert app.tools["get_current_hardware_state"]() == {
-        "status_led::led": None
-    }
-    assert app.annotations["get_current_hardware_state"] == ToolAnnotations(
-        title="Get current hardware state",
-    )
-
-
-def test_server_exposes_environment_state_tool() -> None:
-    app = FakeApp()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(),
-        board_runtime=object(),
-        event_bus=EventBus(),
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
+    runtime, app = make_server(
         model_runtime=SimpleNamespace(
-            model_inferences={},
-            model_output_store=SimpleNamespace(
-                get_environment_state=lambda: {"camera::model": None}
-            ),
-        ),
+            single_inference=single_inference,
+            read_model_output=lambda *args, **kwargs: objects,
+        )
+    )
+
+    runtime.register_vision_language_model_tools(
+        inference.model_id,
+        inference,
+    )
+    captured = app.tools["capture_scene_objects_observer"](
+        "Locate tools",
+        ["frame"],
+    )
+    analysis = app.tools["analyse_scene_observer"](
+        "Describe",
+        ["frame"],
+    )
+
+    assert captured is objects
+    assert analysis == "A workshop"
+    assert [call["inference_type"] for call in calls] == [
+        "locate_object",
+        "scene_analysis",
+    ]
+
+
+def test_scene_analysis_tool_hard_fails_on_non_text_output() -> None:
+    camera = make_camera()
+    inference = VisionLanguageModelInference(
+        model=VisionLanguageAdapter(),
+        name="observer",
+        description="Observe scenes",
+        user_prompt="Observe",
+        subscribed_camera=camera,
+    )
+    runtime, app = make_server(
+        model_runtime=SimpleNamespace(
+            single_inference=lambda **kwargs: object(),
+            read_model_output=lambda *args, **kwargs: object(),
+        )
+    )
+    runtime.register_vision_language_model_tools(
+        inference.model_id,
+        inference,
+    )
+
+    with pytest.raises(TypeError, match="must be text"):
+        app.tools["analyse_scene_observer"]("Describe", ["frame"])
+
+
+def test_environment_state_tool_exposes_model_memory() -> None:
+    model_runtime = SimpleNamespace(
+        model_inferences={},
+        get_model_state=lambda: {"model-key": None},
+    )
+    runtime, app = make_server(
+        model_runtime=model_runtime,
     )
 
     runtime.register_environment_state_tool()
 
     assert app.tools["get_current_environment_state"]() == {
-        "camera::model": None
+        "model-key": None
     }
-    assert app.annotations["get_current_environment_state"] == ToolAnnotations(
-        title="Get current environment state",
-    )
 
 
-def test_database_backed_tool_description_includes_table_name() -> None:
-    database = Database("localhost", 5432, "user", "password", "gerbera")
-    connection = Connection(
-        "motor",
-        "sg90",
-        {"signal": "7"},
-        database=database,
-    )
-    command = CommandCompiler.command_specs(connection)[0]
-    app = FastMCP("test")
-    runtime = ServerRuntime(
-        hardware_system=object(),
-        board_runtime=object(),
-        event_bus=EventBus(),
-        event_worker=_event_worker(),
-        app=app,
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-    )
-
-    runtime.register_connection_tool(
-        connection,
-        command,
-        CommandCompiler.command_annotations(connection, command),
-    )
-
-    tool = asyncio.run(app.get_tool("write_motor"))
-    assert (
-        f"Collected data is stored in table `{connection.event_name}`."
-        in tool.description
-    )
-
-
-def test_server_uses_prebuilt_reaction_and_listener_dependencies() -> None:
-    event_bus = EventBus()
-    reaction_bus = ReactionBus()
-    event_listener = SimpleNamespace()
-    runtime = ServerRuntime(
-        hardware_system=HardwareSystem(),
-        board_runtime=SimpleNamespace(serial_pool={}),
-        event_bus=event_bus,
-        event_worker=_event_worker(),
-        app=FakeApp(),
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-        reaction_bus=reaction_bus,
-        event_listener=event_listener,
-    )
-
-    assert runtime.reaction_bus is reaction_bus
-    assert runtime.event_listener is event_listener
-
-
-def test_stream_off_waits_for_buffered_database_writes() -> None:
+def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
     calls: list[str] = []
     connection = SimpleNamespace(
-        name="ir_sensor",
-        component_type="hw201",
-        event_name="status_stream",
+        event_name="stream-event",
         perform_action=lambda action, params: (
             calls.append("hardware.off") or {"success": True}
         ),
     )
     event_bus = SimpleNamespace(
-        get_event=lambda event_type, microcontroller_id, event_name: SimpleNamespace(
+        get_event=lambda *args: SimpleNamespace(
             flush=lambda: calls.append("stream.flush")
         )
     )
     event_worker = SimpleNamespace(
         wait_until_idle=lambda: calls.append("database.wait")
     )
-    state_runtime = StateRuntime()
-    state_runtime.register_state_store(connection.name, connection.component_type)
-    runtime = ServerRuntime(
-        hardware_system=object(),
-        board_runtime=object(),
+    hardware_runtime = HardwareRuntime()
+    hardware_runtime.register_state_store("stream-state")
+    runtime, _ = make_server(
         event_bus=event_bus,
         event_worker=event_worker,
-        app=FakeApp(),
-        camera_runtime=SimpleNamespace(),
-        model_runtime=SimpleNamespace(model_inferences={}),
-        state_runtime=state_runtime,
+        hardware_runtime=hardware_runtime,
     )
     tool = runtime.build_toggle_tool_function(
         connection=connection,
         state=0,
+        state_key="stream-state",
         stream_microcontroller=SimpleNamespace(id="board-1"),
     )
 
     assert tool() == {"success": True}
-    assert calls == [
-        "hardware.off",
-        "stream.flush",
-        "database.wait",
-    ]
-    state = state_runtime.state_store[(connection.name, connection.component_type)]
-    assert state is not None
-    assert state.value == "0"
-    assert state.unit == "BOOLEAN"
+    assert calls == ["hardware.off", "stream.flush", "database.wait"]
+    assert hardware_runtime.get_state_store() == {
+        "stream-state": {"value": "0", "unit": None}
+    }
