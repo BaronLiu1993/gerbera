@@ -1,382 +1,226 @@
 from datetime import datetime
-import threading
+import time
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from gerbera_sdk.inference import (
-    Frame,
-    ModelOutputStore,
-    ObjectDetectionModel,
-    ObjectDetectionModelProviderEnum,
-    PerceptionStateModel,
-    VisionLanguageModel,
-    VisionLanguageModelProviderEnum,
+from gerbera_sdk.inference import Frame
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
+    ObjectDetectionModelInference,
+)
+from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
+    VisionLanguageModelInference,
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 
 
-def make_camera(name: str) -> Camera:
+class ObjectDetectionAdapter:
+    def detect(self, frame: Frame) -> list:
+        return []
+
+
+class VisionLanguageAdapter:
+    def __init__(self) -> None:
+        self.user_prompts: list[str] = []
+
+    def convert_to_valid_input(self, frame: str) -> dict[str, str]:
+        return {"frame": frame}
+
+    def predict(self, **kwargs) -> dict[str, object]:
+        self.user_prompts.append(kwargs["user_prompt"])
+        return {
+            "environment_name": "workshop",
+            "description": "A workshop",
+            "objects": [],
+        }
+
+    def analyze_scene(self, **kwargs) -> str:
+        return "A workshop scene"
+
+
+class ModelConfig:
+    def __init__(self, inference) -> None:
+        self.model_id = inference.model_id
+        self.inference = inference
+
+    def model_output_keys(self) -> dict[str, dict[str, str]]:
+        return self.inference.model_output_keys
+
+    def create_inference(self):
+        return self.inference
+
+
+def make_camera() -> Camera:
     return Camera(
-        name=name,
+        camera_id="camera",
+        name="camera",
         description="Test camera",
         source=DeviceCameraSource(device_index=0),
     )
 
 
-def make_model(cameras: list[Camera]) -> ObjectDetectionModel:
-    return ObjectDetectionModel(
-        model_name=ObjectDetectionModelProviderEnum.YOLOV5,
+def make_frame() -> Frame:
+    return Frame(
+        timestamp=datetime.now(),
+        image=np.zeros((2, 2, 3), dtype=np.uint8),
+    )
+
+
+def make_object_detection(camera: Camera) -> ObjectDetectionModelInference:
+    return ObjectDetectionModelInference(
+        model=ObjectDetectionAdapter(),
         name="detector",
-        model_source="yolov5n.onnx",
-        subscribed_cameras=cameras,
+        description="Detect objects",
+        subscribed_camera=camera,
+        model_id="detector-id",
+        model_output_keys={
+            "object_detection": {camera.camera_id: "detection-key"}
+        },
+        interval_seconds=0.01,
     )
 
 
-def make_output(camera: Camera, model: ObjectDetectionModel) -> PerceptionStateModel:
-    return PerceptionStateModel(
-        camera_id=camera.camera_id,
-        frame=Frame(
-            timestamp=datetime.now(),
-            image=np.zeros((2, 2, 3), dtype=np.uint8),
-        ),
-        model_name=model.name,
-        perception_objects=[],
+def make_vision(camera: Camera) -> VisionLanguageModelInference:
+    return VisionLanguageModelInference(
+        model=VisionLanguageAdapter(),
+        name="vision",
+        description="Analyze scenes",
+        user_prompt="Observe the scene",
+        subscribed_camera=camera,
+        model_id="vision-id",
+        model_output_keys={
+            "locate_object": {camera.camera_id: "objects-key"},
+            "scene_analysis": {camera.camera_id: "analysis-key"},
+        },
+        interval_seconds=0.01,
     )
 
 
-def register_model(store: ModelOutputStore, model: ObjectDetectionModel) -> None:
-    store.register(
-        [
-            (camera.camera_id, model.model_id)
-            for camera in model.subscribed_cameras
-        ]
+def make_runtime(*inferences) -> ModelRuntime:
+    source = SimpleNamespace(
+        models=[ModelConfig(inference) for inference in inferences]
+    )
+    frames = SimpleNamespace(get_latest_frame=lambda camera_key: make_frame())
+    runtime = ModelRuntime(source, frames)
+    runtime.register_models()
+    return runtime
+
+
+def test_register_models_creates_each_output_slot() -> None:
+    camera = make_camera()
+    runtime = make_runtime(
+        make_object_detection(camera),
+        make_vision(camera),
     )
 
-
-def test_registers_each_model_camera_pair() -> None:
-    first_camera = make_camera("first")
-    second_camera = make_camera("second")
-    store = ModelOutputStore()
-    model = make_model([first_camera, second_camera])
-
-    register_model(store, model)
-
-    with pytest.raises(RuntimeError, match="has not produced an output"):
-        store.read_model_output(first_camera.camera_id, model.model_id)
-
-    with pytest.raises(RuntimeError, match="has not produced an output"):
-        store.read_model_output(second_camera.camera_id, model.model_id)
-
-
-def test_writes_and_reads_latest_model_output() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = make_model([camera])
-    output = make_output(camera, model)
-    register_model(store, model)
-
-    store.write_model_output(camera.camera_id, model.model_id, output)
-
-    assert store.read_model_output(camera.camera_id, model.model_id) is output
-
-
-def test_environment_state_snapshot_excludes_object_detection_frame() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = make_model([camera])
-    output = make_output(camera, model)
-    register_model(store, model)
-    store.write_model_output(camera.camera_id, model.model_id, output)
-
-    snapshot = store.get_environment_state()
-
-    state = snapshot[f"{camera.camera_id}::{model.model_id}"]
-    assert state == {
-        "camera_id": camera.camera_id,
-        "model_name": model.name,
-        "perception_objects": [],
+    assert runtime.model_outputs == {
+        "detection-key": None,
+        "objects-key": None,
+        "analysis-key": None,
     }
 
 
-def test_environment_state_snapshot_includes_unproduced_outputs() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = make_model([camera])
-    register_model(store, model)
+def test_register_models_rejects_duplicate_model_ids() -> None:
+    camera = make_camera()
+    first = make_object_detection(camera)
+    second = make_object_detection(camera)
+    source = SimpleNamespace(models=[ModelConfig(first), ModelConfig(second)])
+    runtime = ModelRuntime(source, SimpleNamespace())
 
-    assert store.get_environment_state() == {
-        f"{camera.camera_id}::{model.model_id}": None
-    }
-
-
-def test_read_fails_before_model_produces_output() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = make_model([camera])
-    register_model(store, model)
-
-    with pytest.raises(RuntimeError, match="has not produced an output"):
-        store.read_model_output(camera.camera_id, model.model_id)
+    with pytest.raises(ValueError, match="Duplicate model ID"):
+        runtime.register_models()
 
 
-def test_unregistered_model_output_fails_loudly() -> None:
-    store = ModelOutputStore()
+def test_read_fails_before_output_is_produced() -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
 
-    with pytest.raises(KeyError, match="not registered"):
-        store.read_model_output("camera", "model")
-
-
-def test_duplicate_registration_does_not_replace_existing_output() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = make_model([camera])
-    output = make_output(camera, model)
-    register_model(store, model)
-    store.write_model_output(camera.camera_id, model.model_id, output)
-
-    with pytest.raises(KeyError, match="already registered"):
-        register_model(store, model)
-
-    assert store.read_model_output(camera.camera_id, model.model_id) is output
-
-
-def test_object_detection_runtime_receives_store_and_model_id() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = make_model([camera])
-
-    inference = model.create_inference(store)
-
-    assert inference.model_id == model.model_id
-    assert inference.model_session.model_output_store is store
-
-
-def test_vlm_runtime_receives_store_and_model_id() -> None:
-    camera = make_camera("camera")
-    store = ModelOutputStore()
-    model = VisionLanguageModel(
-        name="vision",
-        model_provider=VisionLanguageModelProviderEnum.ANTHROPIC,
-        user_prompt="Observe the frame",
-        api_key="test-key",
-        model_name="opus-4.6",
-        subscribed_cameras=[camera],
-    )
-
-    inference = model.create_inference(store)
-
-    assert inference.model_id == model.model_id
-    assert inference.model_session.model_output_store is store
-
-
-def test_object_detection_loop_writes_latest_output(monkeypatch) -> None:
-    class FakeObjectDetectionAdapter:
-        def detect(self, frame: Frame) -> list:
-            return []
-
-    camera = make_camera("camera")
-    camera.latest_frame = Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((2, 2, 3), dtype=np.uint8),
-    )
-    store = ModelOutputStore()
-    model = make_model([camera])
-    register_model(store, model)
-    inference = model.create_inference(store)
-    inference.model_session.model = FakeObjectDetectionAdapter()
-    inference.model_session._stop_event = threading.Event()
-
-    write_model_output = store.write_model_output
-
-    def write_then_stop(**kwargs) -> None:
-        write_model_output(**kwargs)
-        inference.model_session._stop_event.set()
-
-    monkeypatch.setattr(store, "write_model_output", write_then_stop)
-
-    inference.prediction_loop()
-
-    output = store.read_model_output(camera.camera_id, model.model_id)
-    assert isinstance(output, PerceptionStateModel)
-
-
-def test_vlm_loop_writes_latest_output(monkeypatch) -> None:
-    class FakeVisionLanguageModelAdapter:
-        def convert_to_valid_input(self, frame: str) -> dict[str, str]:
-            return {"frame": frame}
-
-        def predict(self, **kwargs) -> dict[str, object]:
-            return {
-                "environment_name": "workshop",
-                "description": "A workshop",
-                "objects": [],
-            }
-
-    camera = make_camera("camera")
-    camera.latest_frame = Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((2, 2, 3), dtype=np.uint8),
-    )
-    store = ModelOutputStore()
-    model = VisionLanguageModel(
-        name="vision",
-        model_provider=VisionLanguageModelProviderEnum.ANTHROPIC,
-        user_prompt="Observe the frame",
-        api_key="test-key",
-        model_name="opus-4.6",
-        subscribed_cameras=[camera],
-    )
-    store.register([(camera.camera_id, model.model_id)])
-    inference = model.create_inference(store)
-    inference.model_session.model = FakeVisionLanguageModelAdapter()
-    inference.model_session._stop_event = threading.Event()
-
-    write_model_output = store.write_model_output
-
-    def write_then_stop(**kwargs) -> None:
-        write_model_output(**kwargs)
-        inference.model_session._stop_event.set()
-
-    monkeypatch.setattr(store, "write_model_output", write_then_stop)
-
-    inference.prediction_loop()
-
-    output = store.read_model_output(camera.camera_id, model.model_id)
-    assert output.environment_name == "workshop"
-
-
-def test_model_runtime_builds_all_model_inferences() -> None:
-    camera = make_camera("camera")
-    object_detection = make_model([camera])
-    vision_language_model = VisionLanguageModel(
-        name="vision",
-        model_provider=VisionLanguageModelProviderEnum.ANTHROPIC,
-        user_prompt="Observe the frame",
-        api_key="test-key",
-        model_name="opus-4.6",
-        subscribed_cameras=[camera],
-    )
-    hardware_system = HardwareSystem(
-        models=[object_detection, vision_language_model],
-    )
-
-    runtime = ModelRuntime(hardware_system)
-
-    assert len(runtime.model_inferences) == 2
-    for inference in runtime.model_inferences.values():
-        assert (
-            inference.model_session.model_output_store
-            is runtime.model_output_store
+    with pytest.raises(RuntimeError, match="has not been produced yet"):
+        runtime.read_model_output(
+            inference.model_id,
+            camera.camera_id,
+            "object_detection",
         )
 
 
-def test_model_runtime_starts_and_stops_all_inference_threads() -> None:
-    camera = make_camera("camera")
-    runtime = ModelRuntime(
-        HardwareSystem(models=[make_model([camera])])
+def test_single_object_detection_uses_latest_frame() -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
+
+    result = runtime.single_inference(
+        inference.model_id,
+        "object_detection",
+        camera.camera_id,
     )
 
-    runtime.turn_on_all_models()
-    assert all(
-        inference.is_running
-        for inference in runtime.model_inferences.values()
+    assert result.camera_id == camera.camera_id
+
+
+def test_single_vlm_outputs_are_persisted_by_operation() -> None:
+    camera = make_camera()
+    inference = make_vision(camera)
+    runtime = make_runtime(inference)
+
+    objects = runtime.single_inference(
+        inference.model_id,
+        "locate_object",
+        ["encoded-frame"],
+        prompt="Locate objects",
+    )
+    analysis = runtime.single_inference(
+        inference.model_id,
+        "scene_analysis",
+        ["encoded-frame"],
+        prompt="Describe the scene",
     )
 
-    runtime.turn_off_all_models()
-    assert all(
-        not inference.is_running
-        for inference in runtime.model_inferences.values()
-    )
+    assert runtime.read_model_output(
+        inference.model_id,
+        camera.camera_id,
+        "locate_object",
+    ) is objects
+    assert runtime.read_model_output(
+        inference.model_id,
+        camera.camera_id,
+        "scene_analysis",
+    ) == analysis
 
 
-def test_model_runtime_turns_one_model_on_and_off_by_id() -> None:
-    camera = make_camera("camera")
-    model = make_model([camera])
-    runtime = ModelRuntime(HardwareSystem(models=[model]))
+def test_model_stream_lifecycle_fails_on_duplicate_operations() -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
 
-    runtime.turn_on_model(model.model_id)
-    runtime.turn_on_model(model.model_id)
-    assert runtime.model_inferences[model.model_id].is_running
+    runtime.turn_on_model_stream(inference.model_id)
+    with pytest.raises(RuntimeError, match="already running"):
+        runtime.turn_on_model_stream(inference.model_id)
 
-    runtime.turn_off_model(model.model_id)
-    runtime.turn_off_model(model.model_id)
-    assert not runtime.model_inferences[model.model_id].is_running
-
-
-def test_model_runtime_runs_single_object_detection_inference_for_multiple_cameras(
-) -> None:
-    class FakeObjectDetectionAdapter:
-        def detect(self, frame: Frame) -> list:
-            return []
-
-    cameras = [make_camera("first"), make_camera("second")]
-    for camera in cameras:
-        camera.latest_frame = Frame(
-            timestamp=datetime.now(),
-            image=np.zeros((2, 2, 3), dtype=np.uint8),
-        )
-    model = make_model(cameras)
-    runtime = ModelRuntime(HardwareSystem(models=[model]))
-    runtime.model_inferences[model.model_id].model_session.model = (
-        FakeObjectDetectionAdapter()
-    )
-
-    output = runtime.single_inference(
-        model.model_id,
-        [camera.camera_id for camera in cameras],
-    )
-
-    assert isinstance(output, list)
-    assert [result.camera_id for result in output] == [
-        camera.camera_id for camera in cameras
-    ]
+    runtime.turn_off_model_stream(inference.model_id)
+    with pytest.raises(RuntimeError, match="not running"):
+        runtime.turn_off_model_stream(inference.model_id)
 
 
-def test_model_runtime_runs_single_vlm_inference() -> None:
-    class FakeVisionLanguageModelAdapter:
-        def __init__(self) -> None:
-            self.frames = []
+def test_turn_on_all_model_streams_uses_configured_vlm_prompt() -> None:
+    camera = make_camera()
+    object_detection = make_object_detection(camera)
+    vision = make_vision(camera)
+    runtime = make_runtime(object_detection, vision)
 
-        def convert_to_valid_input(self, frame: str) -> dict[str, str]:
-            self.frames.append(frame)
-            return {"frame": frame}
+    runtime.turn_on_all_model_streams()
+    for _ in range(100):
+        if (
+            runtime.model_outputs["detection-key"] is not None
+            and runtime.model_outputs["objects-key"] is not None
+        ):
+            break
+        time.sleep(0.005)
+    runtime.turn_off_all_model_streams()
 
-        def predict(self, **kwargs) -> dict[str, object]:
-            return {
-                "environment_name": "workshop",
-                "description": "A workshop",
-                "objects": [],
-            }
-
-    camera = make_camera("camera")
-    model = VisionLanguageModel(
-        name="vision",
-        model_provider=VisionLanguageModelProviderEnum.ANTHROPIC,
-        user_prompt="Observe the frame",
-        api_key="test-key",
-        model_name="opus-4.6",
-        subscribed_cameras=[camera],
-    )
-    runtime = ModelRuntime(HardwareSystem(models=[model]))
-    adapter = FakeVisionLanguageModelAdapter()
-    runtime.model_inferences[model.model_id].model_session.model = adapter
-
-    output = runtime.single_inference(
-        model.model_id,
-        ["first-base64", "second-base64"],
-    )
-
-    assert output.environment_name == "workshop"
-    assert adapter.frames == ["first-base64", "second-base64"]
-
-
-def test_model_runtime_requires_at_least_one_object_detection_input() -> None:
-    camera = make_camera("camera")
-    model = make_model([camera])
-    runtime = ModelRuntime(HardwareSystem(models=[model]))
-
-    with pytest.raises(ValueError, match="At least one camera ID"):
-        runtime.single_inference(model.model_id, [])
+    assert runtime.model_outputs["detection-key"] is not None
+    assert runtime.model_outputs["objects-key"] is not None
+    assert vision.model.user_prompts[0] == vision.user_prompt
+    assert runtime.model_streams == {}

@@ -943,14 +943,13 @@ class ServerRuntime:
         def list_configured_models() -> list[ModelCatalogEntry]:
             catalog: list[ModelCatalogEntry] = []
             for model_id, model in registered_models.values():
-                cameras: list[SubscribedCameraCatalogEntry] = []
-                for camera in model.subscribed_cameras:
-                    cameras.append(
-                        SubscribedCameraCatalogEntry(
-                            camera_id=camera.camera_id,
-                            name=camera.name,
-                        )
+                camera = model.subscribed_camera
+                cameras = [
+                    SubscribedCameraCatalogEntry(
+                        camera_id=camera.camera_id,
+                        name=camera.name,
                     )
+                ]
                 catalog.append(
                     ModelCatalogEntry(
                         model_id=model_id,
