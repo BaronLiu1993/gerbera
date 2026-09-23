@@ -10,7 +10,7 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.validation import validate_hardware_system
+from gerbera_sdk.models.hardware.validation import HardwareValidationFacade
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
@@ -117,9 +117,8 @@ class GerberaRuntime:
     def validate_hardware(
         hardware_system: HardwareSystem,
     ) -> None:
-        error = validate_hardware_system(hardware_system)
-        if error is not None:
-            raise ValueError(error)
+        validation = HardwareValidationFacade.validate(hardware_system)
+        validation.raise_for_errors()
 
     @staticmethod
     def bind_connection_microcontroller_ids(
