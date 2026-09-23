@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 import threading
-from typing import Any, Literal
+from typing import ClassVar, Literal
 import uuid
 
 from pydantic import Field
@@ -10,14 +8,17 @@ from pydantic import Field
 from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
-    ObjectDetectionModelAdapters,
+    ObjectDetectionAdapter,
 )
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
     PerceptionStateModel,
 )
-from gerbera_sdk.inference.model_types import ObjectDetectionModelProviderEnum
+from gerbera_sdk.inference.model_types import (
+    ObjectDetectionModelProviderEnum,
+    build_model_output_keys,
+)
 from gerbera_sdk.models.hardware.camera import Camera
-from gerbera_sdk.utils import StrictSchema, build_hashable_key
+from gerbera_sdk.utils import StrictSchema
 
 
 class ObjectDetectionModel(StrictSchema):
@@ -31,28 +32,19 @@ class ObjectDetectionModel(StrictSchema):
     max_detections: int = 300
     description: str = ""
     model_type: Literal["object_detection"] = "object_detection"
-    model_operations: tuple[Literal["object_detection"], ...] = (
+    model_operations: ClassVar[tuple[Literal["object_detection"], ...]] = (
         "object_detection",
     )
     interval_seconds: float = Field(default=0.2, gt=0)
 
     def model_output_keys(self) -> dict[str, dict[str, str]]:
-        camera_id = self.subscribed_camera.camera_id
-        return {
-            "object_detection": {
-                camera_id: build_hashable_key(
-                    self.model_id,
-                    camera_id,
-                    "object_detection",
-                )
-            }
-        }
+        return build_model_output_keys(
+            self.model_id,
+            self.subscribed_camera.camera_id,
+            self.model_operations,
+        )
 
-    def create_inference(
-        self,
-        model_output_writer: Any,
-        camera_runtime: Any,
-    ) -> "ObjectDetectionModelInference":
+    def create_inference(self) -> "ObjectDetectionModelInference":
         adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
         adapter = adapter_class(
             model_source=self.model_source,
@@ -62,8 +54,6 @@ class ObjectDetectionModel(StrictSchema):
         )
         return ObjectDetectionModelInference(
             model=adapter,
-            model_output_writer=model_output_writer,
-            camera_runtime=camera_runtime,
             name=self.name,
             description=self.description,
             subscribed_camera=self.subscribed_camera,
@@ -76,9 +66,7 @@ class ObjectDetectionModel(StrictSchema):
 
 @dataclass
 class ObjectDetectionModelInference:
-    model: ObjectDetectionModelAdapters
-    model_output_writer: Any
-    camera_runtime: Any
+    model: ObjectDetectionAdapter
     name: str
     description: str
     subscribed_camera: Camera
@@ -92,43 +80,11 @@ class ObjectDetectionModelInference:
         repr=False,
     )
 
-    @property
-    def subscribed_cameras(self) -> list[Camera]:
-        return [self.subscribed_camera]
-
-    def predict_for_frame(
-        self,
-        camera: Camera,
-        frame: Frame,
-    ) -> PerceptionStateModel:
-        return PerceptionStateModel(
-            camera_id=camera.camera_id,
-            frame=frame,
-            model_name=self.name,
-            perception_objects=self.model.detect(frame),
-        )
-
-    def predict(self, camera_id: str) -> PerceptionStateModel:
-        if camera_id != self.subscribed_camera.camera_id:
-            raise RuntimeError(f"Camera is not subscribed: {camera_id}")
-        frame = self.camera_runtime.get_latest_frame(camera_id)
+    def predict(self, frame: Frame) -> PerceptionStateModel:
         with self._prediction_lock:
-            return self.predict_for_frame(self.subscribed_camera, frame)
-
-    def predict_many(self, camera_ids: list[str]) -> list[PerceptionStateModel]:
-        if not camera_ids:
-            raise ValueError("At least one camera ID is required for inference")
-        return [self.predict(camera_id) for camera_id in camera_ids]
-
-    def predict_latest_frame(self) -> None:
-        camera_id = self.subscribed_camera.camera_id
-        with self.camera_runtime.lock:
-            frame = self.camera_runtime.latest_frames.get(camera_id)
-        if frame is None:
-            return
-        with self._prediction_lock:
-            result = self.predict_for_frame(self.subscribed_camera, frame)
-        self.model_output_writer.write_model_output(
-            key=self.model_output_keys["object_detection"][camera_id],
-            model_output=result,
-        )
+            return PerceptionStateModel(
+                camera_id=self.subscribed_camera.camera_id,
+                frame=frame,
+                model_name=self.name,
+                perception_objects=self.model.detect(frame),
+            )

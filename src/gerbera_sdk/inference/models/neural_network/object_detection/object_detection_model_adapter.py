@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, TypeAlias
 
 import cv2
 import numpy as np
@@ -15,7 +16,6 @@ from gerbera_sdk.inference.models.neural_network.object_detection.object_detecti
     PerceptionObjectModel,
 )
 from gerbera_sdk.paths import MODELS_PATH
-
 
 @dataclass
 class ObjectDetectionAdapter(ABC):
@@ -52,9 +52,9 @@ class ObjectDetectionAdapter(ABC):
 
 @dataclass
 class Yolov5ModelAdapter(ObjectDetectionAdapter):
-    confidence_threshold: float
-    iou_threshold: float
-    max_detections: int
+    confidence_threshold: float = 0.25
+    iou_threshold: float = 0.45
+    max_detections: int = 300
 
     def validate_output(self, predictions: NDArray[np.floating]) -> None:
         value_count = 5 + len(self.manifest.output.class_names)
@@ -63,7 +63,7 @@ class Yolov5ModelAdapter(ObjectDetectionAdapter):
             self.manifest.output.prediction_count,
             value_count,
         )
-        
+
         if predictions.shape != expected_shape:
             raise ValueError(
                 "Unexpected YOLOv5 output shape: "
@@ -183,27 +183,6 @@ class Yolov5ModelAdapter(ObjectDetectionAdapter):
         self.model.setInput(blob)
         predictions = self.model.forward()
         return self.decode(predictions)
-
-
-class Yolov8ModelAdapter(ObjectDetectionAdapter):
-    MODEL_FORMAT: ClassVar[ObjectDetectionModelProviderEnum] = (
-        ObjectDetectionModelProviderEnum.YOLOV8
-    )
-
-    def validate_output(self, predictions: NDArray[np.floating]) -> None:
-        pass
-
-    def decode(
-        self,
-        predictions: NDArray[np.floating],
-    ) -> list[PerceptionObjectModel]:
-        pass
-
-    def detect(self, frame: Frame) -> list[PerceptionObjectModel]:
-        pass
-
-
-ObjectDetectionModelAdapters: TypeAlias = Yolov5ModelAdapter
 
 OBJECT_DETECTION_MODEL_REGISTRY = {
     ObjectDetectionModelProviderEnum.YOLOV5: Yolov5ModelAdapter,

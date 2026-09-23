@@ -19,8 +19,19 @@ from gerbera_sdk.inference import (
     VisionLanguageModel,
     VisionLanguageModelFrameEnvironment,
     VisionLanguageModelInference,
+    VisionLanguageModelProviderEnum,
     Yolov5ModelAdapter,
 )
+from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
+
+
+TEST_CAMERA = Camera(
+    name="camera",
+    description="Test camera",
+    source=DeviceCameraSource(device_index=0),
+)
+
+
 class RecordingVisionLanguageModelAdapter(VisionLanguageModelAdapter):
     def __init__(self) -> None:
         super().__init__(api_key="key", model="test-model")
@@ -52,6 +63,14 @@ class RecordingVisionLanguageModelAdapter(VisionLanguageModelAdapter):
             "description": "A workbench",
             "objects": [],
         }
+
+    def analyze_scene(
+        self,
+        model_input: list[dict[str, object]],
+        system_prompt: str,
+        user_prompt: str,
+    ) -> str:
+        return "A workbench"
 
 
 def test_yolov5_adapter_loads_weights_from_project_models(
@@ -88,9 +107,9 @@ def test_object_detection_registry_contains_yolov5_adapter() -> None:
             {
                 "name": "detector",
                 "model_type": "object_detection",
-                "model_class": "yolov5",
-                "weights": "detector.onnx",
-                "class_names": ["part"],
+                "model_name": "yolov5",
+                "model_source": "detector.onnx",
+                "subscribed_camera": TEST_CAMERA,
                 "description": "Detect parts",
             },
             ObjectDetectionModel,
@@ -99,8 +118,10 @@ def test_object_detection_registry_contains_yolov5_adapter() -> None:
             {
                 "name": "observer",
                 "model_type": "vision_language_model",
-                "model_class": "openai",
+                "model_provider": "openai",
                 "model_name": "vision-model",
+                "api_key": "test-key",
+                "subscribed_camera": TEST_CAMERA,
                 "description": "Observe the workspace",
                 "user_prompt": "Describe the workspace",
             },
@@ -139,9 +160,10 @@ def test_vision_language_model_converts_then_predicts() -> None:
         name="vision",
         description="Test vision model",
         user_prompt="Describe the frame",
+        subscribed_camera=TEST_CAMERA,
     )
 
-    result = inference.predict(frames)
+    result = inference.predict(frames, prompt="Describe the frame")
 
     assert adapter.frames == [
         frame.to_base64_string()
@@ -184,10 +206,11 @@ def test_vision_language_model_requires_at_least_one_frame() -> None:
         name="vision",
         description="Test vision model",
         user_prompt="Describe the frames",
+        subscribed_camera=TEST_CAMERA,
     )
 
     with pytest.raises(ValueError, match="At least one frame"):
-        inference.predict([])
+        inference.predict([], prompt="Describe the frames")
 
 
 def test_vision_language_model_converts_each_frame_to_base64() -> None:
@@ -197,6 +220,7 @@ def test_vision_language_model_converts_each_frame_to_base64() -> None:
         name="vision",
         description="Test vision model",
         user_prompt="Describe the frames",
+        subscribed_camera=TEST_CAMERA,
     )
 
     frames = [
@@ -209,7 +233,7 @@ def test_vision_language_model_converts_each_frame_to_base64() -> None:
             image=np.ones((2, 2, 3), dtype=np.uint8),
         ),
     ]
-    result = inference.predict(frames)
+    result = inference.predict(frames, prompt="Describe the frames")
 
     assert adapter.prediction_args["model_input"] == [
         {"frame_index": 0},
@@ -250,6 +274,7 @@ def test_vision_language_model_prompt_defines_normalized_coordinates() -> None:
         name="vision",
         description="Test vision model",
         user_prompt="Describe the frame",
+        subscribed_camera=TEST_CAMERA,
     )
 
     assert "Gerbera hardware setup" in inference.system_prompt

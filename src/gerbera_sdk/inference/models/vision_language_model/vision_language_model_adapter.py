@@ -4,8 +4,6 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import TypeAlias
-
 import httpx
 
 from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
@@ -27,6 +25,20 @@ class VisionLanguageModelAdapter(ABC):
             )
         return output
 
+    @staticmethod
+    def _raise_for_status(
+        response: httpx.Response,
+        provider: str,
+    ) -> None:
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise httpx.HTTPStatusError(
+                f"{exc}\n{provider} response: {response.text}",
+                request=exc.request,
+                response=exc.response,
+            ) from exc
+
     @abstractmethod
     def convert_to_valid_input(
         self,
@@ -44,15 +56,14 @@ class VisionLanguageModelAdapter(ABC):
     ) -> dict[str, object]:
         pass
 
+    @abstractmethod
     def analyze_scene(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
         user_prompt: str,
     ) -> str:
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support scene analysis"
-        )
+        pass
 
 
 class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
@@ -76,38 +87,14 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        response = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": self.model,
-                "max_tokens": self.max_tokens,
-                "system": system_prompt,
-                "output_config": {
-                    "format": {
-                        "type": "json_schema",
-                        "schema": output_schema,
-                    }
-                },
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            *model_input,
-                            {"type": "text", "text": user_prompt},
-                        ],
-                    }
-                ],
-            },
-            timeout=self.timeout_seconds,
+        return self._parse_json_output(
+            self._request(
+                model_input=model_input,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                output_schema=output_schema,
+            )
         )
-        response.raise_for_status()
-        payload = response.json()
-        return self._parse_json_output(payload["content"][0]["text"])
 
     def analyze_scene(
         self,
@@ -115,6 +102,37 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         system_prompt: str,
         user_prompt: str,
     ) -> str:
+        return self._request(model_input, system_prompt, user_prompt)
+
+    def _request(
+        self,
+        model_input: list[dict[str, object]],
+        system_prompt: str,
+        user_prompt: str,
+        output_schema: dict[str, object] | None = None,
+    ) -> str:
+        body: dict[str, object] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "system": system_prompt,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        *model_input,
+                        {"type": "text", "text": user_prompt},
+                    ],
+                }
+            ],
+        }
+        if output_schema is not None:
+            body["output_config"] = {
+                "format": {
+                    "type": "json_schema",
+                    "schema": output_schema,
+                }
+            }
+
         response = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -122,25 +140,20 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
-            json={
-                "model": self.model,
-                "max_tokens": self.max_tokens,
-                "system": system_prompt,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            *model_input,
-                            {"type": "text", "text": user_prompt},
-                        ],
-                    }
-                ],
-            },
+            json=body,
             timeout=self.timeout_seconds,
         )
-        response.raise_for_status()
+        self._raise_for_status(response, "Anthropic")
         payload = response.json()
-        return payload["content"][0]["text"]
+        try:
+            text = payload["content"][0]["text"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RuntimeError(
+                "Anthropic response did not contain text content"
+            ) from exc
+        if not isinstance(text, str):
+            raise RuntimeError("Anthropic response text must be a string")
+        return text
 
 
 class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
@@ -160,50 +173,13 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        response = httpx.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.model,
-                "instructions": system_prompt,
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "vision_language_model_frame_environment",
-                        "schema": output_schema,
-                        "strict": True,
-                    }
-                },
-                "input": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": user_prompt},
-                            *model_input,
-                        ],
-                    }
-                ],
-            },
-            timeout=self.timeout_seconds,
-        )
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise httpx.HTTPStatusError(
-                f"{exc}\nOpenAI response: {response.text}",
-                request=exc.request,
-                response=exc.response,
-            ) from exc
-        payload = response.json()
-        for output in payload.get("output", []):
-            for content in output.get("content", []):
-                if content.get("type") == "output_text":
-                    return self._parse_json_output(content["text"])
-        raise RuntimeError(
-            "OpenAI response did not contain output_text structured output"
+        return self._parse_json_output(
+            self._request(
+                model_input=model_input,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                output_schema=output_schema,
+            )
         )
 
     def analyze_scene(
@@ -212,33 +188,55 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         system_prompt: str,
         user_prompt: str,
     ) -> str:
+        return self._request(model_input, system_prompt, user_prompt)
+
+    def _request(
+        self,
+        model_input: list[dict[str, object]],
+        system_prompt: str,
+        user_prompt: str,
+        output_schema: dict[str, object] | None = None,
+    ) -> str:
+        body: dict[str, object] = {
+            "model": self.model,
+            "instructions": system_prompt,
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": user_prompt},
+                        *model_input,
+                    ],
+                }
+            ],
+        }
+        if output_schema is not None:
+            body["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": "vision_language_model_frame_environment",
+                    "schema": output_schema,
+                    "strict": True,
+                }
+            }
+
         response = httpx.post(
             "https://api.openai.com/v1/responses",
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": self.model,
-                "instructions": system_prompt,
-                "input": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": user_prompt},
-                            *model_input,
-                        ],
-                    }
-                ],
-            },
+            json=body,
             timeout=self.timeout_seconds,
         )
-        response.raise_for_status()
+        self._raise_for_status(response, "OpenAI")
         payload = response.json()
         for output in payload.get("output", []):
             for content in output.get("content", []):
                 if content.get("type") == "output_text":
-                    return content["text"]
+                    text = content.get("text")
+                    if isinstance(text, str):
+                        return text
         raise RuntimeError("OpenAI response did not contain output_text")
 
 
@@ -261,45 +259,13 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        response = httpx.post(
-            (
-                "https://generativelanguage.googleapis.com/v1beta/"
-                f"models/{self.model}:generateContent"
-            ),
-            headers={
-                "x-goog-api-key": self.api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "system_instruction": {
-                    "parts": [{"text": system_prompt}],
-                },
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [
-                            *model_input,
-                            {"text": user_prompt},
-                        ],
-                    }
-                ],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseSchema": output_schema,
-                },
-            },
-            timeout=self.timeout_seconds,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        for candidate in payload.get("candidates", []):
-            content = candidate.get("content", {})
-            for part in content.get("parts", []):
-                text = part.get("text")
-                if text is not None:
-                    return self._parse_json_output(text)
-        raise RuntimeError(
-            "Google response did not contain candidate text structured output"
+        return self._parse_json_output(
+            self._request(
+                model_input=model_input,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                output_schema=output_schema,
+            )
         )
 
     def analyze_scene(
@@ -308,6 +274,35 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         system_prompt: str,
         user_prompt: str,
     ) -> str:
+        return self._request(model_input, system_prompt, user_prompt)
+
+    def _request(
+        self,
+        model_input: list[dict[str, object]],
+        system_prompt: str,
+        user_prompt: str,
+        output_schema: dict[str, object] | None = None,
+    ) -> str:
+        body: dict[str, object] = {
+            "system_instruction": {
+                "parts": [{"text": system_prompt}],
+            },
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        *model_input,
+                        {"text": user_prompt},
+                    ],
+                }
+            ],
+        }
+        if output_schema is not None:
+            body["generationConfig"] = {
+                "responseMimeType": "application/json",
+                "responseSchema": output_schema,
+            }
+
         response = httpx.post(
             (
                 "https://generativelanguage.googleapis.com/v1beta/"
@@ -317,38 +312,19 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
                 "x-goog-api-key": self.api_key,
                 "Content-Type": "application/json",
             },
-            json={
-                "system_instruction": {
-                    "parts": [{"text": system_prompt}],
-                },
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [
-                            *model_input,
-                            {"text": user_prompt},
-                        ],
-                    }
-                ],
-            },
+            json=body,
             timeout=self.timeout_seconds,
         )
-        response.raise_for_status()
+        self._raise_for_status(response, "Google")
         payload = response.json()
         for candidate in payload.get("candidates", []):
             content = candidate.get("content", {})
             for part in content.get("parts", []):
                 text = part.get("text")
-                if text is not None:
+                if isinstance(text, str):
                     return text
         raise RuntimeError("Google response did not contain candidate text")
 
-
-VisionLanguageModelAdapters: TypeAlias = (
-    AnthropicVisionLanguageModelAdapter
-    | OpenAIVisionLanguageModelAdapter
-    | GoogleVisionLanguageModelAdapter
-)
 
 VISION_LANGUAGE_MODEL_REGISTRY = {
     VisionLanguageModelProviderEnum.ANTHROPIC: AnthropicVisionLanguageModelAdapter,

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 import threading
-from typing import Any, Literal
+from typing import ClassVar, Literal, Sequence
 import uuid
 
 from pydantic import Field
@@ -14,21 +15,18 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_sc
 )
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_adapter import (
     VISION_LANGUAGE_MODEL_REGISTRY,
-    VisionLanguageModelAdapters,
+    VisionLanguageModelAdapter,
 )
-from gerbera_sdk.inference.model_types import VisionLanguageModelProviderEnum
+from gerbera_sdk.inference.model_types import (
+    VisionLanguageModelProviderEnum,
+    build_model_output_keys,
+)
 from gerbera_sdk.models.hardware.camera import Camera
-from gerbera_sdk.utils import StrictSchema, build_hashable_key
+from gerbera_sdk.utils import StrictSchema
 
 VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH = (
     Path(__file__).resolve().parent / "vision_language_model.md"
 )
-
-VISION_LANGUAGE_MODEL_VALID_NAME = {
-    VisionLanguageModelProviderEnum.ANTHROPIC: ["opus-4.6"],
-    VisionLanguageModelProviderEnum.OPENAI: [],
-    VisionLanguageModelProviderEnum.GOOGLE: [],
-}
 
 
 class VisionLanguageModel(StrictSchema):
@@ -43,40 +41,22 @@ class VisionLanguageModel(StrictSchema):
     max_tokens: int = 1024
     description: str = ""
     model_type: Literal["vision_language_model"] = "vision_language_model"
-    model_operations: tuple[
+    model_operations: ClassVar[tuple[
         Literal["locate_object", "scene_analysis"], ...
-    ] = (
+    ]] = (
         "locate_object",
         "scene_analysis",
     )
     interval_seconds: float = Field(default=5.0, gt=0)
 
     def model_output_keys(self) -> dict[str, dict[str, str]]:
-        camera_id = self.subscribed_camera.camera_id
-        return {
-            operation: {
-                camera_id: build_hashable_key(
-                    self.model_id,
-                    camera_id,
-                    operation,
-                )
-            }
-            for operation in self.model_operations
-        }
+        return build_model_output_keys(
+            self.model_id,
+            self.subscribed_camera.camera_id,
+            self.model_operations,
+        )
 
-    def create_inference(
-        self,
-        model_output_writer: Any,
-        camera_runtime: Any,
-    ) -> "VisionLanguageModelInference":
-        if (
-            self.model_name
-            not in VISION_LANGUAGE_MODEL_VALID_NAME[self.model_provider]
-        ):
-            raise RuntimeError(
-                f"Model Does Not Exist For Provider {self.model_provider}"
-            )
-
+    def create_inference(self) -> "VisionLanguageModelInference":
         adapter = VISION_LANGUAGE_MODEL_REGISTRY[self.model_provider](
             api_key=self.api_key,
             model=self.model_name,
@@ -85,8 +65,6 @@ class VisionLanguageModel(StrictSchema):
         )
         return VisionLanguageModelInference(
             model=adapter,
-            model_output_writer=model_output_writer,
-            camera_runtime=camera_runtime,
             name=self.name,
             description=self.description,
             user_prompt=self.user_prompt,
@@ -100,13 +78,11 @@ class VisionLanguageModel(StrictSchema):
 
 @dataclass
 class VisionLanguageModelInference:
-    model: VisionLanguageModelAdapters
+    model: VisionLanguageModelAdapter
     name: str
     description: str
     user_prompt: str
-    model_output_writer: Any = None
-    camera_runtime: Any = None
-    subscribed_camera: Camera | None = None
+    subscribed_camera: Camera
     model_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     model_type: str = "vision_language_model"
     model_output_keys: dict[str, dict[str, str]] = field(default_factory=dict)
@@ -117,13 +93,7 @@ class VisionLanguageModelInference:
         repr=False,
     )
 
-    @property
-    def subscribed_cameras(self) -> list[Camera]:
-        if self.subscribed_camera is None:
-            return []
-        return [self.subscribed_camera]
-
-    @property
+    @cached_property
     def system_prompt(self) -> str:
         base_prompt = VISION_LANGUAGE_MODEL_SYSTEM_PROMPT_PATH.read_text().strip()
         return "\n\n".join(
@@ -134,43 +104,21 @@ class VisionLanguageModelInference:
             ]
         )
 
-    def predict_latest_frames(self, prompt: str) -> None:
-        if self.subscribed_camera is None or self.camera_runtime is None:
-            raise RuntimeError("Vision language model stream has no camera runtime")
-        if self.model_output_writer is None:
-            raise RuntimeError("Vision language model stream has no output writer")
-        camera_id = self.subscribed_camera.camera_id
-        with self.camera_runtime.lock:
-            frame = self.camera_runtime.latest_frames.get(camera_id)
-        if frame is None:
-            return
-
-        model_output = self.predict(
-            [frame.to_base64_string()],
-            operation="locate_object",
-            prompt=prompt,
-        )
-        self.model_output_writer.write_model_output(
-            key=self.model_output_keys["locate_object"][camera_id],
-            model_output=model_output,
-        )
-
     def predict(
         self,
-        base64_frames: list[str] | list[Frame],
+        frames: Sequence[str | Frame],
+        prompt: str,
         operation: Literal["locate_object", "scene_analysis"] = "locate_object",
-        prompt: str | None = None,
     ) -> VisionLanguageModelFrameEnvironment | str:
-        if not base64_frames:
+        if not frames:
             raise ValueError("At least one frame is required for inference")
-        prompt = self.user_prompt if prompt is None else prompt
 
         with self._prediction_lock:
             model_input = [
                 self.model.convert_to_valid_input(
                     frame.to_base64_string() if isinstance(frame, Frame) else frame
                 )
-                for frame in base64_frames
+                for frame in frames
             ]
             if operation == "scene_analysis":
                 return self.model.analyze_scene(
