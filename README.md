@@ -88,7 +88,6 @@ STREAM,hw201_8e910dfb_e8f75c2b,value:1
 - `description` is human-facing and can be long.
 - `event_name` is internal, deterministic, hash-based, and Postgres-safe.
 - Database streaming is explicit per connection.
-- Device builders must opt into database compatibility with `supports_database = True`.
 
 ## Identifier Strategy
 

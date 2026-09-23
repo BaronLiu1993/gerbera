@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable
 
-from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.utils import build_connection_event_name
 
 
@@ -13,7 +12,6 @@ class Connection:
     description: str
     microcontroller_id: str | None = None
     stream: bool = False
-    database: Optional[Database] = None
     actions: dict[
         str,
         Callable[[dict[str, object]], dict[str, object]],
@@ -21,9 +19,7 @@ class Connection:
 
     @property
     def stream_enabled(self) -> bool:
-        # Transitional compatibility: old callers used database presence to
-        # request streaming. New callers should set stream=True.
-        return self.stream or self.database is not None
+        return self.stream
 
     @property
     def event_name(self) -> str:
