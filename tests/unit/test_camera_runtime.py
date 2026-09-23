@@ -66,11 +66,11 @@ def _camera(
 
 
 def test_camera_address_resolves_supported_sources() -> None:
-    assert CameraRuntime._get_camera_address(
+    assert CameraRuntime.get_camera_address(
         DeviceCameraSource(device_index=2)
     ) == 2
     assert (
-        CameraRuntime._get_camera_address(
+        CameraRuntime.get_camera_address(
             MJPEGSource(stream_url="http://camera/stream")
         )
         == "http://camera/stream"
@@ -80,38 +80,64 @@ def test_camera_address_resolves_supported_sources() -> None:
 def test_register_cameras_is_idempotent() -> None:
     camera = _camera()
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=[camera])
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
     )
 
-    runtime.register_cameras()
+    runtime.build_camera_sessions()
     first_session = runtime.get_camera_session(camera.camera_id)
-    runtime.register_cameras()
+    runtime.build_camera_sessions()
 
     assert runtime.get_camera_session(camera.camera_id) is first_session
     assert first_session.camera is camera
 
 
-def test_start_cameras_starts_every_configured_camera(
+def test_start_starts_every_configured_camera(
     monkeypatch,
 ) -> None:
     cameras = [_camera("first"), _camera("second")]
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=cameras)
+        hardware_system=HardwareSystem(name="test", cameras=cameras)
     )
     started = []
+    ready = []
     monkeypatch.setattr(
         runtime,
         "turn_on_camera_stream",
         lambda camera_key: started.append(camera_key),
     )
+    monkeypatch.setattr(
+        runtime,
+        "wait_for_first_frame",
+        lambda camera_key: ready.append(camera_key),
+    )
 
-    runtime.start_cameras()
+    runtime.start()
 
     assert started == ["first", "second"]
+    assert ready == ["first", "second"]
     assert set(runtime.camera_registry) == {"first", "second"}
 
 
-def test_capture_frames_reads_from_running_camera_stream(
+def test_start_propagates_camera_capture_failure(monkeypatch) -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    capture = FakeCapture(opened=False)
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda _: capture,
+    )
+
+    with pytest.raises(RuntimeError, match="failed before capturing") as exc:
+        runtime.start()
+
+    assert isinstance(exc.value.__cause__, RuntimeError)
+    assert runtime.get_camera_session(camera.camera_id).thread is None
+    assert capture.released
+
+
+def test_capture_frames_reads_requested_batch(
     monkeypatch,
 ) -> None:
     camera = _camera()
@@ -120,10 +146,14 @@ def test_capture_frames_reads_from_running_camera_stream(
         timestamp=datetime.datetime.now(),
     )
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=[camera])
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
     )
-    runtime.register_cameras()
-    runtime.get_camera_session(camera.camera_id)._thread = SimpleNamespace()
+    runtime.build_camera_sessions()
+    capture = FakeCapture(frame=camera.latest_frame.image)
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        lambda _: capture,
+    )
     sleep_calls = []
     monkeypatch.setattr(
         "gerbera_sdk.models.runtime.camera_runtime.time.sleep",
@@ -136,7 +166,11 @@ def test_capture_frames_reads_from_running_camera_stream(
         interval_seconds=0.25,
     )
 
-    assert frames == [camera.latest_frame] * 3
+    assert len(frames) == 3
+    assert all(
+        np.array_equal(frame.image, camera.latest_frame.image)
+        for frame in frames
+    )
     assert sleep_calls == [0.25, 0.25]
 
 
@@ -152,7 +186,7 @@ def test_capture_frames_rejects_invalid_batch_settings(
     interval_seconds: float,
     message: str,
 ) -> None:
-    runtime = CameraRuntime(hardware_system=HardwareSystem())
+    runtime = CameraRuntime(hardware_system=HardwareSystem(name="test"))
 
     with pytest.raises(ValueError, match=message):
         runtime.capture_frames(
@@ -165,16 +199,15 @@ def test_capture_frames_rejects_invalid_batch_settings(
 def test_capture_frames_fails_before_camera_has_a_frame() -> None:
     camera = _camera()
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=[camera])
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
     )
-    runtime.register_cameras()
-    runtime.get_camera_session(camera.camera_id)._thread = SimpleNamespace()
+    runtime.build_camera_sessions()
 
     with pytest.raises(
         RuntimeError,
         match="Camera has not captured a frame yet",
     ):
-        runtime.capture_frames(camera.camera_id)
+        runtime.get_latest_frame(camera.camera_id)
 
 
 def test_capture_loop_updates_latest_frame(
@@ -182,20 +215,20 @@ def test_capture_loop_updates_latest_frame(
 ) -> None:
     camera = _camera()
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=[camera])
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
     )
-    runtime.register_cameras()
+    runtime.build_camera_sessions()
     session = runtime.get_camera_session(camera.camera_id)
-    session._stop_event = threading.Event()
-    capture = FakeCapture(on_read=session._stop_event.set)
+    session.stop_event = threading.Event()
+    capture = FakeCapture(on_read=session.stop_event.set)
     monkeypatch.setattr(
         "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
         lambda _: capture,
     )
 
-    runtime._capture_loop(camera.camera_id)
+    runtime.capture_loop(camera.camera_id)
 
-    assert camera.latest_frame is not None
+    assert runtime.get_latest_frame(camera.camera_id) is not None
     assert capture.released
 
 
@@ -204,9 +237,9 @@ def test_turn_on_camera_stream_starts_capture_thread(
 ) -> None:
     camera = _camera()
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=[camera])
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
     )
-    runtime.register_cameras()
+    runtime.build_camera_sessions()
     created_threads = []
 
     def build_thread(**kwargs):
@@ -225,8 +258,88 @@ def test_turn_on_camera_stream_starts_capture_thread(
 
     runtime.turn_on_camera_stream(camera.camera_id)
 
-    assert created_threads[0].target == runtime._capture_loop
+    assert created_threads[0].target == runtime.capture_loop
     assert created_threads[0].args == (camera.camera_id,)
+
+
+def test_wait_for_first_frame_propagates_capture_failure() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    runtime.build_camera_sessions()
+    session = runtime.get_camera_session(camera.camera_id)
+    failure = RuntimeError("capture failed")
+    session.startup_error = failure
+    session.first_frame_ready.set()
+
+    with pytest.raises(RuntimeError, match="failed before capturing") as exc:
+        runtime.wait_for_first_frame(camera.camera_id)
+
+    assert exc.value.__cause__ is failure
+
+
+def test_wait_for_first_frame_times_out() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera]),
+        startup_timeout_seconds=0.0,
+    )
+    runtime.build_camera_sessions()
+
+    with pytest.raises(TimeoutError, match="did not capture"):
+        runtime.wait_for_first_frame(camera.camera_id)
+
+
+def test_wait_for_first_frame_rejects_ready_session_without_frame() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    runtime.build_camera_sessions()
+    runtime.get_camera_session(camera.camera_id).first_frame_ready.set()
+
+    with pytest.raises(RuntimeError, match="readiness without a frame"):
+        runtime.wait_for_first_frame(camera.camera_id)
+
+
+def test_turn_off_camera_stream_rejects_live_thread_after_timeout() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    runtime.build_camera_sessions()
+    session = runtime.get_camera_session(camera.camera_id)
+    session.stop_event = threading.Event()
+    session.thread = SimpleNamespace(
+        join=lambda timeout: None,
+        is_alive=lambda: True,
+    )
+
+    with pytest.raises(RuntimeError, match="did not stop"):
+        runtime.turn_off_camera_stream(camera.camera_id)
+
+    assert session.stop_event.is_set()
+    assert session.thread is not None
+
+
+def test_turn_off_camera_stream_clears_a_stopped_session() -> None:
+    camera = _camera()
+    runtime = CameraRuntime(
+        hardware_system=HardwareSystem(name="test", cameras=[camera])
+    )
+    runtime.build_camera_sessions()
+    session = runtime.get_camera_session(camera.camera_id)
+    session.stop_event = threading.Event()
+    session.thread = SimpleNamespace(
+        join=lambda timeout: None,
+        is_alive=lambda: False,
+    )
+
+    runtime.turn_off_camera_stream(camera.camera_id)
+
+    assert session.stop_event is None
+    assert session.thread is None
 
 
 def test_clean_up_cameras_stops_streams_and_clears_registry(
@@ -234,18 +347,18 @@ def test_clean_up_cameras_stops_streams_and_clears_registry(
 ) -> None:
     cameras = [_camera("first"), _camera("second")]
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=cameras)
+        hardware_system=HardwareSystem(name="test", cameras=cameras)
     )
-    runtime.register_cameras()
+    runtime.build_camera_sessions()
     stopped = []
-    runtime.get_camera_session("first")._thread = SimpleNamespace()
+    runtime.get_camera_session("first").thread = SimpleNamespace()
     monkeypatch.setattr(
         runtime,
         "turn_off_camera_stream",
         lambda camera_key: stopped.append(camera_key),
     )
 
-    runtime.clean_up_cameras()
+    runtime.close()
 
     assert stopped == ["first"]
     assert runtime.camera_registry == {}
@@ -256,11 +369,11 @@ def test_clean_up_cameras_continues_after_first_stop_error(
 ) -> None:
     cameras = [_camera("first"), _camera("second")]
     runtime = CameraRuntime(
-        hardware_system=HardwareSystem(cameras=cameras)
+        hardware_system=HardwareSystem(name="test", cameras=cameras)
     )
-    runtime.register_cameras()
-    runtime.get_camera_session("first")._thread = SimpleNamespace()
-    runtime.get_camera_session("second")._thread = SimpleNamespace()
+    runtime.build_camera_sessions()
+    runtime.get_camera_session("first").thread = SimpleNamespace()
+    runtime.get_camera_session("second").thread = SimpleNamespace()
     stop_attempts = []
     first_failure = RuntimeError("first camera failed to stop")
 
@@ -272,15 +385,15 @@ def test_clean_up_cameras_continues_after_first_stop_error(
     monkeypatch.setattr(runtime, "turn_off_camera_stream", stop_camera)
 
     with pytest.raises(RuntimeError, match="Could not clean up cameras") as exc:
-        runtime.clean_up_cameras()
+        runtime.close()
 
     assert stop_attempts == ["first", "second"]
     assert exc.value.__cause__ is first_failure
-    assert set(runtime.camera_registry) == {"first"}
+    assert set(runtime.camera_registry) == {"first", "second"}
 
 
 def test_camera_runtime_rejects_unknown_camera() -> None:
-    runtime = CameraRuntime(hardware_system=HardwareSystem())
+    runtime = CameraRuntime(hardware_system=HardwareSystem(name="test"))
 
     with pytest.raises(RuntimeError, match="Camera does not exist"):
         runtime.get_camera_session("missing")

@@ -1,3 +1,4 @@
+from gerbera_sdk.events.buffer import Buffer
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.models.hardware.connection import Connection
@@ -22,21 +23,26 @@ class FakeDatabase(Database):
 def test_stream_payload_is_buffered_and_written(device_registry) -> None:
     device_registry({"board-1": "/dev/board-1"})
     database = FakeDatabase()
-    board = Microcontroller(port="/dev/board-1", fqbn="arduino:avr:uno")
-    board.add_connections(
-        [
+    board = Microcontroller(
+        name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        connections=[
             Connection(
                 "sensor",
                 "hw201",
                 {"out": "7"},
-                database=database,
+                "Infrared sensor",
+                microcontroller_id="board-1",
+                stream=True,
             )
-        ]
+        ],
     )
     worker = EventWorker(database=database, retry_delay_seconds=0)
 
     worker.start()
     table_name = board.connections[0].event_name
+    buffer = Buffer(table_name=table_name, event_worker=worker)
     event = Event(
         "STREAM",
         board.id,
@@ -45,7 +51,8 @@ def test_stream_payload_is_buffered_and_written(device_registry) -> None:
         board.connections[0].component_type,
         streamable=True,
         table_name=table_name,
-        event_worker=worker,
+        buffer=buffer,
+        event_key=table_name,
         latest_val=None,
     )
     event.perform_work({"value": "1"})

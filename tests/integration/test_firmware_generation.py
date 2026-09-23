@@ -7,12 +7,27 @@ def test_models_generate_routed_firmware_for_read_and_write_components(
     device_registry,
 ) -> None:
     device_registry({"board-1": "/dev/board-1"})
-    board = Microcontroller(port="/dev/board-1", fqbn="arduino:avr:uno")
-    board.add_connections(
-        [
-            Connection("sensor", "hw201", {"out": "7"}),
-            Connection("status_led", "led", {"out": "13"}),
-        ]
+    board = Microcontroller(
+        name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        connections=[
+            Connection(
+                "sensor",
+                "hw201",
+                {"out": "7"},
+                "Infrared sensor",
+                microcontroller_id="board-1",
+                stream=True,
+            ),
+            Connection(
+                "status_led",
+                "led",
+                {"out": "13"},
+                "Status LED",
+                microcontroller_id="board-1",
+            ),
+        ],
     )
 
     firmware = FirmwareGenerator(board).build()
@@ -22,3 +37,5 @@ def test_models_generate_routed_firmware_for_read_and_write_components(
     assert "void handle_status_led" in firmware
     assert 'action == "READ" && commandName == "sensor"' in firmware
     assert 'action == "WRITE" && commandName == "status_led"' in firmware
+    assert "sensor_stream_on" in firmware
+    assert f"STREAM,{board.connections[0].event_name}" in firmware
