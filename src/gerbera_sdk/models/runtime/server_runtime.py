@@ -389,8 +389,6 @@ class ServerRuntime:
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
-        tool_function.__name__ = name
-        tool_function.__doc__ = description
         self.app.tool(
             name=name,
             description=description,
