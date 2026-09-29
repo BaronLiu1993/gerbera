@@ -1,45 +1,134 @@
 from dataclasses import dataclass, field
+import secrets
 import threading
 import time
 
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-
 import serial
+
+from gerbera_sdk.firmware.firmware_schema import (
+    GERBERA_CHECK,
+    GERBERA_HANDSHAKE,
+    GERBERA_HANDSHAKE_TARGET,
+    GERBERA_HEARTBEAT,
+    GERBERA_PROTOCOL_VERSION,
+    GERBERA_START,
+    GERBERA_STOP,
+)
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
+from gerbera_sdk.models.runtime.serial_protocol import (
+    SerialMessage,
+    SerialMessageCodec,
+)
+
+SERIAL_BOOT_SECONDS = 2.0
+HANDSHAKE_CHALLENGE_BYTES = 16
+HANDSHAKE_FIELDS = frozenset({"protocol", "board", "digest", "challenge"})
+CHECK_PASS_FIELDS = frozenset({"status", "session"})
+CHECK_FAIL_FIELDS = frozenset({"status", "error", "session"})
+START_FIELDS = frozenset({"state", "session"})
+THREAD_JOIN_TIMEOUT_SECONDS = 2.0
+
+
+@dataclass(frozen=True)
+class ExpectedSerialMessage:
+    message_type: str
+    target: str
+    fields: frozenset[str]
+
 
 @dataclass
 class SerialConnection:
-    _conn: serial = None
-    _lock: threading.RLock = field(
+    connection: serial.Serial | None = None
+    lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
         repr=False,
     )
 
     def connect(self, port: str, baud: int = 115200) -> None:
-        self._conn = serial.Serial(port, baud, timeout=2)
-        time.sleep(2)
-        self._conn.reset_input_buffer()
+        self.connection = serial.Serial(port, baud, timeout=SERIAL_BOOT_SECONDS)
+        time.sleep(SERIAL_BOOT_SECONDS)
+        self.connection.reset_input_buffer()
 
     def write(self, command: str) -> None:
-        with self._lock:
-            self._conn.write(f"{command}\n".encode())
-            self._conn.flush()
+        with self.lock:
+            connection = self.require_connection()
+            connection.write(f"{command}\n".encode())
+            connection.flush()
 
     def readline(self) -> bytes:
-        return self._conn.readline()
+        return self.require_connection().readline()
+
+    def require_connection(self) -> serial.Serial:
+        if self.connection is None or not self.connection.is_open:
+            raise RuntimeError("Serial connection is not open")
+        return self.connection
 
     def destroy(self) -> None:
-        with self._lock:
-            if self._conn and self._conn.is_open:
-                self._conn.close()
+        with self.lock:
+            if self.connection is not None and self.connection.is_open:
+                self.connection.close()
+
+    def cancel_read(self) -> None:
+        connection = self.require_connection()
+        cancel_read = getattr(connection, "cancel_read", None)
+        if cancel_read is not None:
+            cancel_read()
+
+
+@dataclass
+class BoardSession:
+    connection: SerialConnection
+    session_id: str
+    heartbeat_interval_ms: int
+    heartbeat_stop: threading.Event = field(default_factory=threading.Event)
+    heartbeat_thread: threading.Thread = field(init=False)
+    next_sequence: int = 1
+
+    def __post_init__(self) -> None:
+        self.heartbeat_thread = threading.Thread(
+            target=self.heartbeat_loop,
+            daemon=False,
+            name=f"board-heartbeat-{self.session_id}",
+        )
+
+    def heartbeat_loop(self) -> None:
+        interval_seconds = self.heartbeat_interval_ms / 1000
+        deadline = time.monotonic() + interval_seconds
+        while not self.heartbeat_stop.wait(
+            max(0.0, deadline - time.monotonic())
+        ):
+            self.send_heartbeat()
+            deadline += interval_seconds
+
+    def send_heartbeat(self) -> None:
+        self.connection.write(
+            SerialMessageCodec.encode(
+                SerialMessage(
+                    message_type=GERBERA_HEARTBEAT,
+                    target=GERBERA_HANDSHAKE_TARGET,
+                    fields={
+                        "session": self.session_id,
+                        "sequence": str(self.next_sequence),
+                    },
+                )
+            )
+        )
+        self.next_sequence += 1
+
+    def stop_heartbeat(self) -> None:
+        self.heartbeat_stop.set()
+        self.heartbeat_thread.join(timeout=THREAD_JOIN_TIMEOUT_SECONDS)
+        if self.heartbeat_thread.is_alive():
+            raise RuntimeError("Board heartbeat thread did not stop")
 
 
 @dataclass
 class BoardRuntime:
-    hardware_system: HardwareSystem
+    hardware_plan: HardwarePlan
     serial_pool: dict[str, SerialConnection] = field(default_factory=dict)
-    _lock: threading.RLock = field(
+    sessions: dict[str, BoardSession] = field(default_factory=dict)
+    lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
         repr=False,
@@ -47,47 +136,261 @@ class BoardRuntime:
 
     def start(self) -> None:
         try:
-            with self._lock:
-                for microcontroller in self.hardware_system.microcontrollers:
-                    if microcontroller.id in self.serial_pool:
-                        continue
-
-                    connection = SerialConnection()
-                    connection.connect(
-                        port=microcontroller.port,
-                        baud=microcontroller.baud_rate,
-                    )
-                    self.serial_pool[microcontroller.id] = connection
+            for board in self.hardware_plan.boards:
+                self.start_board(board)
         except Exception as exc:
-            self.close()
-            raise RuntimeError("Could not start board runtime") from exc
+            cleanup_error: Exception | None = None
+            try:
+                self.close()
+            except Exception as close_exc:
+                cleanup_error = close_exc
+            message = "Could not start board runtime"
+            if cleanup_error is not None:
+                message += f"; cleanup also failed: {cleanup_error}"
+            raise RuntimeError(message) from exc
+
+    def start_board(self, board: ResolvedBoard) -> None:
+        with self.lock:
+            if board.microcontroller_id in self.sessions:
+                raise RuntimeError(
+                    "Board session is already registered: "
+                    f"{board.microcontroller_id}"
+                )
+
+        connection = SerialConnection()
+        session_id = ""
+        connection.connect(port=board.port, baud=board.baud_rate)
+        try:
+            session_id = self.verify_contract(board, connection)
+            self.verify_components(board, connection, session_id)
+            self.start_firmware(connection, session_id)
+            self.send_first_heartbeat(connection, session_id)
+            session = BoardSession(
+                connection=connection,
+                session_id=session_id,
+                heartbeat_interval_ms=(
+                    board.watchdog.heartbeat_interval_ms
+                ),
+            )
+            session.heartbeat_thread.start()
+        except Exception:
+            if session_id:
+                self.attempt_stop(connection, session_id)
+            connection.destroy()
+            raise
+
+        with self.lock:
+            self.sessions[board.microcontroller_id] = session
+            self.serial_pool[board.microcontroller_id] = connection
+
+    @staticmethod
+    def verify_contract(
+        board: ResolvedBoard,
+        connection: SerialConnection,
+    ) -> str:
+        challenge = secrets.token_hex(HANDSHAKE_CHALLENGE_BYTES)
+        connection.write(
+            SerialMessageCodec.encode(
+                SerialMessage(
+                    message_type=GERBERA_HANDSHAKE,
+                    target=GERBERA_HANDSHAKE_TARGET,
+                    fields={"challenge": challenge},
+                )
+            )
+        )
+        response = BoardRuntime.read_response(
+            connection,
+            f"Board handshake timed out: {board.microcontroller_id}",
+        )
+        BoardRuntime.require_message(
+            response,
+            ExpectedSerialMessage(
+                GERBERA_HANDSHAKE,
+                GERBERA_HANDSHAKE_TARGET,
+                HANDSHAKE_FIELDS,
+            ),
+        )
+        expected_fields = {
+            "protocol": str(GERBERA_PROTOCOL_VERSION),
+            "board": board.microcontroller_id,
+            "digest": board.contract_digest,
+            "challenge": challenge,
+        }
+        if dict(response.fields) != expected_fields:
+            raise RuntimeError(
+                f"Board contract does not match: {board.microcontroller_id}"
+            )
+        return challenge
+
+    @staticmethod
+    def verify_components(
+        board: ResolvedBoard,
+        connection: SerialConnection,
+        session_id: str,
+    ) -> None:
+        for component in board.connections:
+            component_key = (
+                f"{board.microcontroller_id}.{component.name}"
+            )
+            connection.write(
+                SerialMessageCodec.encode(
+                    SerialMessage(
+                        message_type=GERBERA_CHECK,
+                        target=component_key,
+                        fields={"session": session_id},
+                    )
+                )
+            )
+            response = BoardRuntime.read_response(
+                connection,
+                f"Component check timed out: {component_key}",
+            )
+            expected = {"status": "pass", "session": session_id}
+            if (
+                response.message_type == GERBERA_CHECK
+                and response.target == component_key
+                and response.fields.keys() == CHECK_PASS_FIELDS
+                and dict(response.fields) == expected
+            ):
+                continue
+            failure = {
+                "status": "fail",
+                "error": "component_check_failed",
+                "session": session_id,
+            }
+            if (
+                response.message_type == GERBERA_CHECK
+                and response.target == component_key
+                and response.fields.keys() == CHECK_FAIL_FIELDS
+                and dict(response.fields) == failure
+            ):
+                raise RuntimeError(f"Component check failed: {component_key}")
+            raise RuntimeError(
+                f"Board returned an invalid component check: {component_key}"
+            )
+
+    @staticmethod
+    def start_firmware(
+        connection: SerialConnection,
+        session_id: str,
+    ) -> None:
+        connection.write(
+            SerialMessageCodec.encode(
+                SerialMessage(
+                    message_type=GERBERA_START,
+                    target=GERBERA_HANDSHAKE_TARGET,
+                    fields={"session": session_id},
+                )
+            )
+        )
+        response = BoardRuntime.read_response(
+            connection,
+            "Board start timed out",
+        )
+        BoardRuntime.require_message(
+            response,
+            ExpectedSerialMessage(
+                GERBERA_START,
+                GERBERA_HANDSHAKE_TARGET,
+                START_FIELDS,
+            ),
+        )
+        expected = {"state": "READY", "session": session_id}
+        if dict(response.fields) != expected:
+            raise RuntimeError("Board did not enter READY")
+
+    @staticmethod
+    def send_first_heartbeat(
+        connection: SerialConnection,
+        session_id: str,
+    ) -> None:
+        connection.write(
+            SerialMessageCodec.encode(
+                SerialMessage(
+                    message_type=GERBERA_HEARTBEAT,
+                    target=GERBERA_HANDSHAKE_TARGET,
+                    fields={"session": session_id, "sequence": "0"},
+                )
+            )
+        )
+
+    @staticmethod
+    def read_response(
+        connection: SerialConnection,
+        timeout_message: str,
+    ) -> SerialMessage:
+        raw_response = connection.readline()
+        if not raw_response:
+            raise TimeoutError(timeout_message)
+        return SerialMessageCodec.decode(raw_response)
+
+    @staticmethod
+    def require_message(
+        response: SerialMessage,
+        expected: ExpectedSerialMessage,
+    ) -> None:
+        if response.message_type != expected.message_type:
+            raise RuntimeError("Board returned an invalid message type")
+        if response.target != expected.target:
+            raise RuntimeError("Board returned an invalid message target")
+        if response.fields.keys() != expected.fields:
+            raise RuntimeError("Board returned invalid message fields")
 
     def get_serial_connection(
         self,
-        microcontroller: Microcontroller,
+        microcontroller_id: str,
     ) -> SerialConnection:
-        with self._lock:
-            connection = self.serial_pool.get(microcontroller.id)
-
+        with self.lock:
+            connection = self.serial_pool.get(microcontroller_id)
         if connection is None:
-            raise RuntimeError("Microcontroller does not exist")
+            raise RuntimeError(
+                f"Microcontroller is not connected: {microcontroller_id}"
+            )
         return connection
 
+    @staticmethod
+    def attempt_stop(
+        connection: SerialConnection,
+        session_id: str,
+    ) -> None:
+        try:
+            BoardRuntime.send_stop(connection, session_id)
+        except Exception:
+            return
+
+    @staticmethod
+    def send_stop(connection: SerialConnection, session_id: str) -> None:
+        connection.write(
+            SerialMessageCodec.encode(
+                SerialMessage(
+                    message_type=GERBERA_STOP,
+                    target=GERBERA_HANDSHAKE_TARGET,
+                    fields={"session": session_id},
+                )
+            )
+        )
+
     def close(self) -> None:
-        with self._lock:
-            connections = list(self.serial_pool.items())
+        with self.lock:
+            sessions = list(self.sessions.items())
 
         first_error: Exception | None = None
-        for microcontroller_id, serial_connection in connections:
+        for microcontroller_id, session in sessions:
             try:
-                serial_connection.destroy()
+                session.stop_heartbeat()
+                self.send_stop(session.connection, session.session_id)
             except Exception as exc:
                 if first_error is None:
                     first_error = exc
-            else:
-                with self._lock:
-                    if self.serial_pool.get(microcontroller_id) is serial_connection:
-                        self.serial_pool.pop(microcontroller_id)
+            finally:
+                try:
+                    session.connection.destroy()
+                except Exception as exc:
+                    if first_error is None:
+                        first_error = exc
+                with self.lock:
+                    self.sessions.pop(microcontroller_id, None)
+                    self.serial_pool.pop(microcontroller_id, None)
 
         if first_error is not None:
             raise RuntimeError("Could not stop board runtime") from first_error

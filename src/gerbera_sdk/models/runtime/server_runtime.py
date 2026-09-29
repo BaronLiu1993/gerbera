@@ -13,7 +13,7 @@ from gerbera_sdk.firmware.firmware_schema import (
     ParameterSpec,
 )
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.event_bus import EventBus, EventKey
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.inference.model_types import (
@@ -21,9 +21,13 @@ from gerbera_sdk.inference.model_types import (
     ModelCatalogType,
     SubscribedCameraCatalogEntry,
 )
-from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.hardware_plan import (
+    HardwarePlan,
+    ResolvedBoard,
+    ResolvedConnection,
+    StateKey,
+)
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
@@ -34,7 +38,6 @@ from gerbera_sdk.models.runtime.hardware_runtime import (
 )
 from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.utils import build_hashable_key, parse_event_key
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
@@ -46,6 +49,7 @@ from gerbera_sdk.inference import (
 @dataclass
 class ServerRuntime:
     hardware_system: HardwareSystem
+    hardware_plan: HardwarePlan
     board_runtime: BoardRuntime
     event_bus: EventBus
     event_worker: EventWorker
@@ -75,60 +79,28 @@ class ServerRuntime:
             return "vision_language_model"
         raise ValueError(f"Unsupported inference model type: {type(model).__name__}")
 
-    # Event registration and catalog helpers.
-
-    def register_mcp_event(
+    def register_connection_event(
         self,
-        microcontroller: Microcontroller,
-        connection: Connection,
+        board: ResolvedBoard,
+        connection: ResolvedConnection,
+        event_type: str,
     ) -> None:
-        event_key = build_hashable_key(
-            "MCP",
-            microcontroller.id,
-            connection.event_name,
-        )
-        event = Event(
-            event_type="MCP",
-            microcontroller_id=microcontroller.id,
-            event_name=connection.event_name,
-            connection_name=connection.name,
-            component_type=connection.component_type,
-            streamable=False,
-            table_name=connection.event_name,
-            buffer=Buffer(
-                table_name=connection.event_name,
-                event_worker=self.event_worker,
-            ),
-            event_key=event_key,
-            latest_val=None,
-        )
-        self.event_bus.write_event(
-            "MCP",
-            microcontroller.id,
-            connection.event_name,
-            event,
-        )
-
-    def register_stream_event(
-        self,
-        microcontroller: Microcontroller,
-        connection: Connection,
-    ) -> None:
-        if not connection.stream_enabled:
+        streamable = event_type == "STREAM"
+        if streamable and not connection.stream_enabled:
             return
 
-        event_key = build_hashable_key(
-            "STREAM",
-            microcontroller.id,
+        event_key = (
+            event_type,
+            board.microcontroller_id,
             connection.event_name,
         )
         event = Event(
-            event_type="STREAM",
-            microcontroller_id=microcontroller.id,
+            event_type=event_type,
+            microcontroller_id=board.microcontroller_id,
             event_name=connection.event_name,
             connection_name=connection.name,
             component_type=connection.component_type,
-            streamable=True,
+            streamable=streamable,
             table_name=connection.event_name,
             buffer=Buffer(
                 table_name=connection.event_name,
@@ -138,31 +110,36 @@ class ServerRuntime:
             latest_val=None,
         )
         self.event_bus.write_event(
-            "STREAM",
-            microcontroller.id,
+            event_type,
+            board.microcontroller_id,
             connection.event_name,
             event,
         )
 
     def register_events(self) -> None:
-        for microcontroller in self.hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
-                self.register_mcp_event(microcontroller, connection)
-                self.register_stream_event(microcontroller, connection)
+        for board in self.hardware_plan.boards:
+            for connection in board.connections:
+                self.register_connection_event(
+                    board,
+                    connection,
+                    "MCP",
+                )
+                self.register_connection_event(
+                    board,
+                    connection,
+                    "STREAM",
+                )
 
     def get_event_catalog(
         self,
     ) -> dict[str, dict[str, dict[str, dict[str, object]]]]:
-        connections: dict[tuple[str, str], Connection] = {}
-        for microcontroller in self.hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
-                key = (microcontroller.id, connection.event_name)
-                connections[key] = connection
         catalog: dict[str, dict[str, dict[str, dict[str, object]]]] = {}
 
         for event_key, event in self.event_bus.events.items():
-            event_type, microcontroller_id, event_name = parse_event_key(event_key)
-            connection = connections[(microcontroller_id, event_name)]
+            event_type, microcontroller_id, event_name = event_key
+            connection = self.hardware_plan.connections_by_event_route[
+                (microcontroller_id, event_name)
+            ]
             metadata: dict[str, object] = {
                 "event_type": event_type,
                 "microcontroller_id": microcontroller_id,
@@ -179,14 +156,12 @@ class ServerRuntime:
 
         return catalog
 
-    # Connection command dispatch and MCP tool generation.
-
     def send_read_command(
         self,
-        event_key: str,
+        event_key: EventKey,
     ) -> dict[str, object]:
         try:
-            event = self.event_bus.get_event(*parse_event_key(event_key))
+            event = self.event_bus.get_event(*event_key)
             latest_value = event.read_latest()
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -194,14 +169,14 @@ class ServerRuntime:
 
     def send_write_command(
         self,
-        microcontroller: Microcontroller,
-        connection: Connection,
+        board: ResolvedBoard,
+        connection: ResolvedConnection,
         action: str,
         params: dict[str, object],
     ) -> dict[str, object]:
         try:
             serial_connection = self.board_runtime.get_serial_connection(
-                microcontroller
+                board.microcontroller_id
             )
             built_command = CommandCompiler.build_command(
                 connection,
@@ -217,8 +192,8 @@ class ServerRuntime:
 
     def register_connection_action(
         self,
-        microcontroller: Microcontroller,
-        connection: Connection,
+        board: ResolvedBoard,
+        connection: ResolvedConnection,
         command: CommandSpec,
     ) -> None:
         action = command.method.strip().upper()
@@ -227,7 +202,7 @@ class ServerRuntime:
             params: dict[str, object],
         ) -> dict[str, object]:
             return self.send_write_command(
-                microcontroller=microcontroller,
+                board=board,
                 connection=connection,
                 action=action,
                 params=params,
@@ -237,7 +212,7 @@ class ServerRuntime:
 
     def build_tool_function(
         self,
-        connection: Connection,
+        connection: ResolvedConnection,
         command: CommandSpec,
     ) -> Callable[..., dict[str, object]]:
         action = command.method.strip().upper()
@@ -245,7 +220,7 @@ class ServerRuntime:
 
             def read_tool_function() -> dict[str, object]:
                 return self.send_read_command(
-                    build_hashable_key(
+                    (
                         "MCP",
                         connection.microcontroller_id,
                         connection.event_name,
@@ -306,18 +281,18 @@ class ServerRuntime:
 
     def build_toggle_tool_function(
         self,
-        connection: Connection,
+        connection: ResolvedConnection,
         state: int,
-        state_key: str | None = None,
-        stream_microcontroller: Microcontroller | None = None,
+        state_key: StateKey | None = None,
+        stream_board: ResolvedBoard | None = None,
     ) -> Callable[[], dict[str, object]]:
         def tool_function() -> dict[str, object]:
             response = connection.perform_action("WRITE", {"state": state})
 
-            if stream_microcontroller is not None and state == 0:
+            if stream_board is not None and state == 0:
                 stream_event = self.event_bus.get_event(
                     "STREAM",
-                    stream_microcontroller.id,
+                    stream_board.microcontroller_id,
                     connection.event_name,
                 )
                 stream_event.flush()
@@ -334,7 +309,7 @@ class ServerRuntime:
 
     def register_connection_tool(
         self,
-        connection: Connection,
+        connection: ResolvedConnection,
         command: CommandSpec,
         annotations: ToolAnnotations,
     ) -> None:
@@ -349,23 +324,8 @@ class ServerRuntime:
                 f" Collected data is stored in table " f"`{connection.event_name}`."
             )
 
-        joint_configuration = None
-
         action = command.method.strip().lower()
-        action_connection_name = connection.name
-
-        if joint_configuration is not None:
-            action_connection_name = (
-                f"{connection.name}_{joint_configuration['joint_name']}"
-            )
-
-        # TODO: Validate final MCP tool-name collisions explicitly. Movement
-        # validation rejects duplicate joint names, but a generated name could
-        # still collide with a non-movement tool name.
-        tool_name = f"{action}_{action_connection_name}"
-
-        # Stable hardware state identifier; separate from action, tool name,
-        # and event bus keys.
+        tool_name = f"{action}_{connection.name}"
         state_key = CommandCompiler.state_keys(connection)[0]
         tool_function = self.build_tool_function(
             connection,
@@ -377,7 +337,7 @@ class ServerRuntime:
             tool_function=tool_function,
             annotations=annotations,
             meta={
-                "key": state_key,
+                "key": self.hardware_runtime.state_key_label(state_key),
             },
         )
 
@@ -396,11 +356,9 @@ class ServerRuntime:
             meta=meta,
         )(tool_function)
 
-    # On/off tool helpers for stateful and streamable devices.
-
     def register_state_toggle_tool(
         self,
-        connection: Connection,
+        connection: ResolvedConnection,
         state: int,
         tool_name: str,
         description: str,
@@ -420,13 +378,13 @@ class ServerRuntime:
                 update={"title": description.rstrip(".")}
             ),
             meta={
-                "key": state_key,
+                "key": self.hardware_runtime.state_key_label(state_key),
             },
         )
 
     def register_state_toggle_tools(
         self,
-        connection: Connection,
+        connection: ResolvedConnection,
         annotations: ToolAnnotations,
     ) -> None:
         self.register_state_toggle_tool(
@@ -446,8 +404,8 @@ class ServerRuntime:
 
     def register_stream_toggle_tool(
         self,
-        microcontroller: Microcontroller,
-        connection: Connection,
+        board: ResolvedBoard,
+        connection: ResolvedConnection,
         state: int,
         tool_name: str,
         description: str,
@@ -455,15 +413,14 @@ class ServerRuntime:
         meta: dict[str, Any] | None = None,
     ) -> None:
         state_key = CommandCompiler.state_key(
-            connection.component_type,
-            connection.name,
+            connection,
             "stream_enabled",
         )
         tool_function = self.build_toggle_tool_function(
             connection=connection,
             state=state,
             state_key=state_key,
-            stream_microcontroller=microcontroller,
+            stream_board=board,
         )
         self.register_tool(
             name=tool_name,
@@ -474,19 +431,19 @@ class ServerRuntime:
             ),
             meta=meta
             or {
-                "key": state_key,
+                "key": self.hardware_runtime.state_key_label(state_key),
             },
         )
 
     def register_stream_toggle_tools(
         self,
-        microcontroller: Microcontroller,
-        connection: Connection,
+        board: ResolvedBoard,
+        connection: ResolvedConnection,
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
         self.register_stream_toggle_tool(
-            microcontroller=microcontroller,
+            board=board,
             connection=connection,
             state=1,
             tool_name=f"turn_on_{connection.name}_stream",
@@ -495,7 +452,7 @@ class ServerRuntime:
             meta=meta,
         )
         self.register_stream_toggle_tool(
-            microcontroller=microcontroller,
+            board=board,
             connection=connection,
             state=0,
             tool_name=f"turn_off_{connection.name}_stream",
@@ -504,12 +461,10 @@ class ServerRuntime:
             meta=meta,
         )
 
-    # Hardware, camera, and model tool registration.
-
     def register_hardware_tools(self) -> None:
-        for microcontroller in self.hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
-                self.register_connection_tools(microcontroller, connection)
+        for board in self.hardware_plan.boards:
+            for connection in board.connections:
+                self.register_connection_tools(board, connection)
 
         self.register_camera_tools()
         self.register_inference_tools()
@@ -523,29 +478,35 @@ class ServerRuntime:
         return state is not None and state.min == 0 and state.max == 1
 
     @classmethod
-    def connection_supports_state_toggle(cls, connection: Connection) -> bool:
+    def connection_supports_state_toggle(
+        cls,
+        connection: ResolvedConnection,
+    ) -> bool:
         for command in CommandCompiler.command_specs(connection):
             if cls.command_is_state_toggle(command):
                 return True
         return False
 
     @classmethod
-    def connection_supports_stream_toggle(cls, connection: Connection) -> bool:
+    def connection_supports_stream_toggle(
+        cls,
+        connection: ResolvedConnection,
+    ) -> bool:
         return connection.stream_enabled and cls.connection_supports_state_toggle(
             connection
         )
 
     def register_connection_tools(
         self,
-        microcontroller: Microcontroller,
-        connection: Connection,
+        board: ResolvedBoard,
+        connection: ResolvedConnection,
     ) -> None:
         commands = CommandCompiler.command_specs(connection)
         supports_stream = self.connection_supports_stream_toggle(connection)
         for command in commands:
             annotations = CommandCompiler.command_annotations(connection, command)
             self.register_connection_action(
-                microcontroller,
+                board,
                 connection,
                 command,
             )
@@ -567,7 +528,7 @@ class ServerRuntime:
         )
         if supports_stream:
             self.register_stream_toggle_tools(
-                microcontroller,
+                board,
                 connection,
                 toggle_annotations,
             )

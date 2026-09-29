@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Literal
 
-from gerbera_sdk.utils import StrictSchema, build_hashable_key
+from gerbera_sdk.utils import StrictSchema
 
 
 class VisionLanguageModelProviderEnum(Enum):
@@ -24,7 +24,7 @@ def build_model_output_keys(
     operations: tuple[str, ...],
 ) -> dict[str, str]:
     return {
-        operation: build_hashable_key(model_id, camera_id, operation)
+        operation: ".".join((model_id, camera_id, operation))
         for operation in operations
     }
 

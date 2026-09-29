@@ -274,10 +274,10 @@ def test_listener_logs_async_reaction_callback_failure(caplog) -> None:
     assert "servo unavailable" in caplog.text
 
 
-def test_listener_fails_when_transport_shutdown_fails() -> None:
+def test_listener_fails_when_read_cancellation_fails() -> None:
     class FailingConnection:
-        def destroy(self) -> None:
-            raise OSError("close failed")
+        def cancel_read(self) -> None:
+            raise OSError("cancel failed")
 
     class Thread:
         joined = False
@@ -298,7 +298,7 @@ def test_listener_fails_when_transport_shutdown_fails() -> None:
         reaction_bus=ReactionBus(),
     )
 
-    with pytest.raises(OSError, match="close failed"):
+    with pytest.raises(OSError, match="cancel failed"):
         listener.stop_listeners()
 
     assert thread.joined is False

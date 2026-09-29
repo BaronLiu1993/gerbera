@@ -8,26 +8,22 @@ from serial import SerialException
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.board_runtime import SerialConnection
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.hardware_runtime import (
     ConnectionState,
     HardwareRuntime,
 )
+from gerbera_sdk.models.runtime.serial_protocol import SerialMessageCodec
 
 
-# Runs at runtime
 @dataclass
 class EventListener:
-    hardware_system: HardwareSystem
+    hardware_plan: HardwarePlan
     serial_pool: Mapping[str, SerialConnection]
 
-    # Where events are stored
     event_bus: EventBus
-
-    # Reaction code
-
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
 
@@ -39,8 +35,7 @@ class EventListener:
     )
     threads: dict[str, threading.Thread] = field(
         default_factory=dict
-    )  # Multiple threads to run the loop
-    # Stops every single thread
+    )
     stop_event: threading.Event = field(default_factory=threading.Event)
     lifecycle_lock: threading.RLock = field(
         default_factory=threading.RLock,
@@ -51,8 +46,8 @@ class EventListener:
     def create_listeners(self) -> None:
         with self.lifecycle_lock:
             self.stop_event.clear()
-            for microcontroller in self.hardware_system.microcontrollers:
-                microcontroller_id = microcontroller.id
+            for board in self.hardware_plan.boards:
+                microcontroller_id = board.microcontroller_id
 
                 thread = threading.Thread(
                     target=self.listen_loop,
@@ -70,7 +65,7 @@ class EventListener:
             threads = list(self.threads.items())
 
         for serial_connection in self.serial_pool.values():
-            serial_connection.destroy()
+            serial_connection.cancel_read()
 
         alive_threads = {}
         for microcontroller_id, thread in threads:
@@ -97,69 +92,41 @@ class EventListener:
                     return
                 raise
 
-            if isinstance(line, bytes):
-                line = line.decode(errors="ignore")
-
-            line = line.strip()
             if not line:
                 continue
 
-            parsed_payload = self.parse_payload(line)
-            if parsed_payload is None:
-                continue
-
-            event_type, event_name, payload = parsed_payload
+            message = SerialMessageCodec.decode(line)
 
             self.dispatch_to_event_bus(
-                event_type,
+                message.message_type,
                 microcontroller_id,
-                event_name,
-                payload,
+                message.target,
+                message.fields,
             )
 
             self.dispatch_event_to_reaction_bus(
-                event_type,
+                message.message_type,
                 microcontroller_id,
-                event_name,
-                payload,
+                message.target,
+                message.fields,
             )
 
-    def parse_payload(self, line: str):
-        res_payload = {}
-
-        tokens = line.split(",")
-        if len(tokens) < 2:
-            return None
-
-        event_type, event_name, payload_tokens = tokens[0], tokens[1], tokens[2:]
-
-        for payload_token in payload_tokens:
-            if ":" not in payload_token:
-                continue
-
-            key, val = payload_token.split(":", 1)
-            if key in res_payload:
-                raise ValueError("Key already exists")
-            res_payload[key] = val
-
-        return event_type, event_name, res_payload
-
-    # disptach the event to event bus
     def dispatch_to_event_bus(
         self,
         event_type: str,
         microcontroller_id: str,
         event_name: str,
-        payload: dict[str, str],
+        payload: Mapping[str, str],
     ) -> None:
         handler = self.event_bus.get_event(
             event_type,
             microcontroller_id,
             event_name,
         )
-        # TODO: route error payloads into command results instead of hardware state.
         if "error" in payload:
-            return
+            raise RuntimeError(
+                f"Hardware event failed for {event_name}: {payload['error']}"
+            )
 
         runtime_payload = {
             field: CommandCompiler.state_value(
@@ -173,8 +140,9 @@ class EventListener:
 
         payload_field, value = next(iter(runtime_payload.items()))
         state_key = CommandCompiler.state_key(
-            handler.component_type,
-            handler.connection_name,
+            self.hardware_plan.connections_by_event_route[
+                (microcontroller_id, event_name)
+            ],
             payload_field,
         )
         unit = CommandCompiler.state_unit(handler.component_type, payload_field)
@@ -189,7 +157,7 @@ class EventListener:
         event_type: str,
         microcontroller_id: str,
         event_name: str,
-        payload: dict[str, str],
+        payload: Mapping[str, str],
     ) -> Future[object | None]:
         future = self.reaction_executor.submit(
             asyncio.run,

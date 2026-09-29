@@ -35,7 +35,7 @@ from gerbera_sdk.events.reactions import (
     ReactionCondition,
 )
 
-event_key = "STREAM.board-1.temperature"
+event_key = ("STREAM", "board-1", "temperature")
 reaction_bus = ReactionBus()
 
 
