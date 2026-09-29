@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 
 from gerbera_sdk.inference import (
@@ -9,6 +7,10 @@ from gerbera_sdk.inference import (
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.microcontroller import (
+    Microcontroller,
+    RuntimeWatchdogConfig,
+)
 from gerbera_sdk.models.hardware.movement_system import (
     FixedJoint,
     Link,
@@ -41,17 +43,25 @@ def make_fixed_joint(
     )
 
 
-def test_facade_accepts_a_valid_complete_hardware_graph() -> None:
+def test_facade_accepts_a_valid_complete_hardware_graph(
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
     motor = Connection(
-        name="shoulder-motor",
+        name="shoulder_motor",
         component_type="sg90",
         pins={"signal": "9"},
         description="Shoulder motor",
         microcontroller_id="board-1",
     )
-    board = SimpleNamespace(
-        id="board-1",
+    board = Microcontroller(
         name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
         hardware_system_id="system-1",
         connections=[motor],
     )
@@ -97,7 +107,7 @@ def test_facade_accepts_a_valid_complete_hardware_graph() -> None:
     result.raise_for_errors()
 
 
-def test_facade_aggregates_independent_errors_and_hard_fails() -> None:
+def test_facade_returns_first_error_and_hard_fails() -> None:
     system = HardwareSystem(
         name="",
         cameras=[make_camera("duplicate"), make_camera("duplicate")],
@@ -108,9 +118,6 @@ def test_facade_aggregates_independent_errors_and_hard_fails() -> None:
 
     assert result.errors == (
         "hardware_system.name: cannot be empty",
-        "cameras[duplicate].camera_id: duplicate ID: duplicate",
-        "movement_systems[<empty>].name: cannot be empty",
-        "movement_systems[<empty>].base_link.name: cannot be empty",
     )
     with pytest.raises(ValueError, match="Hardware system validation failed"):
         result.raise_for_errors()
@@ -134,7 +141,7 @@ def test_model_must_reference_a_registered_camera() -> None:
     )
 
 
-def test_movement_cycle_and_unreachable_links_are_reported() -> None:
+def test_movement_cycle_is_the_first_reported_graph_error() -> None:
     base = Link("base")
     first = Link("first")
     second = Link("second")
@@ -151,11 +158,7 @@ def test_movement_cycle_and_unreachable_links_are_reported() -> None:
         HardwareSystem(name="robot", movement_systems=[movement])
     )
 
-    assert "movement_systems[arm]: contains a cycle" in result.errors
-    assert (
-        "movement_systems[arm]: links are not reachable from base link: "
-        "first, second"
-    ) in result.errors
+    assert result.errors == ("movement_systems[arm]: contains a cycle",)
 
 
 @pytest.mark.parametrize(
@@ -200,7 +203,10 @@ def test_revolute_joint_boundaries_are_validated(
     assert any(error.endswith(expected_error) for error in result.errors)
 
 
-def test_motor_must_use_the_registered_connection_instance() -> None:
+def test_motor_must_use_the_registered_connection_instance(
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
     registered_motor = Connection(
         name="motor",
         component_type="sg90",
@@ -215,9 +221,14 @@ def test_motor_must_use_the_registered_connection_instance() -> None:
         description="Copied motor",
         microcontroller_id="board-1",
     )
-    board = SimpleNamespace(
-        id="board-1",
+    board = Microcontroller(
         name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
         hardware_system_id="system-1",
         connections=[registered_motor],
     )

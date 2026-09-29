@@ -8,11 +8,18 @@ from gerbera_sdk.firmware.firmware_schema import LibrarySpec
 from gerbera_sdk.models.hardware.connection import Connection
 
 
+@dataclass(frozen=True)
+class RuntimeWatchdogConfig:
+    heartbeat_interval_ms: int
+    heartbeat_timeout_ms: int
+
+
 @dataclass
 class Microcontroller:
     name: str
     port: str
     fqbn: str
+    watchdog: RuntimeWatchdogConfig
     baud_rate: int = 115200
     description: Optional[str] = None
     connections: list[Connection] = field(default_factory=list)

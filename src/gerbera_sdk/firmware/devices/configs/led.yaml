@@ -8,6 +8,8 @@ libraries: []
 pins:
   out:
     mode: OUTPUT
+    capabilities: [digital_output]
+    assignment: exclusive
 
 state:
   units:
@@ -27,6 +29,16 @@ commands:
       title: Set {connection.name} LED state
       readOnlyHint: false
       openWorldHint: false
+
+verification:
+  startup_timeout_ms: 100
+  monitor_interval_ms: 250
+  check: |
+    return false;
+  monitor: |
+    return false;
+  safe_stop: |
+    digitalWrite({pins.out}, LOW);
 
 firmware:
   handlers:

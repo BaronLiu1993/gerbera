@@ -8,8 +8,12 @@ libraries: []
 pins:
   trig:
     mode: OUTPUT
+    capabilities: [digital_output]
+    assignment: exclusive
   echo:
     mode: INPUT
+    capabilities: [digital_input]
+    assignment: exclusive
 
 state:
   units:
@@ -38,6 +42,26 @@ commands:
       title: Set {connection.name} stream state
       readOnlyHint: false
       openWorldHint: false
+
+verification:
+  startup_timeout_ms: 50
+  monitor_interval_ms: 250
+  check: |
+    digitalWrite({pins.trig}, LOW);
+    delayMicroseconds(2);
+    digitalWrite({pins.trig}, HIGH);
+    delayMicroseconds(10);
+    digitalWrite({pins.trig}, LOW);
+    return pulseIn({pins.echo}, HIGH, 30000) > 0;
+  monitor: |
+    digitalWrite({pins.trig}, LOW);
+    delayMicroseconds(2);
+    digitalWrite({pins.trig}, HIGH);
+    delayMicroseconds(10);
+    digitalWrite({pins.trig}, LOW);
+    return pulseIn({pins.echo}, HIGH, 30000) > 0;
+  safe_stop: |
+    digitalWrite({pins.trig}, LOW);
 
 firmware:
   definitions_when_streaming: |

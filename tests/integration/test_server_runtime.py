@@ -17,6 +17,11 @@ from gerbera_sdk.inference import (
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.microcontroller import (
+    Microcontroller,
+    RuntimeWatchdogConfig,
+)
+from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
@@ -89,8 +94,11 @@ def make_server(
     hardware_runtime=None,
 ) -> tuple[ServerRuntime, FakeApp]:
     app = FakeApp()
+    system = hardware_system or HardwareSystem(name="test")
+    hardware_plan = HardwareContractCompiler.compile(system)
     runtime = ServerRuntime(
-        hardware_system=hardware_system or HardwareSystem(name="test"),
+        hardware_system=system,
+        hardware_plan=hardware_plan,
         board_runtime=SimpleNamespace(),
         event_bus=event_bus or EventBus(),
         event_worker=event_worker or SimpleNamespace(
@@ -145,7 +153,11 @@ def test_camera_tool_forwards_batch_controls_and_serializes_frames() -> None:
 
 
 @pytest.mark.parametrize("stream", [False, True])
-def test_event_registration_respects_explicit_stream_flag(stream: bool) -> None:
+def test_event_registration_respects_explicit_stream_flag(
+    stream: bool,
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
     connection = Connection(
         name="sensor",
         component_type="hw201",
@@ -154,13 +166,21 @@ def test_event_registration_respects_explicit_stream_flag(stream: bool) -> None:
         microcontroller_id="board-1",
         stream=stream,
     )
-    board = SimpleNamespace(id="board-1", connections=[connection])
+    board = Microcontroller(
+        name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
+        connections=[connection],
+    )
+    system = HardwareSystem(name="test", microcontrollers=[board])
+    board.hardware_system_id = system.id
     event_bus = EventBus()
     runtime, _ = make_server(
-        hardware_system=HardwareSystem(
-            name="test",
-            microcontrollers=[board],
-        ),
+        hardware_system=system,
         event_bus=event_bus,
     )
 
@@ -315,7 +335,7 @@ def test_scene_analysis_tool_hard_fails_on_non_text_output() -> None:
 
 def test_state_tools_register_runtime_bound_methods() -> None:
     hardware_runtime = HardwareRuntime(
-        state_store={"hardware-key": None},
+        state_store={("board-1", "sensor", "value"): None},
     )
     hardware_system = HardwareSystem(name="test")
     model_runtime = ModelRuntime(
@@ -332,7 +352,7 @@ def test_state_tools_register_runtime_bound_methods() -> None:
     runtime.register_environment_state_tool()
 
     assert app.tools["get_current_hardware_state"]() == {
-        "hardware-key": None
+        "board-1.sensor.value": None
     }
     assert app.tools["get_current_environment_state"]() == {
         "model-key": None
@@ -356,7 +376,8 @@ def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
         wait_until_idle=lambda: calls.append("database.wait")
     )
     hardware_runtime = HardwareRuntime()
-    hardware_runtime.register_state_store("stream-state")
+    state_key = ("board-1", "sensor", "stream_enabled")
+    hardware_runtime.register_state_store(state_key)
     runtime, _ = make_server(
         event_bus=event_bus,
         event_worker=event_worker,
@@ -365,12 +386,12 @@ def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
     tool = runtime.build_toggle_tool_function(
         connection=connection,
         state=0,
-        state_key="stream-state",
-        stream_microcontroller=SimpleNamespace(id="board-1"),
+        state_key=state_key,
+        stream_board=SimpleNamespace(microcontroller_id="board-1"),
     )
 
     assert tool() == {"success": True}
     assert calls == ["hardware.off", "stream.flush", "database.wait"]
     assert hardware_runtime.get_state_store() == {
-        "stream-state": {"value": "0", "unit": None}
+        "board-1.sensor.stream_enabled": {"value": "0", "unit": None}
     }

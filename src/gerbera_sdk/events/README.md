@@ -17,8 +17,8 @@ reactions/                  Event reactions, conditions, callbacks, and latest v
 
 This folder owns:
 
-- parsing incoming serial event lines
-- routing by `<event_type>.<microcontroller_id>.<event_name>`
+- decoding incoming serial event lines
+- routing by `(event_type, microcontroller_id, event_name)` tuple keys
 - buffering stream payloads
 - flushing partial stream buffers
 - queueing stream batches for the database
@@ -35,7 +35,7 @@ This folder does not own:
 
 ```mermaid
 flowchart TD
-    A[Serial line] --> B[EventListener.parse_payload]
+    A[Serial line] --> B[SerialMessageCodec.decode]
     B --> C{event_type}
     C -->|MCP| D[EventBus MCP event]
     C -->|STREAM| E[EventBus STREAM event]
@@ -99,7 +99,7 @@ The payload key is the hardware state field. Runtime routes it directly into
 hardware state memory as:
 
 ```text
-<component_type>.<connection_name>.<payload_key>
+<microcontroller_id>.<connection_name>.<payload_key>
 ```
 
 Each firmware device builder must define units for every state field it emits:
@@ -121,13 +121,13 @@ Examples:
 
 ```python
 # HW201 digital sensor
-{"hw201.ir_sensor.obstacle_detected": {"value": "1", "unit": None}}
+{"board-1.ir_sensor.obstacle_detected": {"value": "1", "unit": None}}
 
 # HC-SR04 distance sensor
-{"hcsr04.distance_sensor.distance": {"value": "12.4", "unit": "cm"}}
+{"board-1.distance_sensor.distance": {"value": "12.4", "unit": "cm"}}
 
 # SG90 servo response
-{"sg90.servo_motor.angle": {"value": "90", "unit": "degrees"}}
+{"board-1.servo_motor.angle": {"value": "90", "unit": "degrees"}}
 ```
 
 Stream helper tools also maintain `stream_enabled`, but serial MCP/STREAM

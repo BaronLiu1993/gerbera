@@ -79,12 +79,12 @@ def test_runtime_orchestrates_resources_in_dependency_order(
         "worker.start",
         "listener.start",
         "server.run",
-        "listener.stop",
-        "streams.flush",
-        "worker.wait",
-        "worker.stop",
         "models.stop",
         "cameras.close",
+        "listener.stop",
+        "worker.stop",
+        "worker.wait",
+        "streams.flush",
         "board.close",
     ]
 

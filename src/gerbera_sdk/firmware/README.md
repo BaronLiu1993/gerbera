@@ -80,6 +80,7 @@ and renders its firmware templates for a concrete connection.
 Commands sent to Arduino:
 
 ```text
+HANDSHAKE,__gerbera__,challenge:<nonce>
 READ,<connection.name>
 WRITE,<connection.name>,key:value,key:value
 ```
@@ -87,21 +88,25 @@ WRITE,<connection.name>,key:value,key:value
 Responses emitted by Arduino:
 
 ```text
+HANDSHAKE,__gerbera__,protocol:<version>,board:<id>,digest:<digest>,challenge:<nonce>
 MCP,<connection.event_name>,key:value
 STREAM,<connection.event_name>,key:value
 ```
 
 `connection.event_name` is the runtime-safe internal identifier. It is generated from:
 
-- `component_type`
-- a short hash of `microcontroller_id`
-- a short hash of the canonicalized `pins` mapping
+- the connection name
+- a stable hash of `microcontroller_id` and the connection name
 
 This same identifier is reused for:
 
 - firmware serial output
 - event bus routing
 - stream table naming
+
+Pin assignments are represented separately in the board contract digest. At
+startup, the runtime requires the firmware digest and board ID to exactly match
+the compiled hardware plan before registering the serial connection.
 
 ## Reaction
 

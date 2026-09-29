@@ -1,47 +1,73 @@
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
+from gerbera_sdk.firmware.devices.config_schema import DeviceConfig
 from gerbera_sdk.firmware.devices.library import (
     ConfigFirmwareBuilder,
     load_device_config,
 )
 
 
-# Mapping of the Device Name and the Builder
 @dataclass(frozen=True)
 class DeviceDefinition:
     component_type: str
+    config: DeviceConfig
 
 
 @dataclass(frozen=True)
 class DeviceRegistry:
     definitions: tuple[DeviceDefinition, ...]
+    definitions_by_type: Mapping[str, DeviceDefinition] = field(
+        init=False,
+        repr=False,
+    )
 
-    @property
-    def definitions_by_type(self) -> dict[str, DeviceDefinition]:
-        return {
-            definition.component_type: definition for definition in self.definitions
-        }
+    def __post_init__(self) -> None:
+        definitions_by_type: dict[str, DeviceDefinition] = {}
+        for definition in self.definitions:
+            if definition.component_type in definitions_by_type:
+                raise ValueError(
+                    f"Duplicate component type: {definition.component_type}"
+                )
+            definitions_by_type[definition.component_type] = definition
+        object.__setattr__(
+            self,
+            "definitions_by_type",
+            MappingProxyType(definitions_by_type),
+        )
 
     def get_builder(
         self,
         component_type: str,
     ) -> BaseFirmwareBuilder:
-        definition = self.definitions_by_type.get(component_type)
-        if definition is None:
-            raise ValueError(f"Unsupported component type: {component_type}")
+        return ConfigFirmwareBuilder(self.get_definition(component_type).config)
 
-        return ConfigFirmwareBuilder(load_device_config(definition.component_type))
+    def get_definition(self, component_type: str) -> DeviceDefinition:
+        try:
+            return self.definitions_by_type[component_type]
+        except KeyError as exc:
+            raise ValueError(
+                f"Unsupported component type: {component_type}"
+            ) from exc
+
+
+def _load_device_definition(component_type: str) -> DeviceDefinition:
+    return DeviceDefinition(
+        component_type=component_type,
+        config=load_device_config(component_type),
+    )
 
 
 DEVICE_DEFINITIONS = (
-    DeviceDefinition("dcmotor"),
-    DeviceDefinition("hcsr04"),
-    DeviceDefinition("hw201"),
-    DeviceDefinition("ky033"),
-    DeviceDefinition("led"),
-    DeviceDefinition("mg996r"),
-    DeviceDefinition("sg90"),
+    _load_device_definition("dcmotor"),
+    _load_device_definition("hcsr04"),
+    _load_device_definition("hw201"),
+    _load_device_definition("ky033"),
+    _load_device_definition("led"),
+    _load_device_definition("mg996r"),
+    _load_device_definition("sg90"),
 )
 
 DEVICE_REGISTRY = DeviceRegistry(DEVICE_DEFINITIONS)
@@ -49,9 +75,3 @@ DEVICE_REGISTRY = DeviceRegistry(DEVICE_DEFINITIONS)
 
 def get_device_builder(component_type: str):
     return DEVICE_REGISTRY.get_builder(component_type)
-
-
-MICROCONTROLLER_MAPPING = {
-    "arduino:avr:mega": {"includes": ["Arduino.h"], "libraries": ["arduino:avr"]},
-    "arduino:avr:uno": {"includes": ["Arduino.h"], "libraries": ["arduino:avr"]},
-}

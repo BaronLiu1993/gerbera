@@ -3,7 +3,10 @@ from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.microcontroller import (
+    Microcontroller,
+    RuntimeWatchdogConfig,
+)
 
 
 class FakeDatabase(Database):
@@ -27,6 +30,10 @@ def test_stream_payload_is_buffered_and_written(device_registry) -> None:
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
         connections=[
             Connection(
                 "sensor",

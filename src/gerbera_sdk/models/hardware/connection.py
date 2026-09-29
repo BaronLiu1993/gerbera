@@ -29,9 +29,8 @@ class Connection:
             )
 
         return build_connection_event_name(
-            component_type=self.component_type,
             microcontroller_id=self.microcontroller_id,
-            pins=self.pins,
+            connection_name=self.name,
         )
 
     def register_action(

@@ -8,6 +8,8 @@ libraries: []
 pins:
   out:
     mode: INPUT
+    capabilities: [digital_input]
+    assignment: exclusive
 
 state:
   units:
@@ -36,6 +38,15 @@ commands:
       title: Set {connection.name} stream state
       readOnlyHint: false
       openWorldHint: false
+
+verification:
+  startup_timeout_ms: 100
+  monitor_interval_ms: 250
+  check: |
+    return false;
+  monitor: |
+    return false;
+  safe_stop: ""
 
 firmware:
   definitions_when_streaming: |

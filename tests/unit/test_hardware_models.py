@@ -3,7 +3,10 @@ import json
 import pytest
 
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.microcontroller import (
+    Microcontroller,
+    RuntimeWatchdogConfig,
+)
 
 
 def make_connection(*, stream: bool = False) -> Connection:
@@ -56,7 +59,7 @@ def test_connection_event_name_is_stable_for_bound_hardware() -> None:
     connection = make_connection()
 
     assert connection.event_name == connection.event_name
-    assert connection.event_name.startswith("led_")
+    assert connection.event_name.startswith("status_led_")
 
 
 def test_microcontroller_resolves_id_from_its_configured_registry(
@@ -79,6 +82,10 @@ def test_microcontroller_resolves_id_from_its_configured_registry(
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
         config_path=config_path,
     )
 
@@ -105,6 +112,10 @@ def test_microcontroller_hard_fails_when_port_is_not_registered(
         name="board",
         port="/dev/missing",
         fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
         config_path=config_path,
     )
 

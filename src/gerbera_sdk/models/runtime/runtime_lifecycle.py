@@ -43,28 +43,40 @@ class RuntimeLifecycle:
     def _start_resources(
         self,
     ) -> ExitStack:
-        cleanup = ExitStack()
+        startup_cleanup = ExitStack()
         try:
             self.board_runtime.start()
-            cleanup.callback(self.board_runtime.close)
+            startup_cleanup.callback(self.board_runtime.close)
 
             if self.movement_runtime is not None:
                 self.movement_runtime.reset_motors_to_standard_position()
 
             self.camera_runtime.start()
-            cleanup.callback(self.camera_runtime.close)
-            cleanup.callback(self.model_runtime.turn_off_all_model_streams)
+            startup_cleanup.callback(self.camera_runtime.close)
+            startup_cleanup.callback(
+                self.model_runtime.turn_off_all_model_streams
+            )
             self.model_runtime.turn_on_all_model_streams()
 
             self.event_worker.start()
-            cleanup.callback(self.event_worker.stop)
-            cleanup.callback(self.event_worker.wait_until_idle)
-            cleanup.callback(self.event_bus.flush_event_buffers)
+            startup_cleanup.callback(self.event_bus.flush_event_buffers)
+            startup_cleanup.callback(self.event_worker.wait_until_idle)
+            startup_cleanup.callback(self.event_worker.stop)
 
             self.event_listener.create_listeners()
-            cleanup.callback(self.event_listener.stop_listeners)
+            startup_cleanup.callback(self.event_listener.stop_listeners)
+
+            startup_cleanup.pop_all()
         except Exception:
-            cleanup.close()
+            startup_cleanup.close()
             raise
 
-        return cleanup
+        runtime_cleanup = ExitStack()
+        runtime_cleanup.callback(self.board_runtime.close)
+        runtime_cleanup.callback(self.event_bus.flush_event_buffers)
+        runtime_cleanup.callback(self.event_worker.wait_until_idle)
+        runtime_cleanup.callback(self.event_worker.stop)
+        runtime_cleanup.callback(self.event_listener.stop_listeners)
+        runtime_cleanup.callback(self.camera_runtime.close)
+        runtime_cleanup.callback(self.model_runtime.turn_off_all_model_streams)
+        return runtime_cleanup

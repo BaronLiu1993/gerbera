@@ -15,7 +15,7 @@ class Event:
     streamable: bool
     table_name: str
     buffer: Buffer
-    event_key: str
+    event_key: tuple[str, str, str]
     latest_val: dict[str, str] | None = None
     lock: threading.RLock = field(
         default_factory=threading.RLock,

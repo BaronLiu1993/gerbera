@@ -8,10 +8,16 @@ libraries: []
 pins:
   in1:
     mode: OUTPUT
+    capabilities: [digital_output]
+    assignment: exclusive
   in2:
     mode: OUTPUT
+    capabilities: [digital_output]
+    assignment: exclusive
   enable:
     mode: OUTPUT
+    capabilities: [digital_output, pwm_output]
+    assignment: exclusive
 
 state:
   units:
@@ -36,6 +42,18 @@ commands:
       title: Set {connection.name} motor motion
       readOnlyHint: false
       openWorldHint: false
+
+verification:
+  startup_timeout_ms: 100
+  monitor_interval_ms: 100
+  check: |
+    return false;
+  monitor: |
+    return false;
+  safe_stop: |
+    digitalWrite({pins.in1}, LOW);
+    digitalWrite({pins.in2}, LOW);
+    analogWrite({pins.enable}, 0);
 
 firmware:
   handlers:

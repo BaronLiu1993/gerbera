@@ -8,32 +8,15 @@ MAX_EVENT_NAME_LENGTH = 63
 class StrictSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-def build_hashable_key(*parts: object) -> str:
-    return ".".join(str(part) for part in parts)
-
-
-def parse_event_key(event_key: str) -> tuple[str, str, str]:
-    event_type, remainder = event_key.split(".", 1)
-    microcontroller_id, event_name = remainder.rsplit(".", 1)
-    return event_type, microcontroller_id, event_name
-
-
-def hash_event_key(event_key: str) -> str:
-    return hashlib.sha256(event_key.encode()).hexdigest()
-
-
 def build_connection_event_name(
-    component_type: str,
     microcontroller_id: str,
-    pins: dict[object, object],
+    connection_name: str,
 ) -> str:
-    pin_signature = ",".join(
-        f"{key}={value}"
-        for key, value in sorted((str(key), str(value)) for key, value in pins.items())
+    connection_key = "\0".join(
+        (microcontroller_id, connection_name)
     )
-    microcontroller_hash = hashlib.sha1(microcontroller_id.encode()).hexdigest()[:8]
-    pin_hash = hashlib.sha1(pin_signature.encode()).hexdigest()[:8]
-    source = f"{component_type}_{microcontroller_hash}_{pin_hash}"
+    digest = hashlib.sha256(connection_key.encode()).hexdigest()[:16]
+    source = f"{connection_name}_{digest}"
     return safe_identifier(source)
 
 

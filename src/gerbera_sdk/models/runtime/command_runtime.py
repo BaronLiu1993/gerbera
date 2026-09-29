@@ -5,6 +5,7 @@ import math
 from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.hardware_plan import StateKey
 
 
 class CommandCompiler:
@@ -58,21 +59,27 @@ class CommandCompiler:
 
     @staticmethod
     def state_key(
-        component_type: str,
-        connection_name: str,
+        connection: Connection,
         field_name: str,
-    ) -> str:
-        CommandCompiler.state_unit(component_type, field_name)
-        return f"{component_type}.{connection_name}.{field_name}"
+    ) -> StateKey:
+        CommandCompiler.state_unit(connection.component_type, field_name)
+        if connection.microcontroller_id is None:
+            raise RuntimeError(
+                f"Connection is not bound to a microcontroller: {connection.name}"
+            )
+        return (
+            connection.microcontroller_id,
+            connection.name,
+            field_name,
+        )
 
     @staticmethod
-    def state_keys(connection: Connection) -> list[str]:
+    def state_keys(connection: Connection) -> list[StateKey]:
         builder = get_device_builder(connection.component_type)
         fields = builder.state_definitions()["units"]
         return [
             CommandCompiler.state_key(
-                connection.component_type,
-                connection.name,
+                connection,
                 field_name,
             )
             for field_name in fields
@@ -284,17 +291,3 @@ class CommandCompiler:
             return math.degrees(value)
 
         return value
-
-    @staticmethod
-    def parse_response(response: str) -> dict[str, str]:
-        payload: dict[str, str] = {}
-
-        for token in response.split(","):
-            normalized_token = token.strip()
-            if ":" not in normalized_token:
-                continue
-
-            key, value = normalized_token.split(":", 1)
-            payload[key.strip()] = value.strip()
-
-        return payload

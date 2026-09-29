@@ -22,7 +22,7 @@ class MovementSystemValidator:
     def validate(
         cls,
         movement_system: MovementSystem,
-        registered_connections: dict[str, Connection],
+        registered_connections: dict[tuple[str, str], Connection],
     ) -> list[str]:
         errors: list[str] = []
         movement_path = (
@@ -45,7 +45,7 @@ class MovementSystemValidator:
 
         for joint in movement_system.joints:
             errors.extend(
-                cls._validate_joint(
+                cls.validate_joint(
                     joint=joint,
                     movement_path=movement_path,
                     base_link_key=base_link_key,
@@ -59,7 +59,7 @@ class MovementSystemValidator:
             )
 
         errors.extend(
-            cls._validate_acyclic(
+            cls.validate_acyclic(
                 movement_path=movement_path,
                 link_names=link_names,
                 adjacency=adjacency,
@@ -68,7 +68,7 @@ class MovementSystemValidator:
         )
         if base_link_key:
             errors.extend(
-                cls._validate_reachability(
+                cls.validate_reachability(
                     movement_path=movement_path,
                     base_link_key=base_link_key,
                     link_names=link_names,
@@ -78,7 +78,7 @@ class MovementSystemValidator:
         return errors
 
     @classmethod
-    def _validate_joint(
+    def validate_joint(
         cls,
         *,
         joint: Joint,
@@ -89,7 +89,7 @@ class MovementSystemValidator:
         child_links: set[str],
         adjacency: dict[str, list[str]],
         incoming_edge_counts: dict[str, int],
-        registered_connections: dict[str, Connection],
+        registered_connections: dict[tuple[str, str], Connection],
     ) -> list[str]:
         errors: list[str] = []
         joint_name = joint.name.strip()
@@ -128,13 +128,13 @@ class MovementSystemValidator:
                 link_names.add(link_key)
 
         errors.extend(
-            cls._validate_joint_configuration(
+            cls.validate_joint_configuration(
                 joint=joint,
                 joint_path=joint_path,
             )
         )
         errors.extend(
-            cls._validate_motor(
+            cls.validate_motor(
                 joint=joint,
                 joint_path=joint_path,
                 registered_connections=registered_connections,
@@ -169,7 +169,7 @@ class MovementSystemValidator:
         return errors
 
     @staticmethod
-    def _validate_joint_configuration(
+    def validate_joint_configuration(
         *,
         joint: Joint,
         joint_path: str,
@@ -202,11 +202,11 @@ class MovementSystemValidator:
         return errors
 
     @staticmethod
-    def _validate_motor(
+    def validate_motor(
         *,
         joint: Joint,
         joint_path: str,
-        registered_connections: dict[str, Connection],
+        registered_connections: dict[tuple[str, str], Connection],
     ) -> list[str]:
         if isinstance(joint, FixedJoint):
             return []
@@ -219,9 +219,12 @@ class MovementSystemValidator:
         normalized_connection_name = connection_name.casefold()
         errors: list[str] = []
 
-        registered_connection = registered_connections.get(
-            normalized_connection_name
+        microcontroller_id = motor_connection.microcontroller_id
+        connection_key = (
+            microcontroller_id or "",
+            normalized_connection_name,
         )
+        registered_connection = registered_connections.get(connection_key)
         if registered_connection is None:
             errors.append(
                 f"{joint_path}.motor_connection: connection is not registered: "
@@ -245,7 +248,7 @@ class MovementSystemValidator:
         return errors
 
     @staticmethod
-    def _validate_acyclic(
+    def validate_acyclic(
         *,
         movement_path: str,
         link_names: set[str],
@@ -275,7 +278,7 @@ class MovementSystemValidator:
         return []
 
     @staticmethod
-    def _validate_reachability(
+    def validate_reachability(
         *,
         movement_path: str,
         base_link_key: str,

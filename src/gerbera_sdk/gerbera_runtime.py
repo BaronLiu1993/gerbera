@@ -10,7 +10,8 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.validation import HardwareValidationFacade
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
+from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
@@ -29,32 +30,32 @@ class GerberaRuntime:
         flash_firmware: bool = True,
     ) -> None:
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
-        GerberaRuntime.validate_hardware(hardware_system)
+        hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
 
         if install_dependencies:
             GerberaRuntime.install_dependencies(hardware_system)
 
         if flash_firmware:
-            Flash.flash(hardware_system)
+            Flash.flash(hardware_plan)
 
     @staticmethod
     def run(
         hardware_system: HardwareSystem,
         transport: str,
         database_host: str,
-        database_port: int ,
+        database_port: int,
         database_password: str,
         **transport_kwargs,
     ) -> None:
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
-        GerberaRuntime.validate_hardware(hardware_system)
+        hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
 
         database = GerberaRuntime.runtime_database(
             host=database_host,
             port=database_port,
             password=database_password,
         )
-        board_runtime = BoardRuntime(hardware_system)
+        board_runtime = BoardRuntime(hardware_plan)
         camera_runtime = CameraRuntime(hardware_system)
         event_worker = EventWorker(database=database)
         model_runtime = ModelRuntime(
@@ -68,14 +69,14 @@ class GerberaRuntime:
             movement_runtime.register_movement_system()
 
         GerberaRuntime.register_connection_states(
-            hardware_system=hardware_system,
+            hardware_plan=hardware_plan,
             hardware_runtime=hardware_runtime,
         )
 
         event_bus = EventBus()
         reaction_bus = ReactionBus()
         event_listener = EventListener(
-            hardware_system=hardware_system,
+            hardware_plan=hardware_plan,
             serial_pool=board_runtime.serial_pool,
             event_bus=event_bus,
             reaction_bus=reaction_bus,
@@ -97,6 +98,7 @@ class GerberaRuntime:
         )
         server_runtime = ServerRuntime(
             hardware_system=hardware_system,
+            hardware_plan=hardware_plan,
             board_runtime=board_runtime,
             event_bus=event_bus,
             event_worker=event_worker,
@@ -116,9 +118,8 @@ class GerberaRuntime:
     @staticmethod
     def validate_hardware(
         hardware_system: HardwareSystem,
-    ) -> None:
-        validation = HardwareValidationFacade.validate(hardware_system)
-        validation.raise_for_errors()
+    ) -> HardwarePlan:
+        return HardwareContractCompiler.compile(hardware_system)
 
     @staticmethod
     def bind_connection_microcontroller_ids(
@@ -133,15 +134,14 @@ class GerberaRuntime:
 
     @staticmethod
     def register_connection_states(
-        hardware_system: HardwareSystem,
+        hardware_plan: HardwarePlan,
         hardware_runtime: HardwareRuntime,
     ) -> None:
-        for microcontroller in hardware_system.microcontrollers:
-            for connection in microcontroller.connections:
+        for board in hardware_plan.boards:
+            for connection in board.connections:
                 for key in CommandCompiler.state_keys(connection):
                     hardware_runtime.register_state_store(key)
 
-    # Change the database layer after
     @staticmethod
     def runtime_database(
         host: str,
@@ -149,11 +149,11 @@ class GerberaRuntime:
         password: str,
     ) -> Database:
         return Database(
-            host=host, 
+            host=host,
             port=port,
             password=password,
             user="gerbera_writer",
-            database_name="gerbera"
+            database_name="gerbera",
         )
 
     @staticmethod

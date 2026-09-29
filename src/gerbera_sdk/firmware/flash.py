@@ -3,7 +3,9 @@ import shutil
 from pathlib import Path
 
 from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.paths import FIRMWARE_PATH
 
 DEFAULT_BUILD_DIRNAME = "build"
@@ -11,28 +13,43 @@ DEFAULT_BUILD_DIRNAME = "build"
 
 class Flash:
     @staticmethod
-    def generate_files(hardware_system: HardwareSystem) -> dict[str, Path]:
+    def generate_files(
+        hardware: HardwareSystem | HardwarePlan,
+    ) -> dict[str, Path]:
+        hardware_plan = (
+            hardware
+            if isinstance(hardware, HardwarePlan)
+            else HardwareContractCompiler.compile(hardware)
+        )
         sketch_paths: dict[str, Path] = {}
 
-        for microcontroller in hardware_system.microcontrollers:
-            firmware_code = FirmwareGenerator(microcontroller).build()
-            microcontroller_root = FIRMWARE_PATH / microcontroller.id
+        for board in hardware_plan.boards:
+            firmware_files = FirmwareGenerator(board).generate()
+            microcontroller_root = FIRMWARE_PATH / board.microcontroller_id
             microcontroller_root.mkdir(parents=True, exist_ok=True)
-            sketch_path = microcontroller_root / f"{microcontroller.id}.ino"
-            sketch_path.write_text(firmware_code)
-            sketch_paths[microcontroller.id] = sketch_path
+            for filename, source in firmware_files.named_files(
+                board.microcontroller_id
+            ).items():
+                (microcontroller_root / filename).write_text(source)
+            sketch_path = microcontroller_root / f"{board.microcontroller_id}.ino"
+            sketch_paths[board.microcontroller_id] = sketch_path
 
         return sketch_paths
 
     @staticmethod
-    def flash_code(hardware_system: HardwareSystem) -> None:
+    def flash_code(hardware: HardwareSystem | HardwarePlan) -> None:
+        hardware_plan = (
+            hardware
+            if isinstance(hardware, HardwarePlan)
+            else HardwareContractCompiler.compile(hardware)
+        )
         try:
-            sketch_paths = Flash.generate_files(hardware_system)
+            sketch_paths = Flash.generate_files(hardware_plan)
 
-            for microcontroller in hardware_system.microcontrollers:
-                port = microcontroller.port
-                fqbn = microcontroller.fqbn
-                sketch_path = sketch_paths[microcontroller.id]
+            for board in hardware_plan.boards:
+                port = board.port
+                fqbn = board.fqbn
+                sketch_path = sketch_paths[board.microcontroller_id]
                 microcontroller_root = sketch_path.parent
                 build_path = microcontroller_root / DEFAULT_BUILD_DIRNAME
 
@@ -57,8 +74,11 @@ class Flash:
                 ], check=True)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to flash hardware system {hardware_system.id}") from e
+            raise RuntimeError(
+                "Failed to flash hardware system "
+                f"{hardware_plan.hardware_system_id}"
+            ) from e
 
     @staticmethod
-    def flash(hardware_system: HardwareSystem) -> None:
-        Flash.flash_code(hardware_system)
+    def flash(hardware: HardwareSystem | HardwarePlan) -> None:
+        Flash.flash_code(hardware)
