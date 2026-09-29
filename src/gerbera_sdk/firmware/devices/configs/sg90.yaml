@@ -10,6 +10,8 @@ libraries:
 pins:
   signal:
     mode: OUTPUT
+    capabilities: [digital_output]
+    assignment: exclusive
 
 state:
   units:
@@ -30,11 +32,20 @@ commands:
       readOnlyHint: false
       openWorldHint: false
 
+verification:
+  startup_timeout_ms: 100
+  monitor_interval_ms: 100
+  check: |
+    return false;
+  monitor: |
+    return false;
+  safe_stop: |
+    {connection.name}_servo.detach();
+    digitalWrite({pins.signal}, LOW);
+
 firmware:
   definitions: |
     Servo {connection.name}_servo;
-  setup:
-    - "{connection.name}_servo.attach({pins.signal});"
   handlers:
     default: |
       void handle_{connection.name}(const String& input) {
@@ -46,6 +57,9 @@ firmware:
         }
 
         int angle = angleValue.toInt();
+        if (!{connection.name}_servo.attached()) {
+          {connection.name}_servo.attach({pins.signal});
+        }
         {connection.name}_servo.write(angle);
         Serial.print("MCP,{connection.event_name},angle:");
         Serial.println(angle);

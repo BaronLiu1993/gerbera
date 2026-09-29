@@ -2,30 +2,65 @@ from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 
+def is_ascii_letter(character: str) -> bool:
+    return "A" <= character <= "Z" or "a" <= character <= "z"
+
+
+def is_ascii_digit(character: str) -> bool:
+    return "0" <= character <= "9"
+
+
+def is_firmware_identifier(value: str) -> bool:
+    if not value:
+        return False
+    if value[0] != "_" and not is_ascii_letter(value[0]):
+        return False
+    return all(
+        character == "_"
+        or is_ascii_letter(character)
+        or is_ascii_digit(character)
+        for character in value[1:]
+    )
+
+
 class HardwareSystemValidator:
     @classmethod
     def validate(cls, hardware_system: HardwareSystem) -> list[str]:
         errors: list[str] = []
-        errors.extend(cls._validate_identity(hardware_system))
-        errors.extend(cls._validate_microcontrollers(hardware_system))
-        errors.extend(cls._validate_cameras(hardware_system))
-        errors.extend(cls._validate_models(hardware_system))
-        errors.extend(cls._validate_movement_system_names(hardware_system))
+        errors.extend(cls.validate_identity(hardware_system))
+        errors.extend(cls.validate_microcontrollers(hardware_system))
+        errors.extend(cls.validate_cameras(hardware_system))
+        errors.extend(cls.validate_models(hardware_system))
+        errors.extend(cls.validate_movement_system_names(hardware_system))
         return errors
 
     @staticmethod
     def registered_connections(
         hardware_system: HardwareSystem,
-    ) -> dict[str, Connection]:
+    ) -> dict[tuple[str, str], Connection]:
         return {
-            connection.name.strip().casefold(): connection
+            (
+                microcontroller.id,
+                connection.name.strip().casefold(),
+            ): connection
             for microcontroller in hardware_system.microcontrollers
             for connection in microcontroller.connections
-            if connection.name.strip()
+            if isinstance(connection.name, str) and connection.name.strip()
         }
 
+    @classmethod
+    def validate_microcontroller_connections(
+        cls,
+        microcontroller: object,
+    ) -> list[str]:
+        return cls.validate_connections(
+            microcontroller_id=microcontroller.id,
+            connections=microcontroller.connections,
+            connection_owners={},
+        )
+
     @staticmethod
-    def _validate_identity(hardware_system: HardwareSystem) -> list[str]:
+    def validate_identity(hardware_system: HardwareSystem) -> list[str]:
         errors: list[str] = []
         if not hardware_system.id.strip():
             errors.append("hardware_system.id: cannot be empty")
@@ -34,14 +69,13 @@ class HardwareSystemValidator:
         return errors
 
     @classmethod
-    def _validate_microcontrollers(
+    def validate_microcontrollers(
         cls,
         hardware_system: HardwareSystem,
     ) -> list[str]:
         errors: list[str] = []
         microcontroller_ids: set[str] = set()
         connection_owners: dict[str, str] = {}
-
         for microcontroller in hardware_system.microcontrollers:
             microcontroller_id = microcontroller.id.strip()
             path = f"microcontrollers[{microcontroller_id or microcontroller.name}]"
@@ -60,7 +94,7 @@ class HardwareSystemValidator:
                 )
 
             errors.extend(
-                cls._validate_connections(
+                cls.validate_connections(
                     microcontroller_id=microcontroller_id,
                     connections=microcontroller.connections,
                     connection_owners=connection_owners,
@@ -70,7 +104,7 @@ class HardwareSystemValidator:
         return errors
 
     @staticmethod
-    def _validate_connections(
+    def validate_connections(
         *,
         microcontroller_id: str,
         connections: list[Connection],
@@ -78,18 +112,27 @@ class HardwareSystemValidator:
     ) -> list[str]:
         errors: list[str] = []
         connection_names: set[str] = set()
-        used_pins: set[str] = set()
 
         for connection in connections:
-            connection_name = connection.name.strip()
+            connection_name = (
+                connection.name.strip()
+                if isinstance(connection.name, str)
+                else ""
+            )
             normalized_name = connection_name.casefold()
             path = (
                 f"microcontrollers[{microcontroller_id}]."
                 f"connections[{connection_name or '<empty>'}]"
             )
 
-            if not connection_name:
+            if not isinstance(connection.name, str):
+                errors.append(f"{path}.name: must be a string")
+            elif not connection_name:
                 errors.append(f"{path}.name: cannot be empty")
+            elif not is_firmware_identifier(connection_name):
+                errors.append(
+                    f"{path}.name: must be a valid firmware identifier"
+                )
             elif normalized_name in connection_names:
                 errors.append(f"{path}.name: duplicate connection name")
             else:
@@ -114,25 +157,15 @@ class HardwareSystemValidator:
                     f"got {connection.microcontroller_id}"
                 )
 
-            if not connection.component_type.strip():
+            if not isinstance(connection.component_type, str):
+                errors.append(f"{path}.component_type: must be a string")
+            elif not connection.component_type.strip():
                 errors.append(f"{path}.component_type: cannot be empty")
-
-            for pin_name, pin in connection.pins.items():
-                pin_path = f"{path}.pins[{pin_name}]"
-                if not pin.strip():
-                    errors.append(f"{pin_path}: cannot be empty")
-                elif pin in used_pins:
-                    errors.append(
-                        f"{pin_path}: pin already in use on microcontroller "
-                        f"{microcontroller_id}: {pin}"
-                    )
-                else:
-                    used_pins.add(pin)
 
         return errors
 
     @staticmethod
-    def _validate_cameras(hardware_system: HardwareSystem) -> list[str]:
+    def validate_cameras(hardware_system: HardwareSystem) -> list[str]:
         errors: list[str] = []
         camera_ids: set[str] = set()
 
@@ -152,7 +185,7 @@ class HardwareSystemValidator:
         return errors
 
     @staticmethod
-    def _validate_models(hardware_system: HardwareSystem) -> list[str]:
+    def validate_models(hardware_system: HardwareSystem) -> list[str]:
         errors: list[str] = []
         model_ids: set[str] = set()
         model_names: set[str] = set()
@@ -191,7 +224,7 @@ class HardwareSystemValidator:
         return errors
 
     @staticmethod
-    def _validate_movement_system_names(
+    def validate_movement_system_names(
         hardware_system: HardwareSystem,
     ) -> list[str]:
         errors: list[str] = []

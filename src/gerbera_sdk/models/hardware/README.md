@@ -116,20 +116,18 @@ classDiagram
 Current format:
 
 ```text
-<component_type>_<short_microcontroller_hash>_<short_pin_hash>
+<connection_name>_<connection_key_hash>
 ```
 
 How it is built:
 
-- `component_type` is kept readable
-- the owning microcontroller `id` is hashed down to a short stable suffix
-- `pins` are canonicalized into a stable signature such as `echo=8,trigger=9`
-- that pin signature is hashed down to a short suffix
+- the connection name is kept readable
+- the owning microcontroller ID and connection name form the canonical key
+- that key is hashed to a stable suffix
 
-Why pins are included:
-
-- `component_type + microcontroller_id` is not enough when the same board has two devices of the same type
-- adding the pin signature distinguishes physical attachments without relying on mutable fields like `name`
+Pin changes are tracked by the board contract digest instead of changing the
+connection identity. This keeps event routes stable while ensuring stale
+firmware fails the startup handshake.
 
 This is intentionally short to avoid PostgreSQL identifier length issues. It is internal identity, not a user-facing label.
 

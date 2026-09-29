@@ -3,7 +3,7 @@ import uuid
 
 from gerbera_sdk.inference import Model
 from gerbera_sdk.models.hardware.camera import Camera
-from gerbera_sdk.firmware.configurations import MICROCONTROLLER_MAPPING
+from gerbera_sdk.firmware.board_definitions import BOARD_REGISTRY
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.hardware.movement_system import MovementSystem
 
@@ -22,13 +22,11 @@ class HardwareSystem:
         normalized_library_names: set[str] = set()
 
         for microcontroller in self.microcontrollers:
-            fqbn = microcontroller.fqbn
-            if fqbn not in MICROCONTROLLER_MAPPING:
-                raise ValueError(f"Unsupported microcontroller fqbn: {fqbn}")
+            board_definition = BOARD_REGISTRY.get_definition(
+                microcontroller.fqbn
+            )
 
-            package_names = MICROCONTROLLER_MAPPING[fqbn]["libraries"]
-
-            for library in package_names:
+            for library in board_definition.libraries:
                 normalized_library = library.strip().lower()
                 if normalized_library not in normalized_library_names:
                     libraries.append(library)
