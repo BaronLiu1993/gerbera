@@ -10,6 +10,52 @@ Gerbera is a Python SDK and local CLI for turning declared hardware into:
 
 The main idea is simple: the developer declares the hardware once, and Gerbera uses that model to generate firmware and runtime tools.
 
+## ESP32 Bluetooth Classic
+
+The original ESP32 Dev Module can run the Gerbera protocol over Bluetooth
+Classic SPP while keeping USB as a separate firmware-upload connection. Keep
+the machine-specific endpoints in `config.json`:
+
+```json
+{
+  "devices": {
+    "esp32-1": {
+      "id": "esp32-1",
+      "address": "/dev/cu.usbserial-0001",
+      "runtime_transport": {
+        "kind": "bluetooth_classic",
+        "port": "/dev/cu.Gerbera-ESP32",
+        "device_name": "Gerbera-ESP32"
+      }
+    }
+  }
+}
+```
+
+The hardware declaration only needs the stable ID and upload port:
+
+```python
+microcontroller = Microcontroller(
+    name="robot-controller",
+    port="/dev/cu.usbserial-0001",
+    upload_port="/dev/cu.usbserial-0001",
+    device_id="esp32-1",
+    fqbn="esp32:esp32:esp32",
+    watchdog=RuntimeWatchdogConfig(
+        heartbeat_interval_ms=500,
+        heartbeat_timeout_ms=2500,
+    ),
+)
+```
+
+Flash once over USB with `gerbera firmware flash`, pair the ESP32 with the
+host, then run the server against the paired serial endpoint. `gerbera up`
+does not flash firmware. Use `gerbera firmware flash --force` to upload even
+when the stored contract digest is current.
+
+Bluetooth Classic support is limited to boards whose definition declares that
+transport. BLE and OTA updates are not part of this transport.
+
 ## Project Layout
 
 ```text

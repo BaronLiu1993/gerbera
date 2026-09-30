@@ -1,4 +1,4 @@
-from gerbera_sdk.firmware.board_definitions import BoardRegistry
+from gerbera_sdk.firmware.boards import BoardRegistry
 from gerbera_sdk.firmware.configurations import DeviceRegistry
 from gerbera_sdk.firmware.firmware_schema import PinCapability, PinMode
 from gerbera_sdk.models.hardware.validators.hardware_system_validator import (

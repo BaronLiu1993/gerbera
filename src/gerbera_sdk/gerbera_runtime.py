@@ -77,10 +77,11 @@ class GerberaRuntime:
         reaction_bus = ReactionBus()
         event_listener = EventListener(
             hardware_plan=hardware_plan,
-            serial_pool=board_runtime.serial_pool,
+            transport_pool=board_runtime.transport_pool,
             event_bus=event_bus,
             reaction_bus=reaction_bus,
             hardware_runtime=hardware_runtime,
+            reconnect_board=board_runtime.reconnect_board,
         )
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,

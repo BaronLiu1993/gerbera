@@ -59,9 +59,9 @@ class RuntimeLifecycle:
             self.model_runtime.turn_on_all_model_streams()
 
             self.event_worker.start()
-            startup_cleanup.callback(self.event_bus.flush_event_buffers)
-            startup_cleanup.callback(self.event_worker.wait_until_idle)
             startup_cleanup.callback(self.event_worker.stop)
+            startup_cleanup.callback(self.event_worker.wait_until_idle)
+            startup_cleanup.callback(self.event_bus.flush_event_buffers)
 
             self.event_listener.create_listeners()
             startup_cleanup.callback(self.event_listener.stop_listeners)
@@ -73,9 +73,9 @@ class RuntimeLifecycle:
 
         runtime_cleanup = ExitStack()
         runtime_cleanup.callback(self.board_runtime.close)
-        runtime_cleanup.callback(self.event_bus.flush_event_buffers)
-        runtime_cleanup.callback(self.event_worker.wait_until_idle)
         runtime_cleanup.callback(self.event_worker.stop)
+        runtime_cleanup.callback(self.event_worker.wait_until_idle)
+        runtime_cleanup.callback(self.event_bus.flush_event_buffers)
         runtime_cleanup.callback(self.event_listener.stop_listeners)
         runtime_cleanup.callback(self.camera_runtime.close)
         runtime_cleanup.callback(self.model_runtime.turn_off_all_model_streams)

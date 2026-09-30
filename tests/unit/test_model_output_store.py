@@ -293,3 +293,25 @@ def test_turn_on_all_model_streams_uses_configured_vlm_prompt() -> None:
     assert runtime.model_outputs["objects-key"] is not None
     assert vision.model.user_prompts[0] == vision.user_prompt
     assert runtime.model_streams == {}
+
+
+def test_model_stream_failure_is_reported_to_callers() -> None:
+    camera = make_camera()
+    inference = make_object_detection(camera)
+    runtime = make_runtime(inference)
+
+    def fail_prediction(*args, **kwargs) -> None:
+        raise ValueError("invalid prediction")
+
+    inference.model.detect = fail_prediction
+    runtime.turn_on_model_stream(inference.model_id)
+    for _ in range(100):
+        if inference.model_id in runtime.model_stream_failures:
+            break
+        time.sleep(0.005)
+
+    with pytest.raises(RuntimeError, match="Model stream failed") as error:
+        runtime.read_model_output(inference.model_id, "object_detection")
+
+    assert isinstance(error.value.__cause__, ValueError)
+    assert runtime.model_streams == {}

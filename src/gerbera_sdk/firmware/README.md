@@ -77,6 +77,10 @@ and renders its firmware templates for a concrete connection.
 
 ## Wire Protocol
 
+Generated firmware writes this protocol through `GERBERA_TRANSPORT`. USB
+firmware binds it to `Serial`; ESP32 Bluetooth Classic firmware binds it to
+`BluetoothSerial`. Device templates must not write directly to `Serial`.
+
 Commands sent to Arduino:
 
 ```text

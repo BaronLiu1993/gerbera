@@ -3,8 +3,6 @@ import secrets
 import threading
 import time
 
-import serial
-
 from gerbera_sdk.firmware.firmware_schema import (
     GERBERA_CHECK,
     GERBERA_HANDSHAKE,
@@ -19,8 +17,11 @@ from gerbera_sdk.models.runtime.serial_protocol import (
     SerialMessage,
     SerialMessageCodec,
 )
+from gerbera_sdk.models.runtime.board_transport import (
+    BoardTransport,
+    BoardTransportFactory,
+)
 
-SERIAL_BOOT_SECONDS = 2.0
 HANDSHAKE_CHALLENGE_BYTES = 16
 HANDSHAKE_FIELDS = frozenset({"protocol", "board", "digest", "challenge"})
 CHECK_PASS_FIELDS = frozenset({"status", "session"})
@@ -37,48 +38,8 @@ class ExpectedSerialMessage:
 
 
 @dataclass
-class SerialConnection:
-    connection: serial.Serial | None = None
-    lock: threading.RLock = field(
-        default_factory=threading.RLock,
-        init=False,
-        repr=False,
-    )
-
-    def connect(self, port: str, baud: int = 115200) -> None:
-        self.connection = serial.Serial(port, baud, timeout=SERIAL_BOOT_SECONDS)
-        time.sleep(SERIAL_BOOT_SECONDS)
-        self.connection.reset_input_buffer()
-
-    def write(self, command: str) -> None:
-        with self.lock:
-            connection = self.require_connection()
-            connection.write(f"{command}\n".encode())
-            connection.flush()
-
-    def readline(self) -> bytes:
-        return self.require_connection().readline()
-
-    def require_connection(self) -> serial.Serial:
-        if self.connection is None or not self.connection.is_open:
-            raise RuntimeError("Serial connection is not open")
-        return self.connection
-
-    def destroy(self) -> None:
-        with self.lock:
-            if self.connection is not None and self.connection.is_open:
-                self.connection.close()
-
-    def cancel_read(self) -> None:
-        connection = self.require_connection()
-        cancel_read = getattr(connection, "cancel_read", None)
-        if cancel_read is not None:
-            cancel_read()
-
-
-@dataclass
 class BoardSession:
-    connection: SerialConnection
+    transport: BoardTransport
     session_id: str
     heartbeat_interval_ms: int
     heartbeat_stop: threading.Event = field(default_factory=threading.Event)
@@ -102,7 +63,7 @@ class BoardSession:
             deadline += interval_seconds
 
     def send_heartbeat(self) -> None:
-        self.connection.write(
+        self.transport.write(
             SerialMessageCodec.encode(
                 SerialMessage(
                     message_type=GERBERA_HEARTBEAT,
@@ -126,8 +87,11 @@ class BoardSession:
 @dataclass
 class BoardRuntime:
     hardware_plan: HardwarePlan
-    serial_pool: dict[str, SerialConnection] = field(default_factory=dict)
+    transport_pool: dict[str, BoardTransport] = field(default_factory=dict)
     sessions: dict[str, BoardSession] = field(default_factory=dict)
+    transport_factory: BoardTransportFactory = field(
+        default_factory=BoardTransportFactory
+    )
     lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
@@ -157,16 +121,16 @@ class BoardRuntime:
                     f"{board.microcontroller_id}"
                 )
 
-        connection = SerialConnection()
+        transport = self.transport_factory.create(board)
         session_id = ""
-        connection.connect(port=board.port, baud=board.baud_rate)
+        transport.connect()
         try:
-            session_id = self.verify_contract(board, connection)
-            self.verify_components(board, connection, session_id)
-            self.start_firmware(connection, session_id)
-            self.send_first_heartbeat(connection, session_id)
+            session_id = self.verify_contract(board, transport)
+            self.verify_components(board, transport, session_id)
+            self.start_firmware(transport, session_id)
+            self.send_first_heartbeat(transport, session_id)
             session = BoardSession(
-                connection=connection,
+                transport=transport,
                 session_id=session_id,
                 heartbeat_interval_ms=(
                     board.watchdog.heartbeat_interval_ms
@@ -175,18 +139,18 @@ class BoardRuntime:
             session.heartbeat_thread.start()
         except Exception:
             if session_id:
-                self.attempt_stop(connection, session_id)
-            connection.destroy()
+                self.attempt_stop(transport, session_id)
+            transport.close()
             raise
 
         with self.lock:
             self.sessions[board.microcontroller_id] = session
-            self.serial_pool[board.microcontroller_id] = connection
+            self.transport_pool[board.microcontroller_id] = transport
 
     @staticmethod
     def verify_contract(
         board: ResolvedBoard,
-        connection: SerialConnection,
+        connection: BoardTransport,
     ) -> str:
         challenge = secrets.token_hex(HANDSHAKE_CHALLENGE_BYTES)
         connection.write(
@@ -225,7 +189,7 @@ class BoardRuntime:
     @staticmethod
     def verify_components(
         board: ResolvedBoard,
-        connection: SerialConnection,
+        connection: BoardTransport,
         session_id: str,
     ) -> None:
         for component in board.connections:
@@ -271,7 +235,7 @@ class BoardRuntime:
 
     @staticmethod
     def start_firmware(
-        connection: SerialConnection,
+        connection: BoardTransport,
         session_id: str,
     ) -> None:
         connection.write(
@@ -301,7 +265,7 @@ class BoardRuntime:
 
     @staticmethod
     def send_first_heartbeat(
-        connection: SerialConnection,
+        connection: BoardTransport,
         session_id: str,
     ) -> None:
         connection.write(
@@ -316,7 +280,7 @@ class BoardRuntime:
 
     @staticmethod
     def read_response(
-        connection: SerialConnection,
+        connection: BoardTransport,
         timeout_message: str,
     ) -> SerialMessage:
         raw_response = connection.readline()
@@ -336,21 +300,42 @@ class BoardRuntime:
         if response.fields.keys() != expected.fields:
             raise RuntimeError("Board returned invalid message fields")
 
-    def get_serial_connection(
+    def get_transport(
         self,
         microcontroller_id: str,
-    ) -> SerialConnection:
+    ) -> BoardTransport:
         with self.lock:
-            connection = self.serial_pool.get(microcontroller_id)
+            connection = self.transport_pool.get(microcontroller_id)
         if connection is None:
             raise RuntimeError(
                 f"Microcontroller is not connected: {microcontroller_id}"
             )
         return connection
 
+    def reconnect_board(self, microcontroller_id: str) -> None:
+        self.close_board(microcontroller_id)
+        try:
+            board = self.hardware_plan.boards_by_id[microcontroller_id]
+        except KeyError as exc:
+            raise RuntimeError(
+                f"Unknown microcontroller: {microcontroller_id}"
+            ) from exc
+        self.start_board(board)
+
+    def close_board(self, microcontroller_id: str) -> None:
+        with self.lock:
+            session = self.sessions.pop(microcontroller_id, None)
+            self.transport_pool.pop(microcontroller_id, None)
+        if session is None:
+            return
+        try:
+            session.stop_heartbeat()
+        finally:
+            session.transport.close()
+
     @staticmethod
     def attempt_stop(
-        connection: SerialConnection,
+        connection: BoardTransport,
         session_id: str,
     ) -> None:
         try:
@@ -359,7 +344,7 @@ class BoardRuntime:
             return
 
     @staticmethod
-    def send_stop(connection: SerialConnection, session_id: str) -> None:
+    def send_stop(connection: BoardTransport, session_id: str) -> None:
         connection.write(
             SerialMessageCodec.encode(
                 SerialMessage(
@@ -378,19 +363,19 @@ class BoardRuntime:
         for microcontroller_id, session in sessions:
             try:
                 session.stop_heartbeat()
-                self.send_stop(session.connection, session.session_id)
+                self.send_stop(session.transport, session.session_id)
             except Exception as exc:
                 if first_error is None:
                     first_error = exc
             finally:
                 try:
-                    session.connection.destroy()
+                    session.transport.close()
                 except Exception as exc:
                     if first_error is None:
                         first_error = exc
                 with self.lock:
                     self.sessions.pop(microcontroller_id, None)
-                    self.serial_pool.pop(microcontroller_id, None)
+                    self.transport_pool.pop(microcontroller_id, None)
 
         if first_error is not None:
             raise RuntimeError("Could not stop board runtime") from first_error

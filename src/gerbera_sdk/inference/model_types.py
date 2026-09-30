@@ -12,7 +12,6 @@ class VisionLanguageModelProviderEnum(Enum):
 
 class ObjectDetectionModelProviderEnum(Enum):
     YOLOV5 = "yolov5"
-    YOLOV8 = "yolov8"
 
 
 ModelCatalogType = Literal["object_detection", "vision_language_model"]

@@ -1,9 +1,10 @@
-import subprocess
+import json
 import shutil
+import subprocess
 from pathlib import Path
 
 from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
-from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.paths import FIRMWARE_PATH
@@ -43,11 +44,34 @@ class Flash:
             if isinstance(hardware, HardwarePlan)
             else HardwareContractCompiler.compile(hardware)
         )
+        boards = tuple(
+            board
+            for board in hardware_plan.boards
+            if not Flash.firmware_is_current(board)
+        )
+        Flash.flash_boards(hardware_plan, boards)
+
+    @staticmethod
+    def flash_all_code(hardware: HardwareSystem | HardwarePlan) -> None:
+        hardware_plan = (
+            hardware
+            if isinstance(hardware, HardwarePlan)
+            else HardwareContractCompiler.compile(hardware)
+        )
+        Flash.flash_boards(hardware_plan, hardware_plan.boards)
+
+    @staticmethod
+    def flash_boards(
+        hardware_plan: HardwarePlan,
+        boards: tuple[ResolvedBoard, ...],
+    ) -> None:
+        if not boards:
+            return
         try:
             sketch_paths = Flash.generate_files(hardware_plan)
 
-            for board in hardware_plan.boards:
-                port = board.port
+            for board in boards:
+                port = board.firmware_upload_port
                 fqbn = board.fqbn
                 sketch_path = sketch_paths[board.microcontroller_id]
                 microcontroller_root = sketch_path.parent
@@ -64,7 +88,6 @@ class Flash:
                     "--build-path", str(build_path),
                     str(microcontroller_root),
                 ], check=True)
-
                 subprocess.run([
                     "arduino-cli", "upload",
                     "-p", port,
@@ -72,6 +95,7 @@ class Flash:
                     "--input-dir", str(build_path),
                     str(microcontroller_root),
                 ], check=True)
+                Flash.record_firmware_digest(board)
 
         except Exception as e:
             raise RuntimeError(
@@ -82,3 +106,31 @@ class Flash:
     @staticmethod
     def flash(hardware: HardwareSystem | HardwarePlan) -> None:
         Flash.flash_code(hardware)
+
+    @staticmethod
+    def flash_all(hardware: HardwareSystem | HardwarePlan) -> None:
+        Flash.flash_all_code(hardware)
+
+    @staticmethod
+    def manifest_path(board: ResolvedBoard) -> Path:
+        return FIRMWARE_PATH / board.microcontroller_id / "installed.json"
+
+    @staticmethod
+    def firmware_is_current(board: ResolvedBoard) -> bool:
+        manifest_path = Flash.manifest_path(board)
+        if not manifest_path.exists():
+            return False
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return False
+        return manifest.get("contract_digest") == board.contract_digest
+
+    @staticmethod
+    def record_firmware_digest(board: ResolvedBoard) -> None:
+        Flash.manifest_path(board).write_text(
+            json.dumps(
+                {"contract_digest": board.contract_digest},
+                indent=2,
+            )
+        )

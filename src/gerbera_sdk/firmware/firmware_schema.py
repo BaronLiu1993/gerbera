@@ -14,6 +14,11 @@ GERBERA_STATE_READY = "READY"
 GERBERA_STATE_STOPPED = "STOPPED"
 MAX_SERIAL_MESSAGE_BYTES = 1024
 
+
+class BoardTransportKind(str, Enum):
+    USB_SERIAL = "usb_serial"
+    BLUETOOTH_CLASSIC = "bluetooth_classic"
+
 @dataclass(frozen=True)
 class ParameterSpec:
     required: bool = True

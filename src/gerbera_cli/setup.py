@@ -9,6 +9,7 @@ import secrets
 
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.firmware.firmware_schema import ColumnSpec
+from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 
@@ -24,6 +25,7 @@ POSTGRES_VOLUME = "gerbera_postgres_data"
 
 def generate_secret(length: int = 32) -> str:
     return secrets.token_urlsafe(length)
+
 
 # Local Run
 def run_local_server(
@@ -42,12 +44,21 @@ def run_local_server(
         database_password=gerbera_writer_password,
     )
 
-def run_firmware_setup(hardware_system: HardwareSystem) -> None: 
+
+def run_firmware_setup(hardware_system: HardwareSystem) -> None:
     GerberaRuntime.setup(
         hardware_system,
         install_dependencies=True,
         flash_firmware=True,
     )
+
+
+def run_forced_firmware_setup(hardware_system: HardwareSystem) -> None:
+    GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
+    hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
+    GerberaRuntime.install_dependencies(hardware_system)
+    Flash.flash_all(hardware_plan)
+
 
 def setup_local_container(
     gerbera_admin_password: str,

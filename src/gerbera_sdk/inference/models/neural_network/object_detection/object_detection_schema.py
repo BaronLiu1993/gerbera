@@ -1,6 +1,9 @@
+from typing import Literal
+
 from pydantic import Field, InstanceOf
 
 from gerbera_sdk.inference.frame import BoundingBox, Frame
+from gerbera_sdk.inference.model_types import ObjectDetectionModelProviderEnum
 from gerbera_sdk.utils import StrictSchema
 
 
@@ -15,6 +18,8 @@ class ObjectDetectionModelOutputSchema(StrictSchema):
 
 
 class ObjectDetectionModelManifestSchema(StrictSchema):
+    schema_version: Literal[1]
+    model_format: ObjectDetectionModelProviderEnum
     input: ObjectDetectionModelInputSchema
     output: ObjectDetectionModelOutputSchema
 

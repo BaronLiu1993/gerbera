@@ -17,6 +17,7 @@ from gerbera_sdk.inference.models.neural_network.object_detection.object_detecti
 )
 from gerbera_sdk.paths import MODELS_PATH
 
+
 @dataclass
 class ObjectDetectionAdapter(ABC):
     model_source: str
@@ -69,6 +70,8 @@ class Yolov5ModelAdapter(ObjectDetectionAdapter):
                 "Unexpected YOLOv5 output shape: "
                 f"expected {expected_shape}, received {predictions.shape}"
             )
+        if not np.isfinite(predictions).all():
+            raise ValueError("YOLOv5 output contains NaN or infinite values")
 
     def decode(
         self,

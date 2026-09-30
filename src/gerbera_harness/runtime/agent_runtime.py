@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gerbera_harness.runtime.session import (
     TaskDecompositionDecisionEnum,
@@ -6,7 +6,7 @@ from gerbera_harness.runtime.session import (
     Session,
 )
 from gerbera_harness.infrastructure.model import Model
-from gerbera_harness.memory import EventTypeEnum, Memory
+from gerbera_harness.memory import Memory
 from gerbera_harness.tools.client import ToolClient
 from gerbera_harness.runtime.evaluation_runtime import EvaluationRuntime
 from gerbera_harness.runtime.execute_consumer_runtime import ExecuteConsumerRuntime
@@ -24,6 +24,7 @@ from gerbera_harness.runtime.schemas import (
 from gerbera_harness.runtime.task_decomposition_runtime import (
     TaskDecompositionRuntime,
 )
+from gerbera_harness.runtime.task_lifecycle import TaskLifecycleRuntime
 
 
 @dataclass
@@ -37,14 +38,17 @@ class AgentRuntime:
     previous_phase_context: str = ""
     max_task_execution_attempts: int = 5
     max_task_decomposition_retries: int = 5
+    task_lifecycle: TaskLifecycleRuntime = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.task_lifecycle = TaskLifecycleRuntime(self.memory)
 
     def task_execution_attempts_exhausted(self) -> bool:
         current_task = self.memory.get_current_task_state()
         return current_task.attempts >= self.max_task_execution_attempts
 
     def fail_current_task(self, message: str) -> ExecutionResultSchema:
-        self.memory.fail_task()
-        self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_FAILED)
+        self.task_lifecycle.fail_current_task()
         return ExecutionResultSchema(
             decision=ExecutionDecisionEnum.FAILED,
             message=message,
@@ -94,6 +98,7 @@ class AgentRuntime:
             tool_client=self.tool_client,
             user_prompt=self.user_prompt,
             previous_context=self.previous_phase_context,
+            task_lifecycle=self.task_lifecycle,
         ).run_task_decomposition(
             source_urls=source_urls
         )  # we will pass in the source_urls eventually
@@ -110,10 +115,9 @@ class AgentRuntime:
 
     async def run_execution(self) -> ExecutionResultSchema:
         self.memory.require_task_state()
-        while self.memory.has_remaining_tasks():
-            self.memory.advance_to_next_task()
-            self.memory.start_task()
-            self.memory.insert_task_lifecycle_event(EventTypeEnum.TASK_STARTED)
+        while self.task_lifecycle.has_remaining_tasks():
+            self.task_lifecycle.advance_to_next_task()
+            self.task_lifecycle.start_current_task()
             while True:
                 current_task = self.memory.get_current_task_state()
                 # Task attempts count failed/replan recovery cycles, not the
@@ -131,7 +135,7 @@ class AgentRuntime:
                 ).produce_action_groups()
 
                 if result.decision is ExecuteProducerDecision.REPLAN_ACTIONS:
-                    self.memory.increment_current_task_attempts()
+                    self.task_lifecycle.increment_current_task_attempts()
                     if self.task_execution_attempts_exhausted():
                         self.previous_phase_context = result.context
                         return self.fail_current_task(
@@ -159,7 +163,7 @@ class AgentRuntime:
                     # Clearing task state means structured audit for the old
                     # task list lives in events/context. Archive task_state here
                     # later if we need full task-list history after redecompose.
-                    self.memory.clear_task_state()
+                    self.task_lifecycle.clear_tasks()
                     self.session.increment_current_agent_retries()
                     self.previous_phase_context = result.context
                     self.session.perform_transition(LoopStateEnum.TASK_DECOMPOSITION)
@@ -169,7 +173,7 @@ class AgentRuntime:
                     )
 
                 elif result.decision is ExecuteProducerDecision.FAIL:
-                    self.memory.increment_current_task_attempts()
+                    self.task_lifecycle.increment_current_task_attempts()
                     if self.task_execution_attempts_exhausted():
                         return self.fail_current_task(
                             "current task failed after recovery attempts"
@@ -179,10 +183,7 @@ class AgentRuntime:
                     continue
 
                 elif result.decision is ExecuteProducerDecision.SUCCESS:
-                    self.memory.complete_task()
-                    self.memory.insert_task_lifecycle_event(
-                        EventTypeEnum.TASK_COMPLETED
-                    )
+                    self.task_lifecycle.complete_current_task()
                     break
 
                 else:

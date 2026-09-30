@@ -4,6 +4,7 @@ import pytest
 
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.microcontroller import (
+    BoardTransportKind,
     Microcontroller,
     RuntimeWatchdogConfig,
 )
@@ -121,3 +122,36 @@ def test_microcontroller_hard_fails_when_port_is_not_registered(
 
     with pytest.raises(ValueError, match="matched port"):
         _ = board.id
+
+
+def test_microcontroller_loads_runtime_transport_from_config(tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "esp32-1": {
+                        "id": "esp32-1",
+                        "address": "/dev/usb-esp32",
+                        "runtime_transport": {
+                            "kind": "bluetooth_classic",
+                            "port": "/dev/bluetooth-esp32",
+                            "device_name": "Gerbera-ESP32",
+                        },
+                    }
+                }
+            }
+        )
+    )
+    board = Microcontroller(
+        name="esp32",
+        port="/dev/usb-esp32",
+        fqbn="esp32:esp32:esp32",
+        watchdog=RuntimeWatchdogConfig(500, 2500),
+        config_path=config_path,
+    )
+
+    transport = board.active_runtime_transport
+
+    assert transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC
+    assert transport.port == "/dev/bluetooth-esp32"

@@ -95,9 +95,13 @@ classDiagram
 
 `Microcontroller.id`
 
-- is resolved from `config.json["devices"]`
-- is not intended to be user-defined directly
-- is currently derived by matching the declared `port`
+- can be declared explicitly with `device_id`
+- otherwise resolves from `config.json["devices"]` using the upload port
+- remains stable when the runtime transport changes
+
+Upload and runtime connections are separate. `upload_port` is used only by
+Arduino tooling. `runtime_transport` selects USB serial or a board-supported
+wireless transport.
 
 `Connection.microcontroller_id`
 

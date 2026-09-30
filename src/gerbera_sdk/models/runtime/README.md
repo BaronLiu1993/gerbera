@@ -46,9 +46,9 @@ model_runtime.py        Model inference registration, output state, and lifecycl
 
 `BoardRuntime` owns:
 
-- opening one serial connection per microcontroller
-- looking up the active serial connection for a board
-- closing active serial connections
+- opening one configured transport per microcontroller
+- looking up the active transport for a board
+- closing and reconnecting active transports
 
 `CommandCompiler` owns:
 
@@ -67,7 +67,7 @@ flowchart TD
     B --> E[ServerRuntime]
     E --> F[Register MCP/STREAM events and tools]
     E --> G[Start EventListener]
-    C --> H[SerialConnection]
+    C --> H[BoardTransport]
     F --> I[CommandCompiler.build_command]
     I --> H
     H --> J[Firmware]

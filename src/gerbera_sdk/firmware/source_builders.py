@@ -3,6 +3,7 @@ import json
 
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.firmware.firmware_schema import (
+    BoardTransportKind,
     GERBERA_CHECK,
     GERBERA_HANDSHAKE,
     GERBERA_HANDSHAKE_TARGET,
@@ -44,6 +45,7 @@ void loop() {
         return f"""#pragma once
 
 #include <Arduino.h>
+{self.transport_header()}
 
 enum RuntimeState {{
   {GERBERA_STATE_CHECKING},
@@ -82,6 +84,7 @@ class GerberaRuntime {{
 #include \"Components.h\"
 #include \"DeviceCommands.h\"
 
+{self.transport_definition()}
 const long BAUD_RATE = {self.board.baud_rate};
 const unsigned long HEARTBEAT_TIMEOUT_MS = {self.board.watchdog.heartbeat_timeout_ms};
 const unsigned int MAX_SERIAL_MESSAGE_LENGTH = {MAX_SERIAL_MESSAGE_BYTES};
@@ -89,7 +92,7 @@ const char* GERBERA_BOARD_ID = {json.dumps(self.board.microcontroller_id)};
 const char* GERBERA_CONTRACT_DIGEST = {json.dumps(self.board.contract_digest)};
 
 void GerberaRuntime::setup() {{
-  Serial.begin(BAUD_RATE);
+  {self.transport_setup()}
   setupComponentPins();
   setupDeviceCommands();
   stopAllComponents();
@@ -114,13 +117,13 @@ bool GerberaRuntime::isReady() const {{
 }}
 
 void GerberaRuntime::processSerialMessage() {{
-  if (!Serial.available()) {{
+  if (!GERBERA_TRANSPORT.available()) {{
     return;
   }}
-  String input = Serial.readStringUntil('\\n');
+  String input = GERBERA_TRANSPORT.readStringUntil('\\n');
   input.trim();
   if (input.length() > MAX_SERIAL_MESSAGE_LENGTH) {{
-    Serial.println("error:message_too_large");
+    GERBERA_TRANSPORT.println("error:message_too_large");
     return;
   }}
   if (input.length() == 0) {{
@@ -154,12 +157,12 @@ void GerberaRuntime::processSerialMessage() {{
 
 void GerberaRuntime::handleHandshake(const String& input) {{
   if (tokenCount(input) != 3 || !tokenAt(input, 2).startsWith("challenge:")) {{
-    Serial.println("{GERBERA_HANDSHAKE},{GERBERA_HANDSHAKE_TARGET},error:invalid_fields");
+    GERBERA_TRANSPORT.println("{GERBERA_HANDSHAKE},{GERBERA_HANDSHAKE_TARGET},error:invalid_fields");
     return;
   }}
   String challenge = parameterValue(input, "challenge");
   if (challenge.length() == 0) {{
-    Serial.println("{GERBERA_HANDSHAKE},{GERBERA_HANDSHAKE_TARGET},error:missing_challenge");
+    GERBERA_TRANSPORT.println("{GERBERA_HANDSHAKE},{GERBERA_HANDSHAKE_TARGET},error:missing_challenge");
     return;
   }}
 
@@ -169,13 +172,13 @@ void GerberaRuntime::handleHandshake(const String& input) {{
   stopReason = "";
   stoppedComponent = "";
   resetComponentChecks();
-  Serial.print("{GERBERA_HANDSHAKE},{GERBERA_HANDSHAKE_TARGET},protocol:{GERBERA_PROTOCOL_VERSION}");
-  Serial.print(",board:");
-  Serial.print(GERBERA_BOARD_ID);
-  Serial.print(",digest:");
-  Serial.print(GERBERA_CONTRACT_DIGEST);
-  Serial.print(",challenge:");
-  Serial.println(challenge);
+  GERBERA_TRANSPORT.print("{GERBERA_HANDSHAKE},{GERBERA_HANDSHAKE_TARGET},protocol:{GERBERA_PROTOCOL_VERSION}");
+  GERBERA_TRANSPORT.print(",board:");
+  GERBERA_TRANSPORT.print(GERBERA_BOARD_ID);
+  GERBERA_TRANSPORT.print(",digest:");
+  GERBERA_TRANSPORT.print(GERBERA_CONTRACT_DIGEST);
+  GERBERA_TRANSPORT.print(",challenge:");
+  GERBERA_TRANSPORT.println(challenge);
 }}
 
 void GerberaRuntime::handleComponentCheck(const String& input) {{
@@ -188,17 +191,17 @@ void GerberaRuntime::handleComponentCheck(const String& input) {{
   ComponentMonitor* component = findComponent(componentKey);
   if (component == nullptr || !runComponentCheck(*component)) {{
     enterStoppedState("component_check_failed", componentKey);
-    Serial.print("{GERBERA_CHECK},");
-    Serial.print(componentKey);
-    Serial.print(",status:fail,error:component_check_failed,session:");
-    Serial.println(activeSession);
+    GERBERA_TRANSPORT.print("{GERBERA_CHECK},");
+    GERBERA_TRANSPORT.print(componentKey);
+    GERBERA_TRANSPORT.print(",status:fail,error:component_check_failed,session:");
+    GERBERA_TRANSPORT.println(activeSession);
     return;
   }}
   component->checkPassed = true;
-  Serial.print("{GERBERA_CHECK},");
-  Serial.print(componentKey);
-  Serial.print(",status:pass,session:");
-  Serial.println(activeSession);
+  GERBERA_TRANSPORT.print("{GERBERA_CHECK},");
+  GERBERA_TRANSPORT.print(componentKey);
+  GERBERA_TRANSPORT.print(",status:pass,session:");
+  GERBERA_TRANSPORT.println(activeSession);
 }}
 
 void GerberaRuntime::handleStart(const String& input) {{
@@ -214,8 +217,8 @@ void GerberaRuntime::handleStart(const String& input) {{
   state = {GERBERA_STATE_READY};
   lastHeartbeatAt = millis();
   resetComponentMonitorTimes(lastHeartbeatAt);
-  Serial.print("{GERBERA_START},{GERBERA_HANDSHAKE_TARGET},state:{GERBERA_STATE_READY},session:");
-  Serial.println(activeSession);
+  GERBERA_TRANSPORT.print("{GERBERA_START},{GERBERA_HANDSHAKE_TARGET},state:{GERBERA_STATE_READY},session:");
+  GERBERA_TRANSPORT.println(activeSession);
 }}
 
 void GerberaRuntime::handleHeartbeat(const String& input) {{
@@ -280,6 +283,34 @@ void GerberaRuntime::enterStoppedState(
   stoppedComponent = component;
 }}
 """
+
+    def transport_header(self) -> str:
+        if (
+            self.board.active_runtime_transport.kind
+            == BoardTransportKind.BLUETOOTH_CLASSIC
+        ):
+            return (
+                "#include <BluetoothSerial.h>\n\n"
+                "extern BluetoothSerial GERBERA_TRANSPORT;"
+            )
+        return "#define GERBERA_TRANSPORT Serial"
+
+    def transport_definition(self) -> str:
+        if (
+            self.board.active_runtime_transport.kind
+            == BoardTransportKind.BLUETOOTH_CLASSIC
+        ):
+            return "BluetoothSerial GERBERA_TRANSPORT;"
+        return ""
+
+    def transport_setup(self) -> str:
+        transport = self.board.active_runtime_transport
+        if transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC:
+            return (
+                "GERBERA_TRANSPORT.begin("
+                f"{json.dumps(transport.device_name)});"
+            )
+        return "GERBERA_TRANSPORT.begin(BAUD_RATE);"
 
 
 @dataclass(frozen=True)
@@ -608,18 +639,18 @@ void updateDeviceStreams(const GerberaRuntime& runtime) {{
 
 void dispatchDeviceCommand(GerberaRuntime& runtime, const String& input) {{
   if (!runtime.isReady()) {{
-    Serial.println("error:hardware_not_ready");
+    GERBERA_TRANSPORT.println("error:hardware_not_ready");
     return;
   }}
   String action = actionOf(input);
   String commandName = commandNameOf(input);
   if (action.length() == 0 || commandName.length() == 0) {{
-    Serial.println("error:invalid_command");
+    GERBERA_TRANSPORT.println("error:invalid_command");
     return;
   }}
 {self.dispatch_lines()}
-  Serial.print("error:unknown_command:");
-  Serial.println(commandName);
+  GERBERA_TRANSPORT.print("error:unknown_command:");
+  GERBERA_TRANSPORT.println(commandName);
 }}
 """
 

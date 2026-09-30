@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 
-from gerbera_sdk.firmware.board_definitions import BoardRegistry
+from gerbera_sdk.firmware.boards import BoardRegistry
 from gerbera_sdk.firmware.configurations import DeviceRegistry
 from gerbera_sdk.firmware.firmware_schema import PinAssignmentMode
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem

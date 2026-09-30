@@ -76,8 +76,8 @@ firmware:
         long duration = pulseIn({pins.echo}, HIGH, 30000);
         if (duration > 0) {
           float distanceCm = duration * 0.0343 / 2.0;
-          Serial.print("STREAM,{connection.event_name},distance:");
-          Serial.println(distanceCm);
+          GERBERA_TRANSPORT.print("STREAM,{connection.event_name},distance:");
+          GERBERA_TRANSPORT.println(distanceCm);
         }
         delay(100);
       }
@@ -92,13 +92,13 @@ firmware:
         digitalWrite({pins.trig}, LOW);
         long duration = pulseIn({pins.echo}, HIGH, 30000);
         if (duration == 0) {
-          Serial.println("MCP,{connection.event_name},error:timeout");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:timeout");
           return;
         }
 
         float distanceCm = duration * 0.0343 / 2.0;
-        Serial.print("MCP,{connection.event_name},distance:");
-        Serial.println(distanceCm);
+        GERBERA_TRANSPORT.print("MCP,{connection.event_name},distance:");
+        GERBERA_TRANSPORT.println(distanceCm);
       }
     streaming: |
       void handle_{connection.name}(const String& input) {
@@ -107,24 +107,24 @@ firmware:
         if (action == "WRITE") {
           String stateValue = parameterValue(input, "state");
           if (stateValue.length() == 0) {
-            Serial.println("MCP,{connection.event_name},error:invalid_arg");
+            GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_arg");
             return;
           }
 
           float state = stateValue.toFloat();
           if (state == 1) {
             {connection.name}_stream_on = true;
-            Serial.println("MCP,{connection.event_name},stream_enabled:1");
+            GERBERA_TRANSPORT.println("MCP,{connection.event_name},stream_enabled:1");
             return;
           }
 
           if (state == 0) {
             {connection.name}_stream_on = false;
-            Serial.println("MCP,{connection.event_name},stream_enabled:0");
+            GERBERA_TRANSPORT.println("MCP,{connection.event_name},stream_enabled:0");
             return;
           }
 
-          Serial.println("MCP,{connection.event_name},error:invalid_state");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_state");
           return;
         }
 
@@ -135,13 +135,13 @@ firmware:
         digitalWrite({pins.trig}, LOW);
         long duration = pulseIn({pins.echo}, HIGH, 30000);
         if (duration == 0) {
-          Serial.println("MCP,{connection.event_name},error:timeout");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:timeout");
           return;
         }
 
         float distanceCm = duration * 0.0343 / 2.0;
-        Serial.print("MCP,{connection.event_name},distance:");
-        Serial.println(distanceCm);
+        GERBERA_TRANSPORT.print("MCP,{connection.event_name},distance:");
+        GERBERA_TRANSPORT.println(distanceCm);
       }
 
 stream:

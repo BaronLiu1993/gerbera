@@ -1,15 +1,12 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 from gerbera_harness.memory.schemas import (
     EventSchema,
     EventStateSchema,
     EventTypeEnum,
     PhysicalConfigurationStateSchema,
-    SourceTypeEnum,
     TaskSchema,
     TaskStateSchema,
-    TaskStatusEnum,
     TemporalStateSchema,
     WorldStateSchema,
 )
@@ -47,80 +44,11 @@ class Memory:
             movement_system_name
         ] = joint_state
 
-    def initialise_tasks(
-        self,
-        tasks: list[TaskSchema],
-        user_intent: str,
-        goal: str,
-        success_criteria: list[str],
-    ) -> None:
-        self.task_state = TaskStateSchema(
-            user_intent=user_intent,
-            goal=goal,
-            success_criteria=success_criteria,
-            tasks=list(tasks),
-            current_task_id=tasks[0].task_id,
-        )
-
-    def clear_task_state(self) -> None:
-        self.task_state = None
-
     def require_task_state(self) -> TaskStateSchema:
         if self.task_state is None:
             raise RuntimeError("Task state has not been initialised")
         return self.task_state
 
-    def has_remaining_tasks(self) -> bool:
-        task_state = self.require_task_state()
-        return any(task.status is TaskStatusEnum.PENDING for task in task_state.tasks)
-
-    def advance_to_next_task(self) -> None:
-        task_state = self.require_task_state()
-        for task in task_state.tasks:
-            if task.status is TaskStatusEnum.PENDING:
-                task_state.current_task_id = task.task_id
-                return
-
-    def complete_task(self) -> None:
-        task = self.get_current_task_state()
-        if task.status != TaskStatusEnum.IN_PROGRESS:
-            raise ValueError("Task has not started yet")
-        task.status = TaskStatusEnum.COMPLETED
-        task.finished_at = datetime.now(timezone.utc)
-
-    def fail_task(self) -> None:
-        task = self.get_current_task_state()
-        if task.status != TaskStatusEnum.IN_PROGRESS:
-            raise ValueError("Task has not started yet")
-        task.status = TaskStatusEnum.FAILED
-        task.finished_at = datetime.now(timezone.utc)
-
-    def start_task(self) -> None:
-        task_state = self.require_task_state()
-        task = self.get_current_task_state()
-        task.status = TaskStatusEnum.IN_PROGRESS
-        task.started_at = datetime.now(timezone.utc)
-        task_state.current_task_id = task.task_id
-
-    def increment_current_task_attempts(self) -> None:
-        task = self.get_current_task_state()
-        task.attempts += 1
-
-    def insert_task_lifecycle_event(self, event_type: EventTypeEnum) -> None:
-        task = self.get_current_task_state()
-        self.insert_event(
-            EventSchema(
-                session_id=self.session_id,
-                event_type=event_type,
-                source_type=SourceTypeEnum.SYSTEM,
-                source_name="memory",
-                payload=task.model_dump(mode="json"),
-                task_id=task.task_id,
-            )
-        )
-        self.rebuild_temporal_state()
-
-    # get the one that we are currently working on
     def get_current_task_state(self) -> TaskSchema:
         task_state = self.require_task_state()
         current_task_id = task_state.current_task_id
@@ -129,15 +57,12 @@ class Memory:
                 return task
         raise RuntimeError(f"Current task not found: {current_task_id}")
 
-    # get all tasks
     def get_tasks_state(self) -> TaskStateSchema:
         return self.require_task_state()
 
-    # add an event
     def insert_event(self, event: EventSchema) -> None:
         self.events_state.events.append(event)
 
-    # get all events state
     def get_events_state(self) -> list[EventSchema]:
         return list(self.events_state.events)
 

@@ -1,65 +1,70 @@
-from types import SimpleNamespace
-
-import pytest
+import json
 
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.database import Database
+from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.microcontroller import (
+    Microcontroller,
+    RuntimeWatchdogConfig,
+)
 
 
-def test_runtime_rejects_globally_duplicate_connection_names() -> None:
-    hardware_system = SimpleNamespace(
-        microcontrollers=[
-            SimpleNamespace(
-                id="board-a",
-                connections=[SimpleNamespace(name="Sensor")],
-            ),
-            SimpleNamespace(
-                id="board-b",
-                connections=[SimpleNamespace(name=" sensor ")],
-            ),
-        ]
+def test_runtime_binds_connections_to_their_microcontroller(tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "devices": {
+                    "/dev/test": {
+                        "id": "board-a",
+                        "address": "/dev/test",
+                    }
+                }
+            }
+        )
     )
-
-    with pytest.raises(ValueError, match="globally unique"):
-        GerberaRuntime.validate_unique_connection_names(hardware_system)
-
-
-def test_runtime_rejects_empty_connection_names() -> None:
-    hardware_system = SimpleNamespace(
+    connection = Connection(
+        name="sensor",
+        description="Test sensor",
+        component_type="hcsr04",
+        pins={"trig": "4", "echo": "5"},
+    )
+    hardware_system = HardwareSystem(
+        id="system-1",
+        name="Test system",
+        description="Test hardware system",
         microcontrollers=[
-            SimpleNamespace(
-                id="board-a",
-                connections=[SimpleNamespace(name=" ")],
+            Microcontroller(
+                name="Test board",
+                fqbn="arduino:avr:uno",
+                port="/dev/test",
+                watchdog=RuntimeWatchdogConfig(
+                    heartbeat_interval_ms=100,
+                    heartbeat_timeout_ms=500,
+                ),
+                connections=[connection],
+                config_path=config_path,
             )
-        ]
+        ],
     )
 
-    with pytest.raises(ValueError, match="cannot be empty"):
-        GerberaRuntime.validate_unique_connection_names(hardware_system)
+    GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
 
+    assert connection.microcontroller_id == "board-a"
+    assert hardware_system.microcontrollers[0].hardware_system_id == "system-1"
 
-def test_runtime_uses_local_writer_database_by_default(monkeypatch) -> None:
-    monkeypatch.delenv("GERBERA_DATABASE_HOST", raising=False)
-    monkeypatch.delenv("GERBERA_DATABASE_PORT", raising=False)
-    monkeypatch.delenv("GERBERA_WRITER_USER", raising=False)
-    monkeypatch.delenv("GERBERA_WRITER_PASSWORD", raising=False)
-    monkeypatch.delenv("GERBERA_DATABASE_NAME", raising=False)
-    hardware_system = SimpleNamespace(
-        microcontrollers=[
-            SimpleNamespace(
-                id="board-a",
-                connections=[SimpleNamespace(database=None)],
-            )
-        ]
+def test_runtime_builds_writer_database_from_explicit_connection_details() -> None:
+    database = GerberaRuntime.runtime_database(
+        host="database.internal",
+        port=5432,
+        password="secret",
     )
-
-    database = GerberaRuntime.runtime_database()
 
     assert database == Database(
-        host="127.0.0.1",
-        port=6432,
+        host="database.internal",
+        port=5432,
         user="gerbera_writer",
-        password="writer_password",
-        databaseName="gerbera",
+        password="secret",
+        database_name="gerbera",
     )
-
