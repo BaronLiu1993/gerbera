@@ -24,8 +24,6 @@ from gerbera_sdk.events.reactions.reaction_schema import (
 )
 from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 
-LOGGER = logging.getLogger(__name__)
-
 
 @dataclass
 class RegisteredReaction:
@@ -229,10 +227,6 @@ class ReactionBus:
                 reaction.last_error = str(exc)
                 reaction.last_completed_at = datetime.now(timezone.utc)
                 reaction.is_executing = False
-            LOGGER.exception(
-                "Reaction action failed: %s",
-                reaction.definition.reaction_id,
-            )
             return None
 
         with self.lock:
