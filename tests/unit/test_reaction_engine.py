@@ -1,361 +1,237 @@
 import asyncio
-from collections.abc import Awaitable, Callable
-from concurrent.futures import ThreadPoolExecutor
 
+from mcp.types import ToolAnnotations
+from pydantic import ValidationError
 import pytest
 
 from gerbera_sdk.events.reactions import (
-    OperatorEnum,
-    Reaction,
+    CreateReactionSchema,
+    ReactionActionSchema,
     ReactionBus,
-    ReactionCallback,
-    ReactionCondition,
-    ReactionTriggerModeEnum,
-    parse_reaction_value,
+    ReactionConditionSchema,
+    ReactionEventSchema,
+    ReactionOperator,
+    ReactionTriggerMode,
+)
+from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_store import ReactionStore
+
+EVENT = ReactionEventSchema(
+    event_type="STREAM",
+    microcontroller_id="board-1",
+    event_name="temperature",
+    payload_field="value",
 )
 
 
-EVENT_KEY = ("STREAM", "board-1", "temperature")
-MCP_URL = "https://hardware.example.com/mcp"
-
-
-def async_callback(
-    callback: Callable[[float], object],
-) -> Callable[[str, float], Awaitable[object]]:
-    async def run(mcp_url: str, value: float) -> object:
-        return callback(value)
-
-    return run
-
-
-@pytest.mark.parametrize(
-    ("operator", "actual", "expected", "matches"),
-    [
-        (OperatorEnum.EQUAL, 1.0, 1.0, True),
-        (OperatorEnum.NOT_EQUAL, 0.0, 1.0, True),
-        (OperatorEnum.LESS_THAN, 9.0, 10.0, True),
-        (OperatorEnum.GREATER_THAN, 11.0, 10.0, True),
-        (OperatorEnum.LESS_THAN_EQUAL, 10.0, 10.0, True),
-        (OperatorEnum.GREATER_THAN_EQUAL, 10.0, 10.0, True),
-    ],
-)
-def test_reaction_condition_evaluates_supported_operators(
-    operator: OperatorEnum,
-    actual: float,
-    expected: float,
-    matches: bool,
-) -> None:
-    condition = ReactionCondition(expected=expected, operator=operator)
-
-    assert condition.evaluate_condition(actual) is matches
-
-
-def test_reaction_condition_does_not_match_missing_value() -> None:
-    condition = ReactionCondition(
-        expected=1.0,
-        operator=OperatorEnum.NOT_EQUAL,
-    )
-
-    assert condition.evaluate_condition(None) is False
-
-
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        ("1", 1.0),
-        (1, 1.0),
-        (1.25, 1.25),
-    ],
-)
-def test_parse_reaction_value_returns_a_float(value: object, expected: float) -> None:
-    parsed = parse_reaction_value(value)
-
-    assert parsed == expected
-    assert type(parsed) is float
-
-
-@pytest.mark.parametrize(
-    "value",
-    ["on", True, False, float("inf"), float("nan")],
-)
-def test_parse_reaction_value_rejects_non_finite_numbers(value: object) -> None:
-    with pytest.raises(ValueError, match="finite numbers"):
-        parse_reaction_value(value)
-
-
-def test_reaction_callback_stores_value_and_returns_callable_result() -> None:
-    callback = ReactionCallback(
-        callback=async_callback(lambda value: value * 2),
-        mcp_url=MCP_URL,
-    )
-
-    result = asyncio.run(callback(4.0))
-
-    assert result == 8.0
-    assert callback.val == 4.0
-
-
-def test_reaction_callback_passes_mcp_url_and_value_to_script() -> None:
-    calls: list[tuple[str, float]] = []
-
-    async def script_callback(
-        mcp_url: str,
-        value: float,
-    ) -> dict[str, float]:
-        calls.append((mcp_url, value))
-        return {"trigger_value": value}
-
-    callback = ReactionCallback(
-        callback=script_callback,
-        mcp_url=MCP_URL,
-    )
-
-    result = asyncio.run(callback(1.0))
-
-    assert result == {"trigger_value": 1.0}
-    assert callback.val == 1.0
-    assert calls == [(MCP_URL, 1.0)]
-
-
-def test_reaction_bus_evaluates_reaction_registered_for_event() -> None:
-    reaction_bus = ReactionBus()
-    reaction_bus.register_reaction(
-        *EVENT_KEY,
-        Reaction(
-            condition=ReactionCondition(
-                expected=20.0,
-                operator=OperatorEnum.GREATER_THAN,
-            ),
-            callback=ReactionCallback(
-                callback=async_callback(
-                    lambda value: f"high:{value}",
-                ),
-                mcp_url=MCP_URL,
-            ),
+def make_request(
+    *,
+    trigger_mode: ReactionTriggerMode = ReactionTriggerMode.CONTINUOUS,
+    cooldown_seconds: float = 0,
+) -> CreateReactionSchema:
+    return CreateReactionSchema(
+        event=EVENT,
+        condition=ReactionConditionSchema(
+            operator=ReactionOperator.GREATER_THAN,
+            expected_value=20,
         ),
+        action=ReactionActionSchema(
+            tool_name="turn_off_heater",
+            arguments={"level": 0},
+        ),
+        trigger_mode=trigger_mode,
+        cooldown_seconds=cooldown_seconds,
     )
 
-    assert (
-        asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 30.0))
-        == "high:30.0"
+
+def make_bus(tmp_path, action) -> ReactionBus:
+    registry = ReactionToolRegistry()
+    registry.register(
+        "turn_off_heater",
+        action,
+        ToolAnnotations(readOnlyHint=False, openWorldHint=False),
+    )
+    return ReactionBus(
+        action_executor=registry,
+        store=ReactionStore(tmp_path),
     )
 
 
-def test_repeat_reaction_runs_for_every_matching_event() -> None:
-    callback_values: list[float] = []
-    reaction_bus = ReactionBus()
-    reaction_bus.register_reaction(
-        *EVENT_KEY,
-        Reaction(
-            condition=ReactionCondition(
-                expected=1.0,
-                operator=OperatorEnum.EQUAL,
-            ),
-            callback=ReactionCallback(
-                callback=async_callback(
-                    lambda value: callback_values.append(value),
-                ),
-                mcp_url=MCP_URL,
-            ),
-            trigger_mode=ReactionTriggerModeEnum.REPEAT,
-        ),
-    )
-
-    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0))
-    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0))
-
-    assert callback_values == [1.0, 1.0]
-
-
-def test_once_reaction_runs_only_for_first_matching_event() -> None:
-    callback_values: list[float] = []
-    reaction = Reaction(
-        condition=ReactionCondition(
-            expected=1.0,
-            operator=OperatorEnum.EQUAL,
-        ),
-        callback=ReactionCallback(
-            callback=async_callback(
-                lambda value: callback_values.append(value),
-            ),
-            mcp_url=MCP_URL,
-        ),
-        trigger_mode=ReactionTriggerModeEnum.ONCE,
-    )
-    reaction_bus = ReactionBus()
-    reaction_bus.register_reaction(*EVENT_KEY, reaction)
-
-    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 0.0))
-    asyncio.run(reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0))
-    second_result = asyncio.run(
-        reaction_bus.emit_evaluation_event(EVENT_KEY, 1.0)
-    )
-
-    assert callback_values == [1.0]
-    assert reaction.has_triggered is True
-    assert second_result is None
-
-
-def test_once_reaction_claim_is_atomic() -> None:
-    reaction = Reaction(
-        condition=ReactionCondition(
-            expected=1.0,
-            operator=OperatorEnum.EQUAL,
-        ),
-        callback=ReactionCallback(
-            callback=async_callback(lambda value: value),
-            mcp_url=MCP_URL,
-        ),
-        trigger_mode=ReactionTriggerModeEnum.ONCE,
-    )
-
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        claims = list(executor.map(lambda _: reaction.can_trigger(), range(32)))
-
-    assert claims.count(True) == 1
-    assert claims.count(False) == 31
-
-
-def test_reaction_bus_rejects_second_reaction_for_same_event() -> None:
-    reaction_bus = ReactionBus()
-    reaction = Reaction(
-        condition=ReactionCondition(
-            expected=20.0,
-            operator=OperatorEnum.GREATER_THAN,
-        ),
-        callback=ReactionCallback(
-            callback=async_callback(lambda value: value),
-            mcp_url=MCP_URL,
-        ),
-    )
-    reaction_bus.register_reaction(*EVENT_KEY, reaction)
-
-    with pytest.raises(ValueError, match="already registered"):
-        reaction_bus.register_reaction(
-            *EVENT_KEY,
-            Reaction(
-                condition=ReactionCondition(
-                    expected=50.0,
-                    operator=OperatorEnum.GREATER_THAN,
-                ),
-                callback=ReactionCallback(
-                    callback=async_callback(lambda value: value),
-                    mcp_url=MCP_URL,
-                ),
-            ),
+def test_ordered_condition_rejects_text() -> None:
+    with pytest.raises(ValidationError, match="require a number"):
+        ReactionConditionSchema(
+            operator=ReactionOperator.GREATER_THAN,
+            expected_value="hot",
         )
 
 
-def test_reaction_bus_returns_none_when_reaction_does_not_match() -> None:
-    reaction_bus = ReactionBus()
-    reaction_bus.register_reaction(
-        *EVENT_KEY,
-        Reaction(
-            condition=ReactionCondition(
-                expected=50.0,
-                operator=OperatorEnum.GREATER_THAN,
-            ),
-            callback=ReactionCallback(
-                callback=async_callback(
-                    lambda value: f"very-high:{value}",
-                ),
-                mcp_url=MCP_URL,
-            ),
-        ),
+def test_create_list_and_delete_reaction(tmp_path) -> None:
+    bus = make_bus(tmp_path, lambda level: {"level": level})
+
+    created = bus.create_reaction(make_request())
+
+    assert bus.list_reactions() == [created]
+    assert bus.store.definition_path(created.definition.reaction_id).exists()
+    deleted = bus.delete_reaction(created.definition.reaction_id)
+    assert deleted == created.definition
+    assert bus.list_reactions() == []
+    assert not bus.store.definition_path(deleted.reaction_id).exists()
+
+
+def test_once_reaction_deletes_before_running_action(tmp_path) -> None:
+    observations: list[int] = []
+    bus: ReactionBus
+
+    def action(level: int) -> dict[str, int]:
+        observations.append(len(bus.list_reactions()))
+        return {"level": level}
+
+    bus = make_bus(tmp_path, action)
+    created = bus.create_reaction(
+        make_request(trigger_mode=ReactionTriggerMode.ONCE)
     )
 
-    assert asyncio.run(
-        reaction_bus.emit_evaluation_event(EVENT_KEY, 30.0)
-    ) is None
+    first = asyncio.run(
+        bus.update_reaction_value(*EVENT.event_key, {"value": "30"})
+    )
+    second = asyncio.run(
+        bus.update_reaction_value(*EVENT.event_key, {"value": "31"})
+    )
+
+    assert first == [{"level": 0}]
+    assert second == []
+    assert observations == [0]
+    assert not bus.store.definition_path(
+        created.definition.reaction_id
+    ).exists()
 
 
-def test_reaction_bus_returns_no_results_for_unknown_event() -> None:
-    reaction_bus = ReactionBus()
+def test_continuous_reaction_runs_for_each_matching_event(tmp_path) -> None:
+    calls: list[int] = []
 
-    assert asyncio.run(
-        reaction_bus.emit_evaluation_event(EVENT_KEY, 30.0)
-    ) is None
+    def action(level: int) -> dict[str, int]:
+        calls.append(level)
+        return {"level": level}
+
+    bus = make_bus(tmp_path, action)
+    created = bus.create_reaction(make_request())
+
+    asyncio.run(bus.update_reaction_value(*EVENT.event_key, {"value": 30}))
+    asyncio.run(bus.update_reaction_value(*EVENT.event_key, {"value": 31}))
+
+    reaction = bus.get_reaction(created.definition.reaction_id)
+    assert calls == [0, 0]
+    assert reaction.runtime.trigger_count == 2
+    assert reaction.runtime.latest_value == 31
+    assert reaction.runtime.last_result == {"level": 0}
 
 
-def test_reaction_bus_stores_value_and_emits_reaction_evaluation() -> None:
-    reaction_bus = ReactionBus()
-    reaction_bus.register_reaction(
-        *EVENT_KEY,
-        Reaction(
-            condition=ReactionCondition(
-                expected=20.0,
-                operator=OperatorEnum.GREATER_THAN,
-            ),
-            callback=ReactionCallback(
-                callback=async_callback(lambda value: value),
-                mcp_url=MCP_URL,
-            ),
-        ),
+def test_once_reaction_stays_deleted_when_action_fails(tmp_path) -> None:
+    def fail(level: int) -> None:
+        raise RuntimeError("heater unavailable")
+
+    bus = make_bus(tmp_path, fail)
+    created = bus.create_reaction(
+        make_request(trigger_mode=ReactionTriggerMode.ONCE)
     )
 
     result = asyncio.run(
-        reaction_bus.update_reaction_value(*EVENT_KEY, {"value": "30"})
+        bus.update_reaction_value(*EVENT.event_key, {"value": 30})
     )
 
-    assert result == 30.0
-    assert reaction_bus.latest_values[EVENT_KEY] == 30.0
+    assert result == []
+    assert bus.list_reactions() == []
+    assert not bus.store.definition_path(
+        created.definition.reaction_id
+    ).exists()
 
 
-def test_reaction_bus_does_not_replace_value_when_duplicate_register_fails() -> None:
-    reaction_bus = ReactionBus()
-    reaction = Reaction(
-        condition=ReactionCondition(
-            expected=1.0,
-            operator=OperatorEnum.EQUAL,
-        ),
-        callback=ReactionCallback(
-            callback=async_callback(lambda value: value),
-            mcp_url=MCP_URL,
-        ),
+def test_continuous_reaction_honors_cooldown(tmp_path) -> None:
+    calls: list[int] = []
+    bus = make_bus(
+        tmp_path,
+        lambda level: calls.append(level) or {"level": level},
     )
-    reaction_bus.register_reaction(*EVENT_KEY, reaction)
-    asyncio.run(
-        reaction_bus.update_reaction_value(*EVENT_KEY, {"value": 10})
+    bus.create_reaction(make_request(cooldown_seconds=60))
+
+    asyncio.run(bus.update_reaction_value(*EVENT.event_key, {"value": 30}))
+    asyncio.run(bus.update_reaction_value(*EVENT.event_key, {"value": 31}))
+
+    assert calls == [0]
+
+
+def test_multiple_reactions_can_watch_the_same_event(tmp_path) -> None:
+    calls: list[int] = []
+    bus = make_bus(
+        tmp_path,
+        lambda level: calls.append(level) or {"level": level},
     )
-    with pytest.raises(ValueError, match="already registered"):
-        reaction_bus.register_reaction(*EVENT_KEY, reaction)
+    bus.create_reaction(make_request())
+    bus.create_reaction(make_request())
 
-    assert reaction_bus.latest_values[EVENT_KEY] == 10.0
+    results = asyncio.run(
+        bus.update_reaction_value(*EVENT.event_key, {"value": 30})
+    )
+
+    assert calls == [0, 0]
+    assert results == [{"level": 0}, {"level": 0}]
 
 
-def test_reaction_bus_ignores_unknown_event() -> None:
-    reaction_bus = ReactionBus()
+def test_invalid_event_value_is_reported_without_raising(tmp_path) -> None:
+    bus = make_bus(tmp_path, lambda level: {"level": level})
+    created = bus.create_reaction(make_request())
 
     result = asyncio.run(
-        reaction_bus.update_reaction_value(*EVENT_KEY, {"value": 30})
+        bus.update_reaction_value(*EVENT.event_key, {"value": "hot"})
     )
 
-    assert result is None
-    assert reaction_bus.latest_values == {}
-
-
-def test_reaction_bus_rejects_non_numeric_sensor_value() -> None:
-    reaction_bus = ReactionBus()
-    reaction_bus.register_reaction(
-        *EVENT_KEY,
-        Reaction(
-            condition=ReactionCondition(
-                expected=1.0,
-                operator=OperatorEnum.EQUAL,
-            ),
-            callback=ReactionCallback(
-                callback=async_callback(lambda value: value),
-                mcp_url=MCP_URL,
-            ),
-        ),
+    reaction = bus.get_reaction(created.definition.reaction_id)
+    assert result == []
+    assert reaction.runtime.last_error == (
+        "Reaction values must be finite numbers"
     )
 
-    with pytest.raises(ValueError, match="finite numbers"):
-        asyncio.run(
-            reaction_bus.update_reaction_value(
-                *EVENT_KEY,
-                {"value": "on"},
+
+def test_action_failure_is_reported_without_removing_continuous_reaction(
+    tmp_path,
+) -> None:
+    def fail(level: int) -> None:
+        raise RuntimeError("heater unavailable")
+
+    bus = make_bus(tmp_path, fail)
+    created = bus.create_reaction(make_request())
+
+    result = asyncio.run(
+        bus.update_reaction_value(*EVENT.event_key, {"value": 30})
+    )
+
+    reaction = bus.get_reaction(created.definition.reaction_id)
+    assert result == []
+    assert reaction.runtime.last_error == "heater unavailable"
+    assert reaction.runtime.trigger_count == 1
+
+
+def test_reaction_store_loads_persisted_definitions(tmp_path) -> None:
+    bus = make_bus(tmp_path, lambda level: {"level": level})
+    created = bus.create_reaction(make_request())
+
+    stored = bus.store.load()
+
+    assert stored == (created.definition,)
+
+
+def test_tool_registry_rejects_read_only_actions() -> None:
+    registry = ReactionToolRegistry()
+    registry.register(
+        "read_temperature",
+        lambda: 20,
+        ToolAnnotations(readOnlyHint=True),
+    )
+
+    with pytest.raises(ValueError, match="explicitly modify state"):
+        registry.validate_action(
+            ReactionActionSchema(
+                tool_name="read_temperature",
+                arguments={},
             )
         )
-
-    assert reaction_bus.latest_values[EVENT_KEY] is None

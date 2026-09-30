@@ -1,45 +1,66 @@
 from dataclasses import dataclass
-from enum import Enum
 import math
 
+from gerbera_sdk.events.reactions.reaction_schema import (
+    ReactionConditionSchema,
+    ReactionOperator,
+    ReactionValue,
+)
 
-class OperatorEnum(str, Enum):
-    EQUAL = "equal"
-    NOT_EQUAL = "not_equal"
-    LESS_THAN = "less_than"
-    GREATER_THAN = "greater_than"
-    LESS_THAN_EQUAL = "less_than_equal"
-    GREATER_THAN_EQUAL = "greater_than_equal"
+OperatorEnum = ReactionOperator
 
 
-@dataclass
+@dataclass(frozen=True)
 class ReactionCondition:
-    expected: float
-    operator: OperatorEnum
+    expected: ReactionValue
+    operator: ReactionOperator
 
-    def evaluate_condition(self, actual: float | None) -> bool:
+    def evaluate_condition(self, actual: object | None) -> bool:
         if actual is None:
             return False
+        return reaction_matches(
+            ReactionConditionSchema(
+                expected_value=self.expected,
+                operator=self.operator,
+            ),
+            actual,
+        )
 
-        if self.operator == OperatorEnum.EQUAL:
-            return actual == self.expected
 
-        if self.operator == OperatorEnum.NOT_EQUAL:
-            return actual != self.expected
+def reaction_matches(
+    condition: ReactionConditionSchema,
+    actual: object,
+) -> bool:
+    parsed_value = parse_value_like(actual, condition.expected_value)
+    expected_value = condition.expected_value
+    comparisons = {
+        ReactionOperator.EQUAL: lambda: parsed_value == expected_value,
+        ReactionOperator.NOT_EQUAL: lambda: parsed_value != expected_value,
+        ReactionOperator.LESS_THAN: lambda: parsed_value < expected_value,
+        ReactionOperator.LESS_THAN_EQUAL: lambda: parsed_value <= expected_value,
+        ReactionOperator.GREATER_THAN: lambda: parsed_value > expected_value,
+        ReactionOperator.GREATER_THAN_EQUAL: lambda: parsed_value >= expected_value,
+    }
+    return comparisons[condition.operator]()
 
-        if self.operator == OperatorEnum.LESS_THAN:
-            return actual < self.expected
 
-        if self.operator == OperatorEnum.GREATER_THAN:
-            return actual > self.expected
+def parse_value_like(value: object, expected: ReactionValue) -> ReactionValue:
+    if isinstance(expected, bool):
+        return parse_boolean(value)
+    if isinstance(expected, (int, float)):
+        return parse_reaction_value(value)
+    return str(value)
 
-        if self.operator == OperatorEnum.LESS_THAN_EQUAL:
-            return actual <= self.expected
 
-        if self.operator == OperatorEnum.GREATER_THAN_EQUAL:
-            return actual >= self.expected
-
-        raise ValueError(f"Unsupported operator: {self.operator}")
+def parse_boolean(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized_value = str(value).strip().casefold()
+    if normalized_value in {"1", "true"}:
+        return True
+    if normalized_value in {"0", "false"}:
+        return False
+    raise ValueError("Reaction value must be a boolean")
 
 
 def parse_reaction_value(value: object) -> float:

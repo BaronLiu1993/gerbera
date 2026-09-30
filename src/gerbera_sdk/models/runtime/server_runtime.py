@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import Parameter, Signature
+import logging
 import time
 from typing import Annotated, Any, Callable
 
@@ -38,12 +39,22 @@ from gerbera_sdk.models.runtime.hardware_runtime import (
 )
 from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_schema import (
+    CreateReactionSchema,
+    DeleteReactionResultSchema,
+    DeleteReactionSchema,
+    ReactionEventSchema,
+    ReactionSchema,
+)
 from gerbera_sdk.inference import (
     Inference,
     ObjectDetectionModelInference,
     VisionLanguageModelInference,
     VisionLanguageModelFrameEnvironment,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,6 +71,9 @@ class ServerRuntime:
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
     movement_runtime: MovementRuntime | None = None
+    reaction_tool_registry: ReactionToolRegistry = field(
+        default_factory=ReactionToolRegistry
+    )
     event_read_timeout_seconds: float = 1.0
     event_read_poll_seconds: float = 0.02
 
@@ -349,12 +363,115 @@ class ServerRuntime:
         annotations: ToolAnnotations,
         meta: dict[str, Any] | None = None,
     ) -> None:
+        self.reaction_tool_registry.register(
+            name,
+            tool_function,
+            annotations,
+        )
         self.app.tool(
             name=name,
             description=description,
             annotations=annotations,
             meta=meta,
         )(tool_function)
+
+    def validate_reaction_event(self, event: ReactionEventSchema) -> None:
+        try:
+            self.event_bus.get_event(*event.event_key)
+        except RuntimeError as exc:
+            raise ValueError(
+                f"Unknown reaction event: {event.event_key}"
+            ) from exc
+
+        route = (event.microcontroller_id, event.event_name)
+        connection = self.hardware_plan.connections_by_event_route[route]
+        payload_fields = {
+            state_key[2]
+            for state_key in CommandCompiler.state_keys(connection)
+        }
+        if event.payload_field not in payload_fields:
+            raise ValueError(
+                "Unknown reaction payload field: "
+                f"{event.payload_field} for {event.event_name}"
+            )
+
+    def validate_reaction_definition(
+        self,
+        definition: CreateReactionSchema,
+    ) -> None:
+        self.validate_reaction_event(definition.event)
+        self.reaction_tool_registry.validate_action(definition.action)
+
+    def restore_reactions(self) -> None:
+        for definition in self.reaction_bus.store.load():
+            try:
+                self.validate_reaction_definition(definition)
+                self.reaction_bus.register_definition(
+                    definition,
+                    persist=False,
+                )
+            except ValueError as exc:
+                LOGGER.warning(
+                    "Ignoring unusable stored reaction %s: %s",
+                    definition.reaction_id,
+                    exc,
+                )
+
+    def register_reaction_tools(self) -> None:
+        self.reaction_bus.configure_executor(self.reaction_tool_registry)
+        self.restore_reactions()
+
+        def create_reaction(
+            reaction: CreateReactionSchema,
+        ) -> ReactionSchema:
+            self.validate_reaction_definition(reaction)
+            return self.reaction_bus.create_reaction(reaction)
+
+        def list_reactions() -> list[ReactionSchema]:
+            return self.reaction_bus.list_reactions()
+
+        def delete_reaction(
+            request: DeleteReactionSchema,
+        ) -> DeleteReactionResultSchema:
+            deleted = self.reaction_bus.delete_reaction(
+                request.reaction_id
+            )
+            return DeleteReactionResultSchema(deleted=deleted)
+
+        self.register_tool(
+            name="create_reaction",
+            description=(
+                "Create a persisted reaction that invokes a Gerbera tool "
+                "when a hardware event condition matches."
+            ),
+            tool_function=create_reaction,
+            annotations=ToolAnnotations(
+                title="Create reaction",
+                readOnlyHint=False,
+                openWorldHint=False,
+            ),
+        )
+        self.register_tool(
+            name="list_reactions",
+            description="List active reactions and their runtime status.",
+            tool_function=list_reactions,
+            annotations=ToolAnnotations(
+                title="List reactions",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self.register_tool(
+            name="delete_reaction",
+            description="Permanently delete an active reaction.",
+            tool_function=delete_reaction,
+            annotations=ToolAnnotations(
+                title="Delete reaction",
+                readOnlyHint=False,
+                destructiveHint=True,
+                openWorldHint=False,
+            ),
+        )
 
     def register_state_toggle_tool(
         self,

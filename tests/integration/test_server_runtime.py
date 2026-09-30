@@ -7,6 +7,16 @@ import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.events.reactions.reaction_schema import (
+    CreateReactionSchema,
+    DeleteReactionSchema,
+    ReactionActionSchema,
+    ReactionConditionSchema,
+    ReactionEventSchema,
+    ReactionOperator,
+    ReactionTriggerMode,
+)
+from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 from gerbera_sdk.inference import (
     Frame,
     ObjectDetectionModelInference,
@@ -92,6 +102,7 @@ def make_server(
     event_bus=None,
     event_worker=None,
     hardware_runtime=None,
+    reaction_bus=None,
 ) -> tuple[ServerRuntime, FakeApp]:
     app = FakeApp()
     system = hardware_system or HardwareSystem(name="test")
@@ -109,10 +120,77 @@ def make_server(
         camera_runtime=camera_runtime or SimpleNamespace(),
         model_runtime=model_runtime or SimpleNamespace(registered_models={}),
         event_listener=SimpleNamespace(),
-        reaction_bus=ReactionBus(),
+        reaction_bus=reaction_bus or ReactionBus(),
         hardware_runtime=hardware_runtime or HardwareRuntime(),
     )
     return runtime, app
+
+
+def test_reaction_management_tools_create_list_and_delete(
+    tmp_path,
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    connection = Connection(
+        name="sensor",
+        component_type="hw201",
+        pins={"out": "7"},
+        description="Infrared sensor",
+        microcontroller_id="board-1",
+        stream=True,
+    )
+    board = Microcontroller(
+        name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(
+            heartbeat_interval_ms=100,
+            heartbeat_timeout_ms=500,
+        ),
+        connections=[connection],
+    )
+    system = HardwareSystem(name="test", microcontrollers=[board])
+    board.hardware_system_id = system.id
+    runtime, app = make_server(
+        hardware_system=system,
+        reaction_bus=ReactionBus(store=ReactionStore(tmp_path)),
+    )
+    resolved_board = runtime.hardware_plan.boards[0]
+    resolved_connection = resolved_board.connections[0]
+    runtime.register_events()
+    runtime.register_connection_tools(
+        resolved_board,
+        resolved_connection,
+    )
+    runtime.register_reaction_tools()
+    request = CreateReactionSchema(
+        event=ReactionEventSchema(
+            event_type="STREAM",
+            microcontroller_id=resolved_board.microcontroller_id,
+            event_name=resolved_connection.event_name,
+            payload_field="obstacle_detected",
+        ),
+        condition=ReactionConditionSchema(
+            operator=ReactionOperator.EQUAL,
+            expected_value=1,
+        ),
+        action=ReactionActionSchema(
+            tool_name="turn_off_sensor_stream",
+            arguments={},
+        ),
+        trigger_mode=ReactionTriggerMode.CONTINUOUS,
+    )
+
+    created = app.tools["create_reaction"](request)
+
+    assert app.tools["list_reactions"]() == [created]
+    deleted = app.tools["delete_reaction"](
+        DeleteReactionSchema(
+            reaction_id=created.definition.reaction_id,
+        )
+    )
+    assert deleted.deleted == created.definition
+    assert app.tools["list_reactions"]() == []
 
 
 def test_camera_tool_forwards_batch_controls_and_serializes_frames() -> None:
