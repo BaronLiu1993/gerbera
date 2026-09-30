@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from gerbera_sdk.firmware.board_definitions import BOARD_REGISTRY, BoardDefinition
+from gerbera_sdk.firmware.boards import BOARD_REGISTRY, BoardDefinition
 from gerbera_sdk.firmware.configurations import DEVICE_REGISTRY
 from gerbera_sdk.firmware.firmware_schema import (
     BoardTransportKind,

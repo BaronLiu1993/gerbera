@@ -3,7 +3,7 @@ import uuid
 
 from gerbera_sdk.inference import Model
 from gerbera_sdk.models.hardware.camera import Camera
-from gerbera_sdk.firmware.board_definitions import BOARD_REGISTRY
+from gerbera_sdk.firmware.boards import BOARD_REGISTRY
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.hardware.movement_system import MovementSystem
 

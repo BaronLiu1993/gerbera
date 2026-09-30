@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Callable
 
-from gerbera_sdk.firmware.board_definitions import BoardDefinition
+from gerbera_sdk.firmware.boards import BoardDefinition
 from gerbera_sdk.firmware.configurations import DeviceDefinition
 from gerbera_sdk.firmware.firmware_schema import (
     PinAssignmentMode,

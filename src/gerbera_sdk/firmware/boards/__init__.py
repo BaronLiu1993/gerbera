@@ -1,4 +1,4 @@
-from gerbera_sdk.firmware.boards import (
+from gerbera_sdk.firmware.boards.definitions import (
     ARDUINO_MEGA,
     ARDUINO_MEGA_STRATEGY,
     ARDUINO_UNO,
