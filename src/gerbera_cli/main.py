@@ -13,10 +13,13 @@ from gerbera_cli.setup import (
     run_local_server,
     setup_local_container,
     pull_sandbox_image,
+    run_forced_firmware_setup,
     run_firmware_setup,
 )
 
 app = typer.Typer()
+firmware_app = typer.Typer()
+app.add_typer(firmware_app, name="firmware")
 
 
 @app.command(name="init")
@@ -157,9 +160,20 @@ def up():
             api_key=secrets["api_key"],
         )
 
-        run_firmware_setup(hardware_system=hardware)
     else:
         pass
+
+
+@firmware_app.command(name="flash")
+def flash_firmware(
+    force: bool = typer.Option(False, "--force"),
+) -> None:
+    config = json.loads(Path("config.json").read_text())
+    hardware = load_hardware_system(config)
+    if force:
+        run_forced_firmware_setup(hardware)
+        return
+    run_firmware_setup(hardware)
 
 
 @app.command(name="server")
