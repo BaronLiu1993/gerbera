@@ -1,153 +1,60 @@
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from types import MappingProxyType
+from collections.abc import Callable, Mapping
+from importlib import resources
+from typing import Any
 
-from gerbera_sdk.firmware.firmware_schema import PinCapability
+import yaml
 
-
-@dataclass(frozen=True)
-class BoardPinDefinition:
-    canonical_name: str
-    aliases: frozenset[str]
-    capabilities: frozenset[PinCapability]
-    reserved_by: str | None = None
-
-
-@dataclass(frozen=True)
-class BoardDefinition:
-    fqbn: str
-    pins: tuple[BoardPinDefinition, ...]
-    includes: tuple[str, ...]
-    libraries: tuple[str, ...]
-    pins_by_alias: Mapping[str, BoardPinDefinition] = field(
-        init=False,
-        repr=False,
-    )
-
-    def __post_init__(self) -> None:
-        pins_by_alias: dict[str, BoardPinDefinition] = {}
-        for pin in self.pins:
-            for alias in pin.aliases:
-                if alias in pins_by_alias:
-                    raise ValueError(
-                        f"Duplicate pin alias for {self.fqbn}: {alias}"
-                    )
-                pins_by_alias[alias] = pin
-        object.__setattr__(
-            self,
-            "pins_by_alias",
-            MappingProxyType(pins_by_alias),
-        )
-
-    def resolve_pin(self, pin_name: str) -> BoardPinDefinition:
-        try:
-            return self.pins_by_alias[pin_name]
-        except KeyError as exc:
-            raise ValueError(
-                f"Unknown physical pin for {self.fqbn}: {pin_name}"
-            ) from exc
-
-
-@dataclass(frozen=True)
-class BoardRegistry:
-    definitions: tuple[BoardDefinition, ...]
-    definitions_by_fqbn: Mapping[str, BoardDefinition] = field(
-        init=False,
-        repr=False,
-    )
-
-    def __post_init__(self) -> None:
-        definitions_by_fqbn: dict[str, BoardDefinition] = {}
-        for definition in self.definitions:
-            if definition.fqbn in definitions_by_fqbn:
-                raise ValueError(f"Duplicate board FQBN: {definition.fqbn}")
-            definitions_by_fqbn[definition.fqbn] = definition
-        object.__setattr__(
-            self,
-            "definitions_by_fqbn",
-            MappingProxyType(definitions_by_fqbn),
-        )
-
-    def get_definition(self, fqbn: str) -> BoardDefinition:
-        try:
-            return self.definitions_by_fqbn[fqbn]
-        except KeyError as exc:
-            raise ValueError(
-                f"Unsupported microcontroller fqbn: {fqbn}"
-            ) from exc
-
-
-_DIGITAL_CAPABILITIES = frozenset(
-    {
-        PinCapability.DIGITAL_INPUT,
-        PinCapability.DIGITAL_OUTPUT,
-    }
+from gerbera_sdk.firmware.board_definition_strategies import (
+    AvrBoardDefinitionStrategy,
+    BoardDefinition,
+    BoardDefinitionStrategy,
+    BoardPinDefinition,
+    BoardRegistry,
+    Esp32DevModuleDefinitionStrategy,
 )
-_ANALOG_CAPABILITIES = _DIGITAL_CAPABILITIES | {
-    PinCapability.ANALOG_INPUT,
+
+StrategyLoader = Callable[[Mapping[str, Any]], BoardDefinitionStrategy]
+STRATEGY_LOADERS: Mapping[str, StrategyLoader] = {
+    "avr": AvrBoardDefinitionStrategy.from_data,
+    "esp32_dev_module": Esp32DevModuleDefinitionStrategy.from_data,
 }
 
 
-def _digital_pin(
-    pin: int,
-    *,
-    pwm: bool = False,
-    interrupt: bool = False,
-    reserved_by: str | None = None,
-) -> BoardPinDefinition:
-    capabilities = set(_DIGITAL_CAPABILITIES)
-    if pwm:
-        capabilities.add(PinCapability.PWM_OUTPUT)
-    if interrupt:
-        capabilities.add(PinCapability.INTERRUPT_INPUT)
-    return BoardPinDefinition(
-        canonical_name=str(pin),
-        aliases=frozenset({str(pin), f"D{pin}"}),
-        capabilities=frozenset(capabilities),
-        reserved_by=reserved_by,
+def load_board_strategies() -> tuple[BoardDefinitionStrategy, ...]:
+    config_resource = resources.files("gerbera_sdk.firmware").joinpath(
+        "boards.yaml"
+    )
+    config = yaml.safe_load(config_resource.read_text())
+    return tuple(
+        STRATEGY_LOADERS[board["strategy"]](board)
+        for board in config["boards"]
     )
 
 
-def _analog_pin(pin: int, digital_alias: int) -> BoardPinDefinition:
-    return BoardPinDefinition(
-        canonical_name=f"A{pin}",
-        aliases=frozenset({f"A{pin}", str(digital_alias)}),
-        capabilities=frozenset(_ANALOG_CAPABILITIES),
-    )
+BOARD_STRATEGIES = load_board_strategies()
+BOARD_DEFINITIONS = tuple(strategy.build() for strategy in BOARD_STRATEGIES)
+BOARD_REGISTRY = BoardRegistry(BOARD_DEFINITIONS)
+STRATEGIES_BY_FQBN = {
+    strategy.fqbn: strategy for strategy in BOARD_STRATEGIES
+}
 
+ARDUINO_UNO_STRATEGY = STRATEGIES_BY_FQBN["arduino:avr:uno"]
+ARDUINO_MEGA_STRATEGY = STRATEGIES_BY_FQBN["arduino:avr:mega"]
+ESP32_DEV_MODULE_STRATEGY = STRATEGIES_BY_FQBN["esp32:esp32:esp32"]
 
-ARDUINO_UNO = BoardDefinition(
-    fqbn="arduino:avr:uno",
-    pins=tuple(
-        _digital_pin(
-            pin,
-            pwm=pin in {3, 5, 6, 9, 10, 11},
-            interrupt=pin in {2, 3},
-            reserved_by="serial" if pin in {0, 1} else None,
-        )
-        for pin in range(14)
-    )
-    + tuple(_analog_pin(pin, pin + 14) for pin in range(6)),
-    includes=("Arduino.h",),
-    libraries=("arduino:avr",),
-)
+ARDUINO_UNO = BOARD_REGISTRY.get_definition("arduino:avr:uno")
+ARDUINO_MEGA = BOARD_REGISTRY.get_definition("arduino:avr:mega")
+ESP32_DEV_MODULE = BOARD_REGISTRY.get_definition("esp32:esp32:esp32")
 
-
-ARDUINO_MEGA = BoardDefinition(
-    fqbn="arduino:avr:mega",
-    pins=tuple(
-        _digital_pin(
-            pin,
-            pwm=pin in set(range(2, 14)) | {44, 45, 46},
-            interrupt=pin in {2, 3, 18, 19, 20, 21},
-            reserved_by="serial" if pin in {0, 1} else None,
-        )
-        for pin in range(54)
-    )
-    + tuple(_analog_pin(pin, pin + 54) for pin in range(16)),
-    includes=("Arduino.h",),
-    libraries=("arduino:avr",),
-)
-
-
-BOARD_REGISTRY = BoardRegistry((ARDUINO_MEGA, ARDUINO_UNO))
+__all__ = [
+    "ARDUINO_MEGA",
+    "ARDUINO_MEGA_STRATEGY",
+    "ARDUINO_UNO",
+    "ARDUINO_UNO_STRATEGY",
+    "BOARD_REGISTRY",
+    "ESP32_DEV_MODULE",
+    "ESP32_DEV_MODULE_STRATEGY",
+    "BoardDefinition",
+    "BoardPinDefinition",
+    "BoardRegistry",
+]

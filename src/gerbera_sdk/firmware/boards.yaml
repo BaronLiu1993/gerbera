@@ -1,0 +1,44 @@
+boards:
+  - strategy: avr
+    fqbn: arduino:avr:uno
+    digital_pin_count: 14
+    analog_pin_count: 6
+    pwm_pins: [3, 5, 6, 9, 10, 11]
+    interrupt_pins: [2, 3]
+    includes: [Arduino.h]
+    libraries: [arduino:avr]
+    supported_transports: [usb_serial]
+
+  - strategy: avr
+    fqbn: arduino:avr:mega
+    digital_pin_count: 54
+    analog_pin_count: 16
+    pwm_pins: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 44, 45, 46]
+    interrupt_pins: [2, 3, 18, 19, 20, 21]
+    includes: [Arduino.h]
+    libraries: [arduino:avr]
+    supported_transports: [usb_serial]
+
+  - strategy: esp32_dev_module
+    fqbn: esp32:esp32:esp32
+    includes: [Arduino.h]
+    libraries: [esp32:esp32]
+    supported_transports: [usb_serial, bluetooth_classic]
+    output_pins: [0, 1, 2, 3, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33]
+    input_only_pins: [34, 35, 36, 39]
+    analog_input_pins: [32, 33, 34, 35, 36, 39]
+    reserved_pins:
+      0: boot strapping
+      1: serial
+      2: boot strapping
+      3: serial
+      5: boot strapping
+      6: flash
+      7: flash
+      8: flash
+      9: flash
+      10: flash
+      11: flash
+      12: boot strapping
+      15: boot strapping
+    flash_pins: [6, 7, 8, 9, 10, 11]
