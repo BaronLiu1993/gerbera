@@ -49,9 +49,16 @@ class DefinitionValidator:
         device_registry: DeviceRegistry,
     ) -> list[str]:
         errors: list[str] = []
+        component_types: set[str] = set()
 
         for definition in device_registry.definitions:
             path = f"device_definitions[{definition.component_type}]"
+            if definition.component_type in component_types:
+                errors.append(
+                    f"{path}.component_type: duplicate component type"
+                )
+            else:
+                component_types.add(definition.component_type)
             if definition.config.component_type != definition.component_type:
                 errors.append(
                     f"{path}.component_type: config declares "
@@ -151,9 +158,16 @@ class DefinitionValidator:
         board_registry: BoardRegistry,
     ) -> list[str]:
         errors: list[str] = []
+        board_fqbns: set[str] = set()
 
         for definition in board_registry.definitions:
             path = f"board_definitions[{definition.fqbn}]"
+            if definition.fqbn in board_fqbns:
+                errors.append(f"{path}.fqbn: duplicate FQBN")
+            else:
+                board_fqbns.add(definition.fqbn)
+
+            pin_aliases: set[str] = set()
             for pin in definition.pins:
                 pin_path = f"{path}.pins[{pin.canonical_name}]"
                 if pin.canonical_name not in pin.aliases:
@@ -162,5 +176,12 @@ class DefinitionValidator:
                     )
                 if not pin.capabilities:
                     errors.append(f"{pin_path}: must define capabilities")
+                for alias in sorted(pin.aliases):
+                    if alias in pin_aliases:
+                        errors.append(
+                            f"{pin_path}.aliases[{alias}]: duplicate pin alias"
+                        )
+                    else:
+                        pin_aliases.add(alias)
 
         return errors

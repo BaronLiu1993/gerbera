@@ -32,18 +32,16 @@ class BoardDefinition:
     )
 
     def __post_init__(self) -> None:
-        pins_by_alias: dict[str, BoardPinDefinition] = {}
-        for pin in self.pins:
-            for alias in pin.aliases:
-                if alias in pins_by_alias:
-                    raise ValueError(
-                        f"Duplicate pin alias for {self.fqbn}: {alias}"
-                    )
-                pins_by_alias[alias] = pin
         object.__setattr__(
             self,
             "pins_by_alias",
-            MappingProxyType(pins_by_alias),
+            MappingProxyType(
+                {
+                    alias: pin
+                    for pin in self.pins
+                    for alias in pin.aliases
+                }
+            ),
         )
 
     def resolve_pin(self, pin_name: str) -> BoardPinDefinition:
@@ -64,15 +62,15 @@ class BoardRegistry:
     )
 
     def __post_init__(self) -> None:
-        definitions_by_fqbn: dict[str, BoardDefinition] = {}
-        for definition in self.definitions:
-            if definition.fqbn in definitions_by_fqbn:
-                raise ValueError(f"Duplicate board FQBN: {definition.fqbn}")
-            definitions_by_fqbn[definition.fqbn] = definition
         object.__setattr__(
             self,
             "definitions_by_fqbn",
-            MappingProxyType(definitions_by_fqbn),
+            MappingProxyType(
+                {
+                    definition.fqbn: definition
+                    for definition in self.definitions
+                }
+            ),
         )
 
     def get_definition(self, fqbn: str) -> BoardDefinition:

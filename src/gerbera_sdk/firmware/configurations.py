@@ -25,17 +25,15 @@ class DeviceRegistry:
     )
 
     def __post_init__(self) -> None:
-        definitions_by_type: dict[str, DeviceDefinition] = {}
-        for definition in self.definitions:
-            if definition.component_type in definitions_by_type:
-                raise ValueError(
-                    f"Duplicate component type: {definition.component_type}"
-                )
-            definitions_by_type[definition.component_type] = definition
         object.__setattr__(
             self,
             "definitions_by_type",
-            MappingProxyType(definitions_by_type),
+            MappingProxyType(
+                {
+                    definition.component_type: definition
+                    for definition in self.definitions
+                }
+            ),
         )
 
     def get_builder(
