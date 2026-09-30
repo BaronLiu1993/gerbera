@@ -64,7 +64,7 @@ firmware:
         int speed = 255;
 
         if (directionValue.length() == 0) {
-          Serial.println("MCP,{connection.event_name},error:invalid_arg");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_arg");
           return;
         }
 
@@ -84,7 +84,7 @@ firmware:
           digitalWrite({pins.in1}, HIGH);
           digitalWrite({pins.in2}, LOW);
           analogWrite({pins.enable}, speed);
-          Serial.println("MCP,{connection.event_name},motor_state:1");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},motor_state:1");
           return;
         }
 
@@ -92,7 +92,7 @@ firmware:
           digitalWrite({pins.in1}, LOW);
           digitalWrite({pins.in2}, HIGH);
           analogWrite({pins.enable}, speed);
-          Serial.println("MCP,{connection.event_name},motor_state:-1");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},motor_state:-1");
           return;
         }
 
@@ -100,11 +100,11 @@ firmware:
           digitalWrite({pins.in1}, LOW);
           digitalWrite({pins.in2}, LOW);
           analogWrite({pins.enable}, 0);
-          Serial.println("MCP,{connection.event_name},motor_state:0");
+          GERBERA_TRANSPORT.println("MCP,{connection.event_name},motor_state:0");
           return;
         }
 
-        Serial.println("MCP,{connection.event_name},error:invalid_direction");
+        GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_direction");
       }
 
 stream:

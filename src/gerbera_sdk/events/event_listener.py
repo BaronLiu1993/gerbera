@@ -3,13 +3,15 @@ import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 import threading
+import time
+from typing import Callable
 
 from serial import SerialException
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
-from gerbera_sdk.models.runtime.board_runtime import SerialConnection
+from gerbera_sdk.models.runtime.board_transport import BoardTransport
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.hardware_runtime import (
     ConnectionState,
@@ -17,15 +19,19 @@ from gerbera_sdk.models.runtime.hardware_runtime import (
 )
 from gerbera_sdk.models.runtime.serial_protocol import SerialMessageCodec
 
+RECONNECT_ATTEMPTS = 3
+RECONNECT_BACKOFF_SECONDS = 0.25
+
 
 @dataclass
 class EventListener:
     hardware_plan: HardwarePlan
-    serial_pool: Mapping[str, SerialConnection]
+    transport_pool: Mapping[str, BoardTransport]
 
     event_bus: EventBus
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
+    reconnect_board: Callable[[str], None] | None = None
 
     reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
@@ -64,8 +70,8 @@ class EventListener:
             self.stop_event.set()
             threads = list(self.threads.items())
 
-        for serial_connection in self.serial_pool.values():
-            serial_connection.cancel_read()
+        for transport in list(self.transport_pool.values()):
+            transport.cancel_read()
 
         alive_threads = {}
         for microcontroller_id, thread in threads:
@@ -82,15 +88,16 @@ class EventListener:
             names = ", ".join(thread.name for thread in alive_threads.values())
             raise RuntimeError(f"Event listener threads did not stop: {names}")
 
-    def listen_loop(self, microcontroller_id) -> None:
-        serial_connection = self.serial_pool[microcontroller_id]
+    def listen_loop(self, microcontroller_id: str) -> None:
         while not self.stop_event.is_set():
+            transport = self.transport_pool[microcontroller_id]
             try:
-                line = serial_connection.readline()
+                line = transport.readline()
             except (OSError, SerialException):
                 if self.stop_event.is_set():
                     return
-                raise
+                self.reconnect(microcontroller_id)
+                continue
 
             if not line:
                 continue
@@ -110,6 +117,24 @@ class EventListener:
                 message.target,
                 message.fields,
             )
+
+    def reconnect(self, microcontroller_id: str) -> None:
+        if self.reconnect_board is None:
+            raise RuntimeError(
+                f"Board transport disconnected: {microcontroller_id}"
+            )
+        for attempt in range(RECONNECT_ATTEMPTS):
+            if self.stop_event.is_set():
+                return
+            try:
+                self.reconnect_board(microcontroller_id)
+                return
+            except Exception as exc:
+                if attempt == RECONNECT_ATTEMPTS - 1:
+                    raise RuntimeError(
+                        f"Could not reconnect board: {microcontroller_id}"
+                    ) from exc
+                time.sleep(RECONNECT_BACKOFF_SECONDS * (attempt + 1))
 
     def dispatch_to_event_bus(
         self,

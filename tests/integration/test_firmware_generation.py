@@ -1,7 +1,9 @@
 from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import (
     Microcontroller,
+    RuntimeTransportConfig,
     RuntimeWatchdogConfig,
 )
 
@@ -57,3 +59,35 @@ def test_models_generate_routed_firmware_for_read_and_write_components(
     assert stream_name in firmware.commands_source
     assert "component_feedback_lost" in firmware.runtime_source
     assert "error:hardware_not_ready" in firmware.commands_source
+
+
+def test_esp32_generates_bluetooth_transport_firmware() -> None:
+    board = Microcontroller(
+        name="esp32",
+        port="/dev/usb-esp32",
+        upload_port="/dev/usb-esp32",
+        device_id="esp32-1",
+        runtime_transport=RuntimeTransportConfig.bluetooth_classic(
+            "/dev/bluetooth-esp32",
+            "Gerbera-ESP32",
+        ),
+        fqbn="esp32:esp32:esp32",
+        watchdog=RuntimeWatchdogConfig(500, 2500),
+        connections=[
+            Connection(
+                name="status_led",
+                component_type="led",
+                pins={"out": "GPIO23"},
+                description="Status LED",
+            )
+        ],
+    )
+    system = HardwareSystem(name="esp32", microcontrollers=[board])
+    board.hardware_system_id = system.id
+    board.connections[0].microcontroller_id = board.id
+
+    firmware = FirmwareGenerator(board).generate()
+
+    assert "#include <BluetoothSerial.h>" in firmware.runtime_header
+    assert 'GERBERA_TRANSPORT.begin("Gerbera-ESP32")' in firmware.runtime_source
+    assert "Serial.print" not in firmware.commands_source

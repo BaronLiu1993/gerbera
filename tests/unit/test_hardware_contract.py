@@ -6,6 +6,7 @@ from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import (
     Microcontroller,
+    RuntimeTransportConfig,
     RuntimeWatchdogConfig,
 )
 from gerbera_sdk.models.hardware.validation import (
@@ -121,6 +122,39 @@ def test_contract_digest_changes_with_watchdog_timing(device_registry) -> None:
     second_digest = HardwareContractCompiler.compile(second).boards[0].contract_digest
 
     assert first_digest != second_digest
+
+
+def test_contract_digest_changes_with_runtime_transport(device_registry) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    usb_system = build_system([])
+    bluetooth_system = build_system([])
+    bluetooth_board = bluetooth_system.microcontrollers[0]
+    bluetooth_board.fqbn = "esp32:esp32:esp32"
+    bluetooth_board.runtime_transport = RuntimeTransportConfig.bluetooth_classic(
+        "/dev/bluetooth-board-1",
+        "Gerbera-ESP32",
+    )
+
+    usb_digest = HardwareContractCompiler.compile(usb_system).boards[0].contract_digest
+    bluetooth_digest = HardwareContractCompiler.compile(
+        bluetooth_system
+    ).boards[0].contract_digest
+
+    assert usb_digest != bluetooth_digest
+
+
+def test_avr_board_rejects_bluetooth_transport(device_registry) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    system = build_system([])
+    system.microcontrollers[0].runtime_transport = (
+        RuntimeTransportConfig.bluetooth_classic(
+            "/dev/bluetooth-board-1",
+            "Gerbera-AVR",
+        )
+    )
+
+    with pytest.raises(ValueError, match="is not supported"):
+        HardwareContractCompiler.compile(system)
 
 
 def test_contract_digest_changes_with_safe_stop_strategy(

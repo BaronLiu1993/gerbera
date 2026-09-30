@@ -175,7 +175,7 @@ class ServerRuntime:
         params: dict[str, object],
     ) -> dict[str, object]:
         try:
-            serial_connection = self.board_runtime.get_serial_connection(
+            transport = self.board_runtime.get_transport(
                 board.microcontroller_id
             )
             built_command = CommandCompiler.build_command(
@@ -184,7 +184,7 @@ class ServerRuntime:
                 params=params,
             )
 
-            serial_connection.write(built_command)
+            transport.write(built_command)
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 

@@ -10,8 +10,8 @@ from gerbera_sdk.models.hardware.microcontroller import RuntimeWatchdogConfig
 from gerbera_sdk.models.runtime.board_runtime import (
     BoardRuntime,
     BoardSession,
-    SerialConnection,
 )
+from gerbera_sdk.models.runtime.board_transport import SerialBoardTransport
 
 
 class HandshakeConnection:
@@ -146,7 +146,11 @@ def test_start_requires_ready_for_the_current_session() -> None:
 def test_board_runtime_registers_connection_after_handshake(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(SerialConnection, "connect", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        SerialBoardTransport,
+        "connect",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(BoardRuntime, "verify_contract", lambda *args: "session")
     monkeypatch.setattr(BoardRuntime, "verify_components", lambda *args: None)
     monkeypatch.setattr(BoardRuntime, "start_firmware", lambda *args: None)
@@ -156,13 +160,17 @@ def test_board_runtime_registers_connection_after_handshake(
 
     runtime.start()
 
-    assert set(runtime.serial_pool) == {"board-1"}
+    assert set(runtime.transport_pool) == {"board-1"}
     assert set(runtime.sessions) == {"board-1"}
 
 
 def test_board_runtime_does_not_register_failed_handshake(monkeypatch) -> None:
-    monkeypatch.setattr(SerialConnection, "connect", lambda *args, **kwargs: None)
-    monkeypatch.setattr(SerialConnection, "destroy", lambda *args: None)
+    monkeypatch.setattr(
+        SerialBoardTransport,
+        "connect",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(SerialBoardTransport, "close", lambda *args: None)
 
     def reject_contract(*args) -> None:
         raise RuntimeError("contract mismatch")
@@ -173,4 +181,4 @@ def test_board_runtime_does_not_register_failed_handshake(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="Could not start"):
         runtime.start()
 
-    assert runtime.serial_pool == {}
+    assert runtime.transport_pool == {}

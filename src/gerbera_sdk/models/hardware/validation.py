@@ -5,10 +5,16 @@ from types import MappingProxyType
 
 from gerbera_sdk.firmware.board_definitions import BOARD_REGISTRY, BoardDefinition
 from gerbera_sdk.firmware.configurations import DEVICE_REGISTRY
-from gerbera_sdk.firmware.firmware_schema import GERBERA_PROTOCOL_VERSION
+from gerbera_sdk.firmware.firmware_schema import (
+    BoardTransportKind,
+    GERBERA_PROTOCOL_VERSION,
+)
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.hardware.microcontroller import RuntimeWatchdogConfig
+from gerbera_sdk.models.hardware.microcontroller import (
+    RuntimeTransportConfig,
+    RuntimeWatchdogConfig,
+)
 from gerbera_sdk.models.hardware.hardware_plan import (
     ConnectionKey,
     EventRouteKey,
@@ -54,6 +60,7 @@ class BoardContractIdentity:
     microcontroller_id: str
     baud_rate: int
     definition: BoardDefinition
+    runtime_transport: RuntimeTransportConfig | None = None
 
 
 class HardwareValidationFacade:
@@ -72,6 +79,11 @@ class HardwareValidationFacade:
 
         for microcontroller in hardware_system.microcontrollers:
             errors = HardwareContractCompiler.validate_watchdog(microcontroller)
+            if errors:
+                return ValidationResult.from_errors(errors)
+            errors = HardwareContractCompiler.validate_transport(
+                microcontroller
+            )
             if errors:
                 return ValidationResult.from_errors(errors)
 
@@ -169,6 +181,8 @@ class HardwareContractCompiler:
         ValidationResult.from_errors(pin_errors).raise_for_errors()
         watchdog_errors = cls.validate_watchdog(microcontroller)
         ValidationResult.from_errors(watchdog_errors).raise_for_errors()
+        transport_errors = cls.validate_transport(microcontroller)
+        ValidationResult.from_errors(transport_errors).raise_for_errors()
         return cls.resolve_board(microcontroller)
 
     @staticmethod
@@ -230,19 +244,23 @@ class HardwareContractCompiler:
             )
 
         connections = tuple(resolved_connections)
+        runtime_transport = microcontroller.active_runtime_transport
         return ResolvedBoard(
             microcontroller_id=microcontroller_id,
             name=microcontroller.name,
-            port=microcontroller.port,
+            port=runtime_transport.port,
             baud_rate=microcontroller.baud_rate,
             definition=board_definition,
             connections=connections,
             watchdog=microcontroller.watchdog,
+            upload_port=microcontroller.firmware_upload_port,
+            runtime_transport=runtime_transport,
             contract_digest=HardwareContractCompiler.calculate_board_digest(
                 BoardContractIdentity(
                     microcontroller_id=microcontroller_id,
                     baud_rate=microcontroller.baud_rate,
                     definition=board_definition,
+                    runtime_transport=runtime_transport,
                 ),
                 connections,
                 microcontroller.watchdog,
@@ -265,6 +283,11 @@ class HardwareContractCompiler:
             "fqbn": identity.definition.fqbn,
             "microcontroller_id": identity.microcontroller_id,
             "protocol_version": GERBERA_PROTOCOL_VERSION,
+            "runtime_transport": (
+                HardwareContractCompiler.transport_contract_payload(
+                    identity.runtime_transport
+                )
+            ),
             "watchdog": {
                 "heartbeat_interval_ms": watchdog.heartbeat_interval_ms,
                 "heartbeat_timeout_ms": watchdog.heartbeat_timeout_ms,
@@ -276,6 +299,42 @@ class HardwareContractCompiler:
             separators=(",", ":"),
         )
         return hashlib.sha256(serialized_payload.encode()).hexdigest()
+
+    @staticmethod
+    def transport_contract_payload(
+        transport: RuntimeTransportConfig | None,
+    ) -> dict[str, str | None]:
+        resolved_transport = transport or RuntimeTransportConfig.usb_serial("")
+        return {
+            "device_name": resolved_transport.device_name,
+            "kind": resolved_transport.kind.value,
+        }
+
+    @staticmethod
+    def validate_transport(
+        microcontroller: Microcontroller,
+    ) -> list[str]:
+        transport = microcontroller.active_runtime_transport
+        path = f"microcontrollers[{microcontroller.id}].runtime_transport"
+        if not transport.port.strip():
+            return [f"{path}.port: cannot be empty"]
+
+        board_definition = BOARD_REGISTRY.get_definition(
+            microcontroller.fqbn
+        )
+        if transport.kind not in board_definition.supported_transports:
+            return [
+                f"{path}.kind: {transport.kind.value} is not supported by "
+                f"{microcontroller.fqbn}"
+            ]
+
+        if transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC:
+            device_name = transport.device_name or ""
+            if not device_name.strip():
+                return [f"{path}.device_name: cannot be empty"]
+            if "\n" in device_name or "\r" in device_name:
+                return [f"{path}.device_name: cannot contain newlines"]
+        return []
 
     @staticmethod
     def connection_contract_payload(

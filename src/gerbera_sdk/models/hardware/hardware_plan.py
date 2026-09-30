@@ -10,7 +10,10 @@ from gerbera_sdk.firmware.firmware_schema import (
     PinMode,
 )
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.hardware.microcontroller import RuntimeWatchdogConfig
+from gerbera_sdk.models.hardware.microcontroller import (
+    RuntimeTransportConfig,
+    RuntimeWatchdogConfig,
+)
 
 ConnectionKey = tuple[str, str]
 EventRouteKey = tuple[str, str]
@@ -85,10 +88,22 @@ class ResolvedBoard:
     connections: tuple[ResolvedConnection, ...]
     watchdog: RuntimeWatchdogConfig
     contract_digest: str
+    upload_port: str | None = None
+    runtime_transport: RuntimeTransportConfig | None = None
 
     @property
     def fqbn(self) -> str:
         return self.definition.fqbn
+
+    @property
+    def firmware_upload_port(self) -> str:
+        return self.upload_port or self.port
+
+    @property
+    def active_runtime_transport(self) -> RuntimeTransportConfig:
+        return self.runtime_transport or RuntimeTransportConfig.usb_serial(
+            self.port
+        )
 
 
 @dataclass(frozen=True)
