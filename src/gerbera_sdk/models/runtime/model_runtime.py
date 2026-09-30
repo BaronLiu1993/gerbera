@@ -43,6 +43,7 @@ class ModelRuntime:
     model_outputs: dict[str, ModelOutput | None] = field(default_factory=dict)
     registered_models: dict[str, RegisteredModel] = field(default_factory=dict)
     model_streams: dict[str, ModelStream] = field(default_factory=dict)
+    model_stream_failures: dict[str, Exception] = field(default_factory=dict)
     lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
@@ -98,6 +99,7 @@ class ModelRuntime:
     ) -> ModelOutput:
         with self.lock:
             registered_model = self.registered_models[model_id]
+            self.raise_model_stream_failure(model_id)
             output_type = registered_model.strategy.output_types[output_name]
             key = registered_model.inference.model_output_keys[output_name]
             model_output = self.model_outputs[key]
@@ -182,6 +184,7 @@ class ModelRuntime:
     ) -> None:
         with self.lock:
             registered_model = self.registered_models[model_id]
+            self.model_stream_failures.pop(model_id, None)
             stream = self.model_streams.get(model_id)
             if stream is not None and stream.thread.is_alive():
                 raise RuntimeError(f"Model stream is already running: {model_id}")
@@ -244,6 +247,9 @@ class ModelRuntime:
             while not stop_event.is_set():
                 prediction()
                 stop_event.wait(interval_seconds)
+        except Exception as error:
+            with self.lock:
+                self.model_stream_failures[model_id] = error
         finally:
             with self.lock:
                 stream = self.model_streams[model_id]
@@ -258,12 +264,19 @@ class ModelRuntime:
             self.registered_models[model_id]
             stream = self.model_streams.get(model_id)
         if stream is None:
+            self.raise_model_stream_failure(model_id)
             raise RuntimeError(f"Model stream is not running: {model_id}")
 
         stream.stop_event.set()
         stream.thread.join(timeout=5.0)
         if stream.thread.is_alive():
             raise RuntimeError(f"Model stream did not stop: {model_id}")
+        self.raise_model_stream_failure(model_id)
+
+    def raise_model_stream_failure(self, model_id: str) -> None:
+        failure = self.model_stream_failures.get(model_id)
+        if failure is not None:
+            raise RuntimeError(f"Model stream failed: {model_id}") from failure
 
     def turn_on_all_model_streams(self) -> None:
         with self.lock:

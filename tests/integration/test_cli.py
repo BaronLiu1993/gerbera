@@ -8,5 +8,6 @@ def test_cli_exposes_supported_workflows() -> None:
 
     assert result.exit_code == 0
     assert "init" in result.stdout
-    assert "setup" in result.stdout
-    assert "deploy" in result.stdout
+    assert "up" in result.stdout
+    assert "server" in result.stdout
+    assert "down" in result.stdout

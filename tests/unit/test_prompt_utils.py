@@ -2,9 +2,9 @@ from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
 
 def test_load_prompt_reads_main_prompt() -> None:
-    prompt = load_prompt(PromptTypeEnum.MAIN, "INITIALISATION.md")
+    prompt = load_prompt(PromptTypeEnum.MAIN, "TASK_DECOMPOSITION.md")
 
-    assert prompt.startswith("# Initialisation")
+    assert prompt.startswith("## Role")
 
 
 def test_load_prompt_reads_sub_prompt() -> None:
@@ -13,30 +13,24 @@ def test_load_prompt_reads_sub_prompt() -> None:
     assert prompt.startswith("# Planning")
 
 
-def test_initialisation_prompt_requires_continuous_time_series() -> None:
-    prompt = load_prompt(PromptTypeEnum.MAIN, "INITIALISATION.md")
+def test_task_decomposition_prompt_keeps_tasks_non_executable() -> None:
+    prompt = load_prompt(PromptTypeEnum.MAIN, "TASK_DECOMPOSITION.md")
 
-    assert "You MUST use `continuous`" in prompt
-    assert "repeated timestamped readings" in prompt
-    assert "IR sensor output remains stable over 30 seconds" in prompt
-    assert "Do not represent a time-series experiment" in prompt
-
-
-def test_initialisation_prompt_requires_parameter_lists() -> None:
-    prompt = load_prompt(PromptTypeEnum.MAIN, "INITIALISATION.md")
-
-    assert "Parameter-list fields are mandatory" in prompt
-    assert "Every `discrete` action must include `params`" in prompt
-    assert "both `forward_tool_call_params` and" in prompt
-    assert "`reverse_tool_call_params`" in prompt
-    assert "Never omit a parameter-list field" in prompt
+    assert "Tasks are high-level instructions" in prompt
+    assert "- Operate hardware." in prompt
+    assert "- Generate nested action groups." in prompt
 
 
-def test_observation_prompt_requires_sql_for_analysis_tasks() -> None:
+def test_planning_prompt_defines_continuous_action_boundaries() -> None:
+    prompt = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
+
+    assert "Use continuous actions only when" in prompt
+    assert "must later be reversed" in prompt
+
+
+def test_observation_prompt_only_allows_read_only_tools() -> None:
     prompt = load_prompt(PromptTypeEnum.SUB, "OBSERVE.md")
 
-    assert "post-collection data-analysis tasks" in prompt
-    assert "must call `query_database`" in prompt
-    assert "PostgreSQL" in prompt
-    assert "`get_table_schemas`" in prompt
-    assert "Do not return null evidence fields" in prompt
+    assert "Only read-only tools are available" in prompt
+    assert "Do not command actuators" in prompt
+    assert "Do not invent" in prompt

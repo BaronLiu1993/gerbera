@@ -6,7 +6,7 @@ from typing import Any
 from gerbera_harness.memory import EventTypeEnum, Memory, TaskSchema
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ContextBuilder(ABC):
     memory: Memory
     task_id: str | None = None

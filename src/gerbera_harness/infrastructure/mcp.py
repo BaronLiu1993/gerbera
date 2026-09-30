@@ -69,4 +69,13 @@ class MCPClient:
         if name not in allowed_tool_names:
             raise ValueError(f"MCP tool is not allowed: {name}")
         result = await self.client.call_tool(name, arguments)
+        if result.is_error:
+            details = "; ".join(
+                content.text
+                for content in result.content
+                if hasattr(content, "text")
+            )
+            raise RuntimeError(
+                f"MCP tool '{name}' failed: {details or 'unknown error'}"
+            )
         return result.data

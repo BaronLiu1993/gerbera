@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from queue import Empty, Queue
 import threading
-import time
 import uuid
 
 from gerbera_sdk.models.hardware.database import Database
@@ -27,6 +26,17 @@ class EventWorker:
     )
     stop_event: threading.Event | None = None
     thread: threading.Thread | None = None
+    failures: list[RuntimeError] = field(default_factory=list, init=False)
+    retry_timers: set[threading.Timer] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+    )
+    retry_condition: threading.Condition = field(
+        default_factory=threading.Condition,
+        init=False,
+        repr=False,
+    )
 
     def start(self) -> None:
         if self.thread is not None:
@@ -40,6 +50,7 @@ class EventWorker:
         )
         self.stop_event = stop_event
         self.thread = thread
+        self.failures.clear()
 
         try:
             thread.start()
@@ -75,6 +86,8 @@ class EventWorker:
 
             try:
                 self.process_job(job)
+            except RuntimeError as error:
+                self.failures.append(error)
             finally:
                 self.queue.task_done()
 
@@ -96,12 +109,13 @@ class EventWorker:
     def process_job(self, job: WriteJob) -> None:
         try:
             self.database.write_database_table(job.table_name, job.batch)
-        except Exception:
+        except Exception as error:
             if job.retry_count >= self.max_retries:
-                raise RuntimeError("Failed to Write to Database")
+                raise RuntimeError(
+                    f"Database write failed for table: {job.table_name}"
+                ) from error
 
-            time.sleep(self.retry_delay_seconds)
-            self.queue.put(
+            self.schedule_retry(
                 WriteJob(
                     table_name=job.table_name,
                     batch=job.batch,
@@ -109,5 +123,28 @@ class EventWorker:
                 )
             )
 
+    def schedule_retry(self, job: WriteJob) -> None:
+        timer: threading.Timer
+
+        def enqueue_retry() -> None:
+            self.queue.put(job)
+            with self.retry_condition:
+                self.retry_timers.discard(timer)
+                self.retry_condition.notify_all()
+
+        timer = threading.Timer(self.retry_delay_seconds, enqueue_retry)
+        timer.daemon = True
+        with self.retry_condition:
+            self.retry_timers.add(timer)
+        timer.start()
+
     def wait_until_idle(self) -> None:
-        self.queue.join()
+        while True:
+            self.queue.join()
+            with self.retry_condition:
+                if not self.retry_timers:
+                    break
+                self.retry_condition.wait()
+
+        if self.failures:
+            raise self.failures[0]

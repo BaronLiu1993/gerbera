@@ -210,7 +210,7 @@ def test_once_reaction_claim_is_atomic() -> None:
     )
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        claims = list(executor.map(lambda _: reaction.claim_trigger(), range(32)))
+        claims = list(executor.map(lambda _: reaction.can_trigger(), range(32)))
 
     assert claims.count(True) == 1
     assert claims.count(False) == 31

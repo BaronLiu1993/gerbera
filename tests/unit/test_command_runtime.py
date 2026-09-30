@@ -13,6 +13,7 @@ def _connection(component_type: str) -> Connection:
     }
     return Connection(
         name="component",
+        description="Test component",
         component_type=component_type,
         pins=pins[component_type],
         microcontroller_id="board-1",
@@ -36,7 +37,7 @@ def test_build_command_normalizes_a_valid_parameter() -> None:
         (_connection("led"), {}, "Missing required parameter"),
         (_connection("led"), {"state": "invalid"}, "Invalid numeric value"),
         (_connection("led"), {"unknown": 1}, "Unsupported parameter"),
-        (_connection("sg90"), {"angle": "181"}, "must be <= 180"),
+        (_connection("sg90"), {"angle": "181"}, "must be <= 3.141592653589793"),
         (_connection("sg90"), {"angle": "not-a-number"}, "Invalid numeric value"),
     ],
 )
@@ -78,8 +79,10 @@ def test_every_device_command_defines_complete_tool_annotations(
     }
     connection = Connection(
         name=f"test_{component_type}",
+        description=f"Test {component_type}",
         component_type=component_type,
         pins=pins[component_type],
+        microcontroller_id="board-1",
         stream=True,
     )
 

@@ -69,37 +69,43 @@ class FakeConnection:
         return self.cursor_instance
 
 
-class FakePool:
-    def __init__(self) -> None:
-        self.opened = False
-        self.connection_instance = FakeConnection()
+class FakeAsyncConnection:
+    connection_instance = FakeConnection()
 
-    async def open(self) -> None:
-        self.opened = True
-
-    def connection(self) -> FakeConnection:
-        return self.connection_instance
+    @classmethod
+    async def connect(cls, dsn: str, *, connect_timeout: float):
+        return cls.connection_instance
 
 
-class FakeDatabaseGateway(DatabaseGateway):
-    def __init__(self) -> None:
-        self.pool = FakePool()
+def database_gateway() -> DatabaseGateway:
+    return DatabaseGateway(
+        host="database.internal",
+        port="5432",
+        db_name="gerbera",
+        read_user="reader",
+        read_password="secret",
+    )
 
-    @property
-    def connection_pool(self) -> FakePool:
-        return self.pool
 
-
-def test_get_table_schemas_uses_parameterized_schema_query() -> None:
-    gateway = FakeDatabaseGateway()
+def test_get_table_schemas_uses_parameterized_schema_query(monkeypatch) -> None:
+    FakeAsyncConnection.connection_instance = FakeConnection()
+    monkeypatch.setattr(
+        "gerbera_harness.infrastructure.database.AsyncConnection",
+        FakeAsyncConnection,
+    )
+    gateway = database_gateway()
 
     result = asyncio.run(
         gateway.get_table_schemas(["readings", "events"])
     )
 
-    cursor = gateway.connection_pool.connection_instance.cursor_instance
+    connection = FakeAsyncConnection.connection_instance
+    cursor = connection.cursor_instance
 
-    assert gateway.connection_pool.opened is True
+    assert connection.executed == [
+        "SET TRANSACTION READ ONLY",
+        "SET LOCAL statement_timeout = '10s'",
+    ]
     assert "table_name = any(%s)" in cursor.query
     assert cursor.params == (["readings", "events"],)
     assert result == [
@@ -121,10 +127,9 @@ def test_get_table_schemas_uses_parameterized_schema_query() -> None:
 
 
 def test_get_table_schemas_returns_empty_list_without_querying() -> None:
-    gateway = FakeDatabaseGateway()
+    gateway = database_gateway()
 
     assert asyncio.run(gateway.get_table_schemas([])) == []
-    assert gateway.connection_pool.opened is False
 
 
 def test_database_gateway_returns_json_safe_values() -> None:

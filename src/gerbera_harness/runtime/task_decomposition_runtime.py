@@ -20,6 +20,7 @@ from gerbera_harness.memory import Memory, TaskSchema, TaskStatusEnum
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 from gerbera_harness.runtime.context import TaskDecompositionContextBuilder
 from gerbera_harness.tools.client import ToolClient
+from gerbera_harness.runtime.task_lifecycle import TaskLifecycleRuntime
 
 TASK_DECOMPOSITION_PROMPT = load_prompt(
     PromptTypeEnum.MAIN,
@@ -34,6 +35,7 @@ class TaskDecompositionRuntime:
     tool_client: ToolClient
     user_prompt: str
     previous_context: str
+    task_lifecycle: TaskLifecycleRuntime
     max_attempts: int = 3
     clarifying_questions: dict[str, tuple[Question, Answer] | None] = field(
         default_factory=dict
@@ -61,7 +63,7 @@ class TaskDecompositionRuntime:
             intent = TaskDecompositionIntentSchema.model_validate_json(raw_intent)
 
             tasks = self.build_tasks(intent)
-            self.memory.initialise_tasks(
+            self.task_lifecycle.initialise_tasks(
                 tasks,
                 user_intent=self.user_prompt,
                 goal=intent.goal,

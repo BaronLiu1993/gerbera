@@ -112,6 +112,12 @@ def test_object_detection_registry_contains_yolov5_adapter() -> None:
     )
 
 
+def test_object_detection_providers_match_registered_adapters() -> None:
+    assert set(ObjectDetectionModelProviderEnum) == set(
+        OBJECT_DETECTION_MODEL_REGISTRY
+    )
+
+
 def test_object_detection_inference_predicts_the_supplied_frame() -> None:
     frame = Frame(
         timestamp=datetime.now(),
