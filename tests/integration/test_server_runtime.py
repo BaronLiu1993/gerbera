@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions.reaction_schema import (
     CreateReactionSchema,
@@ -33,9 +34,13 @@ from gerbera_sdk.models.hardware.microcontroller import (
 )
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.command_acknowledgement import (
+    CommandAcknowledgementRegistry,
+)
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.serial_protocol import SerialMessageCodec
 
 
 class FakeApp:
@@ -103,6 +108,7 @@ def make_server(
     event_worker=None,
     hardware_runtime=None,
     reaction_bus=None,
+    command_acknowledgements=None,
 ) -> tuple[ServerRuntime, FakeApp]:
     app = FakeApp()
     system = hardware_system or HardwareSystem(name="test")
@@ -122,8 +128,73 @@ def make_server(
         event_listener=SimpleNamespace(),
         reaction_bus=reaction_bus or ReactionBus(),
         hardware_runtime=hardware_runtime or HardwareRuntime(),
+        command_acknowledgements=(
+            command_acknowledgements
+            or CommandAcknowledgementRegistry()
+        ),
     )
     return runtime, app
+
+
+def test_listener_acknowledgement_completes_server_command(
+    device_registry,
+) -> None:
+    device_registry({"board-1": "/dev/board-1"})
+    connection = Connection(
+        name="sensor",
+        component_type="hw201",
+        pins={"out": "7"},
+        description="Infrared sensor",
+        microcontroller_id="board-1",
+    )
+    board = Microcontroller(
+        name="board",
+        port="/dev/board-1",
+        fqbn="arduino:avr:uno",
+        watchdog=RuntimeWatchdogConfig(100, 500),
+        connections=[connection],
+    )
+    system = HardwareSystem(name="test", microcontrollers=[board])
+    board.hardware_system_id = system.id
+    registry = CommandAcknowledgementRegistry()
+    runtime, _ = make_server(
+        hardware_system=system,
+        command_acknowledgements=registry,
+    )
+    listener = EventListener(
+        hardware_plan=runtime.hardware_plan,
+        transport_pool={},
+        event_bus=runtime.event_bus,
+        reaction_bus=runtime.reaction_bus,
+        hardware_runtime=runtime.hardware_runtime,
+        command_acknowledgements=registry,
+    )
+
+    class AcknowledgingTransport:
+        def write(self, command: str) -> None:
+            message = SerialMessageCodec.decode(command)
+            listener.resolve_acknowledgement(
+                {
+                    "command_id": message.fields["command_id"],
+                    "obstacle_detected": "1",
+                }
+            )
+
+    runtime.board_runtime = SimpleNamespace(
+        get_transport=lambda microcontroller_id: AcknowledgingTransport()
+    )
+    response = runtime.send_command(
+        runtime.hardware_plan.boards[0],
+        runtime.hardware_plan.boards[0].connections[0],
+        "READ",
+        {},
+    )
+    listener.reaction_executor.shutdown(wait=True)
+
+    assert response == {
+        "success": True,
+        "value": {"obstacle_detected": "1"},
+    }
 
 
 def test_reaction_management_tools_create_list_and_delete(

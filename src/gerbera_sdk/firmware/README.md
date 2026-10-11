@@ -85,17 +85,22 @@ Commands sent to Arduino:
 
 ```text
 HANDSHAKE,__gerbera__,challenge:<nonce>
-READ,<connection.name>
-WRITE,<connection.name>,key:value,key:value
+READ,<connection.name>,command_id:<id>
+WRITE,<connection.name>,key:value,key:value,command_id:<id>
 ```
 
 Responses emitted by Arduino:
 
 ```text
 HANDSHAKE,__gerbera__,protocol:<version>,board:<id>,digest:<digest>,challenge:<nonce>
-MCP,<connection.event_name>,key:value
+MCP,<connection.event_name>,command_id:<id>,key:value
 STREAM,<connection.event_name>,key:value
 ```
+
+Every command response echoes the host-generated `command_id`. The runtime uses
+it to match concurrent acknowledgements and removes it before updating hardware
+state or evaluating reactions. Stream events are unsolicited and therefore do
+not include a command ID.
 
 `connection.event_name` is the runtime-safe internal identifier. It is generated from:
 

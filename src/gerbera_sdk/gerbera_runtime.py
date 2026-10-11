@@ -15,6 +15,9 @@ from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.command_acknowledgement import (
+    CommandAcknowledgementRegistry,
+)
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
@@ -75,12 +78,14 @@ class GerberaRuntime:
 
         event_bus = EventBus()
         reaction_bus = ReactionBus()
+        command_acknowledgements = CommandAcknowledgementRegistry()
         event_listener = EventListener(
             hardware_plan=hardware_plan,
             transport_pool=board_runtime.transport_pool,
             event_bus=event_bus,
             reaction_bus=reaction_bus,
             hardware_runtime=hardware_runtime,
+            command_acknowledgements=command_acknowledgements,
             reconnect_board=board_runtime.reconnect_board,
         )
         runtime_lifecycle = RuntimeLifecycle(
@@ -109,6 +114,7 @@ class GerberaRuntime:
             event_listener=event_listener,
             reaction_bus=reaction_bus,
             hardware_runtime=hardware_runtime,
+            command_acknowledgements=command_acknowledgements,
             movement_runtime=movement_runtime,
         )
 

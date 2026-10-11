@@ -30,6 +30,15 @@ def test_build_command_normalizes_a_valid_parameter() -> None:
     assert command == "WRITE,component,state:1.0"
 
 
+def test_attach_command_id_adds_protocol_metadata() -> None:
+    command = CommandCompiler.attach_command_id(
+        "READ,component",
+        "command-123",
+    )
+
+    assert command == "READ,component,command_id:command-123"
+
+
 @pytest.mark.parametrize(
     ("connection", "params", "message"),
     [

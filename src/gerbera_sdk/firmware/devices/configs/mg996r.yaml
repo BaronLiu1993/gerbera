@@ -52,7 +52,7 @@ firmware:
         String angleValue = parameterValue(input, "angle");
 
         if (angleValue.length() == 0) {
-          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_arg");
+          sendMcpResponse(input, "{connection.event_name}", "error", "invalid_arg");
           return;
         }
 
@@ -61,8 +61,7 @@ firmware:
           {connection.name}_servo.attach({pins.signal});
         }
         {connection.name}_servo.write(angle);
-        GERBERA_TRANSPORT.print("MCP,{connection.event_name},angle:");
-        GERBERA_TRANSPORT.println(angle);
+        sendMcpResponse(input, "{connection.event_name}", "angle", String(angle));
       }
 
 stream:

@@ -536,6 +536,12 @@ int tokenCount(const String& input);
 String actionOf(const String& input);
 String commandNameOf(const String& input);
 String parameterValue(const String& input, const String& parameterName);
+void sendMcpResponse(
+  const String& input,
+  const String& eventName,
+  const String& fieldName,
+  const String& value
+);
 bool isUnsignedInteger(const String& value);
 void setupDeviceCommands();
 void updateDeviceStreams(const GerberaRuntime& runtime);
@@ -613,6 +619,25 @@ String parameterValue(const String& input, const String& parameterName) {{
     }}
   }}
   return "";
+}}
+
+void sendMcpResponse(
+  const String& input,
+  const String& eventName,
+  const String& fieldName,
+  const String& value
+) {{
+  GERBERA_TRANSPORT.print("MCP,");
+  GERBERA_TRANSPORT.print(eventName);
+  String commandId = parameterValue(input, "command_id");
+  if (commandId.length() > 0) {{
+    GERBERA_TRANSPORT.print(",command_id:");
+    GERBERA_TRANSPORT.print(commandId);
+  }}
+  GERBERA_TRANSPORT.print(",");
+  GERBERA_TRANSPORT.print(fieldName);
+  GERBERA_TRANSPORT.print(":");
+  GERBERA_TRANSPORT.println(value);
 }}
 
 bool isUnsignedInteger(const String& value) {{

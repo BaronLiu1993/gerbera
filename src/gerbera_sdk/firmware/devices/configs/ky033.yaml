@@ -61,10 +61,8 @@ firmware:
   handlers:
     default: |
       void handle_{connection.name}(const String& input) {
-        (void)input;
         int value = digitalRead({pins.out});
-        GERBERA_TRANSPORT.print("MCP,{connection.event_name},line_detected:");
-        GERBERA_TRANSPORT.println(value);
+        sendMcpResponse(input, "{connection.event_name}", "line_detected", String(value));
       }
     streaming: |
       void handle_{connection.name}(const String& input) {
@@ -73,30 +71,29 @@ firmware:
         if (action == "WRITE") {
           String stateValue = parameterValue(input, "state");
           if (stateValue.length() == 0) {
-            GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_arg");
+            sendMcpResponse(input, "{connection.event_name}", "error", "invalid_arg");
             return;
           }
 
           float state = stateValue.toFloat();
           if (state == 1) {
             {connection.name}_stream_on = true;
-            GERBERA_TRANSPORT.println("MCP,{connection.event_name},stream_enabled:1");
+            sendMcpResponse(input, "{connection.event_name}", "stream_enabled", "1");
             return;
           }
 
           if (state == 0) {
             {connection.name}_stream_on = false;
-            GERBERA_TRANSPORT.println("MCP,{connection.event_name},stream_enabled:0");
+            sendMcpResponse(input, "{connection.event_name}", "stream_enabled", "0");
             return;
           }
 
-          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_state");
+          sendMcpResponse(input, "{connection.event_name}", "error", "invalid_state");
           return;
         }
 
         int value = digitalRead({pins.out});
-        GERBERA_TRANSPORT.print("MCP,{connection.event_name},line_detected:");
-        GERBERA_TRANSPORT.println(value);
+        sendMcpResponse(input, "{connection.event_name}", "line_detected", String(value));
       }
 
 stream:

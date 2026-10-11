@@ -59,6 +59,8 @@ def test_models_generate_routed_firmware_for_read_and_write_components(
     assert stream_name in firmware.commands_source
     assert "component_feedback_lost" in firmware.runtime_source
     assert "error:hardware_not_ready" in firmware.commands_source
+    assert 'parameterValue(input, "command_id")' in firmware.commands_source
+    assert 'GERBERA_TRANSPORT.print(",command_id:")' in firmware.commands_source
 
 
 def test_esp32_generates_bluetooth_transport_firmware() -> None:

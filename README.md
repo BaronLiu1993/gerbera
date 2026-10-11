@@ -16,6 +16,11 @@ Gerbera provides:
 - persistent event reactions that invoke Gerbera tools locally
 - an optional agent harness that can use the SDK through MCP
 
+Gerbera requires Python 3.12. Install the project and its development tools
+with `python3.12 -m pip install -e ".[dev]"`. The root `requirements.txt`
+delegates to this same package definition so dependency declarations stay in
+one place.
+
 ## Architecture
 
 ```mermaid
@@ -142,20 +147,23 @@ sequenceDiagram
 
     Client->>Server: call generated tool
     Server->>Compiler: validate and encode command
-    Compiler-->>Server: WRITE,target,key:value
+    Compiler-->>Server: WRITE,target,key:value,command_id:id
     Server->>Transport: write command
     Transport->>Firmware: newline-delimited command
-    Server-->>Client: transport write result
-    Firmware-->>Listener: MCP,target,key:value
+    Firmware-->>Listener: MCP,target,command_id:id,key:value
+    Listener-->>Server: resolve matching acknowledgement
     Listener->>State: update latest event and hardware state
+    Server-->>Client: confirmed board result
 ```
 
-A successful write result means the command was validated and written to the
-transport. The board's resulting `MCP` wire event arrives asynchronously and
-updates the event and hardware-state stores.
+A successful command result means the board executed the command and returned
+the matching acknowledgement before the timeout. Board errors, disconnects,
+and acknowledgement timeouts are returned as failed tool results. Multiple
+in-flight commands are matched by command ID even if responses arrive out of
+order.
 
-Read tools return the latest cached `MCP` event for their connection. State
-tools expose snapshots such as `get_current_hardware_state` and
+Read tools send a fresh `READ` command and wait for its board response. State
+tools expose cached snapshots such as `get_current_hardware_state` and
 `get_current_environment_state`.
 
 ## Event and Streaming Flow
@@ -208,6 +216,12 @@ flowchart TD
     ReactionBus -->|matching condition| ToolRegistry[Internal Gerbera tool registry]
     ToolRegistry -->|state-changing action| BoardCommand[Generated tool / board command]
 ```
+
+Malformed messages, unknown routes, conversion failures, and uncorrelated
+board errors are recorded and skipped without stopping later events. Transport
+failures trigger a bounded three-attempt reconnect policy. The read-only
+`get_event_listener_health` tool reports each board's status, last error, last
+successful message time, rejected-message count, and reconnect-attempt count.
 
 The serial listener does not perform database writes or reaction actions
 directly. Database work runs on `EventWorker`, and reaction evaluation runs on a

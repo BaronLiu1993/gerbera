@@ -84,7 +84,6 @@ firmware:
   handlers:
     default: |
       void handle_{connection.name}(const String& input) {
-        (void)input;
         digitalWrite({pins.trig}, LOW);
         delayMicroseconds(2);
         digitalWrite({pins.trig}, HIGH);
@@ -92,13 +91,12 @@ firmware:
         digitalWrite({pins.trig}, LOW);
         long duration = pulseIn({pins.echo}, HIGH, 30000);
         if (duration == 0) {
-          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:timeout");
+          sendMcpResponse(input, "{connection.event_name}", "error", "timeout");
           return;
         }
 
         float distanceCm = duration * 0.0343 / 2.0;
-        GERBERA_TRANSPORT.print("MCP,{connection.event_name},distance:");
-        GERBERA_TRANSPORT.println(distanceCm);
+        sendMcpResponse(input, "{connection.event_name}", "distance", String(distanceCm));
       }
     streaming: |
       void handle_{connection.name}(const String& input) {
@@ -107,24 +105,24 @@ firmware:
         if (action == "WRITE") {
           String stateValue = parameterValue(input, "state");
           if (stateValue.length() == 0) {
-            GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_arg");
+            sendMcpResponse(input, "{connection.event_name}", "error", "invalid_arg");
             return;
           }
 
           float state = stateValue.toFloat();
           if (state == 1) {
             {connection.name}_stream_on = true;
-            GERBERA_TRANSPORT.println("MCP,{connection.event_name},stream_enabled:1");
+            sendMcpResponse(input, "{connection.event_name}", "stream_enabled", "1");
             return;
           }
 
           if (state == 0) {
             {connection.name}_stream_on = false;
-            GERBERA_TRANSPORT.println("MCP,{connection.event_name},stream_enabled:0");
+            sendMcpResponse(input, "{connection.event_name}", "stream_enabled", "0");
             return;
           }
 
-          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:invalid_state");
+          sendMcpResponse(input, "{connection.event_name}", "error", "invalid_state");
           return;
         }
 
@@ -135,13 +133,12 @@ firmware:
         digitalWrite({pins.trig}, LOW);
         long duration = pulseIn({pins.echo}, HIGH, 30000);
         if (duration == 0) {
-          GERBERA_TRANSPORT.println("MCP,{connection.event_name},error:timeout");
+          sendMcpResponse(input, "{connection.event_name}", "error", "timeout");
           return;
         }
 
         float distanceCm = duration * 0.0343 / 2.0;
-        GERBERA_TRANSPORT.print("MCP,{connection.event_name},distance:");
-        GERBERA_TRANSPORT.println(distanceCm);
+        sendMcpResponse(input, "{connection.event_name}", "distance", String(distanceCm));
       }
 
 stream:

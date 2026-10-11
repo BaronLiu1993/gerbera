@@ -6,6 +6,10 @@ from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_plan import StateKey
+from gerbera_sdk.models.runtime.serial_protocol import (
+    SerialMessage,
+    SerialMessageCodec,
+)
 
 
 class CommandCompiler:
@@ -254,6 +258,19 @@ class CommandCompiler:
             )
 
         return ",".join(parts)
+
+    @staticmethod
+    def attach_command_id(command: str, command_id: str) -> str:
+        message = SerialMessageCodec.decode(command)
+        fields = dict(message.fields)
+        fields["command_id"] = command_id
+        return SerialMessageCodec.encode(
+            SerialMessage(
+                message_type=message.message_type,
+                target=message.target,
+                fields=fields,
+            )
+        )
 
     @staticmethod
     def is_servo_angle(

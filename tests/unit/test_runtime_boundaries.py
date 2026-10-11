@@ -1,5 +1,6 @@
 import json
 
+from gerbera_sdk import gerbera_runtime as runtime_module
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.connection import Connection
@@ -68,3 +69,54 @@ def test_runtime_builds_writer_database_from_explicit_connection_details() -> No
         password="secret",
         database_name="gerbera",
     )
+
+
+def test_runtime_shares_acknowledgement_registry(monkeypatch) -> None:
+    registries = {}
+
+    class CapturingEventListener:
+        def __init__(self, **dependencies) -> None:
+            registries["listener"] = dependencies[
+                "command_acknowledgements"
+            ]
+
+    class CapturingServerRuntime:
+        def __init__(self, **dependencies) -> None:
+            registries["server"] = dependencies[
+                "command_acknowledgements"
+            ]
+
+        def register_events(self) -> None:
+            return None
+
+        def register_tools(self) -> None:
+            return None
+
+    class InactiveMcpServer:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def run(self, **kwargs) -> None:
+            return None
+
+    monkeypatch.setattr(
+        runtime_module,
+        "EventListener",
+        CapturingEventListener,
+    )
+    monkeypatch.setattr(
+        runtime_module,
+        "ServerRuntime",
+        CapturingServerRuntime,
+    )
+    monkeypatch.setattr(runtime_module, "FastMCP", InactiveMcpServer)
+
+    GerberaRuntime.run(
+        HardwareSystem(name="test"),
+        transport="http",
+        database_host="localhost",
+        database_port=5432,
+        database_password="secret",
+    )
+
+    assert registries["listener"] is registries["server"]

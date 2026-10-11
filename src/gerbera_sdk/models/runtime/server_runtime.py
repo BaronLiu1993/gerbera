@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from inspect import Parameter, Signature
 import logging
-import time
 from typing import Annotated, Any, Callable
 
 from fastmcp import FastMCP
@@ -14,7 +13,7 @@ from gerbera_sdk.firmware.firmware_schema import (
     ParameterSpec,
 )
 from gerbera_sdk.events.event import Event
-from gerbera_sdk.events.event_bus import EventBus, EventKey
+from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.inference.model_types import (
@@ -32,6 +31,9 @@ from gerbera_sdk.models.hardware.hardware_plan import (
 from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.command_acknowledgement import (
+    CommandAcknowledgementRegistry,
+)
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import (
     ConnectionState,
@@ -70,12 +72,12 @@ class ServerRuntime:
     event_listener: EventListener
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
+    command_acknowledgements: CommandAcknowledgementRegistry
     movement_runtime: MovementRuntime | None = None
     reaction_tool_registry: ReactionToolRegistry = field(
         default_factory=ReactionToolRegistry
     )
     event_read_timeout_seconds: float = 1.0
-    event_read_poll_seconds: float = 0.02
 
     def register_tools(self) -> None:
         self.register_hardware_tools()
@@ -84,6 +86,7 @@ class ServerRuntime:
         self.register_reaction_catalog_tool()
         self.register_hardware_state_tool()
         self.register_environment_state_tool()
+        self.register_event_listener_health_tool()
 
     @staticmethod
     def model_catalog_type(model: Inference) -> ModelCatalogType:
@@ -170,24 +173,16 @@ class ServerRuntime:
 
         return catalog
 
-    def send_read_command(
-        self,
-        event_key: EventKey,
-    ) -> dict[str, object]:
-        try:
-            event = self.event_bus.get_event(*event_key)
-            latest_value = event.read_latest()
-        except Exception as exc:
-            return {"success": False, "error": str(exc)}
-        return {"success": True, "value": latest_value}
-
-    def send_write_command(
+    def send_command(
         self,
         board: ResolvedBoard,
         connection: ResolvedConnection,
         action: str,
         params: dict[str, object],
     ) -> dict[str, object]:
+        pending = self.command_acknowledgements.register(
+            board.microcontroller_id
+        )
         try:
             transport = self.board_runtime.get_transport(
                 board.microcontroller_id
@@ -197,12 +192,23 @@ class ServerRuntime:
                 action=action,
                 params=params,
             )
-
-            transport.write(built_command)
+            correlated_command = CommandCompiler.attach_command_id(
+                built_command,
+                pending.command_id,
+            )
+            transport.write(correlated_command)
+            payload = self.command_acknowledgements.wait(
+                pending,
+                self.event_read_timeout_seconds,
+            )
         except Exception as exc:
+            self.command_acknowledgements.fail(
+                pending.command_id,
+                str(exc),
+            )
             return {"success": False, "error": str(exc)}
 
-        return {"success": True}
+        return {"success": True, "value": payload}
 
     def register_connection_action(
         self,
@@ -215,7 +221,7 @@ class ServerRuntime:
         def action_function(
             params: dict[str, object],
         ) -> dict[str, object]:
-            return self.send_write_command(
+            return self.send_command(
                 board=board,
                 connection=connection,
                 action=action,
@@ -230,19 +236,6 @@ class ServerRuntime:
         command: CommandSpec,
     ) -> Callable[..., dict[str, object]]:
         action = command.method.strip().upper()
-        if action == "READ":
-
-            def read_tool_function() -> dict[str, object]:
-                return self.send_read_command(
-                    (
-                        "MCP",
-                        connection.microcontroller_id,
-                        connection.event_name,
-                    )
-                )
-
-            return read_tool_function
-
         if not command.params:
 
             def tool_function() -> dict[str, object]:
@@ -279,6 +272,18 @@ class ServerRuntime:
             return_annotation=dict[str, object],
         )
         return tool_function
+
+    def register_event_listener_health_tool(self) -> None:
+        self.register_tool(
+            name="get_event_listener_health",
+            description="Get serial listener health for each board.",
+            tool_function=self.event_listener.get_health,
+            annotations=ToolAnnotations(
+                title="Get event listener health",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
 
     def build_parameter_annotation(
         self,
