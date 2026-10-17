@@ -1,311 +1,262 @@
 # Gerbera
 
-Gerbera turns a Python hardware declaration into generated microcontroller
-firmware and a local MCP server. The same validated hardware plan drives both
-sides, so pin assignments, commands, event names, runtime tools, and firmware
-stay aligned.
+[![Tests](https://github.com/BaronLiu1993/gerbera/actions/workflows/run-tests.yml/badge.svg)](https://github.com/BaronLiu1993/gerbera/actions/workflows/run-tests.yml)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Status](https://img.shields.io/badge/status-early%20development-orange)
 
-Gerbera provides:
+**Declare hardware in Python, generate validated microcontroller firmware, and
+expose it to agents through MCP.**
 
-- Arduino firmware generation and flashing
-- USB serial and ESP32 Bluetooth Classic runtime transports
-- MCP tools generated from declared hardware, cameras, models, and movement
-  systems
-- serial event ingestion and current hardware state
-- buffered sensor-stream persistence to PostgreSQL
-- persistent event reactions that invoke Gerbera tools locally
-- an optional agent harness that can use the SDK through MCP
+Gerbera uses one hardware declaration to generate firmware and construct a
+local [Model Context Protocol](https://modelcontextprotocol.io/) server. Device
+wiring, firmware commands, runtime tools, events, reactions, cameras, and model
+inference all share the same validated contract.
 
-Gerbera requires Python 3.12. Install the project and its development tools
-with `python3.12 -m pip install -e ".[dev]"`. The root `requirements.txt`
-delegates to this same package definition so dependency declarations stay in
-one place.
+> [!IMPORTANT]
+> Gerbera is in early development. APIs, configuration formats, and generated
+> firmware contracts may change between releases.
 
-## Architecture
+## Contents
+
+- [Why Gerbera](#why-gerbera)
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Supported hardware](#supported-hardware)
+- [Models](#models)
+- [Bluetooth runtime](#bluetooth-runtime)
+- [CLI](#cli)
+- [Documentation](#documentation)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Why Gerbera
+
+- **One source of truth.** A typed `HardwareSystem` describes boards, wiring,
+  cameras, models, and movement systems.
+- **Generated firmware.** Gerbera validates pin capabilities and creates an
+  Arduino sketch for each configured microcontroller.
+- **Generated MCP tools.** Declared device commands become tools that any MCP
+  client can discover and call.
+- **Confirmed commands.** State-changing calls wait for acknowledgements from
+  the board instead of reporting success after a transport write.
+- **Host-side intelligence.** Cameras, object detection, segmentation, depth
+  estimation, vision-language models, and movement run alongside the hardware
+  server.
+- **Local automation.** Persistent reactions connect hardware events to Gerbera
+  tools without requiring a particular agent harness.
+- **Replaceable clients.** The included harness is optional; the SDK remains a
+  standalone MCP server.
+
+## How it works
 
 ```mermaid
 flowchart LR
     Declaration[Python HardwareSystem] --> Compiler[HardwareContractCompiler]
-    BoardConfig[Board config] --> Compiler
-    DeviceConfig[Device YAML configs] --> Compiler
+    Config[Board and device YAML] --> Compiler
     Compiler --> Plan[Validated HardwarePlan]
 
-    Plan --> Generator[FirmwareGenerator]
-    Generator --> Sketch[Arduino sketch]
-    Sketch --> Flash[arduino-cli compile and upload]
-    Flash --> Board[Microcontroller firmware]
+    Plan --> Firmware[Generated firmware]
+    Firmware --> Board[Arduino or ESP32]
 
-    Plan --> Runtime[GerberaRuntime]
-    Runtime --> BoardRuntime[BoardRuntime]
-    Runtime --> ServerRuntime[ServerRuntime]
-    Runtime --> EventRuntime[EventBus and EventWorker]
-    Runtime --> StateRuntime[Hardware, model, and movement state]
-
-    Client[Any MCP client] <--> ServerRuntime
-    Harness[Optional Gerbera harness] <--> ServerRuntime
-    BoardRuntime <--> Transport[USB serial or Bluetooth SPP]
+    Plan --> Runtime[Gerbera runtime]
+    Runtime <--> Transport[USB serial or Bluetooth SPP]
     Transport <--> Board
-    Board --> Listener[EventListener]
-    Listener --> EventRuntime
-    Listener --> Reactions[ReactionBus]
-    Reactions --> ServerRuntime
+    Runtime <--> Client[Any MCP client]
+    Runtime <--> Harness[Optional Gerbera harness]
 ```
 
-The SDK is the hardware-facing system. It owns contracts, firmware, transports,
-events, state, reactions, inference, movement, and MCP tool registration. The
-optional harness is a separate MCP client: it discovers and calls the same tools
-available to any other compatible client. The SDK does not import or depend on
-the harness.
+`HardwareContractCompiler` resolves board definitions, device definitions,
+wiring, commands, event routes, and transports into an immutable plan. Firmware
+generation and the live runtime consume that same plan, preventing the two
+sides from silently drifting apart.
 
-## Source of Truth
+At startup, Gerbera verifies the connected board identity, protocol version,
+and contract digest. Firmware that does not match the current declaration is
+rejected before hardware commands are accepted.
 
-The developer declares a `HardwareSystem` containing microcontrollers,
-connections, cameras, models, and movement systems. Each hardware connection
-selects a `component_type`, such as `hw201`, `hcsr04`, `led`, or `dcmotor`.
+## Requirements
 
-Gerbera combines three inputs:
+Required:
 
-1. The Python `HardwareSystem` describes the concrete system and its wiring.
-2. `firmware/boards/config.yaml` describes supported boards, pins, capabilities,
-   transports, and Arduino packages.
-3. `firmware/devices/configs/*.yaml` describes each component's pins, state,
-   commands, validation, and firmware templates.
+- Python 3.12
+- [arduino-cli](https://arduino.github.io/arduino-cli/) available on `PATH`
+- A supported Arduino or ESP32 board
+- A USB connection for initial firmware upload
 
-`HardwareContractCompiler` validates these inputs and produces an immutable
-`HardwarePlan`. Validation covers board support, connection names, pin
-capabilities, pin conflicts, transports, watchdogs, and movement connections.
-Invalid declarations fail before firmware generation or runtime startup.
+Required by the standard local deployment:
 
-The resolved plan contains stable board IDs, resolved physical pins, supported
-commands, event routes, and a contract digest. Both firmware generation and the
-live runtime consume this plan.
+- Docker
+- Docker access to GitHub Container Registry
 
-## Build and Flash Flow
+Docker runs PostgreSQL and the optional agent harness. The standalone SDK can
+instead be embedded with `GerberaRuntime`, provided a compatible PostgreSQL
+database is supplied.
 
-```mermaid
-sequenceDiagram
-    participant Developer
-    participant CLI
-    participant Compiler as HardwareContractCompiler
-    participant Generator as FirmwareGenerator
-    participant Arduino as arduino-cli
-    participant Board
+## Installation
 
-    Developer->>CLI: gerbera firmware flash
-    CLI->>Compiler: compile HardwareSystem
-    Compiler-->>CLI: HardwarePlan and contract digest
-    CLI->>Generator: generate one sketch per board
-    Generator-->>CLI: .gerbera/firmware/<board-id>/
-    CLI->>Arduino: compile and upload
-    Arduino->>Board: flash over upload port
-    CLI->>CLI: store installed contract digest
+Gerbera is currently installed from source:
+
+```bash
+git clone https://github.com/BaronLiu1993/gerbera.git
+cd gerbera
+
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-Firmware is only reflashed when the compiled contract digest changes. Use
-`gerbera firmware flash --force` to upload regardless of the stored digest.
-Generated sketches parse Gerbera commands, operate pins and devices, run safety
-checks, and emit structured event lines. They intentionally contain no MCP,
-database, agent, or reaction logic.
+On Windows, activate the environment with:
 
-## Runtime Startup
-
-`GerberaRuntime.run(...)` is the composition root. Before serving MCP requests,
-it creates and connects the runtime components in this order:
-
-1. Compile and validate the current `HardwareSystem`.
-2. Create board, camera, model, event, reaction, hardware-state, and optional
-   movement runtimes.
-3. Register event routes and MCP tools from the resolved plan.
-4. Open one runtime transport per microcontroller.
-5. Perform a nonce-based handshake and verify protocol version, board ID, and
-   contract digest.
-6. Run each component's firmware health check.
-7. Start the firmware session and board heartbeat.
-8. Start cameras, inference streams, the database event worker, and serial
-   listener threads.
-9. Serve the generated tools through FastMCP.
-
-If the connected firmware does not match the current hardware plan, startup
-fails instead of operating against a stale board contract. Shutdown stops
-listeners and inference, flushes event buffers, waits for database writes, and
-closes transports and cameras.
-
-## Command Flow
-
-State-changing MCP tools are generated from the commands in each device YAML
-configuration.
-
-```mermaid
-sequenceDiagram
-    participant Client as MCP client
-    participant Server as ServerRuntime
-    participant Compiler as CommandCompiler
-    participant Transport as BoardTransport
-    participant Firmware
-    participant Listener as EventListener
-    participant State as EventBus / HardwareRuntime
-
-    Client->>Server: call generated tool
-    Server->>Compiler: validate and encode command
-    Compiler-->>Server: WRITE,target,key:value,command_id:id
-    Server->>Transport: write command
-    Transport->>Firmware: newline-delimited command
-    Firmware-->>Listener: MCP,target,command_id:id,key:value
-    Listener-->>Server: resolve matching acknowledgement
-    Listener->>State: update latest event and hardware state
-    Server-->>Client: confirmed board result
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
-A successful command result means the board executed the command and returned
-the matching acknowledgement before the timeout. Board errors, disconnects,
-and acknowledgement timeouts are returned as failed tool results. Multiple
-in-flight commands are matched by command ID even if responses arrive out of
-order.
+## Quick start
 
-Read tools send a fresh `READ` command and wait for its board response. State
-tools expose cached snapshots such as `get_current_hardware_state` and
-`get_current_environment_state`.
+### 1. Declare the hardware
 
-## Event and Streaming Flow
+Create `index.py`. Replace the serial port with the upload port reported by
+`arduino-cli board list`.
 
-Firmware emits newline-delimited messages using this shape:
+```python
+from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.microcontroller import (
+    Microcontroller,
+    RuntimeWatchdogConfig,
+)
+
+
+status_led = Connection(
+    name="status_led",
+    component_type="led",
+    pins={"out": "13"},
+    description="Built-in status LED",
+)
+
+controller = Microcontroller(
+    name="controller",
+    port="/dev/cu.usbmodem101",
+    fqbn="arduino:avr:uno",
+    watchdog=RuntimeWatchdogConfig(
+        heartbeat_interval_ms=500,
+        heartbeat_timeout_ms=2500,
+    ),
+    connections=[status_led],
+)
+
+hardware_system = HardwareSystem(
+    name="hello-gerbera",
+    description="A Gerbera-controlled status LED",
+    microcontrollers=[controller],
+)
+```
+
+### 2. Initialize the project
+
+Connect the board over USB and run:
+
+```bash
+gerbera init
+```
+
+Select the connected board, keep `index.py` as the entry point, and use
+`hardware_system` as the hardware variable. Initialization creates
+`config.json` and the local `.gerbera/` workspace. It currently also collects
+credentials for the optional harness.
+
+### 3. Generate and flash firmware
+
+```bash
+gerbera firmware flash
+```
+
+Gerbera installs the required Arduino cores and libraries, validates the
+hardware contract, generates the sketch, and uploads it. Later runs skip boards
+whose installed contract is already current. Force an upload with:
+
+```bash
+gerbera firmware flash --force
+```
+
+### 4. Start local services
+
+```bash
+gerbera up
+```
+
+Choose `local` when prompted. This starts PostgreSQL and the optional harness
+with Docker.
+
+### 5. Start the MCP hardware server
+
+```bash
+gerbera server
+```
+
+The MCP endpoint is available at `http://localhost:8001/mcp`. Compatible clients
+can discover the generated LED tool, call it, and receive the board-confirmed
+result.
+
+## Supported hardware
+
+### Boards
+
+| Board | FQBN | Runtime transports |
+| --- | --- | --- |
+| Arduino Uno | `arduino:avr:uno` | USB serial |
+| Arduino Mega | `arduino:avr:mega` | USB serial |
+| ESP32 Dev Module | `esp32:esp32:esp32` | USB serial, Bluetooth Classic SPP |
+
+### Device definitions
+
+Gerbera currently includes configuration-driven support for:
+
+- LEDs
+- HC-SR04 ultrasonic sensors
+- HW-201 and KY-033 infrared sensors
+- DC motors
+- SG90 and MG996R servos
+
+Device behavior is defined in
+[`src/gerbera_sdk/firmware/devices/configs/`](src/gerbera_sdk/firmware/devices/configs/).
+Adding a device definition supplies its pin contract, commands, state, firmware
+handlers, and validation rules.
+
+## Models
+
+Local neural-network models live in named subfolders:
 
 ```text
-<message_type>,<target>,<field>:<value>,<field>:<value>
+.gerbera/models/<model-name>/
+├── model.yaml
+└── model.onnx
 ```
 
-Examples:
+Code refers only to the subfolder name. `model.yaml` declares the model format,
+weights filename, input shape, and output contract. Gerbera validates the
+manifest and selects the matching adapter.
 
-```text
-MCP,led_8e910dfb_f928a260,state:on
-STREAM,hw201_8e910dfb_e8f75c2b,obstacle_detected:1
-```
+Supported local adapters include:
 
-The event route is the tuple:
+| Task | Formats |
+| --- | --- |
+| Object detection | YOLOv5 |
+| Object segmentation | YOLOv5 Seg, YOLOv8 Seg |
+| Depth estimation | MiDaS, Depth Anything |
 
-```text
-(event_type, microcontroller_id, event_name)
-```
+Vision-language adapters are available for OpenAI, Anthropic, and Google
+models. Camera and inference data remain on the host; they do not pass through
+the microcontroller serial protocol.
 
-`event_name` is generated as:
+## Bluetooth runtime
 
-```text
-<component_type>_<short_microcontroller_hash>_<short_connection_hash>
-```
-
-This gives firmware, event routing, reactions, and database tables the same
-stable, PostgreSQL-safe identifier.
-
-For every received `MCP` or `STREAM` line, `EventListener` decodes the message
-and sends the payload down two independent paths:
-
-```mermaid
-flowchart TD
-    Board[Microcontroller] -->|MCP or STREAM line| Listener[EventListener]
-    Listener --> Decode[SerialMessageCodec]
-    Decode --> EventBus[EventBus route]
-    Decode --> ReactionExecutor[Dedicated reaction executor]
-
-    EventBus --> Latest[Latest event value]
-    EventBus --> HardwareState[HardwareRuntime state]
-    EventBus -->|STREAM only| Buffer[Per-event buffer]
-    Buffer -->|batch of 50 or flush| Worker[EventWorker queue]
-    Worker -->|retry on failure| Database[(PostgreSQL)]
-
-    ReactionExecutor --> ReactionBus[ReactionBus]
-    ReactionBus -->|matching condition| ToolRegistry[Internal Gerbera tool registry]
-    ToolRegistry -->|state-changing action| BoardCommand[Generated tool / board command]
-```
-
-Malformed messages, unknown routes, conversion failures, and uncorrelated
-board errors are recorded and skipped without stopping later events. Transport
-failures trigger a bounded three-attempt reconnect policy. The read-only
-`get_event_listener_health` tool reports each board's status, last error, last
-successful message time, rejected-message count, and reconnect-attempt count.
-
-The serial listener does not perform database writes or reaction actions
-directly. Database work runs on `EventWorker`, and reaction evaluation runs on a
-dedicated single-worker executor. This keeps serial reads isolated from slower
-consumers.
-
-Stream buffers flush when they reach 50 records, when streaming is turned off,
-or during shutdown. Each database job owns a copy of its batch and retries up to
-the configured limit.
-
-## Reactions
-
-Reactions provide server-local automation without coupling the SDK to a
-particular harness. Any MCP client can use:
-
-- `create_reaction`
-- `list_reactions`
-- `delete_reaction`
-
-Use `list_reaction_events` to discover valid event routes. A reaction declares:
-
-- an event route and payload field
-- a typed comparison and expected value
-- an existing state-changing Gerbera tool plus its arguments
-- `once` or `continuous` execution
-- an optional cooldown
-
-When an event arrives, the reaction bus reads the selected field, evaluates the
-condition, and invokes the action through the server's internal tool registry.
-It does not make an HTTP request back to its own MCP endpoint. Read-only tools
-and reaction-management tools cannot be actions.
-
-`once` reactions are deleted before action execution, so they run at most once
-even if the action fails. `continuous` reactions remain until explicitly
-deleted, honor their cooldown, and cannot overlap themselves.
-
-Definitions persist at:
-
-```text
-.gerbera/reactions/<reaction-id>.json
-```
-
-They are validated and restored at server startup. Runtime observations such as
-latest value, trigger count, last result, and last error remain in memory.
-
-See [Reaction details](src/gerbera_sdk/events/reactions/README.md).
-
-## Cameras and Models
-
-`CameraRuntime` owns configured camera capture and the latest frames.
-`ModelRuntime` registers inference adapters and exposes tools for single
-inference, continuous inference, and reading model output. Continuous model
-workers read the latest frame, run the configured strategy, and update the
-in-memory environment state returned by `get_current_environment_state`.
-
-Camera and model data does not pass through the microcontroller serial protocol.
-It stays on the host and is exposed through the same MCP server as hardware
-tools.
-
-## Optional Harness
-
-The harness is an MCP client and agent orchestration layer. It owns sessions,
-planning, execution, review, memory, LLM adapters, local tools, and sandbox
-access. It discovers the Gerbera server's MCP tools and calls them like any
-other client.
-
-```text
-user request
-  -> harness API
-  -> agent runtime
-  -> planning / execution / review
-  -> MCP client
-  -> standalone Gerbera MCP server
-  -> hardware, models, movement, or reaction tools
-```
-
-Hardware event ingestion and reaction execution stay inside the SDK. The
-harness is not required to run the hardware server or its reactions.
-
-## ESP32 Bluetooth Classic
-
-The original ESP32 Dev Module can use Bluetooth Classic SPP as its runtime
-transport while keeping USB as the firmware upload connection. Configure the
-machine-specific endpoints in `config.json`:
+The ESP32 Dev Module can use Bluetooth Classic SPP for runtime commands while
+USB remains the firmware upload connection.
 
 ```json
 {
@@ -323,86 +274,59 @@ machine-specific endpoints in `config.json`:
 }
 ```
 
-The hardware declaration retains the stable device ID and upload port:
+Flash firmware over USB once, pair the ESP32 with the host, and then start the
+server using the paired serial endpoint. Bluetooth support does not provide OTA
+firmware updates.
 
-```python
-microcontroller = Microcontroller(
-    name="robot-controller",
-    port="/dev/cu.usbserial-0001",
-    upload_port="/dev/cu.usbserial-0001",
-    device_id="esp32-1",
-    fqbn="esp32:esp32:esp32",
-    watchdog=RuntimeWatchdogConfig(
-        heartbeat_interval_ms=500,
-        heartbeat_timeout_ms=2500,
-    ),
-)
-```
+## CLI
 
-Flash once over USB, pair the ESP32 with the host, and run the server against
-the paired serial endpoint. USB serial and Bluetooth SPP use the same Gerbera
-wire protocol and runtime interfaces. Bluetooth does not provide OTA firmware
-updates; firmware changes still require the upload connection.
-
-## Project Layout
-
-```text
-src/gerbera_cli/                 CLI initialization, provisioning, flashing, and startup
-src/gerbera_sdk/                 Standalone hardware SDK and MCP server
-src/gerbera_sdk/firmware/        Board/device definitions and firmware generation
-src/gerbera_sdk/models/hardware/ Hardware declarations and contract validation
-src/gerbera_sdk/models/runtime/  Board, server, state, model, camera, and movement runtimes
-src/gerbera_sdk/events/          Event routing, buffering, persistence, and reactions
-src/gerbera_sdk/inference/       Inference models and runtime strategies
-src/gerbera_harness/             Optional agent orchestration client
-tests/                           Unit and integration tests
-config.json                      Machine-local device and entry-point configuration
-.gerbera/                        Generated firmware, model artifacts, reactions, and secrets
-```
-
-## Runtime Ownership
-
-| Component | Owns |
+| Command | Purpose |
 | --- | --- |
-| `GerberaRuntime` | Dependency construction and top-level setup/run entry points |
-| `HardwareContractCompiler` | Validation and immutable runtime plan creation |
-| `FirmwareGenerator` / `Flash` | Sketch generation, compilation, upload, and installed digest |
-| `BoardRuntime` | Transports, startup verification, sessions, heartbeats, and reconnection |
-| `ServerRuntime` | MCP event and tool registration plus command dispatch |
-| `EventListener` | Per-board serial reads and event dispatch |
-| `EventBus` / `Buffer` | Latest event values and stream batching |
-| `EventWorker` | Asynchronous database writes and retry |
-| `HardwareRuntime` | Current connection-state snapshot |
-| `ReactionBus` | Persisted event conditions and local tool actions |
-| `CameraRuntime` / `ModelRuntime` | Host camera frames and inference state |
-| `MovementRuntime` | Movement registration, state, and kinematics |
-| `gerbera_harness` | Optional agent reasoning and MCP client orchestration |
+| `gerbera init` | Create the project configuration and `.gerbera/` workspace |
+| `gerbera firmware flash` | Validate, generate, and upload changed firmware |
+| `gerbera firmware flash --force` | Upload firmware regardless of its installed digest |
+| `gerbera up` | Start local PostgreSQL and the optional harness |
+| `gerbera server` | Start the standalone MCP hardware server |
 
-## Main CLI Lifecycle
+Use `gerbera --help` or `gerbera <command> --help` for the installed command
+reference. Cloud deployment and `gerbera down` are not implemented yet.
 
-```text
-gerbera init
-  Create config.json and the .gerbera workspace.
-
-gerbera firmware flash
-  Validate, generate, compile, and upload changed firmware.
-
-gerbera firmware flash --force
-  Upload firmware even when the installed digest is current.
-
-gerbera server
-  Start the standalone Gerbera MCP hardware server.
-
-gerbera up
-  Provision local supporting services and start the optional harness.
-```
-
-## Detailed Documentation
+## Documentation
 
 - [SDK overview](src/gerbera_sdk/README.md)
-- [Hardware model](src/gerbera_sdk/models/hardware/README.md)
-- [Runtime model](src/gerbera_sdk/models/runtime/README.md)
+- [Hardware declarations and validation](src/gerbera_sdk/models/hardware/README.md)
+- [Runtime architecture](src/gerbera_sdk/models/runtime/README.md)
 - [Firmware generation](src/gerbera_sdk/firmware/README.md)
-- [Events](src/gerbera_sdk/events/README.md)
+- [Events and persistence](src/gerbera_sdk/events/README.md)
 - [Reactions](src/gerbera_sdk/events/reactions/README.md)
-- [Harness](src/gerbera_harness/README.md)
+- [Optional agent harness](src/gerbera_harness/README.md)
+- [Test organization](tests/README.md)
+
+## Development
+
+Install the development dependencies and run the complete test suite:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest
+```
+
+The same test command runs in GitHub Actions on every push and pull request.
+
+## Contributing
+
+Issues and pull requests are welcome while the public contribution guide is
+being prepared. Before submitting a change:
+
+1. Keep SDK hardware behavior independent from the optional harness.
+2. Add or update tests for behavior that changes.
+3. Run `python -m pytest` locally.
+4. Explain user-visible contract or firmware changes in the pull request.
+
+Use [GitHub Issues](https://github.com/BaronLiu1993/gerbera/issues) for bug
+reports and feature proposals.
+
+## License
+
+Gerbera does not currently declare an open-source license. Until a license is
+added, standard copyright restrictions apply.
