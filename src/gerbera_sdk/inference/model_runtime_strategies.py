@@ -1,11 +1,23 @@
 from typing import ClassVar
 
 from gerbera_sdk.inference.frame import Frame
+from gerbera_sdk.inference.models.neural_network.object_depth.object_depth_model_inference import (
+    ObjectDepthModelInference,
+)
+from gerbera_sdk.inference.models.neural_network.object_depth.object_depth_schema import (
+    ObjectDepthStateModel,
+)
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
     ObjectDetectionModelInference,
 )
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
     PerceptionStateModel,
+)
+from gerbera_sdk.inference.models.neural_network.object_segmentation.object_segmentation_model_inference import (
+    ObjectSegmentationModelInference,
+)
+from gerbera_sdk.inference.models.neural_network.object_segmentation.object_segmentation_schema import (
+    ObjectSegmentationStateModel,
 )
 from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
     VisionLanguageModelInference,
@@ -46,6 +58,76 @@ class ObjectDetectionRuntimeStrategy:
     @staticmethod
     def default_stream_prompt(
         inference: ObjectDetectionModelInference,
+    ) -> None:
+        return None
+
+
+class ObjectDepthRuntimeStrategy:
+    output_types: ClassVar[dict[str, type]] = {
+        "object_depth": ObjectDepthStateModel,
+    }
+    stream_output_name = "object_depth"
+
+    @staticmethod
+    def perform(
+        inference: ObjectDepthModelInference,
+        frame: Frame,
+    ) -> ObjectDepthStateModel:
+        return inference.predict(frame)
+
+    @staticmethod
+    def resolve_stream_prompt(
+        inference: ObjectDepthModelInference,
+        prompt: str | None,
+    ) -> None:
+        return None
+
+    def predict_stream(
+        self,
+        inference: ObjectDepthModelInference,
+        frame: Frame,
+        prompt: str | None,
+    ) -> ObjectDepthStateModel:
+        return self.perform(inference, frame)
+
+    @staticmethod
+    def default_stream_prompt(
+        inference: ObjectDepthModelInference,
+    ) -> None:
+        return None
+
+
+class ObjectSegmentationRuntimeStrategy:
+    output_types: ClassVar[dict[str, type]] = {
+        "object_segmentation": ObjectSegmentationStateModel,
+    }
+    stream_output_name = "object_segmentation"
+
+    @staticmethod
+    def perform(
+        inference: ObjectSegmentationModelInference,
+        frame: Frame,
+    ) -> ObjectSegmentationStateModel:
+        return inference.predict(frame)
+
+    @staticmethod
+    def resolve_stream_prompt(
+        inference: ObjectSegmentationModelInference,
+        prompt: str | None,
+    ) -> None:
+        return None
+
+    def predict_stream(
+        self,
+        inference: ObjectSegmentationModelInference,
+        frame: Frame,
+        prompt: str | None,
+    ) -> ObjectSegmentationStateModel:
+        return self.perform(inference, frame)
+
+    @staticmethod
+    def default_stream_prompt(
+        inference: ObjectSegmentationModelInference,
     ) -> None:
         return None
 
@@ -117,10 +199,15 @@ class VisionLanguageRuntimeStrategy:
 
 
 ModelRuntimeStrategy = (
-    ObjectDetectionRuntimeStrategy | VisionLanguageRuntimeStrategy
+    ObjectDepthRuntimeStrategy
+    | ObjectDetectionRuntimeStrategy
+    | ObjectSegmentationRuntimeStrategy
+    | VisionLanguageRuntimeStrategy
 )
 
 MODEL_RUNTIME_STRATEGIES: dict[type, ModelRuntimeStrategy] = {
+    ObjectDepthModelInference: ObjectDepthRuntimeStrategy(),
     ObjectDetectionModelInference: ObjectDetectionRuntimeStrategy(),
+    ObjectSegmentationModelInference: ObjectSegmentationRuntimeStrategy(),
     VisionLanguageModelInference: VisionLanguageRuntimeStrategy(),
 }

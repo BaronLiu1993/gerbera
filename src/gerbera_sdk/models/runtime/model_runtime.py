@@ -9,18 +9,25 @@ from typing_extensions import TypeAlias
 
 from gerbera_sdk.inference import (
     Inference,
+    ObjectDepthStateModel,
+    ObjectSegmentationStateModel,
     PerceptionStateModel,
     VisionLanguageModelFrameEnvironment,
 )
 from gerbera_sdk.inference.model_runtime_strategies import (
     MODEL_RUNTIME_STRATEGIES,
     ModelRuntimeStrategy,
+    VisionLanguageRuntimeStrategy,
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 
 ModelOutput: TypeAlias = (
-    PerceptionStateModel | VisionLanguageModelFrameEnvironment | str
+    ObjectDepthStateModel
+    | ObjectSegmentationStateModel
+    | PerceptionStateModel
+    | VisionLanguageModelFrameEnvironment
+    | str
 )
 
 
@@ -128,12 +135,51 @@ class ModelRuntime:
         self,
         model_id: str,
     ) -> PerceptionStateModel:
+        result = self.perform_frame_inference(model_id)
+        if not isinstance(result, PerceptionStateModel):
+            raise TypeError(f"Model is not an object detector: {model_id}")
+        return result
+
+    def perform_object_depth(
+        self,
+        model_id: str,
+    ) -> ObjectDepthStateModel:
+        result = self.perform_frame_inference(model_id)
+        if not isinstance(result, ObjectDepthStateModel):
+            raise TypeError(f"Model is not an object depth model: {model_id}")
+        return result
+
+    def perform_object_segmentation(
+        self,
+        model_id: str,
+    ) -> ObjectSegmentationStateModel:
+        result = self.perform_frame_inference(model_id)
+        if not isinstance(result, ObjectSegmentationStateModel):
+            raise TypeError(
+                f"Model is not an object segmentation model: {model_id}"
+            )
+        return result
+
+    def perform_frame_inference(self, model_id: str) -> ModelOutput:
         with self.lock:
             registered_model = self.registered_models[model_id]
+        if isinstance(
+            registered_model.strategy,
+            VisionLanguageRuntimeStrategy,
+        ):
+            raise TypeError(
+                f"Model does not support frame inference: {model_id}"
+            )
         inference = registered_model.inference
         camera_id = inference.subscribed_camera.camera_id
         frame = self.camera_runtime.get_latest_frame(camera_id)
-        return registered_model.strategy.perform(inference, frame)
+        result = registered_model.strategy.perform(inference, frame)
+        output_name = registered_model.strategy.stream_output_name
+        self.write_model_output(
+            key=inference.model_output_keys[output_name],
+            model_output=result,
+        )
+        return result
 
     def locate_objects(
         self,

@@ -51,12 +51,26 @@ from gerbera_sdk.events.reactions.reaction_schema import (
 )
 from gerbera_sdk.inference import (
     Inference,
+    ObjectDepthModelInference,
     ObjectDetectionModelInference,
+    ObjectSegmentationModelInference,
     VisionLanguageModelInference,
     VisionLanguageModelFrameEnvironment,
 )
 
 LOGGER = logging.getLogger(__name__)
+
+MODEL_CATALOG_TYPES: dict[type, ModelCatalogType] = {
+    ObjectDepthModelInference: "object_depth",
+    ObjectDetectionModelInference: "object_detection",
+    ObjectSegmentationModelInference: "object_segmentation",
+    VisionLanguageModelInference: "vision_language_model",
+}
+
+FRAME_MODEL_OUTPUT_NAMES: dict[type, str] = {
+    ObjectDepthModelInference: "object_depth",
+    ObjectSegmentationModelInference: "object_segmentation",
+}
 
 
 @dataclass
@@ -90,11 +104,12 @@ class ServerRuntime:
 
     @staticmethod
     def model_catalog_type(model: Inference) -> ModelCatalogType:
-        if isinstance(model, ObjectDetectionModelInference):
-            return "object_detection"
-        if isinstance(model, VisionLanguageModelInference):
-            return "vision_language_model"
-        raise ValueError(f"Unsupported inference model type: {type(model).__name__}")
+        try:
+            return MODEL_CATALOG_TYPES[type(model)]
+        except KeyError as error:
+            raise ValueError(
+                f"Unsupported inference model type: {type(model).__name__}"
+            ) from error
 
     def register_connection_event(
         self,
@@ -748,10 +763,7 @@ class ServerRuntime:
             annotations=ToolAnnotations(
                 title=f"Start continuous inference for {model.name}",
                 readOnlyHint=False,
-                openWorldHint=not isinstance(
-                    model,
-                    ObjectDetectionModelInference,
-                ),
+                openWorldHint=isinstance(model, VisionLanguageModelInference),
             ),
         )
         self.register_tool(
@@ -765,10 +777,19 @@ class ServerRuntime:
             ),
         )
 
-        if isinstance(model, ObjectDetectionModelInference):
-            self.register_object_detection_tools(model_id, model)
-        else:
-            self.register_vision_language_model_tools(model_id, model)
+        tool_registrars: dict[type, Callable[[str, Any], None]] = {
+            ObjectDepthModelInference: self.register_frame_model_tools,
+            ObjectDetectionModelInference: self.register_object_detection_tools,
+            ObjectSegmentationModelInference: self.register_frame_model_tools,
+            VisionLanguageModelInference: self.register_vision_language_model_tools,
+        }
+        try:
+            registrar = tool_registrars[type(model)]
+        except KeyError as error:
+            raise ValueError(
+                f"Unsupported inference model type: {type(model).__name__}"
+            ) from error
+        registrar(model_id, model)
 
     def register_movement_tools(self) -> None:
         if self.movement_runtime is None:
@@ -880,6 +901,51 @@ class ServerRuntime:
 
         def predict_with_model() -> dict[str, object]:
             result = self.model_runtime.perform_object_detection(model_id)
+            return result.model_dump(mode="json", exclude={"frame"})
+
+        self.register_tool(
+            name=f"read_{model.name}",
+            description=(
+                f"Read the latest continuous inference output from "
+                f"{model.name} for its subscribed camera."
+            ),
+            tool_function=read_model_output,
+            annotations=ToolAnnotations(
+                title=f"Read latest inference from {model.name}",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
+        self.register_tool(
+            name=f"perform_single_{model.name}",
+            description=(
+                f"{model.description} Uses the current frame from the model's "
+                "subscribed camera."
+            ),
+            tool_function=predict_with_model,
+            annotations=ToolAnnotations(
+                title=f"Perform one-shot inference with {model.name}",
+                readOnlyHint=True,
+                openWorldHint=False,
+            ),
+        )
+
+    def register_frame_model_tools(
+        self,
+        model_id: str,
+        model: ObjectDepthModelInference | ObjectSegmentationModelInference,
+    ) -> None:
+        output_name = FRAME_MODEL_OUTPUT_NAMES[type(model)]
+
+        def read_model_output() -> dict[str, object]:
+            result = self.model_runtime.read_model_output(
+                model_id,
+                output_name,
+            )
+            return result.model_dump(mode="json", exclude={"frame"})
+
+        def predict_with_model() -> dict[str, object]:
+            result = self.model_runtime.perform_frame_inference(model_id)
             return result.model_dump(mode="json", exclude={"frame"})
 
         self.register_tool(

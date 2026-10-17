@@ -14,7 +14,22 @@ class ObjectDetectionModelProviderEnum(Enum):
     YOLOV5 = "yolov5"
 
 
-ModelCatalogType = Literal["object_detection", "vision_language_model"]
+class ObjectDepthModelProviderEnum(Enum):
+    MIDAS = "midas"
+    DEPTH_ANYTHING = "depth_anything"
+
+
+class ObjectSegmentationModelProviderEnum(Enum):
+    YOLOV5_SEG = "yolov5_seg"
+    YOLOV8_SEG = "yolov8_seg"
+
+
+ModelCatalogType = Literal[
+    "object_depth",
+    "object_detection",
+    "object_segmentation",
+    "vision_language_model",
+]
 
 
 def build_model_output_keys(
