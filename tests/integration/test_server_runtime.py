@@ -19,8 +19,13 @@ from gerbera_sdk.events.reactions.reaction_schema import (
 )
 from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 from gerbera_sdk.inference import (
+    DepthMapModel,
     Frame,
+    ObjectDepthModelInference,
+    ObjectDepthStateModel,
     ObjectDetectionModelInference,
+    ObjectSegmentationModelInference,
+    ObjectSegmentationStateModel,
     PerceptionStateModel,
     VisionLanguageModelFrameEnvironment,
     VisionLanguageModelInference,
@@ -391,6 +396,79 @@ def test_object_detection_tools_bridge_server_and_model_runtime() -> None:
         "model_name": inference.name,
         "perception_objects": [],
     }
+
+
+@pytest.mark.parametrize(
+    ("inference_class", "model_name", "output_name", "output"),
+    [
+        (
+            ObjectDepthModelInference,
+            "depth",
+            "object_depth",
+            ObjectDepthStateModel(
+                camera_id="camera-1",
+                frame=make_frame(),
+                model_name="depth",
+                depth_map=DepthMapModel(
+                    width=1,
+                    height=1,
+                    values=[[1.0]],
+                    minimum_value=1.0,
+                    maximum_value=1.0,
+                    value_type="relative_depth",
+                    unit="relative",
+                ),
+            ),
+        ),
+        (
+            ObjectSegmentationModelInference,
+            "segmenter",
+            "object_segmentation",
+            ObjectSegmentationStateModel(
+                camera_id="camera-1",
+                frame=make_frame(),
+                model_name="segmenter",
+                segmented_objects=[],
+            ),
+        ),
+    ],
+)
+def test_frame_model_tools_bridge_server_and_model_runtime(
+    inference_class,
+    model_name: str,
+    output_name: str,
+    output,
+) -> None:
+    camera = make_camera()
+    inference = inference_class(
+        model=object(),
+        name=model_name,
+        description=f"Run {model_name}",
+        subscribed_camera=camera,
+        model_id=f"{model_name}-id",
+    )
+    calls: list[tuple[str, str]] = []
+    model_runtime = SimpleNamespace(
+        read_model_output=lambda model_id, requested_output: (
+            calls.append((model_id, requested_output)) or output
+        ),
+        perform_frame_inference=lambda model_id: (
+            calls.append((model_id, "perform")) or output
+        ),
+    )
+    runtime, app = make_server(model_runtime=model_runtime)
+
+    runtime.register_frame_model_tools(inference.model_id, inference)
+    read_result = app.tools[f"read_{model_name}"]()
+    perform_result = app.tools[f"perform_single_{model_name}"]()
+
+    assert calls == [
+        (inference.model_id, output_name),
+        (inference.model_id, "perform"),
+    ]
+    serialized_output = output.model_dump(mode="json", exclude={"frame"})
+    assert read_result == serialized_output
+    assert perform_result == serialized_output
 
 
 def test_vision_language_tools_route_each_operation() -> None:

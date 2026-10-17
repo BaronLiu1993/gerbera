@@ -5,7 +5,12 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from gerbera_sdk.inference import Frame
+from gerbera_sdk.inference import (
+    DepthMapModel,
+    Frame,
+    ObjectDepthModelInference,
+    ObjectSegmentationModelInference,
+)
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
     ObjectDetectionModelInference,
 )
@@ -20,6 +25,24 @@ from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 
 class ObjectDetectionAdapter:
     def detect(self, frame: Frame) -> list:
+        return []
+
+
+class ObjectDepthAdapter:
+    def estimate(self, frame: Frame) -> DepthMapModel:
+        return DepthMapModel(
+            width=1,
+            height=1,
+            values=[[1.0]],
+            minimum_value=1.0,
+            maximum_value=1.0,
+            value_type="relative_depth",
+            unit="relative",
+        )
+
+
+class ObjectSegmentationAdapter:
+    def segment(self, frame: Frame) -> list:
         return []
 
 
@@ -78,6 +101,32 @@ def make_object_detection(camera: Camera) -> ObjectDetectionModelInference:
         subscribed_camera=camera,
         model_id="detector-id",
         model_output_keys={"object_detection": "detection-key"},
+        interval_seconds=0.01,
+    )
+
+
+def make_object_depth(camera: Camera) -> ObjectDepthModelInference:
+    return ObjectDepthModelInference(
+        model=ObjectDepthAdapter(),
+        name="depth",
+        description="Estimate depth",
+        subscribed_camera=camera,
+        model_id="depth-id",
+        model_output_keys={"object_depth": "depth-key"},
+        interval_seconds=0.01,
+    )
+
+
+def make_object_segmentation(
+    camera: Camera,
+) -> ObjectSegmentationModelInference:
+    return ObjectSegmentationModelInference(
+        model=ObjectSegmentationAdapter(),
+        name="segmenter",
+        description="Segment objects",
+        subscribed_camera=camera,
+        model_id="segmenter-id",
+        model_output_keys={"object_segmentation": "segmentation-key"},
         interval_seconds=0.01,
     )
 
@@ -173,6 +222,41 @@ def test_object_detection_uses_its_subscribed_camera() -> None:
     result = runtime.perform_object_detection(inference.model_id)
 
     assert result.camera_id == camera.camera_id
+
+
+def test_depth_inference_persists_typed_output() -> None:
+    camera = make_camera()
+    inference = make_object_depth(camera)
+    runtime = make_runtime(inference)
+
+    result = runtime.perform_object_depth(inference.model_id)
+
+    assert runtime.read_model_output(
+        inference.model_id,
+        "object_depth",
+    ) is result
+
+
+def test_segmentation_inference_persists_typed_output() -> None:
+    camera = make_camera()
+    inference = make_object_segmentation(camera)
+    runtime = make_runtime(inference)
+
+    result = runtime.perform_object_segmentation(inference.model_id)
+
+    assert runtime.read_model_output(
+        inference.model_id,
+        "object_segmentation",
+    ) is result
+
+
+def test_frame_inference_rejects_vision_language_models() -> None:
+    camera = make_camera()
+    inference = make_vision(camera)
+    runtime = make_runtime(inference)
+
+    with pytest.raises(TypeError, match="does not support frame inference"):
+        runtime.perform_frame_inference(inference.model_id)
 
 
 def test_vlm_operations_persist_their_outputs() -> None:
