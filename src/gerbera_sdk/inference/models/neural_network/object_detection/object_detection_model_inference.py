@@ -6,30 +6,30 @@ import uuid
 from pydantic import Field
 
 from gerbera_sdk.inference.frame import Frame
+from gerbera_sdk.inference.models.neural_network.local_model_files import (
+    LocalModelFiles,
+)
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_adapter import (
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionAdapter,
 )
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
+    ObjectDetectionModelManifestSchema,
     PerceptionStateModel,
 )
-from gerbera_sdk.inference.model_types import (
-    ObjectDetectionModelProviderEnum,
-    build_model_output_keys,
-)
+from gerbera_sdk.inference.model_types import build_model_output_keys
 from gerbera_sdk.models.hardware.camera import Camera
 from gerbera_sdk.utils import StrictSchema
 
 
 class ObjectDetectionModel(StrictSchema):
-    model_name: ObjectDetectionModelProviderEnum
     model_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = Field(min_length=1)
-    model_source: str = Field(min_length=1)
+    model_directory: str = Field(min_length=1)
     subscribed_camera: Camera
-    confidence_threshold: float = 0.25
-    iou_threshold: float = 0.45
-    max_detections: int = 300
+    confidence_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
+    iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    max_detections: int = Field(default=300, gt=0)
     description: str = ""
     model_type: Literal["object_detection"] = "object_detection"
     model_operations: ClassVar[tuple[Literal["object_detection"], ...]] = (
@@ -45,13 +45,18 @@ class ObjectDetectionModel(StrictSchema):
         )
 
     def create_inference(self) -> "ObjectDetectionModelInference":
-        adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[self.model_name]
+        manifest = ObjectDetectionModelManifestSchema.model_validate(
+            LocalModelFiles(self.model_directory).read_manifest()
+        )
+        adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[manifest.model_format]
         adapter = adapter_class(
-            model_source=self.model_source,
+            model_directory=self.model_directory,
+            manifest=manifest,
             confidence_threshold=self.confidence_threshold,
             iou_threshold=self.iou_threshold,
             max_detections=self.max_detections,
         )
+        adapter.validate_configuration()
         return ObjectDetectionModelInference(
             model=adapter,
             name=self.name,

@@ -5,6 +5,13 @@ import pytest
 import yaml
 
 from gerbera_sdk.inference import Frame, Yolov5ModelAdapter
+from gerbera_sdk.inference.models.neural_network import local_model_files
+from gerbera_sdk.inference.models.neural_network.local_model_files import (
+    LocalModelFiles,
+)
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
+    ObjectDetectionModelManifestSchema,
+)
 
 
 def make_predictions() -> np.ndarray:
@@ -20,29 +27,33 @@ def adapter(tmp_path, monkeypatch) -> Yolov5ModelAdapter:
     manifest = {
         "schema_version": 1,
         "model_format": "yolov5",
+        "weights": "model.onnx",
         "input": {"width": 640, "height": 640},
         "output": {
             "prediction_count": 25200,
             "class_names": class_names,
         },
     }
-    manifest_path = tmp_path / "yolov5n.onnx.yaml"
+    model_directory = tmp_path / "yolov5n"
+    model_directory.mkdir()
+    manifest_path = model_directory / "model.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest))
-    monkeypatch.setattr(
-        "gerbera_sdk.inference.models.neural_network.object_detection."
-        "object_detection_model_adapter.MODELS_PATH",
-        tmp_path,
+    (model_directory / "model.onnx").touch()
+    monkeypatch.setattr(local_model_files, "MODELS_PATH", tmp_path)
+    validated_manifest = ObjectDetectionModelManifestSchema.model_validate(
+        LocalModelFiles("yolov5n").read_manifest()
     )
 
     return Yolov5ModelAdapter(
-        model_source="yolov5n.onnx",
+        model_directory="yolov5n",
+        manifest=validated_manifest,
         confidence_threshold=0.25,
         iou_threshold=0.45,
         max_detections=300,
     )
 
 
-def test_manifest_is_loaded_from_model_source_yaml(
+def test_manifest_is_loaded_from_model_directory(
     adapter: Yolov5ModelAdapter,
 ) -> None:
     assert adapter.manifest.input.width == 640

@@ -20,6 +20,7 @@ class ObjectDetectionModelOutputSchema(StrictSchema):
 class ObjectDetectionModelManifestSchema(StrictSchema):
     schema_version: Literal[1]
     model_format: ObjectDetectionModelProviderEnum
+    weights: str = Field(min_length=1)
     input: ObjectDetectionModelInputSchema
     output: ObjectDetectionModelOutputSchema
 

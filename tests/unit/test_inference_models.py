@@ -25,6 +25,10 @@ from gerbera_sdk.inference import (
     VisionLanguageModelProviderEnum,
     Yolov5ModelAdapter,
 )
+from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
+    ObjectDetectionModelManifestSchema,
+)
+from gerbera_sdk.inference.models.neural_network import local_model_files
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 
 
@@ -86,8 +90,14 @@ class RecordingObjectDetectionAdapter:
 
 
 def test_yolov5_adapter_loads_weights_from_project_models(
+    tmp_path,
     monkeypatch,
 ) -> None:
+    model_directory = tmp_path / "yolov5s"
+    model_directory.mkdir()
+    weights_path = model_directory / "model.onnx"
+    weights_path.touch()
+    monkeypatch.setattr(local_model_files, "MODELS_PATH", tmp_path)
     loaded_paths = []
     model = object()
     monkeypatch.setattr(
@@ -96,11 +106,25 @@ def test_yolov5_adapter_loads_weights_from_project_models(
         lambda path: loaded_paths.append(path) or model,
     )
 
-    adapter = Yolov5ModelAdapter(model_source="yolov5s.onnx")
+    manifest = ObjectDetectionModelManifestSchema.model_validate(
+        {
+            "schema_version": 1,
+            "model_format": "yolov5",
+            "weights": "model.onnx",
+            "input": {"width": 640, "height": 640},
+            "output": {
+                "prediction_count": 25200,
+                "class_names": ["object"],
+            },
+        }
+    )
+    adapter = Yolov5ModelAdapter(
+        model_directory="yolov5s",
+        manifest=manifest,
+    )
 
     assert adapter.model is model
-    assert adapter.model is model
-    assert loaded_paths == [".gerbera/models/yolov5s.onnx"]
+    assert loaded_paths == [str(weights_path)]
 
 
 def test_object_detection_registry_contains_yolov5_adapter() -> None:
@@ -116,6 +140,31 @@ def test_object_detection_providers_match_registered_adapters() -> None:
     assert set(ObjectDetectionModelProviderEnum) == set(
         OBJECT_DETECTION_MODEL_REGISTRY
     )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("confidence_threshold", -0.01),
+        ("confidence_threshold", 1.01),
+        ("iou_threshold", -0.01),
+        ("iou_threshold", 1.01),
+        ("max_detections", 0),
+    ],
+)
+def test_object_detection_rejects_invalid_thresholds(
+    field_name: str,
+    invalid_value: float,
+) -> None:
+    definition = {
+        "name": "detector",
+        "model_directory": "detector",
+        "subscribed_camera": TEST_CAMERA,
+        field_name: invalid_value,
+    }
+
+    with pytest.raises(ValidationError):
+        ObjectDetectionModel.model_validate(definition)
 
 
 def test_object_detection_inference_predicts_the_supplied_frame() -> None:
@@ -146,8 +195,7 @@ def test_object_detection_inference_predicts_the_supplied_frame() -> None:
             {
                 "name": "detector",
                 "model_type": "object_detection",
-                "model_name": "yolov5",
-                "model_source": "detector.onnx",
+                "model_directory": "detector",
                 "subscribed_camera": TEST_CAMERA,
                 "description": "Detect parts",
             },

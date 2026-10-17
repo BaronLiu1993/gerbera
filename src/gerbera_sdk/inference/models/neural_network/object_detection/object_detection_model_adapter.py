@@ -3,56 +3,69 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
+from typing import ClassVar
 
 import cv2
 import numpy as np
-import yaml
 from numpy.typing import NDArray
 
 from gerbera_sdk.inference.frame import BoundingBox, Frame
 from gerbera_sdk.inference.model_types import ObjectDetectionModelProviderEnum
+from gerbera_sdk.inference.models.neural_network.local_model_files import (
+    LocalModelFiles,
+)
 from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_schema import (
     ObjectDetectionModelManifestSchema,
     PerceptionObjectModel,
 )
-from gerbera_sdk.paths import MODELS_PATH
 
 
 @dataclass
 class ObjectDetectionAdapter(ABC):
-    model_source: str
+    model_directory: str
+    manifest: ObjectDetectionModelManifestSchema
+
+    provider: ClassVar[ObjectDetectionModelProviderEnum]
+
+    @cached_property
+    def files(self) -> LocalModelFiles:
+        return LocalModelFiles(self.model_directory)
 
     @cached_property
     def model(self) -> cv2.dnn.Net:
-        return cv2.dnn.readNetFromONNX(str(MODELS_PATH / self.model_source))
-
-    @cached_property
-    def manifest(self) -> ObjectDetectionModelManifestSchema:
-        manifest_path = MODELS_PATH / f"{self.model_source}.yaml"
-        manifest_data = yaml.safe_load(manifest_path.read_text())
-        manifest = ObjectDetectionModelManifestSchema.model_validate(
-            manifest_data
+        return cv2.dnn.readNetFromONNX(
+            str(self.files.weights_path(self.manifest.weights))
         )
-        return manifest
+
+    def validate_configuration(self) -> None:
+        if self.manifest.model_format is not self.provider:
+            raise ValueError(
+                f"Detection manifest format {self.manifest.model_format.value} "
+                f"does not match adapter {self.provider.value}"
+            )
+        self.files.weights_path(self.manifest.weights)
 
     @abstractmethod
     def validate_output(self, predictions: NDArray[np.floating]) -> None:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def detect(self, frame: Frame) -> list[PerceptionObjectModel]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def decode(
         self,
         predictions: NDArray[np.floating],
     ) -> list[PerceptionObjectModel]:
-        pass
+        raise NotImplementedError
 
 
 @dataclass
 class Yolov5ModelAdapter(ObjectDetectionAdapter):
+    provider: ClassVar[ObjectDetectionModelProviderEnum] = (
+        ObjectDetectionModelProviderEnum.YOLOV5
+    )
     confidence_threshold: float = 0.25
     iou_threshold: float = 0.45
     max_detections: int = 300

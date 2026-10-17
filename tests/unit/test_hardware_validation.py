@@ -2,7 +2,6 @@ import pytest
 
 from gerbera_sdk.inference import (
     ObjectDetectionModel,
-    ObjectDetectionModelProviderEnum,
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
@@ -86,9 +85,8 @@ def test_facade_accepts_a_valid_complete_hardware_graph(
     )
     camera = make_camera()
     model = ObjectDetectionModel(
-        model_name=ObjectDetectionModelProviderEnum.YOLOV5,
         name="detector",
-        model_source="detector.onnx",
+        model_directory="detector",
         subscribed_camera=camera,
     )
     system = HardwareSystem(
@@ -125,9 +123,8 @@ def test_facade_returns_first_error_and_hard_fails() -> None:
 
 def test_model_must_reference_a_registered_camera() -> None:
     model = ObjectDetectionModel(
-        model_name=ObjectDetectionModelProviderEnum.YOLOV5,
         name="detector",
-        model_source="detector.onnx",
+        model_directory="detector",
         subscribed_camera=make_camera("missing"),
     )
 
