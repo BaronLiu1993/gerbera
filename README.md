@@ -117,18 +117,24 @@ On Windows, activate the environment with:
 
 ## Quick start
 
-### 1. Declare the hardware
+### 1. Initialize the project
 
-Create `index.py`. Replace the serial port with the upload port reported by
-`arduino-cli board list`.
+Connect a supported board over USB and run:
+
+```bash
+gerbera init
+```
+
+Gerbera detects the board, writes a validated `gerbera.yaml`, creates the local
+`.gerbera/` workspace, generates secrets, and scaffolds `index.py`. If more than
+one board is connected, it asks which boards to include.
+
+### 2. Declare the hardware
+
+Open the generated `index.py` and add components to the scaffolded controller:
 
 ```python
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import (
-    Microcontroller,
-    RuntimeWatchdogConfig,
-)
 
 
 status_led = Connection(
@@ -138,69 +144,47 @@ status_led = Connection(
     description="Built-in status LED",
 )
 
-controller = Microcontroller(
-    name="controller",
-    port="/dev/cu.usbmodem101",
-    fqbn="arduino:avr:uno",
-    watchdog=RuntimeWatchdogConfig(
-        heartbeat_interval_ms=500,
-        heartbeat_timeout_ms=2500,
-    ),
-    connections=[status_led],
-)
-
-hardware_system = HardwareSystem(
-    name="hello-gerbera",
-    description="A Gerbera-controlled status LED",
-    microcontrollers=[controller],
-)
+controller_1.connections.append(status_led)
 ```
 
-### 2. Initialize the project
-
-Connect the board over USB and run:
+To include the optional agent harness during initialization, run:
 
 ```bash
-gerbera init
+gerbera init --with-harness
 ```
 
-Select the connected board, keep `index.py` as the entry point, and use
-`hardware_system` as the hardware variable. Initialization creates
-`config.json` and the local `.gerbera/` workspace. It currently also collects
-credentials for the optional harness.
-
-### 3. Generate and flash firmware
-
-```bash
-gerbera firmware flash
-```
-
-Gerbera installs the required Arduino cores and libraries, validates the
-hardware contract, generates the sketch, and uploads it. Later runs skip boards
-whose installed contract is already current. Force an upload with:
-
-```bash
-gerbera firmware flash --force
-```
-
-### 4. Start local services
+### 3. Start Gerbera
 
 ```bash
 gerbera up
 ```
 
-Choose `local` when prompted. This starts PostgreSQL and the optional harness
-with Docker.
+One command runs preflight checks, validates the hardware, starts PostgreSQL,
+creates stream tables, flashes changed firmware, starts the MCP server, checks
+its health, and starts the harness when configured. Startup is idempotent and
+rolls back services created by a failed run.
 
-### 5. Start the MCP hardware server
+Use the lifecycle commands to inspect and stop the stack:
 
 ```bash
+gerbera status
+gerbera logs --follow
+gerbera doctor
+gerbera down
+```
+
+Advanced commands remain available when only one layer is needed:
+
+```bash
+gerbera up --skip-flash
+gerbera up --no-harness
+gerbera firmware flash --force
 gerbera server
 ```
 
-The MCP endpoint is available at `http://localhost:8001/mcp`. Compatible clients
-can discover the generated LED tool, call it, and receive the board-confirmed
-result.
+The MCP endpoint is available at `http://localhost:8001/mcp` by default.
+Compatible clients can discover generated hardware tools, call them, and receive
+board-confirmed results.
 
 ## Supported hardware
 
@@ -279,6 +263,11 @@ server using the paired serial endpoint. Bluetooth support does not provide OTA
 firmware updates.
 
 ## CLI
+
+The optional harness uses JSON-defined workflows with replaceable node strategies,
+fixed entry and exit boundaries, and a REST run API. It connects to the SDK over
+MCP and can run on a different machine. See the
+[harness guide](src/gerbera_harness/README.md) for configuration and extension examples.
 
 | Command | Purpose |
 | --- | --- |
