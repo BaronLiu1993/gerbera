@@ -3,7 +3,8 @@ from dataclasses import dataclass, field
 from gerbera_harness.infrastructure.event_consumer import EventConsumer
 from gerbera_harness.runtime.agent_runtime import AgentRuntime
 from gerbera_harness.runtime.session import Session
-from gerbera_harness.infrastructure.model import Model, ModelProviderEnum
+from gerbera_harness.infrastructure.model import Model
+from gerbera_harness.runtime.contracts import ModelClient
 from gerbera_harness.memory import (
     EventStateSchema,
     Memory,
@@ -26,15 +27,11 @@ class Orchestrator:
         self,
         user_prompt: str,
         mcp_url: str,
-        provider: str,
-        api_key: str,
-        model: str,
+        model: ModelClient,
     ) -> AgentRuntime:
         runtime = self.build_agent_runtime(
             user_prompt=user_prompt,
             mcp_url=mcp_url,
-            provider=provider,
-            api_key=api_key,
             model=model,
         )
         self.sessions[runtime.session.session_id] = runtime
@@ -45,9 +42,7 @@ class Orchestrator:
         self,
         user_prompt: str,
         mcp_url: str,
-        provider: str,
-        api_key: str,
-        model: str,
+        model: ModelClient,
     ) -> AgentRuntime:
         session = Session()
         memory = Memory(
@@ -60,11 +55,7 @@ class Orchestrator:
                 session_id=session.session_id,
             ),
         )
-        runtime_model = Model(
-            model_provider=ModelProviderEnum(provider),
-            model=model,
-            api_key=api_key,
-        )
+        runtime_model = Model(client=model)
         tool_client = ToolClient(
             mcp_url=mcp_url,
             local_tool_registry=self.local_tool_registry,
