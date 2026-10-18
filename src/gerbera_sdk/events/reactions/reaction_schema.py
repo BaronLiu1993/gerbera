@@ -99,7 +99,6 @@ class ReactionDefinitionSchema(CreateReactionSchema):
 
 class ReactionRuntimeSchema(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-
     latest_value: ReactionValue | None = None
     trigger_count: int = Field(default=0, ge=0)
     last_triggered_at: datetime | None = None
@@ -110,14 +109,12 @@ class ReactionRuntimeSchema(BaseModel):
 
 class ReactionSchema(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-
     definition: ReactionDefinitionSchema
     runtime: ReactionRuntimeSchema
 
 
 class DeleteReactionSchema(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-
     reaction_id: UUID
 
 
