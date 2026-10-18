@@ -398,6 +398,8 @@ class HardwareContractCompiler:
     def validate_watchdog(microcontroller: Microcontroller) -> list[str]:
         watchdog = microcontroller.watchdog
         path = f"microcontrollers[{microcontroller.id}].watchdog"
+        if not isinstance(watchdog, RuntimeWatchdogConfig):
+            return [f"{path}: RuntimeWatchdogConfig is required"]
         interval = watchdog.heartbeat_interval_ms
         timeout = watchdog.heartbeat_timeout_ms
         if (
