@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from inspect import Parameter, Signature
+import json
 import logging
 from typing import Annotated, Any, Callable
 
@@ -7,6 +8,7 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from gerbera_protocol import RuntimeManifest
 from gerbera_sdk.events.buffer import Buffer
 from gerbera_sdk.firmware.firmware_schema import (
     CommandSpec,
@@ -94,6 +96,7 @@ class ServerRuntime:
     event_read_timeout_seconds: float = 1.0
 
     def register_tools(self) -> None:
+        self.register_remote_resources()
         self.register_hardware_tools()
         self.register_movement_tools()
         self.register_reaction_tools()
@@ -101,6 +104,50 @@ class ServerRuntime:
         self.register_hardware_state_tool()
         self.register_environment_state_tool()
         self.register_event_listener_health_tool()
+
+    def register_remote_resources(self) -> None:
+        @self.app.resource("gerbera://manifest", mime_type="application/json")
+        def runtime_manifest() -> str:
+            return RuntimeManifest(
+                instance_id=self.hardware_system.id,
+                capabilities=("tools", "hardware_state", "environment_state"),
+                resource_uris=(
+                    "gerbera://hardware/state", "gerbera://environment/state",
+                    "gerbera://hardware", "gerbera://health",
+                ),
+            ).model_dump_json()
+
+        @self.app.resource("gerbera://hardware/state", mime_type="application/json")
+        def hardware_state() -> str:
+            return json.dumps(self.hardware_runtime.get_state_store())
+
+        @self.app.resource("gerbera://environment/state", mime_type="application/json")
+        def environment_state() -> str:
+            return json.dumps(self.model_runtime.get_model_state())
+
+        @self.app.resource("gerbera://health", mime_type="application/json")
+        def listener_health() -> str:
+            return json.dumps(self.event_listener.get_health())
+
+        @self.app.resource("gerbera://hardware", mime_type="application/json")
+        def hardware_description() -> str:
+            return json.dumps({
+                "name": self.hardware_system.name,
+                "description": self.hardware_system.description,
+                "boards": [
+                    {
+                        "id": board.microcontroller_id,
+                        "name": board.name,
+                        "fqbn": board.definition.fqbn,
+                        "devices": [
+                            {"name": connection.name, "type": connection.component_type}
+                            for connection in board.connections
+                        ],
+                    }
+                    for board in self.hardware_plan.boards
+                ],
+                "cameras": [camera.name for camera in self.hardware_system.cameras],
+            })
 
     @staticmethod
     def model_catalog_type(model: Inference) -> ModelCatalogType:
@@ -1169,6 +1216,7 @@ class ServerRuntime:
             tool_function=self.hardware_runtime.get_state_store,
             annotations=ToolAnnotations(
                 title="Get current hardware state",
+                readOnlyHint=True,
             ),
         )
 
@@ -1179,5 +1227,6 @@ class ServerRuntime:
             tool_function=self.model_runtime.get_model_state,
             annotations=ToolAnnotations(
                 title="Get current environment state",
+                readOnlyHint=True,
             ),
         )
