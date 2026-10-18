@@ -1,0 +1,16 @@
+{
+  "type": "prompt",
+  "config": {
+    "prompt_file": "../prompts/evaluate.md",
+    "outcome_pointer": "/decision",
+    "response_schema": {
+      "type": "object", "properties": {
+        "decision": {"type": "string", "enum": ["succeeded", "continue", "failed"]},
+        "message": {"type": "string"}
+      }, "required": ["decision", "message"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "evidence": "/values"},
+  "outputs": {"": "/values/evaluation"},
+  "outcomes": ["succeeded", "continue", "failed"]
+}

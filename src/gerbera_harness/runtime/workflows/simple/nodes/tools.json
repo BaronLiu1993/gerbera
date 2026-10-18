@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "type": "tool_execution",
+  "config": {},
+  "inputs": {"calls": "/values/calls"},
+  "outputs": {"/results": "/values/results"},
+  "outcomes": ["complete"]
+}

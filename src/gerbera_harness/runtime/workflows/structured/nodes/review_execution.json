@@ -1,0 +1,16 @@
+{
+  "type": "observation",
+  "config": {
+    "prompt": "Review execution using fresh hardware evidence and command results. Accepted means the execution can be evaluated. Retry means re-observe and replan. Redecompose means the task decomposition must change. Do not infer physical success from acknowledgement alone.",
+    "outcome_pointer": "/decision",
+    "response_schema": {
+      "type": "object", "properties": {
+        "decision": {"type": "string", "enum": ["accepted", "retry", "redecompose"]},
+        "message": {"type": "string"}
+      }, "required": ["decision", "message"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "plan": "/values/plan", "results": "/values/execution_results"},
+  "outputs": {"": "/values/execution_review"},
+  "outcomes": ["accepted", "retry", "redecompose"]
+}

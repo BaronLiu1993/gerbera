@@ -1,0 +1,16 @@
+{
+  "type": "prompt",
+  "config": {
+    "prompt": "Review the plan against the objective, observations, available tools, and physical constraints. Approve only executable calls with valid arguments; otherwise request revision with feedback. Do not execute tools.",
+    "outcome_pointer": "/decision",
+    "response_schema": {
+      "type": "object", "properties": {
+        "decision": {"type": "string", "enum": ["approved", "revise"]},
+        "message": {"type": "string"}
+      }, "required": ["decision", "message"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "plan": "/values/plan", "observation": "/values/observation"},
+  "outputs": {"": "/values/planning_review"},
+  "outcomes": ["approved", "revise"]
+}

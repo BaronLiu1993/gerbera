@@ -1,0 +1,6 @@
+{
+  "type": "tool_execution", "config": {},
+  "inputs": {"calls": "/values/plan/calls"},
+  "outputs": {"/results": "/values/execution_results"},
+  "outcomes": ["complete"]
+}

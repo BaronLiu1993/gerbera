@@ -1,0 +1,17 @@
+{
+  "type": "prompt",
+  "config": {
+    "prompt_file": "../prompts/decompose.md",
+    "response_schema": {
+      "type": "object",
+      "properties": {
+        "tasks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "success_criteria": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      },
+      "required": ["tasks", "success_criteria"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "previous": "/values"},
+  "outputs": {"": "/values/decomposition"},
+  "outcomes": ["complete"]
+}

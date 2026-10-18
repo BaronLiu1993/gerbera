@@ -1,0 +1,16 @@
+{
+  "type": "prompt",
+  "config": {
+    "prompt": "Review whether the observation provides enough evidence to plan. Choose retry when more observation is needed, accepted otherwise. Include concrete feedback.",
+    "outcome_pointer": "/decision",
+    "response_schema": {
+      "type": "object", "properties": {
+        "decision": {"type": "string", "enum": ["retry", "accepted"]},
+        "message": {"type": "string"}
+      }, "required": ["decision", "message"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "observation": "/values/observation"},
+  "outputs": {"": "/values/observation_review"},
+  "outcomes": ["retry", "accepted"]
+}

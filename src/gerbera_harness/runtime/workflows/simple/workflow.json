@@ -1,0 +1,37 @@
+{
+  "schema_version": "1",
+  "name": "simple",
+  "interface": {
+    "input_schema": {
+      "type": "object",
+      "properties": {"prompt": {"type": "string", "minLength": 1}},
+      "required": ["prompt"],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {"message": {"type": "string"}},
+      "required": ["message"],
+      "additionalProperties": false
+    }
+  },
+  "nodes": {
+    "prepare": {
+      "type": "transform",
+      "config": {"constants": {"history": [], "results": []}},
+      "outputs": {"/history": "/values/history", "/results": "/values/results"},
+      "outcomes": ["complete"]
+    },
+    "model": "nodes/model.json",
+    "tools": "nodes/tools.json"
+  },
+  "transitions": [
+    {"from": "__entry__", "outcome": "start", "to": "prepare"},
+    {"from": "prepare", "outcome": "complete", "to": "model"},
+    {"from": "model", "outcome": "tool_calls", "to": "tools"},
+    {"from": "tools", "outcome": "complete", "to": "model"},
+    {"from": "model", "outcome": "complete", "to": "__exit__", "terminal": {
+      "status": "succeeded", "output": {"message": "/nodes/model/output/message"}
+    }}
+  ]
+}

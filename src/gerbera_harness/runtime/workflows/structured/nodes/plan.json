@@ -1,0 +1,19 @@
+{
+  "type": "prompt",
+  "config": {
+    "prompt_file": "../prompts/plan.md",
+    "response_schema": {
+      "type": "object", "properties": {
+        "plan": {"type": "string"},
+        "calls": {"type": "array", "maxItems": 20, "items": {
+          "type": "object", "properties": {
+            "name": {"type": "string"}, "arguments_json": {"type": "string"}
+          }, "required": ["name", "arguments_json"], "additionalProperties": false
+        }}
+      }, "required": ["plan", "calls"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "evidence": "/values"},
+  "outputs": {"": "/values/plan"},
+  "outcomes": ["complete"]
+}

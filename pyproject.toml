@@ -12,6 +12,7 @@ dependencies = [
     "fastmcp==3.0.0",
     "httpx>=0.27,<1.0",
     "ikpy>=3.4,<4.0",
+    "jsonschema>=4.23,<5.0",
     "numpy>=2.0,<3.0",
     "opencv-python-headless",
     "pydantic>=2.0,<3.0",
@@ -38,6 +39,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
+"gerbera_harness.runtime.workflows" = ["**/*.json", "**/*.md"]
 "gerbera_sdk.firmware.boards" = ["*.yaml"]
 "gerbera_sdk.firmware.devices.configs" = ["*.yaml"]
 

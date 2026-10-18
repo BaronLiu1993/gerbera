@@ -1,0 +1,13 @@
+{
+  "type": "observation",
+  "config": {
+    "prompt": "Observe the current environment using the provided remote evidence. Summarize relevant facts, uncertainty, and missing information for the objective. Do not infer physical success from a command alone.",
+    "response_schema": {
+      "type": "object", "properties": {"message": {"type": "string"}},
+      "required": ["message"], "additionalProperties": false
+    }
+  },
+  "inputs": {"prompt": "/input/prompt", "tasks": "/values/decomposition"},
+  "outputs": {"": "/values/observation"},
+  "outcomes": ["complete"]
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "type": "agent",
+  "config": {},
+  "inputs": {"prompt": "/input/prompt", "history": "/values/history", "results": "/values/results"},
+  "outputs": {"/history": "/values/history", "/calls": "/values/calls"},
+  "outcomes": ["tool_calls", "complete"]
+}

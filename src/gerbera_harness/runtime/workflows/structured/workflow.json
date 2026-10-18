@@ -1,0 +1,45 @@
+{
+  "schema_version": "1",
+  "name": "structured",
+  "interface": {
+    "input_schema": {
+      "type": "object", "properties": {"prompt": {"type": "string", "minLength": 1}},
+      "required": ["prompt"], "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object", "properties": {"message": {"type": "string"}},
+      "required": ["message"], "additionalProperties": false
+    }
+  },
+  "nodes": {
+    "decompose": "nodes/decompose.json",
+    "observe": "nodes/observe.json",
+    "review_observation": "nodes/review_observation.json",
+    "plan": "nodes/plan.json",
+    "review_plan": "nodes/review_plan.json",
+    "execute": "nodes/execute.json",
+    "review_execution": "nodes/review_execution.json",
+    "evaluate": "nodes/evaluate.json"
+  },
+  "transitions": [
+    {"from": "__entry__", "outcome": "start", "to": "decompose"},
+    {"from": "decompose", "outcome": "complete", "to": "observe"},
+    {"from": "observe", "outcome": "complete", "to": "review_observation"},
+    {"from": "review_observation", "outcome": "retry", "to": "observe"},
+    {"from": "review_observation", "outcome": "accepted", "to": "plan"},
+    {"from": "plan", "outcome": "complete", "to": "review_plan"},
+    {"from": "review_plan", "outcome": "revise", "to": "plan"},
+    {"from": "review_plan", "outcome": "approved", "to": "execute"},
+    {"from": "execute", "outcome": "complete", "to": "review_execution"},
+    {"from": "review_execution", "outcome": "retry", "to": "observe"},
+    {"from": "review_execution", "outcome": "redecompose", "to": "decompose"},
+    {"from": "review_execution", "outcome": "accepted", "to": "evaluate"},
+    {"from": "evaluate", "outcome": "continue", "to": "decompose"},
+    {"from": "evaluate", "outcome": "succeeded", "to": "__exit__", "terminal": {
+      "status": "succeeded", "output": {"message": "/values/evaluation/message"}
+    }},
+    {"from": "evaluate", "outcome": "failed", "to": "__exit__", "terminal": {
+      "status": "failed", "error": {"code": "evaluation_failed", "message": "The objective could not be verified."}
+    }}
+  ]
+}
