@@ -1,6 +1,7 @@
 .venv
 .pytest_cache
 config.json
+gerbera.yaml
 .gerbera/firmware/
 __pycache__
 serve_mcp.py

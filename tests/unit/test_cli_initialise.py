@@ -13,7 +13,13 @@ def test_load_board_data_indexes_detected_ports_by_address() -> None:
                         "port": {
                             "address": "/dev/board-1",
                             "protocol": "serial",
-                        }
+                        },
+                        "matching_boards": [
+                            {
+                                "name": "Arduino Uno",
+                                "fqbn": "arduino:avr:uno",
+                            }
+                        ],
                     }
                 ]
             }
@@ -22,8 +28,13 @@ def test_load_board_data_indexes_detected_ports_by_address() -> None:
 
     boards = load_board_data(arduino_result)
 
-    assert boards["/dev/board-1"]["address"] == "/dev/board-1"
-    assert boards["/dev/board-1"]["protocol"] == "serial"
+    assert boards["/dev/board-1"] | {"id": "ignored"} == {
+        "id": "ignored",
+        "address": "/dev/board-1",
+        "protocol": "serial",
+        "fqbn": "arduino:avr:uno",
+        "name": "Arduino Uno",
+    }
 
 
 def test_load_board_data_returns_empty_mapping_without_detected_ports() -> None:

@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+import yaml
+
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.firmware.firmware_schema import (
     BoardTransportKind,
@@ -91,25 +93,27 @@ class Microcontroller:
         registered_device = self.get_registered_device()
         if registered_device is None:
             raise ValueError(
-                "No device in config.json['devices'] matched port for upload: "
+                "No configured device matched port for upload: "
                 f"{self.firmware_upload_port}"
             )
         device_id = registered_device.get("id")
         if not device_id:
-            raise ValueError("Microcontroller id is missing from config.json")
+            raise ValueError("Configured microcontroller id is missing")
         return device_id
 
     def get_registered_device(self) -> dict[str, Any] | None:
         if not self.config_path.exists():
             if self.device_id is not None:
                 return None
-            raise FileNotFoundError("Config.json Not Found")
-        config = json.loads(self.config_path.read_text())
+            raise FileNotFoundError(
+                f"Microcontroller configuration not found: {self.config_path}"
+            )
+        config = self.read_config()
         registry = config.get("devices")
         if not registry:
             if self.device_id is not None:
                 return None
-            raise ValueError("Devices is Not Found in Config.json")
+            raise ValueError("Devices are missing from project configuration")
         upload_port = self.firmware_upload_port
         for device in registry.values():
             if self.device_id is not None and device.get("id") == self.device_id:
@@ -117,6 +121,18 @@ class Microcontroller:
             if device.get("address") == upload_port:
                 return device
         return None
+
+    def read_config(self) -> dict[str, Any]:
+        if self.config_path.suffix == ".json":
+            config = json.loads(self.config_path.read_text())
+        else:
+            config = yaml.safe_load(self.config_path.read_text())
+        if not isinstance(config, dict):
+            raise ValueError(
+                f"Microcontroller configuration must be a mapping: "
+                f"{self.config_path}"
+            )
+        return config
 
     def get_required_connection_libraries(self) -> list[LibrarySpec]:
         libraries: list[LibrarySpec] = []

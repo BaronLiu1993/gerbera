@@ -12,3 +12,6 @@ def test_cli_exposes_supported_workflows() -> None:
     assert "server" in result.stdout
     assert "down" in result.stdout
     assert "firmware" in result.stdout
+    assert "status" in result.stdout
+    assert "logs" in result.stdout
+    assert "doctor" in result.stdout
