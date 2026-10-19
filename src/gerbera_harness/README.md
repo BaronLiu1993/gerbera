@@ -286,6 +286,14 @@ The bootstrap validates the remote manifest and discovers tools during startup.
 it read-only when starting the harness container. Workflow files are interpreted
 by the harness process.
 
+The configured server exposes `/ready` separately from `/health`. Readiness
+requires successful startup/tool discovery and, when an SDK connector is
+configured, a ready `gerbera://readiness` report from that SDK. Dependency checks
+are bounded; an unavailable SDK makes the harness unready rather than healthy
+merely because HTTP is listening. `MCP_URL` is the deployment override for the
+connector endpoint. The CLI launches and polls this server; it does not construct
+models, validate workflows, or execute agent runs.
+
 Start a run:
 
 ```http
@@ -320,3 +328,8 @@ SDK server → gerbera_protocol
 `runtime/nodes/` owns reusable node strategies and their configuration schemas.
 `memory/` is retained for earlier structured runtime integrations; the new engine
 uses thin per-run JSON state and keeps projections in extensions.
+
+Legacy agent orchestration also lives under `runtime/`, with its API import
+retained as a compatibility facade. Temporal reconstruction is a runtime
+projection, not a responsibility of memory. Deployment orchestration belongs to
+the CLI and is not exported by `gerbera_harness.runtime`.

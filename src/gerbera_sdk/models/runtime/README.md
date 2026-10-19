@@ -26,13 +26,16 @@ board_runtime.py        Per-process board transport pool and lifecycle.
 camera_runtime.py       Per-process camera transport, latest-frame cache, and lifecycle.
 command_runtime.py      Command compilation and response parsing.
 model_runtime.py        Model inference registration, output state, and lifecycle.
+runtime_lifecycle.py    SDK-owned preparation, resource startup and cleanup.
+storage.py              Stream schema preparation and bounded database startup wait.
+readiness.py            Live dependency readiness reports.
 ```
 
 ## Ownership
 
 `GerberaRuntime` owns:
 
-- startup and shutdown order
+- composing the SDK-owned preparation and lifecycle
 - resolving the database and constructing one event worker for stream writes
 
 `ServerRuntime` owns:
@@ -40,9 +43,19 @@ model_runtime.py        Model inference registration, output state, and lifecycl
 - MCP app/tool registration
 - event registration
 - building the nested runtime event catalog used by agents
-- event listener lifecycle
+- event listener health/tool exposure (lifecycle belongs to `RuntimeLifecycle`)
 - binding executable actions onto connections
 - command dispatch through board transport
+
+`RuntimeLifecycle` owns storage preparation, firmware reconciliation and resource
+startup/shutdown order. Every normal SDK server startup uses it, independently of
+the CLI. Cleanup callbacks are registered before starting dependencies so partial
+startup failures and interruptions release already-owned resources.
+
+`RuntimeReadiness` checks lifecycle phase, board sessions/listeners, cameras,
+inference failures and event-worker health. `/ready` returns 503 while unavailable
+and 200 when ready; it is distinct from HTTP liveness. The CLI polls these reports
+without reproducing SDK validation or examining device state itself.
 
 `BoardRuntime` owns:
 

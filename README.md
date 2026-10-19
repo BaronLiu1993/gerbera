@@ -73,9 +73,26 @@ wiring, commands, event routes, and transports into an immutable plan. Firmware
 generation and the live runtime consume that same plan, preventing the two
 sides from silently drifting apart.
 
-At startup, Gerbera verifies the connected board identity, protocol version,
-and contract digest. Firmware that does not match the current declaration is
-rejected before hardware commands are accepted.
+At startup, the SDK validates the declaration, prepares stream storage, and
+reconciles firmware against a live board handshake. A confirmed contract mismatch
+triggers an update before normal connections start. An unknown identity or broken
+connection fails startup rather than triggering a blind upload. First-time uploads
+require the board-specific authorization created during SDK initialization.
+
+### Ownership
+
+| Component | Owns | Does not own |
+| --- | --- | --- |
+| CLI | Deployment metadata, service launch/stop, readiness polling and logs | Hardware/model validation, firmware, schemas, agent execution |
+| SDK | Hardware declarations, validation, firmware reconciliation, connections, stream schemas and hardware readiness | Harness configuration or agent workflows |
+| Harness | Models, workflows, tools, connector readiness and run lifecycle | SDK imports, board connections or firmware uploads |
+| Firmware | Physical I/O, component checks and watchdog safe-stop | Host-side workflow decisions |
+| `gerbera_protocol` | Versioned JSON wire contracts | Service orchestration or runtime objects |
+
+The harness talks to the SDK over MCP, including when they run on different
+machines. The CLI is not in the command path after service startup. Legacy agent
+orchestration lives under `gerbera_harness/runtime/`; memory only stores state and
+runtime projections rebuild derived views.
 
 ## Requirements
 
@@ -125,9 +142,12 @@ Connect a supported board over USB and run:
 gerbera init
 ```
 
-Gerbera detects the board, writes a validated `gerbera.yaml`, creates the local
-`.gerbera/` workspace, generates secrets, and scaffolds `index.py`. If more than
-one board is connected, it asks which boards to include.
+The CLI delegates board discovery and hardware scaffolding to the SDK. It creates
+a deployment-only `gerbera.yaml`, scoped service credentials, and a local
+`.gerbera/` workspace. The SDK creates `index.py` and
+`.gerbera/sdk/runtime.json`, retaining each selected board's identity and explicit
+watchdog settings. If more than one board is connected, the SDK asks which boards
+to include. Harness setup, when selected, is handled by the harness itself.
 
 ### 2. Declare the hardware
 
@@ -159,10 +179,18 @@ gerbera init --with-harness
 gerbera up
 ```
 
-One command runs preflight checks, validates the hardware, starts PostgreSQL,
-creates stream tables, flashes changed firmware, starts the MCP server, checks
-its health, and starts the harness when configured. Startup is idempotent and
-rolls back services created by a failed run.
+The CLI starts PostgreSQL and the SDK, then waits for the SDK's `/ready` report.
+Inside SDK startup, hardware is validated, storage becomes available, stream
+tables are prepared, firmware is reconciled, and board/camera/model/event
+runtimes start. Only then does the CLI start the optional harness and wait for its
+readiness. A failed launch rolls back only services started by that invocation;
+database volumes are retained.
+
+`/health` means the service is alive; `/ready` means its configured dependencies
+are usable. The SDK also publishes readiness as `gerbera://readiness`. The harness
+checks this report over MCP instead of inferring hardware readiness from an open
+port. Neither liveness nor readiness asserts that external model credentials have
+been accepted by a model provider.
 
 Use the lifecycle commands to inspect and stop the stack:
 
@@ -176,15 +204,51 @@ gerbera down
 Advanced commands remain available when only one layer is needed:
 
 ```bash
-gerbera up --skip-flash
 gerbera up --no-harness
-gerbera firmware flash --force
 gerbera server
 ```
 
 The MCP endpoint is available at `http://localhost:8001/mcp` by default.
 Compatible clients can discover generated hardware tools, call them, and receive
 board-confirmed results.
+
+### Run services independently
+
+The SDK performs the same mandatory preparation without the CLI:
+
+```bash
+python -m gerbera_sdk.server serve --config .gerbera/sdk/runtime.json
+```
+
+Its `check` subcommand validates SDK configuration and hardware without starting
+connections or uploading firmware. The optional harness has its own entry point:
+
+```bash
+GERBERA_HARNESS_CONFIG=.gerbera/harness/harness.json \\
+MCP_URL=http://localhost:8001/mcp \\
+uvicorn gerbera_harness.bootstrap:create_server_app --factory --port 8000
+```
+
+For API models, provide the configured API-key environment variable to the harness
+process. Docker deployments receive only their scoped environment files. SDK
+credentials contain writer/schema-owner passwords, not database-admin or model
+credentials. CLI status, logs and shutdown do not load service secrets.
+
+In `gerbera.yaml`, set a service's `managed: false` and its reachable `url` to use
+an independently managed service. The CLI waits for external SDK/harness readiness
+but never starts or stops those services. Deployment URLs supply managed-service
+endpoints; `MCP_URL` overrides the harness connector setting.
+
+Older combined project manifests must be split before using the new CLI: retain
+hardware settings in the SDK config, put model/workflow settings in the harness
+config, and leave only `services` and launch settings in `gerbera.yaml`. The SDK
+can still read a legacy hardware manifest through `--config`. Existing files and
+database volumes are never migrated or replaced automatically.
+
+When working from an unreleased checkout, use container images built from the
+same revision; published `latest` images may not include the current readiness
+contract. The harness image can be rebuilt with
+`docker build -f .docker/harness/Dockerfile -t ghcr.io/baronliu1993/gerbera:latest .`.
 
 ## Supported hardware
 
@@ -272,13 +336,16 @@ MCP and can run on a different machine. See the
 | Command | Purpose |
 | --- | --- |
 | `gerbera init` | Create the project configuration and `.gerbera/` workspace |
-| `gerbera firmware flash` | Validate, generate, and upload changed firmware |
-| `gerbera firmware flash --force` | Upload firmware regardless of its installed digest |
-| `gerbera up` | Start local PostgreSQL and the optional harness |
-| `gerbera server` | Start the standalone MCP hardware server |
+| `gerbera up` | Launch services in dependency order and wait for readiness |
+| `gerbera server` | Launch the SDK in the foreground with mandatory SDK preparation |
+| `gerbera status` | Show service readiness and database process status |
+| `gerbera doctor` | Request service-owned readiness reports |
+| `gerbera logs --follow` | Follow managed service logs |
+| `gerbera down` | Stop managed services without deleting data |
 
 Use `gerbera --help` or `gerbera <command> --help` for the installed command
-reference. Cloud deployment and `gerbera down` are not implemented yet.
+reference. There is no manual firmware command or flash-skip flag: reconciliation
+is part of SDK startup, not an optional deployment step.
 
 ## Documentation
 

@@ -13,11 +13,10 @@ It is the layer that turns a declared hardware system into:
 ## Folders
 
 ```text
-contracts/          Shared typed contracts for commands, firmware, and schemas.
 events/             Event routing, stream buffering, and event reactions.
 firmware/           Firmware generation, flashing, and device builders.
-harness/            Agent, experiment, and memory support.
 models/             Hardware declarations and board, database, and server runtimes.
+server/             Independent SDK entry point, SDK configuration and scaffolding.
 utils.py            Cross-cutting helpers such as event naming and identifiers.
 gerbera_runtime.py  Top-level composition root for setup and run.
 ```
@@ -40,6 +39,11 @@ The SDK does not own:
 - dashboards or UI presentation
 - cloud/database provisioning outside the declared connection info
 - application-specific business logic on top of device events
+- harness model/workflow configuration or agent lifecycle
+
+Wire contracts shared with remote clients live in the neutral `gerbera_protocol`
+package. The SDK does not import the CLI or harness. The CLI launches it as a
+separate process and waits for service-owned readiness.
 
 ## High-Level Flow
 
@@ -68,10 +72,24 @@ flowchart TD
 Use `GerberaRuntime` in [gerbera_runtime.py](/Users/jiexuanliu/Desktop/firecracker/cli/src/gerbera_sdk/gerbera_runtime.py):
 
 - `setup(...)`
-  Installs Arduino dependencies and flashes firmware when requested.
+  Validates hardware and reconciles firmware using the same live-handshake policy
+  as startup. It is not a way to bypass startup preparation.
 
 - `run(...)`
-  Builds the board runtime, event worker, and server runtime, starts them in order, runs the MCP app, and closes resources on exit.
+  Validates hardware, constructs runtimes, prepares storage, reconciles firmware,
+  starts dependencies, runs the MCP app, and closes resources on exit.
+
+The independently runnable entry point owns loading and validating SDK settings
+and hardware code:
+
+```bash
+python -m gerbera_sdk.server serve --config .gerbera/sdk/runtime.json
+python -m gerbera_sdk.server check --config .gerbera/sdk/runtime.json
+```
+
+`check` does not connect to hardware, upload firmware or require the CLI. SDK
+configuration and writer/schema-owner credentials remain on the hardware host.
+The harness can run remotely with only the SDK MCP endpoint and its own secrets.
 
 ## Runtime Shape
 
@@ -84,10 +102,15 @@ Current runtime responsibilities are split like this:
   Owns event registration, tool registration, command dispatch, and MCP app interaction.
 
 - `Database`
-  Owns database credentials and insert execution. Table provisioning belongs to harness.
+  Owns database connection details and insert execution. `RuntimeStorage` prepares
+  device stream tables as the schema-owner role before the writer starts.
 
 - `EventWorker`
   Owns asynchronous stream write queueing and retry.
 
 - `GerberaRuntime`
   Is the composition root that wires board, event, database, and server objects together in the right order.
+
+- `RuntimeReadiness`
+  Reports lifecycle and dependency health via HTTP `/ready` and the MCP resource
+  `gerbera://readiness`. HTTP `/health` is liveness only.

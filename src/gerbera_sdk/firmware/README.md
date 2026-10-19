@@ -117,6 +117,21 @@ Pin assignments are represented separately in the board contract digest. At
 startup, the runtime requires the firmware digest and board ID to exactly match
 the compiled hardware plan before registering the serial connection.
 
+SDK startup owns firmware reconciliation, including when the SDK runs without
+the CLI. It reads the live identity/protocol/digest rather than trusting
+`installed.json`. A recognized board with an outdated contract is compiled,
+uploaded and checked again before connections start. Dependencies are installed
+only when missing and an update is required.
+
+A timeout is not evidence of outdated firmware. First-time SDK initialization
+records explicit permission for the selected board ID, FQBN and USB upload port in
+`provisioning.json`. That permission is consumed immediately before upload, not
+during dependency installation or compilation. Other transport/identity failures
+fail startup without uploading. After a failed upload, check the physical board
+and rerun `python -m gerbera_sdk.server initialise` on the SDK host to explicitly
+authorize another initial upload; existing source/configuration is not replaced.
+CLI firmware commands and force/skip-flash options are intentionally absent.
+
 ## Reaction
 
 Keep generated firmware thin. It should parse command strings, touch hardware, and emit structured serial lines.
