@@ -2,6 +2,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from collections.abc import Callable
 
 from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
@@ -64,6 +65,7 @@ class Flash:
     def flash_boards(
         hardware_plan: HardwarePlan,
         boards: tuple[ResolvedBoard, ...],
+        before_upload: Callable[[], None] | None = None,
     ) -> None:
         if not boards:
             return
@@ -88,6 +90,8 @@ class Flash:
                     "--build-path", str(build_path),
                     str(microcontroller_root),
                 ], check=True)
+                if before_upload is not None:
+                    before_upload()
                 subprocess.run([
                     "arduino-cli", "upload",
                     "-p", port,

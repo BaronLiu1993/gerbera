@@ -30,6 +30,10 @@ START_FIELDS = frozenset({"state", "session"})
 THREAD_JOIN_TIMEOUT_SECONDS = 2.0
 
 
+class FirmwareContractMismatch(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class ExpectedSerialMessage:
     message_type: str
@@ -180,8 +184,13 @@ class BoardRuntime:
             "digest": board.contract_digest,
             "challenge": challenge,
         }
-        if dict(response.fields) != expected_fields:
+        if (response.fields["board"] != board.microcontroller_id
+                or response.fields["challenge"] != challenge):
             raise RuntimeError(
+                f"Board contract does not match: identity or challenge for {board.microcontroller_id}"
+            )
+        if dict(response.fields) != expected_fields:
+            raise FirmwareContractMismatch(
                 f"Board contract does not match: {board.microcontroller_id}"
             )
         return challenge
