@@ -1,85 +1,35 @@
-import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+import yaml
 
-from gerbera_cli.configuration import (
-    HarnessConfig,
-    ProjectConfig,
-    ProjectSecrets,
-)
+from gerbera_cli.configuration import ProjectConfig, ServiceSpec
 
 
-def test_project_config_round_trips_through_yaml(tmp_path: Path) -> None:
-    config_path = tmp_path / "gerbera.yaml"
-    expected = ProjectConfig()
+def test_deployment_loads_only_service_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "gerbera.yaml"
+    path.write_text(yaml.safe_dump({"services": {"sdk": {
+        "url": "http://sdk.example:8001", "managed": False,
+        "config": "not-loaded-by-cli.json",
+    }}}))
 
-    expected.save(config_path)
+    config = ProjectConfig.load(path)
 
-    assert ProjectConfig.load(config_path) == expected
-
-
-def test_project_config_migrates_legacy_json(tmp_path: Path) -> None:
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "entry_point": "robot.py",
-                "hardware_name": "robot",
-                "devices": {},
-            }
-        )
+    assert config.services["sdk"] == ServiceSpec(
+        url="http://sdk.example:8001", managed=False, config="not-loaded-by-cli.json",
     )
 
-    config = ProjectConfig.load(config_path)
 
-    assert (
-        config.project.entry_point,
-        config.project.hardware_variable,
-    ) == (Path("robot.py"), "robot")
+def test_deployment_retains_launch_timeout(tmp_path: Path) -> None:
+    path = tmp_path / "gerbera.yaml"
+    path.write_text("services: {}\nstartup_timeout_seconds: 42\n")
 
-
-def test_enabled_harness_requires_provider() -> None:
-    with pytest.raises(ValidationError) as error:
-        HarnessConfig(enabled=True)
-
-    assert "Harness provider is required" in str(error.value)
+    assert ProjectConfig.load(path).startup_timeout_seconds == 42
 
 
-def test_project_secrets_round_trip_without_config_file(
-    tmp_path: Path,
-) -> None:
-    secrets_path = tmp_path / "secrets.json"
-    expected = ProjectSecrets(
-        gerbera_admin_password="admin",
-        gerbera_schema_password="schema",
-        gerbera_writer_password="writer",
-        gerbera_reader_password="reader",
-    )
+def test_legacy_domain_manifest_requires_explicit_conversion(tmp_path: Path) -> None:
+    path = tmp_path / "gerbera.yaml"
+    path.write_text("project: {}\ndevices: {}\n")
 
-    expected.save(secrets_path)
-
-    assert ProjectSecrets.load(secrets_path) == expected
-
-
-def test_project_secrets_accept_legacy_provider_field(
-    tmp_path: Path,
-) -> None:
-    secrets_path = tmp_path / "secrets.json"
-    secrets_path.write_text(
-        json.dumps(
-            {
-                "provider": "openai",
-                "api_key": "key",
-                "gerbera_admin_password": "admin",
-                "gerbera_schema_password": "schema",
-                "gerbera_writer_password": "writer",
-                "gerbera_reader_password": "reader",
-            }
-        )
-    )
-
-    secrets = ProjectSecrets.load(secrets_path)
-
-    assert secrets.api_key == "key"
+    with pytest.raises(ValueError, match="deployment-only"):
+        ProjectConfig.load(path)

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from gerbera_harness.runtime import (
+from gerbera_cli.deployment import (
     ProjectRuntime,
     StartupOptions,
     StartupStage,
@@ -69,29 +69,22 @@ def test_start_runs_complete_lifecycle_in_order() -> None:
     ProjectRuntime(services).start()
 
     assert services.calls == [
-        "preflight",
-        "validate_hardware",
         "start_database",
-        "prepare_database",
-        "setup_firmware",
         "start_server",
         "wait_for_server",
         "start_harness",
     ]
 
 
-def test_start_can_skip_firmware_and_harness() -> None:
+def test_start_can_skip_harness() -> None:
     services = RecordingServices()
 
     ProjectRuntime(services).start(
-        StartupOptions(flash_firmware=False, start_harness=False)
+        StartupOptions(start_harness=False)
     )
 
     assert services.calls == [
-        "preflight",
-        "validate_hardware",
         "start_database",
-        "prepare_database",
         "start_server",
         "wait_for_server",
     ]
@@ -103,4 +96,33 @@ def test_start_rolls_back_only_services_started_by_current_run() -> None:
     with pytest.raises(RuntimeError):
         ProjectRuntime(services).start()
 
-    assert services.calls[-1] == "rollback:server,database"
+    assert services.calls[-1] == "rollback:sdk,database"
+
+
+def test_start_does_not_roll_back_reused_services() -> None:
+    class ExistingServices(RecordingServices):
+        def start_database(self) -> bool:
+            return False
+
+        def start_server(self) -> bool:
+            return False
+
+    services = ExistingServices(fail_at="wait_for_server")
+
+    with pytest.raises(RuntimeError):
+        ProjectRuntime(services).start()
+
+    assert services.calls[-1] == "rollback:"
+
+
+def test_rollback_failure_does_not_hide_original_startup_error() -> None:
+    class FailedRollback(RecordingServices):
+        def rollback(self, stages) -> None:
+            raise RuntimeError("cleanup failed")
+
+    services = FailedRollback(fail_at="wait_for_server")
+
+    with pytest.raises(RuntimeError, match="wait_for_server") as error:
+        ProjectRuntime(services).start()
+
+    assert "cleanup failed" in error.value.__notes__[0]

@@ -5,42 +5,25 @@ from typing import Protocol
 
 class StartupStage(str, Enum):
     DATABASE = "database"
-    SERVER = "server"
+    SERVER = "sdk"
     HARNESS = "harness"
 
 
 @dataclass(frozen=True)
 class StartupOptions:
-    flash_firmware: bool = True
     start_harness: bool = True
 
 
 class ProjectServices(Protocol):
-    def preflight(self) -> None: ...
-
-    def validate_hardware(self) -> None: ...
-
     def start_database(self) -> bool: ...
-
-    def prepare_database(self) -> None: ...
-
-    def setup_firmware(self) -> None: ...
-
     def start_server(self) -> bool: ...
-
     def wait_for_server(self) -> None: ...
-
     def start_harness(self) -> bool: ...
-
     def rollback(self, stages: tuple[StartupStage, ...]) -> None: ...
-
     def stop(self) -> None: ...
-
     def status(self) -> dict[str, object]: ...
-
     def logs(self, follow: bool) -> None: ...
-
-    def doctor(self) -> tuple[str, ...]: ...
+    def doctor(self) -> dict[str, object]: ...
 
 
 @dataclass
@@ -48,22 +31,20 @@ class ProjectRuntime:
     services: ProjectServices
 
     def start(self, options: StartupOptions = StartupOptions()) -> None:
-        started_stages: list[StartupStage] = []
+        started = []
         try:
-            self.services.preflight()
-            self.services.validate_hardware()
             if self.services.start_database():
-                started_stages.append(StartupStage.DATABASE)
-            self.services.prepare_database()
-            if options.flash_firmware:
-                self.services.setup_firmware()
+                started.append(StartupStage.DATABASE)
             if self.services.start_server():
-                started_stages.append(StartupStage.SERVER)
+                started.append(StartupStage.SERVER)
             self.services.wait_for_server()
             if options.start_harness and self.services.start_harness():
-                started_stages.append(StartupStage.HARNESS)
-        except BaseException:
-            self.services.rollback(tuple(reversed(started_stages)))
+                started.append(StartupStage.HARNESS)
+        except BaseException as error:
+            try:
+                self.services.rollback(tuple(reversed(started)))
+            except Exception as cleanup_error:
+                error.add_note(f"Deployment rollback also failed: {cleanup_error}")
             raise
 
     def stop(self) -> None:
@@ -75,5 +56,5 @@ class ProjectRuntime:
     def logs(self, follow: bool = False) -> None:
         self.services.logs(follow)
 
-    def doctor(self) -> tuple[str, ...]:
+    def doctor(self) -> dict[str, object]:
         return self.services.doctor()

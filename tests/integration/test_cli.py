@@ -1,17 +1,18 @@
+import pytest
 from typer.testing import CliRunner
 
 from gerbera_cli.main import app
 
 
-def test_cli_exposes_supported_workflows() -> None:
-    result = CliRunner().invoke(app, ["--help"])
+@pytest.mark.parametrize("command", ["init", "up", "server", "down", "status", "logs", "doctor"])
+def test_cli_exposes_deployment_workflows(command) -> None:
+    assert command in CliRunner().invoke(app, ["--help"]).stdout
 
-    assert result.exit_code == 0
-    assert "init" in result.stdout
-    assert "up" in result.stdout
-    assert "server" in result.stdout
-    assert "down" in result.stdout
-    assert "firmware" in result.stdout
-    assert "status" in result.stdout
-    assert "logs" in result.stdout
-    assert "doctor" in result.stdout
+
+def test_cli_has_no_manual_firmware_command() -> None:
+    assert "firmware" not in CliRunner().invoke(app, ["--help"]).stdout
+
+
+@pytest.mark.parametrize("option", ["--skip-flash", "--force"])
+def test_up_cannot_bypass_sdk_preparation(option) -> None:
+    assert CliRunner().invoke(app, ["up", option]).exit_code == 2

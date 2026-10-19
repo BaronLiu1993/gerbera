@@ -4,51 +4,60 @@ import subprocess
 
 from typer.testing import CliRunner
 
-from gerbera_cli.configuration import ProjectConfig, ProjectSecrets
+from gerbera_cli.configuration import ProjectConfig
 from gerbera_cli.main import app
+from gerbera_sdk.server.initialise import initialise_sdk
 
 
-def test_init_creates_runnable_project(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    board_output = json.dumps(
-        {
-            "detected_ports": [
-                {
-                    "port": {
-                        "address": "/dev/board-1",
-                        "protocol": "serial",
-                    },
-                    "matching_boards": [
-                        {
-                            "name": "Arduino Uno",
-                            "fqbn": "arduino:avr:uno",
-                        }
-                    ],
-                }
-            ]
-        }
-    )
-
-    def detect_board(*args, **kwargs) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(args[0], 0, board_output, "")
-
-    monkeypatch.setattr(subprocess, "run", detect_board)
+def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("gerbera_sdk.server.initialise.discover_boards", lambda: {
+        "/dev/board-1": {
+            "id": "board-1", "address": "/dev/board-1",
+            "protocol": "serial", "fqbn": "arduino:avr:uno",
+        },
+    })
+    commands = []
+
+    def run_service(command, **kwargs):
+        commands.append(command[2:])
+        initialise_sdk(Path(".gerbera/sdk/runtime.json"))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("gerbera_cli.initialise.subprocess.run", run_service)
     result = CliRunner().invoke(app, ["init"])
-    config = ProjectConfig.load(Path("gerbera.yaml"))
-    secrets = ProjectSecrets.load()
+    if result.exception:
+        raise result.exception
     compile(Path("index.py").read_text(), "index.py", "exec")
-    created_paths = (
-        Path("gerbera.yaml").is_file(),
-        Path(".gerbera/secrets/secrets.json").is_file(),
-        Path("index.py").is_file(),
-    )
 
     assert (
-        result.exit_code,
-        len(config.devices),
-        bool(secrets.gerbera_admin_password),
-        created_paths,
-    ) == (0, 1, True, (True, True, True))
+        commands, set(ProjectConfig.load().services),
+        set(json.loads(Path(".gerbera/secrets/sdk.json").read_text())),
+        json.loads(Path(".gerbera/sdk/runtime.json").read_text())["devices"]["/dev/board-1"]["id"],
+    ) == (
+        [["gerbera_sdk.server", "initialise"]], {"sdk", "harness", "database"},
+        {"gerbera_schema_password", "gerbera_writer_password"}, "board-1",
+    )
+
+
+def test_init_can_resume_after_harness_setup_was_cancelled(monkeypatch, tmp_path: Path) -> None:
+    from gerbera_cli.initialise import initialise_project_files
+
+    monkeypatch.chdir(tmp_path)
+    attempts = []
+
+    def run_service(command, **kwargs):
+        attempts.append(command[2])
+        if command[2] == "gerbera_harness.initialise" and attempts.count(command[2]) == 1:
+            raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr("gerbera_cli.initialise.subprocess.run", run_service)
+    import pytest
+
+    with pytest.raises(subprocess.CalledProcessError):
+        initialise_project_files(True, None)
+    original = Path(".gerbera/secrets/database.env").read_text()
+
+    initialise_project_files(True, None)
+
+    assert Path(".gerbera/secrets/database.env").read_text() == original
