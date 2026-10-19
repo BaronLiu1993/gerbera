@@ -1,13 +1,15 @@
 import os
-import subprocess
+import asyncio
 
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.firmware.flash import Flash
+from gerbera_sdk.firmware.reconciliation import FirmwareDependencies, FirmwareReconciler
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
@@ -23,23 +25,19 @@ from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
+from gerbera_sdk.models.runtime.readiness import RuntimeReadiness
+from gerbera_sdk.models.runtime.storage import RuntimeStorage
 
 
 class GerberaRuntime:
     @staticmethod
     def setup(
         hardware_system: HardwareSystem,
-        install_dependencies: bool = True,
-        flash_firmware: bool = True,
     ) -> None:
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
         hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
 
-        if install_dependencies:
-            GerberaRuntime.install_dependencies(hardware_system)
-
-        if flash_firmware:
-            Flash.flash(hardware_plan)
+        FirmwareReconciler(BoardRuntime(hardware_plan)).reconcile()
 
     @staticmethod
     def run(
@@ -48,6 +46,7 @@ class GerberaRuntime:
         database_host: str,
         database_port: int,
         database_password: str,
+        database_schema_password: str | None = None,
         **transport_kwargs,
     ) -> None:
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
@@ -88,6 +87,16 @@ class GerberaRuntime:
             command_acknowledgements=command_acknowledgements,
             reconnect_board=board_runtime.reconnect_board,
         )
+        readiness = RuntimeReadiness(
+            board_runtime, camera_runtime, model_runtime, event_listener, event_worker,
+        )
+        schema_password = database_schema_password or os.environ.get("GERBERA_SCHEMA_PASSWORD")
+        schema_owner = None
+        if schema_password:
+            schema_owner = Database(
+                host=database_host, port=database_port, password=schema_password,
+                user="gerbera_schema_owner", database_name="gerbera",
+            )
         runtime_lifecycle = RuntimeLifecycle(
             board_runtime=board_runtime,
             camera_runtime=camera_runtime,
@@ -97,11 +106,26 @@ class GerberaRuntime:
             event_bus=event_bus,
             hardware_runtime=hardware_runtime,
             movement_runtime=movement_runtime,
+            storage=RuntimeStorage(hardware_plan, database, schema_owner),
+            readiness=readiness,
         )
         app = FastMCP(
             hardware_system.description,
             lifespan=runtime_lifecycle,
         )
+
+        @app.custom_route("/health", methods=["GET"])
+        async def health(request: Request) -> JSONResponse:
+            return JSONResponse({"service": "sdk", "status": "alive"})
+
+        @app.custom_route("/ready", methods=["GET"])
+        async def ready(request: Request) -> JSONResponse:
+            report = await asyncio.to_thread(readiness.snapshot)
+            return JSONResponse(report.model_dump(mode="json"), status_code=200 if report.ready else 503)
+
+        @app.resource("gerbera://readiness", mime_type="application/json")
+        def runtime_readiness() -> str:
+            return readiness.snapshot().model_dump_json()
         server_runtime = ServerRuntime(
             hardware_system=hardware_system,
             hardware_plan=hardware_plan,
@@ -165,22 +189,5 @@ class GerberaRuntime:
 
     @staticmethod
     def install_dependencies(hardware_system: HardwareSystem) -> None:
-        for package_name in hardware_system.get_required_microcontroller_libraries():
-            subprocess.run(
-                ["arduino-cli", "core", "install", package_name],
-                check=True,
-            )
-
-        installed_libraries: set[str] = set()
-        for microcontroller in hardware_system.microcontrollers:
-            for library in microcontroller.get_required_connection_libraries():
-                install_name = library.install.strip()
-                normalized_name = install_name.lower()
-                if not install_name or normalized_name in installed_libraries:
-                    continue
-
-                subprocess.run(
-                    ["arduino-cli", "lib", "install", install_name],
-                    check=True,
-                )
-                installed_libraries.add(normalized_name)
+        GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
+        FirmwareDependencies(GerberaRuntime.validate_hardware(hardware_system)).install()

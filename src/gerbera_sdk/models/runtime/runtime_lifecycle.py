@@ -12,6 +12,9 @@ from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
+from gerbera_sdk.firmware.reconciliation import FirmwareReconciler
+from gerbera_sdk.models.runtime.readiness import RuntimeReadiness
+from gerbera_sdk.models.runtime.storage import RuntimeStorage
 
 
 @dataclass
@@ -24,50 +27,66 @@ class RuntimeLifecycle:
     event_bus: EventBus
     hardware_runtime: HardwareRuntime
     movement_runtime: MovementRuntime | None = None
+    storage: RuntimeStorage | None = None
+    readiness: RuntimeReadiness | None = None
 
     @asynccontextmanager
     async def __call__(
         self,
         server: FastMCP,
     ) -> AsyncGenerator[dict[str, object], None]:
-        with self._start_resources():
-            yield {
-                "board_runtime": self.board_runtime,
-                "camera_runtime": self.camera_runtime,
-                "event_worker": self.event_worker,
-                "model_runtime": self.model_runtime,
-                "hardware_runtime": self.hardware_runtime,
-                "movement_runtime": self.movement_runtime,
-            }
+        try:
+            with self._start_resources():
+                if self.readiness is not None:
+                    self.readiness.phase = "ready"
+                try:
+                    yield {
+                        "board_runtime": self.board_runtime,
+                        "camera_runtime": self.camera_runtime,
+                        "event_worker": self.event_worker,
+                        "model_runtime": self.model_runtime,
+                        "hardware_runtime": self.hardware_runtime,
+                        "movement_runtime": self.movement_runtime,
+                    }
+                finally:
+                    if self.readiness is not None:
+                        self.readiness.phase = "stopping"
+        except BaseException:
+            if self.readiness is not None:
+                self.readiness.phase = "failed"
+            raise
 
     def _start_resources(
         self,
     ) -> ExitStack:
         startup_cleanup = ExitStack()
         try:
-            self.board_runtime.start()
+            if self.storage is not None:
+                self.storage.prepare()
+            FirmwareReconciler(self.board_runtime).reconcile()
             startup_cleanup.callback(self.board_runtime.close)
+            self.board_runtime.start()
 
             if self.movement_runtime is not None:
                 self.movement_runtime.reset_motors_to_standard_position()
 
-            self.camera_runtime.start()
             startup_cleanup.callback(self.camera_runtime.close)
+            self.camera_runtime.start()
             startup_cleanup.callback(
                 self.model_runtime.turn_off_all_model_streams
             )
             self.model_runtime.turn_on_all_model_streams()
 
-            self.event_worker.start()
             startup_cleanup.callback(self.event_worker.stop)
+            self.event_worker.start()
             startup_cleanup.callback(self.event_worker.wait_until_idle)
             startup_cleanup.callback(self.event_bus.flush_event_buffers)
 
-            self.event_listener.create_listeners()
             startup_cleanup.callback(self.event_listener.stop_listeners)
+            self.event_listener.create_listeners()
 
             startup_cleanup.pop_all()
-        except Exception:
+        except BaseException:
             startup_cleanup.close()
             raise
 

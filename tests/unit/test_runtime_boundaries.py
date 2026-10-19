@@ -99,6 +99,12 @@ def test_runtime_shares_acknowledgement_registry(monkeypatch) -> None:
         def run(self, **kwargs) -> None:
             return None
 
+        def custom_route(self, *args, **kwargs):
+            return lambda function: function
+
+        def resource(self, *args, **kwargs):
+            return lambda function: function
+
     monkeypatch.setattr(
         runtime_module,
         "EventListener",

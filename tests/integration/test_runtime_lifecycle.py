@@ -6,6 +6,14 @@ import pytest
 from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
 
 
+@pytest.fixture(autouse=True)
+def reconcile_firmware(monkeypatch):
+    monkeypatch.setattr(
+        "gerbera_sdk.models.runtime.runtime_lifecycle.FirmwareReconciler",
+        lambda runtime: SimpleNamespace(reconcile=lambda: runtime.prepare()),
+    )
+
+
 def build_lifecycle(
     calls: list[str],
     *,
@@ -18,6 +26,7 @@ def build_lifecycle(
 
     return RuntimeLifecycle(
         board_runtime=SimpleNamespace(
+            prepare=lambda: calls.append("firmware.reconcile"),
             start=lambda: calls.append("board.start"),
             close=lambda: calls.append("board.close"),
         ),
@@ -42,6 +51,7 @@ def build_lifecycle(
             flush_event_buffers=lambda: calls.append("streams.flush"),
         ),
         hardware_runtime=SimpleNamespace(name="hardware-runtime"),
+        storage=SimpleNamespace(prepare=lambda: calls.append("storage.prepare")),
         movement_runtime=SimpleNamespace(
             reset_motors_to_standard_position=lambda: calls.append(
                 "movement.reset"
@@ -72,6 +82,8 @@ def test_runtime_orchestrates_resources_in_dependency_order(
         asyncio.run(serve())
 
     assert calls == [
+        "storage.prepare",
+        "firmware.reconcile",
         "board.start",
         "movement.reset",
         "cameras.start",
@@ -103,6 +115,8 @@ def test_runtime_cleans_started_dependencies_when_model_start_fails() -> None:
 
     assert exc.value is failure
     assert calls == [
+        "storage.prepare",
+        "firmware.reconcile",
         "board.start",
         "movement.reset",
         "cameras.start",
@@ -125,3 +139,42 @@ def test_runtime_skips_movement_reset_when_movement_is_not_configured() -> None:
     asyncio.run(serve())
 
     assert "movement.reset" not in calls
+
+
+def test_partial_board_start_is_cleaned_by_sdk_lifecycle() -> None:
+    calls = []
+    lifecycle = build_lifecycle(calls)
+
+    def fail_start():
+        calls.append("board.partial_start")
+        raise RuntimeError("board failed")
+
+    lifecycle.board_runtime.start = fail_start
+
+    async def serve():
+        async with lifecycle(SimpleNamespace()):
+            raise AssertionError("startup should fail")
+
+    with pytest.raises(RuntimeError, match="board failed"):
+        asyncio.run(serve())
+
+    assert calls[-1] == "board.close"
+
+
+def test_interrupted_camera_start_cleans_partial_dependencies() -> None:
+    calls = []
+    lifecycle = build_lifecycle(calls)
+
+    def interrupt_start():
+        raise KeyboardInterrupt()
+
+    lifecycle.camera_runtime.start = interrupt_start
+
+    async def serve():
+        async with lifecycle(SimpleNamespace()):
+            raise AssertionError("startup should not complete")
+
+    with pytest.raises(KeyboardInterrupt):
+        asyncio.run(serve())
+
+    assert calls[-2:] == ["cameras.close", "board.close"]

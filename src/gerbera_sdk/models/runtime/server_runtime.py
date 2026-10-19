@@ -110,10 +110,11 @@ class ServerRuntime:
         def runtime_manifest() -> str:
             return RuntimeManifest(
                 instance_id=self.hardware_system.id,
-                capabilities=("tools", "hardware_state", "environment_state"),
+                capabilities=("tools", "hardware_state", "environment_state", "readiness"),
                 resource_uris=(
                     "gerbera://hardware/state", "gerbera://environment/state",
                     "gerbera://hardware", "gerbera://health",
+                    "gerbera://readiness",
                 ),
             ).model_dump_json()
 
