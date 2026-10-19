@@ -58,12 +58,16 @@ def initialise_sdk(path: Path) -> None:
     entry_point = root / settings.entry_point
     if entry_point.exists():
         raise FileExistsError(f"Hardware entry point already exists: {entry_point}; configure it explicitly")
-    controllers = ",\n".join(controller_source(index, device) for index, device in enumerate(devices.values(), 1))
+    controllers = "\n\n".join(controller_source(index, device) for index, device in enumerate(devices.values(), 1))
+    controller_names = ", ".join(f"microcontroller_{index}" for index in range(1, len(devices) + 1))
     entry_point.write_text(
         "from gerbera_sdk.models.hardware.hardware_system import HardwareSystem\n"
-        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeWatchdogConfig\n\n"
-        'hardware_system = HardwareSystem(name="gerbera-project", microcontrollers=[\n'
-        f"{controllers}\n])\n"
+        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller\n\n\n"
+        f"{controllers}\n\n"
+        "hardware_system = HardwareSystem(\n"
+        '    name="gerbera-project",\n'
+        f"    microcontrollers=[{controller_names}],\n"
+        ")\n"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(settings.model_dump_json(indent=2))
@@ -83,7 +87,8 @@ def authorize_provisioning(device: RegisteredDevice) -> None:
 
 def controller_source(index: int, device: RegisteredDevice) -> str:
     return (
-        f"    Microcontroller(name='controller_{index}', port={device.address!r}, fqbn={device.fqbn!r},\n"
-        f"        device_id={device.id!r}, watchdog=RuntimeWatchdogConfig(\n"
-        "            heartbeat_interval_ms=500, heartbeat_timeout_ms=2500)),"
-    ).removesuffix(",")
+        f"microcontroller_{index} = Microcontroller(\n"
+        f"    device_id={device.id!r},\n"
+        f"    name='controller_{index}',\n"
+        ")"
+    )

@@ -6,7 +6,6 @@ from pydantic import Field
 import yaml
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import RuntimeTransportConfig
 from gerbera_sdk.utils import StrictSchema
 
 
@@ -58,12 +57,7 @@ class SdkSettings(StrictSchema):
             raise TypeError(f"{self.hardware_variable} must be a HardwareSystem")
         for controller in hardware.microcontrollers:
             controller.config_path = config_path
-            registered = next((device for device in self.devices.values()
-                               if device.id == controller.device_id or device.address == controller.firmware_upload_port), None)
-            if registered is not None:
-                controller.device_id = registered.id
-                if controller.runtime_transport is None and registered.runtime_transport is not None:
-                    controller.runtime_transport = RuntimeTransportConfig.from_data(registered.runtime_transport)
+            controller.resolve_configuration()
         return hardware
 
     def load_secrets(self, config_path: Path) -> "SdkSecrets":

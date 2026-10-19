@@ -15,8 +15,8 @@ from gerbera_sdk.models.hardware.connection import Connection
 
 @dataclass(frozen=True)
 class RuntimeWatchdogConfig:
-    heartbeat_interval_ms: int
-    heartbeat_timeout_ms: int
+    heartbeat_interval_ms: int = 500
+    heartbeat_timeout_ms: int = 2500
 
 
 @dataclass(frozen=True)
@@ -55,18 +55,30 @@ class RuntimeTransportConfig:
 
 @dataclass
 class Microcontroller:
-    name: str
-    port: str
-    fqbn: str
-    watchdog: RuntimeWatchdogConfig
+    name: str | None = None
+    port: str | None = None
+    fqbn: str | None = None
+    watchdog: RuntimeWatchdogConfig = field(default_factory=RuntimeWatchdogConfig)
     baud_rate: int = 115200
     description: Optional[str] = None
     connections: list[Connection] = field(default_factory=list)
-    config_path: Path = Path("config.json")
+    config_path: Path = Path(".gerbera/sdk/runtime.json")
     hardware_system_id: str | None = None
     device_id: str | None = None
     upload_port: str | None = None
     runtime_transport: RuntimeTransportConfig | None = None
+
+    def resolve_configuration(self) -> None:
+        if self.port is None or self.fqbn is None:
+            registered = self.get_registered_device()
+            if registered is None:
+                raise ValueError(f"No configured device matched ID: {self.device_id}")
+            if self.port is None:
+                self.port = registered["address"]
+            if self.fqbn is None:
+                self.fqbn = registered["fqbn"]
+        if self.name is None:
+            self.name = f"controller_{self.id[:8]}"
 
     @property
     def id(self) -> str:
@@ -116,9 +128,10 @@ class Microcontroller:
             raise ValueError("Devices are missing from project configuration")
         upload_port = self.firmware_upload_port
         for device in registry.values():
-            if self.device_id is not None and device.get("id") == self.device_id:
-                return device
-            if device.get("address") == upload_port:
+            if self.device_id is not None:
+                if device.get("id") == self.device_id:
+                    return device
+            elif device.get("address") == upload_port:
                 return device
         return None
 

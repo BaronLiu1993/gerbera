@@ -158,6 +158,7 @@ class GerberaRuntime:
     ) -> None:
         hardware_system_id = hardware_system.id
         for microcontroller in hardware_system.microcontrollers:
+            microcontroller.resolve_configuration()
             microcontroller.hardware_system_id = hardware_system_id
             microcontroller_id = microcontroller.id
             for connection in microcontroller.connections:
