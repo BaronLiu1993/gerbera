@@ -1,3 +1,4 @@
+from gerbera_harness.runtime.temporal_projection import TemporalStateProjection
 import json
 from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
@@ -92,7 +93,7 @@ class ReviewRuntime:
 
         self.memory.define_world_state(world_state)
         self.memory.update_hardware_state_by_name(hardware_state)
-        self.memory.rebuild_temporal_state()
+        TemporalStateProjection(self.memory).rebuild()
 
     def update_memory_with_review(self, agent_payload: dict[str, Any]) -> None:
         task_id = self.memory.require_task_state().current_task_id
@@ -105,7 +106,7 @@ class ReviewRuntime:
             task_id=task_id,
         )
         self.memory.insert_event(review_event)
-        self.memory.rebuild_temporal_state()
+        TemporalStateProjection(self.memory).rebuild()
 
     async def run_review(self) -> ExecuteProducerResult:
         client = self.model.get_agent_client()

@@ -1,3 +1,4 @@
+from gerbera_harness.runtime.temporal_projection import TemporalStateProjection
 import asyncio
 from dataclasses import dataclass
 from typing import Any
@@ -208,4 +209,4 @@ class ExecuteConsumerRuntime:
                 task_id=self.memory.require_task_state().current_task_id,
             )
         )
-        self.memory.rebuild_temporal_state()
+        TemporalStateProjection(self.memory).rebuild()

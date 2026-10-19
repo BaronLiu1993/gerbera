@@ -1,3 +1,4 @@
+from gerbera_harness.runtime.temporal_projection import TemporalStateProjection
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -111,7 +112,7 @@ class ObservationRuntime:
 
         self.memory.define_world_state(world_state)
         self.memory.update_hardware_state_by_name(hardware_state)
-        self.memory.rebuild_temporal_state()
+        TemporalStateProjection(self.memory).rebuild()
 
     def append_iteration_context(
         self,

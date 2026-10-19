@@ -1,3 +1,4 @@
+from gerbera_harness.runtime.temporal_projection import TemporalStateProjection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -91,4 +92,4 @@ class TaskLifecycleRuntime:
                 task_id=task.task_id,
             )
         )
-        self.memory.rebuild_temporal_state()
+        TemporalStateProjection(self.memory).rebuild()
