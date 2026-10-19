@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+from functools import cached_property
 import json
 
 from fastmcp import Client
 from pydantic import JsonValue
-from gerbera_protocol import RuntimeManifest
+from gerbera_protocol import ReadinessReport, RuntimeManifest
 
 from gerbera_harness.connectors.urls import require_remote_url
 from gerbera_harness.runtime.contracts import ResourceSource, ToolSource
@@ -28,19 +29,21 @@ class McpResourceSource:
 class GerberaSdkConnector:
     mcp_url: str
 
-    @property
+    @cached_property
     def tools(self) -> ToolSource:
         return McpToolSource(self.mcp_url)
 
-    @property
+    @cached_property
     def resources(self) -> ResourceSource:
         return McpResourceSource(self.mcp_url)
 
     async def connect(self) -> RuntimeManifest:
         manifest = await self.resources.read_resource("gerbera://manifest")
         result = RuntimeManifest.model_validate(manifest)
-        await self.tools.list_tools()
         return result
 
-    async def health(self) -> JsonValue:
-        return await self.tools.call_tool("get_event_listener_health", {})
+    async def health(self) -> ReadinessReport:
+        report = ReadinessReport.model_validate(await self.resources.read_resource("gerbera://readiness"))
+        if report.service != "sdk":
+            raise ValueError("Connector received readiness from a different service")
+        return report

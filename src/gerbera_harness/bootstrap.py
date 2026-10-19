@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from starlette.applications import Starlette
 
 from gerbera_harness.api.app import create_app
+from gerbera_harness.api.readiness import install_readiness
 from gerbera_harness.configuration import HarnessSettings
 from gerbera_harness.connectors.gerbera import GerberaSdkConnector
 from gerbera_harness.extensions import (
@@ -18,6 +19,7 @@ from gerbera_harness.infrastructure.sandbox import SandboxGateway
 from gerbera_harness.models.registry import default_model_registry
 from gerbera_harness.runtime.contracts import HarnessServices
 from gerbera_harness.runtime.harness import Harness, HarnessBuilder
+from gerbera_harness.runtime.readiness import HarnessReadiness
 from gerbera_harness.runtime.state_machine.loader import unique_json_object
 from gerbera_harness.runtime.workflows.presets import simple_workflow, structured_workflow
 from gerbera_harness.tools.sources import CompositeToolSource, LocalToolSource
@@ -30,6 +32,8 @@ def load_settings() -> tuple[HarnessSettings, Path]:
         import json
 
         payload = json.loads(path.read_text(), object_pairs_hook=unique_json_object)
+        if "MCP_URL" in os.environ:
+            payload["connector"] = {**payload.get("connector", {}), "mcp_url": os.environ["MCP_URL"]}
         return HarnessSettings.model_validate(payload), path.parent
     if "GERBERA_HARNESS_CONFIG" in os.environ:
         raise FileNotFoundError(f"Harness configuration not found: {path}")
@@ -45,12 +49,13 @@ def load_settings() -> tuple[HarnessSettings, Path]:
     return HarnessSettings.model_validate(payload), path.parent
 
 
-def build_harness(settings: HarnessSettings, root: Path) -> Harness:
+def build_harness(
+    settings: HarnessSettings, root: Path, connector: GerberaSdkConnector | None = None,
+) -> Harness:
     model = default_model_registry().build(settings.model)
     sources = [LocalToolSource()]
-    connector = None
     if settings.connector is not None:
-        connector = GerberaSdkConnector(settings.connector.mcp_url)
+        connector = connector or GerberaSdkConnector(settings.connector.mcp_url)
         sources.append(connector.tools)
     tools = CompositeToolSource(tuple(sources))
     services = HarnessServices(model, tools, connector.resources if connector else None)
@@ -95,17 +100,31 @@ def install_extensions(builder: HarnessBuilder, settings: HarnessSettings) -> No
 
 def create_server_app() -> Starlette:
     settings, root = load_settings()
-    harness = build_harness(settings, root)
+    connector = GerberaSdkConnector(settings.connector.mcp_url) if settings.connector else None
+    harness = build_harness(settings, root, connector)
+    readiness = HarnessReadiness(harness.services.tools, connector.health if connector else None)
     application = create_app(harness)
+    install_readiness(application, readiness)
     application_lifespan = application.router.lifespan_context
 
     @asynccontextmanager
     async def lifespan(app: Starlette):
-        if settings.connector is not None:
-            await GerberaSdkConnector(settings.connector.mcp_url).connect()
-        await harness.services.tools.list_tools()
-        async with application_lifespan(app):
-            yield
+        try:
+            if connector is not None:
+                await connector.connect()
+                report = await connector.health()
+                if not report.ready:
+                    raise RuntimeError("Configured SDK is not ready")
+            await harness.services.tools.list_tools()
+            async with application_lifespan(app):
+                readiness.phase = "ready"
+                try:
+                    yield
+                finally:
+                    readiness.phase = "stopping"
+        except BaseException:
+            readiness.phase = "failed"
+            raise
 
     application.router.lifespan_context = lifespan
     return application
