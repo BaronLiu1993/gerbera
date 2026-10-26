@@ -1,0 +1,19 @@
+src/gerbera_sdk/models/hardware/movement_system.py
+  s_eb6570f5ffe476::t_5e86d0e33bfbde 1-5,11,13,17,19,37,46,55,62,79,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "484f16ed4e53d2e196b0e6a42b88c51eecc4fefa",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
