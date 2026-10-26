@@ -1,6 +1,6 @@
 import pytest
 
-from gerbera_sdk.models.runtime.serial_protocol import (
+from gerbera_sdk.models.runtime.boards.serial_protocol import (
     MAX_SERIAL_MESSAGE_BYTES,
     SerialMessage,
     SerialMessageCodec,

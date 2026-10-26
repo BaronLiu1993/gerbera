@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 from gerbera_harness.api.readiness import install_readiness
 from gerbera_harness.runtime.readiness import HarnessReadiness
 from gerbera_protocol import ReadinessReport
-from gerbera_sdk.models.runtime.readiness import RuntimeReadiness
+from gerbera_sdk.models.runtime.server.readiness import RuntimeReadiness
 
 
 def thread(alive=True):

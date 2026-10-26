@@ -12,7 +12,7 @@ from gerbera_sdk.models.hardware.camera import (
     MJPEGSource,
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 
 
 class FakeCapture:
@@ -125,7 +125,7 @@ def test_start_propagates_camera_capture_failure(monkeypatch) -> None:
     )
     capture = FakeCapture(opened=False)
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        "gerbera_sdk.models.runtime.perception.camera_runtime.cv2.VideoCapture",
         lambda _: capture,
     )
 
@@ -151,12 +151,12 @@ def test_capture_frames_reads_requested_batch(
     runtime.build_camera_sessions()
     capture = FakeCapture(frame=camera.latest_frame.image)
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        "gerbera_sdk.models.runtime.perception.camera_runtime.cv2.VideoCapture",
         lambda _: capture,
     )
     sleep_calls = []
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.time.sleep",
+        "gerbera_sdk.models.runtime.perception.camera_runtime.time.sleep",
         lambda seconds: sleep_calls.append(seconds),
     )
 
@@ -222,7 +222,7 @@ def test_capture_loop_updates_latest_frame(
     session.stop_event = threading.Event()
     capture = FakeCapture(on_read=session.stop_event.set)
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.cv2.VideoCapture",
+        "gerbera_sdk.models.runtime.perception.camera_runtime.cv2.VideoCapture",
         lambda _: capture,
     )
 
@@ -252,7 +252,7 @@ def test_turn_on_camera_stream_starts_capture_thread(
         return thread
 
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.camera_runtime.threading.Thread",
+        "gerbera_sdk.models.runtime.perception.camera_runtime.threading.Thread",
         build_thread,
     )
 

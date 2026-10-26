@@ -6,7 +6,7 @@ import pytest
 
 from gerbera_sdk.firmware.reconciliation import FirmwareDependencies, FirmwareReconciler, InitialProvisioning
 from gerbera_sdk.firmware.flash import Flash
-from gerbera_sdk.models.runtime.board_runtime import FirmwareContractMismatch
+from gerbera_sdk.models.runtime.boards.board_runtime import FirmwareContractMismatch
 
 
 @pytest.fixture

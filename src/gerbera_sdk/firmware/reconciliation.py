@@ -5,7 +5,7 @@ import subprocess
 
 from gerbera_sdk.firmware.flash import Flash
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
-from gerbera_sdk.models.runtime.board_runtime import BoardRuntime, FirmwareContractMismatch
+from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime, FirmwareContractMismatch
 from gerbera_sdk.paths import FIRMWARE_PATH
 
 

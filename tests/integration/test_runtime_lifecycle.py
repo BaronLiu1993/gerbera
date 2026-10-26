@@ -3,13 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
+from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
 
 
 @pytest.fixture(autouse=True)
 def reconcile_firmware(monkeypatch):
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.runtime_lifecycle.FirmwareReconciler",
+        "gerbera_sdk.models.runtime.server.runtime_lifecycle.FirmwareReconciler",
         lambda runtime: SimpleNamespace(reconcile=lambda: runtime.prepare()),
     )
 

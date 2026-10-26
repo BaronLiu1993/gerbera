@@ -4,7 +4,7 @@ import pytest
 
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.runtime.command_acknowledgement import (
+from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
     CommandAcknowledgementRegistry,
 )
 

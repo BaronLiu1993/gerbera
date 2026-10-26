@@ -18,18 +18,34 @@ It is not responsible for:
 - pin modeling
 - board/package metadata for compilation
 
-## Files
+## Boundaries
 
 ```text
-server_runtime.py       MCP tools, events, listeners, and command dispatch.
-board_runtime.py        Per-process board transport pool and lifecycle.
-camera_runtime.py       Per-process camera transport, latest-frame cache, and lifecycle.
-command_runtime.py      Command compilation and response parsing.
-model_runtime.py        Model inference registration, output state, and lifecycle.
-runtime_lifecycle.py    SDK-owned preparation, resource startup and cleanup.
-storage.py              Stream schema preparation and bounded database startup wait.
-readiness.py            Live dependency readiness reports.
+boards/
+    board_runtime.py            Board sessions, handshake and transport lifecycle.
+    board_transport.py          Serial and Bluetooth transport implementations.
+    serial_protocol.py          Wire message encoding and decoding.
+commands/
+    command_runtime.py          Command compilation and response parsing.
+    command_acknowledgement.py  Pending command correlation and completion.
+perception/
+    camera_runtime.py           Camera capture, latest-frame cache and lifecycle.
+    model_runtime.py            Inference registration, output state and lifecycle.
+movement/
+    movement_runtime.py         Joint state, kinematics and motor coordination.
+state/
+    hardware_runtime.py         Connection state storage and snapshots.
+storage/
+    storage.py                  Stream schemas and bounded database startup wait.
+server/
+    server_runtime.py           MCP tools, resources, events and command dispatch.
+    runtime_lifecycle.py        SDK preparation, resource startup and cleanup.
+    readiness.py                Live dependency readiness reports.
 ```
+
+`server` composes the runtime capabilities and owns their startup order. The other
+folders own the board, command, perception, movement, state and persistence behavior
+that the server uses. Hardware declarations remain under `models/hardware`.
 
 ## Ownership
 

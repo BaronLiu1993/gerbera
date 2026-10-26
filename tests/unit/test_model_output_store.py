@@ -19,8 +19,8 @@ from gerbera_sdk.inference.models.vision_language_model.vision_language_model_in
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 
 
 class ObjectDetectionAdapter:

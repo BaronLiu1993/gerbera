@@ -13,16 +13,16 @@ from serial import SerialException
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
-from gerbera_sdk.models.runtime.board_transport import BoardTransport
-from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.command_acknowledgement import (
+from gerbera_sdk.models.runtime.boards.board_transport import BoardTransport
+from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
     CommandAcknowledgementRegistry,
 )
-from gerbera_sdk.models.runtime.hardware_runtime import (
+from gerbera_sdk.models.runtime.state.hardware_runtime import (
     ConnectionState,
     HardwareRuntime,
 )
-from gerbera_sdk.models.runtime.serial_protocol import SerialMessageCodec
+from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
 
 RECONNECT_ATTEMPTS = 3
 RECONNECT_BACKOFF_SECONDS = 0.25

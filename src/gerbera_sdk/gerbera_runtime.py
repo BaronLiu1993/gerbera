@@ -14,19 +14,19 @@ from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
-from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.command_acknowledgement import (
+from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
     CommandAcknowledgementRegistry,
 )
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.runtime_lifecycle import RuntimeLifecycle
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
-from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
-from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
-from gerbera_sdk.models.runtime.readiness import RuntimeReadiness
-from gerbera_sdk.models.runtime.storage import RuntimeStorage
+from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
+from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.movement.movement_runtime import MovementRuntime
+from gerbera_sdk.models.runtime.server.readiness import RuntimeReadiness
+from gerbera_sdk.models.runtime.storage.storage import RuntimeStorage
 
 
 class GerberaRuntime:

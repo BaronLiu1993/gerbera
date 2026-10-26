@@ -20,7 +20,7 @@ from gerbera_sdk.models.hardware.hardware_plan import (
     ResolvedBoard,
     ResolvedConnection,
 )
-from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 
 
 @dataclass(frozen=True)

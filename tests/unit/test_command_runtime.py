@@ -2,7 +2,7 @@ import pytest
 
 from gerbera_sdk.firmware.configurations import DEVICE_REGISTRY
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 
 
 def _connection(component_type: str) -> Connection:

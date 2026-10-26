@@ -6,7 +6,7 @@ from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_plan import StateKey
-from gerbera_sdk.models.runtime.serial_protocol import (
+from gerbera_sdk.models.runtime.boards.serial_protocol import (
     SerialMessage,
     SerialMessageCodec,
 )

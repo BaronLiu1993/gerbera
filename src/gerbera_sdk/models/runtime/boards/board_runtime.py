@@ -13,11 +13,11 @@ from gerbera_sdk.firmware.firmware_schema import (
     GERBERA_STOP,
 )
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
-from gerbera_sdk.models.runtime.serial_protocol import (
+from gerbera_sdk.models.runtime.boards.serial_protocol import (
     SerialMessage,
     SerialMessageCodec,
 )
-from gerbera_sdk.models.runtime.board_transport import (
+from gerbera_sdk.models.runtime.boards.board_transport import (
     BoardTransport,
     BoardTransportFactory,
 )

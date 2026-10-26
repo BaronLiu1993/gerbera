@@ -6,7 +6,7 @@ import psycopg
 import pytest
 
 from gerbera_sdk.models.hardware.database import Database
-from gerbera_sdk.models.runtime.storage import RuntimeStorage, connect_database
+from gerbera_sdk.models.runtime.storage.storage import RuntimeStorage, connect_database
 
 
 @pytest.fixture
@@ -17,23 +17,23 @@ def database():
 def test_sdk_retries_only_database_connection_failures(monkeypatch, database) -> None:
     connection = object()
     connect = Mock(side_effect=[psycopg.OperationalError("starting"), connection])
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.psycopg.connect", connect)
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.psycopg.connect", connect)
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.time.sleep", lambda seconds: None)
 
     assert connect_database(database) is connection
 
 
 def test_sdk_database_wait_has_a_deadline(monkeypatch, database) -> None:
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.psycopg.connect",
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.psycopg.connect",
                         Mock(side_effect=psycopg.OperationalError("not available")))
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.time.monotonic", Mock(side_effect=[0, 61]))
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.time.monotonic", Mock(side_effect=[0, 61]))
 
     with pytest.raises(TimeoutError, match="storage"):
         connect_database(database)
 
 
 def test_schema_errors_are_not_retried_as_readiness_failures(monkeypatch, database) -> None:
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.psycopg.connect",
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.psycopg.connect",
                         Mock(side_effect=psycopg.ProgrammingError("invalid schema")))
 
     with pytest.raises(psycopg.ProgrammingError):
@@ -53,14 +53,14 @@ def test_sdk_prepares_schema_as_owner_before_checking_writer(monkeypatch, databa
     cursor.__exit__ = Mock(return_value=None)
     connection = SimpleNamespace(cursor=lambda: cursor, execute=Mock())
     roles = []
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.get_device_builder",
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.get_device_builder",
                         lambda kind: SimpleNamespace(build_stream_contract=lambda item: contract))
 
     def connect(role):
         roles.append(role.user)
         return nullcontext(connection)
 
-    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.connect_database", connect)
+    monkeypatch.setattr("gerbera_sdk.models.runtime.storage.storage.connect_database", connect)
 
     RuntimeStorage(plan, database, owner).prepare()
 

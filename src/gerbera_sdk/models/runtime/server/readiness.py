@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
 from gerbera_protocol import ReadinessReport
-from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 

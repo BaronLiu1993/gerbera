@@ -7,11 +7,11 @@ import pytest
 from gerbera_sdk.firmware.board_definitions import ARDUINO_UNO
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
 from gerbera_sdk.models.hardware.microcontroller import RuntimeWatchdogConfig
-from gerbera_sdk.models.runtime.board_runtime import (
+from gerbera_sdk.models.runtime.boards.board_runtime import (
     BoardRuntime,
     BoardSession,
 )
-from gerbera_sdk.models.runtime.board_transport import SerialBoardTransport
+from gerbera_sdk.models.runtime.boards.board_transport import SerialBoardTransport
 
 
 class HandshakeConnection:

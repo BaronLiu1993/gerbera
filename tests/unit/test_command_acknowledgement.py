@@ -1,6 +1,6 @@
 import pytest
 
-from gerbera_sdk.models.runtime.command_acknowledgement import (
+from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
     CommandAcknowledgementRegistry,
 )
 

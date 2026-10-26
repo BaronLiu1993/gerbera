@@ -20,7 +20,7 @@ from gerbera_sdk.inference.model_runtime_strategies import (
     VisionLanguageRuntimeStrategy,
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 
 ModelOutput: TypeAlias = (
     ObjectDepthStateModel

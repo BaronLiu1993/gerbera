@@ -30,18 +30,18 @@ from gerbera_sdk.models.hardware.hardware_plan import (
     ResolvedConnection,
     StateKey,
 )
-from gerbera_sdk.models.runtime.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.command_acknowledgement import (
+from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
     CommandAcknowledgementRegistry,
 )
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.hardware_runtime import (
+from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.state.hardware_runtime import (
     ConnectionState,
     HardwareRuntime,
 )
-from gerbera_sdk.models.runtime.movement_runtime import MovementRuntime
+from gerbera_sdk.models.runtime.movement.movement_runtime import MovementRuntime
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
 from gerbera_sdk.events.reactions.reaction_schema import (

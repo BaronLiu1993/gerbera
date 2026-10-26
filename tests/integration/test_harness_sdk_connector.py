@@ -6,7 +6,7 @@ from fastmcp import Client, FastMCP
 from gerbera_harness.connectors import gerbera as connector_module
 from gerbera_harness.connectors.gerbera import GerberaSdkConnector
 from gerbera_protocol import ReadinessReport, RuntimeManifest
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
 
 
 def test_connector_reads_sdk_resources_without_sharing_python_objects(monkeypatch):

@@ -38,14 +38,14 @@ from gerbera_sdk.models.hardware.microcontroller import (
     RuntimeWatchdogConfig,
 )
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
-from gerbera_sdk.models.runtime.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.command_acknowledgement import (
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
     CommandAcknowledgementRegistry,
 )
-from gerbera_sdk.models.runtime.hardware_runtime import HardwareRuntime
-from gerbera_sdk.models.runtime.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.server_runtime import ServerRuntime
-from gerbera_sdk.models.runtime.serial_protocol import SerialMessageCodec
+from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
 
 
 class FakeApp:

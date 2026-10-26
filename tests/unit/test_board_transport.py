@@ -6,7 +6,7 @@ from gerbera_sdk.models.hardware.microcontroller import (
     RuntimeTransportConfig,
     RuntimeWatchdogConfig,
 )
-from gerbera_sdk.models.runtime.board_transport import (
+from gerbera_sdk.models.runtime.boards.board_transport import (
     BoardTransportFactory,
     SerialBoardTransport,
 )
