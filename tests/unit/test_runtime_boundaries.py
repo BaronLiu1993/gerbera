@@ -77,13 +77,13 @@ def test_runtime_shares_acknowledgement_registry(monkeypatch) -> None:
     class CapturingEventListener:
         def __init__(self, **dependencies) -> None:
             registries["listener"] = dependencies[
-                "command_acknowledgements"
+                "command_responses"
             ]
 
     class CapturingServerRuntime:
         def __init__(self, **dependencies) -> None:
             registries["server"] = dependencies[
-                "command_acknowledgements"
+                "command_responses"
             ]
 
         def register_events(self) -> None:

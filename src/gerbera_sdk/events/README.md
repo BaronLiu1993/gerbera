@@ -131,7 +131,7 @@ Examples:
 ```
 
 Stream helper tools also maintain `stream_enabled`, but serial MCP/STREAM
-readings and normal write acknowledgements now report returned data under the
+readings and normal write command responses now report returned data under the
 semantic state field they modify or observe.
 
 That identifier is generated from:

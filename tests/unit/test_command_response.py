@@ -1,12 +1,12 @@
 import pytest
 
-from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
-    CommandAcknowledgementRegistry,
+from gerbera_sdk.models.runtime.commands.command_response import (
+    CommandResponseRegistry,
 )
 
 
 def test_registry_resolves_commands_out_of_order() -> None:
-    registry = CommandAcknowledgementRegistry()
+    registry = CommandResponseRegistry()
     first = registry.register("board-1")
     second = registry.register("board-1")
 
@@ -23,7 +23,7 @@ def test_registry_resolves_commands_out_of_order() -> None:
 
 
 def test_registry_propagates_board_errors() -> None:
-    registry = CommandAcknowledgementRegistry()
+    registry = CommandResponseRegistry()
     pending = registry.register("board-1")
     registry.fail(pending.command_id, "invalid_state")
 
@@ -32,7 +32,7 @@ def test_registry_propagates_board_errors() -> None:
 
 
 def test_registry_fails_only_disconnected_board_commands() -> None:
-    registry = CommandAcknowledgementRegistry()
+    registry = CommandResponseRegistry()
     disconnected = registry.register("board-1")
     connected = registry.register("board-2")
 
@@ -46,15 +46,15 @@ def test_registry_fails_only_disconnected_board_commands() -> None:
 
 
 def test_registry_times_out_unacknowledged_command() -> None:
-    registry = CommandAcknowledgementRegistry()
+    registry = CommandResponseRegistry()
     pending = registry.register("board-1")
 
-    with pytest.raises(TimeoutError, match="acknowledgement timed out"):
+    with pytest.raises(TimeoutError, match="command response timed out"):
         registry.wait(pending, 0)
 
 
 def test_registry_removes_timed_out_command() -> None:
-    registry = CommandAcknowledgementRegistry()
+    registry = CommandResponseRegistry()
     pending = registry.register("board-1")
 
     try:

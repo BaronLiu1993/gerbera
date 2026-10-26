@@ -27,7 +27,7 @@ boards/
     serial_protocol.py          Wire message encoding and decoding.
 commands/
     command_runtime.py          Command compilation and response parsing.
-    command_acknowledgement.py  Pending command correlation and completion.
+    command_response.py  Pending command correlation and completion.
 perception/
     camera_runtime.py           Camera capture, latest-frame cache and lifecycle.
     model_runtime.py            Inference registration, output state and lifecycle.

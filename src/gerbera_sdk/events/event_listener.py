@@ -15,8 +15,8 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.boards.board_transport import BoardTransport
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
-    CommandAcknowledgementRegistry,
+from gerbera_sdk.models.runtime.commands.command_response import (
+    CommandResponseRegistry,
 )
 from gerbera_sdk.models.runtime.state.hardware_runtime import (
     ConnectionState,
@@ -63,7 +63,7 @@ class EventListener:
     event_bus: EventBus
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
-    command_acknowledgements: CommandAcknowledgementRegistry
+    command_responses: CommandResponseRegistry
     reconnect_board: Callable[[str], None] | None = None
 
     reaction_executor: ThreadPoolExecutor = field(
@@ -113,7 +113,7 @@ class EventListener:
             self.stop_event.set()
             threads = list(self.threads.items())
 
-        self.command_acknowledgements.fail_all(
+        self.command_responses.fail_all(
             "Event listeners are stopping"
         )
 
@@ -151,7 +151,7 @@ class EventListener:
             except (KeyError, OSError, SerialException) as exc:
                 if self.stop_event.is_set():
                     return
-                self.command_acknowledgements.fail_board(
+                self.command_responses.fail_board(
                     microcontroller_id,
                     f"Board transport disconnected: {exc}",
                 )
@@ -186,7 +186,7 @@ class EventListener:
         message = SerialMessageCodec.decode(line)
         payload = dict(message.fields)
         if message.message_type == "MCP":
-            if self.resolve_acknowledgement(payload):
+            if self.resolve_command_response(payload):
                 if not payload:
                     self.record_success(microcontroller_id)
                     return
@@ -211,16 +211,16 @@ class EventListener:
         )
         self.record_success(microcontroller_id)
 
-    def resolve_acknowledgement(self, payload: dict[str, str]) -> bool:
+    def resolve_command_response(self, payload: dict[str, str]) -> bool:
         command_id = payload.pop(COMMAND_ID_FIELD, None)
         if command_id is None:
             return False
         error = payload.get("error")
         if error is not None:
-            self.command_acknowledgements.fail(command_id, error)
+            self.command_responses.fail(command_id, error)
             payload.clear()
             return True
-        self.command_acknowledgements.resolve(command_id, payload)
+        self.command_responses.resolve(command_id, payload)
         return True
 
     def reconnect(self, microcontroller_id: str) -> None:

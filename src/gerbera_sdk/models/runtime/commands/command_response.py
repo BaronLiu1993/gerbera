@@ -14,7 +14,7 @@ class PendingCommand:
 
 
 @dataclass
-class CommandAcknowledgementRegistry:
+class CommandResponseRegistry:
     pending_commands: dict[str, PendingCommand] = field(default_factory=dict)
     lock: threading.RLock = field(
         default_factory=threading.RLock,
@@ -36,7 +36,7 @@ class CommandAcknowledgementRegistry:
         command_id: str,
         payload: Mapping[str, str],
     ) -> bool:
-        pending = self._remove(command_id)
+        pending = self.remove(command_id)
         if pending is None:
             return False
         pending.payload = dict(payload)
@@ -44,7 +44,7 @@ class CommandAcknowledgementRegistry:
         return True
 
     def fail(self, command_id: str, error: str) -> bool:
-        pending = self._remove(command_id)
+        pending = self.remove(command_id)
         if pending is None:
             return False
         pending.error = error
@@ -60,13 +60,13 @@ class CommandAcknowledgementRegistry:
             ]
             for pending in matching:
                 self.pending_commands.pop(pending.command_id, None)
-        self._fail_commands(matching, error)
+        self.fail_commands(matching, error)
 
     def fail_all(self, error: str) -> None:
         with self.lock:
             pending = list(self.pending_commands.values())
             self.pending_commands.clear()
-        self._fail_commands(pending, error)
+        self.fail_commands(pending, error)
 
     def wait(
         self,
@@ -74,20 +74,20 @@ class CommandAcknowledgementRegistry:
         timeout_seconds: float,
     ) -> dict[str, str]:
         if not pending.completion.wait(timeout_seconds):
-            self._remove(pending.command_id)
+            self.remove(pending.command_id)
             raise TimeoutError(
-                f"Board acknowledgement timed out: {pending.command_id}"
+                f"Board command response timed out: {pending.command_id}"
             )
         if pending.error is not None:
             raise RuntimeError(pending.error)
         return pending.payload or {}
 
-    def _remove(self, command_id: str) -> PendingCommand | None:
+    def remove(self, command_id: str) -> PendingCommand | None:
         with self.lock:
             return self.pending_commands.pop(command_id, None)
 
     @staticmethod
-    def _fail_commands(
+    def fail_commands(
         pending_commands: list[PendingCommand],
         error: str,
     ) -> None:

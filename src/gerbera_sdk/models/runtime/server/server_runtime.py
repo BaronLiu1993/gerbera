@@ -33,8 +33,8 @@ from gerbera_sdk.models.hardware.hardware_plan import (
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
-    CommandAcknowledgementRegistry,
+from gerbera_sdk.models.runtime.commands.command_response import (
+    CommandResponseRegistry,
 )
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.state.hardware_runtime import (
@@ -88,7 +88,7 @@ class ServerRuntime:
     event_listener: EventListener
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
-    command_acknowledgements: CommandAcknowledgementRegistry
+    command_responses: CommandResponseRegistry
     movement_runtime: MovementRuntime | None = None
     reaction_tool_registry: ReactionToolRegistry = field(
         default_factory=ReactionToolRegistry
@@ -237,7 +237,7 @@ class ServerRuntime:
         action: str,
         params: dict[str, object],
     ) -> dict[str, object]:
-        pending = self.command_acknowledgements.register(
+        pending = self.command_responses.register(
             board.microcontroller_id
         )
         try:
@@ -254,12 +254,12 @@ class ServerRuntime:
                 pending.command_id,
             )
             transport.write(correlated_command)
-            payload = self.command_acknowledgements.wait(
+            payload = self.command_responses.wait(
                 pending,
                 self.event_read_timeout_seconds,
             )
         except Exception as exc:
-            self.command_acknowledgements.fail(
+            self.command_responses.fail(
                 pending.command_id,
                 str(exc),
             )

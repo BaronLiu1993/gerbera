@@ -4,8 +4,8 @@ import pytest
 
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
-    CommandAcknowledgementRegistry,
+from gerbera_sdk.models.runtime.commands.command_response import (
+    CommandResponseRegistry,
 )
 
 
@@ -17,7 +17,7 @@ def make_listener(reconnect_board) -> EventListener:
         event_bus=dependency,
         reaction_bus=dependency,
         hardware_runtime=dependency,
-        command_acknowledgements=CommandAcknowledgementRegistry(),
+        command_responses=CommandResponseRegistry(),
         reconnect_board=reconnect_board,
     )
 
@@ -101,7 +101,7 @@ def test_malformed_message_does_not_stop_later_events() -> None:
         hardware_runtime=SimpleNamespace(
             update_state=lambda key, state: updated_states.append((key, state))
         ),
-        command_acknowledgements=CommandAcknowledgementRegistry(),
+        command_responses=CommandResponseRegistry(),
     )
 
     listener.listen_loop("board-1")

@@ -101,7 +101,7 @@ STREAM,<connection.event_name>,key:value
 ```
 
 Every command response echoes the host-generated `command_id`. The runtime uses
-it to match concurrent acknowledgements and removes it before updating hardware
+it to match concurrent command responses and removes it before updating hardware
 state or evaluating reactions. Stream events are unsolicited and therefore do
 not include a command ID.
 

@@ -39,8 +39,8 @@ from gerbera_sdk.models.hardware.microcontroller import (
 )
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.commands.command_acknowledgement import (
-    CommandAcknowledgementRegistry,
+from gerbera_sdk.models.runtime.commands.command_response import (
+    CommandResponseRegistry,
 )
 from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
@@ -113,7 +113,7 @@ def make_server(
     event_worker=None,
     hardware_runtime=None,
     reaction_bus=None,
-    command_acknowledgements=None,
+    command_responses=None,
 ) -> tuple[ServerRuntime, FakeApp]:
     app = FakeApp()
     system = hardware_system or HardwareSystem(name="test")
@@ -133,9 +133,9 @@ def make_server(
         event_listener=SimpleNamespace(),
         reaction_bus=reaction_bus or ReactionBus(),
         hardware_runtime=hardware_runtime or HardwareRuntime(),
-        command_acknowledgements=(
-            command_acknowledgements
-            or CommandAcknowledgementRegistry()
+        command_responses=(
+            command_responses
+            or CommandResponseRegistry()
         ),
     )
     return runtime, app
@@ -161,10 +161,10 @@ def test_listener_acknowledgement_completes_server_command(
     )
     system = HardwareSystem(name="test", microcontrollers=[board])
     board.hardware_system_id = system.id
-    registry = CommandAcknowledgementRegistry()
+    registry = CommandResponseRegistry()
     runtime, _ = make_server(
         hardware_system=system,
-        command_acknowledgements=registry,
+        command_responses=registry,
     )
     listener = EventListener(
         hardware_plan=runtime.hardware_plan,
@@ -172,13 +172,13 @@ def test_listener_acknowledgement_completes_server_command(
         event_bus=runtime.event_bus,
         reaction_bus=runtime.reaction_bus,
         hardware_runtime=runtime.hardware_runtime,
-        command_acknowledgements=registry,
+        command_responses=registry,
     )
 
     class AcknowledgingTransport:
         def write(self, command: str) -> None:
             message = SerialMessageCodec.decode(command)
-            listener.resolve_acknowledgement(
+            listener.resolve_command_response(
                 {
                     "command_id": message.fields["command_id"],
                     "obstacle_detected": "1",
