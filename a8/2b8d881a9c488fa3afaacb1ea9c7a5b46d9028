@@ -1,0 +1,25 @@
+tests/integration/test_harness_sdk_connector.py
+  s_eb6570f5ffe476::t_758596fb189491 41
+  s_eb6570f5ffe476::t_65fc14c27d0107 34-35
+tests/integration/test_harness_service_startup.py
+  s_eb6570f5ffe476::t_758596fb189491 24,54,66
+tests/unit/test_service_readiness.py
+  s_eb6570f5ffe476::t_758596fb189491 39,86
+  s_eb6570f5ffe476::t_65fc14c27d0107 44-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a82b8d881a9c488fa3afaacb1ea9c7a5b46d9028",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
