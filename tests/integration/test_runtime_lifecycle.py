@@ -7,10 +7,10 @@ from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
 
 
 @pytest.fixture(autouse=True)
-def reconcile_firmware(monkeypatch):
+def verify_firmware(monkeypatch):
     monkeypatch.setattr(
-        "gerbera_sdk.models.runtime.server.runtime_lifecycle.FirmwareReconciler",
-        lambda runtime: SimpleNamespace(reconcile=lambda: runtime.prepare()),
+        "gerbera_sdk.models.runtime.server.runtime_lifecycle.FirmwareVerifier",
+        lambda runtime: SimpleNamespace(verify=lambda: runtime.prepare()),
     )
 
 
@@ -26,7 +26,7 @@ def build_lifecycle(
 
     return RuntimeLifecycle(
         board_runtime=SimpleNamespace(
-            prepare=lambda: calls.append("firmware.reconcile"),
+            prepare=lambda: calls.append("firmware.verify"),
             start=lambda: calls.append("board.start"),
             close=lambda: calls.append("board.close"),
         ),
@@ -83,7 +83,7 @@ def test_runtime_orchestrates_resources_in_dependency_order(
 
     assert calls == [
         "storage.prepare",
-        "firmware.reconcile",
+        "firmware.verify",
         "board.start",
         "movement.reset",
         "cameras.start",
@@ -116,7 +116,7 @@ def test_runtime_cleans_started_dependencies_when_model_start_fails() -> None:
     assert exc.value is failure
     assert calls == [
         "storage.prepare",
-        "firmware.reconcile",
+        "firmware.verify",
         "board.start",
         "movement.reset",
         "cameras.start",
@@ -178,3 +178,23 @@ def test_interrupted_camera_start_cleans_partial_dependencies() -> None:
         asyncio.run(serve())
 
     assert calls[-2:] == ["cameras.close", "board.close"]
+
+
+def test_firmware_mismatch_stops_startup_before_hardware_starts(monkeypatch) -> None:
+    calls = []
+    lifecycle = build_lifecycle(calls)
+
+    def fail_verification():
+        calls.append("firmware.verify")
+        raise RuntimeError("firmware mismatch")
+
+    lifecycle.board_runtime.prepare = fail_verification
+
+    async def serve():
+        async with lifecycle(SimpleNamespace()):
+            raise AssertionError("startup should fail")
+
+    with pytest.raises(RuntimeError, match="firmware mismatch"):
+        asyncio.run(serve())
+
+    assert calls == ["storage.prepare", "firmware.verify"]

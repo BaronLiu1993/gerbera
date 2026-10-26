@@ -9,7 +9,8 @@ from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.firmware.reconciliation import FirmwareDependencies, FirmwareReconciler
+from gerbera_sdk.firmware.firmware_dependencies import FirmwareDependencies
+from gerbera_sdk.firmware.firmware_verifier import FirmwareVerifier
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
@@ -37,7 +38,7 @@ class GerberaRuntime:
         GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
         hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
 
-        FirmwareReconciler(BoardRuntime(hardware_plan)).reconcile()
+        FirmwareVerifier(BoardRuntime(hardware_plan)).verify()
 
     @staticmethod
     def run(

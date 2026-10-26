@@ -63,7 +63,7 @@ that the server uses. Hardware declarations remain under `models/hardware`.
 - binding executable actions onto connections
 - command dispatch through board transport
 
-`RuntimeLifecycle` owns storage preparation, firmware reconciliation and resource
+`RuntimeLifecycle` owns storage preparation, firmware verification and resource
 startup/shutdown order. Every normal SDK server startup uses it, independently of
 the CLI. Cleanup callbacks are registered before starting dependencies so partial
 startup failures and interruptions release already-owned resources.

@@ -7,7 +7,6 @@ import uuid
 import questionary
 
 from gerbera_sdk.firmware.boards import BOARD_REGISTRY
-from gerbera_sdk.paths import FIRMWARE_PATH
 from gerbera_sdk.server.configuration import RegisteredDevice, SdkSettings
 
 
@@ -29,14 +28,7 @@ def discover_boards() -> dict[str, dict]:
 
 def initialise_sdk(path: Path) -> None:
     if path.exists():
-        for device in SdkSettings.load(path).devices.values():
-            authorization = FIRMWARE_PATH / device.id / "provisioning.json"
-            if not authorization.exists() and questionary.confirm(
-                f"Authorize an initial firmware upload to {device.address} ({device.fqbn})? "
-                "Only do this after checking the physical board and upload port.",
-                default=False,
-            ).ask():
-                authorize_provisioning(device)
+        SdkSettings.load(path)
         return
     detected = discover_boards()
     if not detected:
@@ -71,18 +63,6 @@ def initialise_sdk(path: Path) -> None:
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(settings.model_dump_json(indent=2))
-    for device in devices.values():
-        authorize_provisioning(device)
-
-
-def authorize_provisioning(device: RegisteredDevice) -> None:
-    directory = FIRMWARE_PATH / device.id
-    directory.mkdir(parents=True, exist_ok=True)
-    authorization = directory / "provisioning.json"
-    authorization.touch(mode=0o600, exist_ok=False)
-    authorization.write_text(json.dumps({
-        "microcontroller_id": device.id, "fqbn": device.fqbn, "upload_port": device.address,
-    }))
 
 
 def controller_source(index: int, device: RegisteredDevice) -> str:

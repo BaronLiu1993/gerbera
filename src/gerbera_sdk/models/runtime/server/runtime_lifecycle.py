@@ -12,7 +12,7 @@ from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.movement.movement_runtime import MovementRuntime
-from gerbera_sdk.firmware.reconciliation import FirmwareReconciler
+from gerbera_sdk.firmware.firmware_verifier import FirmwareVerifier
 from gerbera_sdk.models.runtime.server.readiness import RuntimeReadiness
 from gerbera_sdk.models.runtime.storage.storage import RuntimeStorage
 
@@ -63,7 +63,7 @@ class RuntimeLifecycle:
         try:
             if self.storage is not None:
                 self.storage.prepare()
-            FirmwareReconciler(self.board_runtime).reconcile()
+            FirmwareVerifier(self.board_runtime).verify()
             startup_cleanup.callback(self.board_runtime.close)
             self.board_runtime.start()
 
