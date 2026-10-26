@@ -17,7 +17,7 @@ class VisionLanguageModelAdapter(ABC):
     timeout_seconds: float = 120.0
 
     @staticmethod
-    def _parse_json_output(output_text: str) -> dict[str, object]:
+    def parse_json_output(output_text: str) -> dict[str, object]:
         output = json.loads(output_text)
         if not isinstance(output, dict):
             raise RuntimeError(
@@ -26,7 +26,7 @@ class VisionLanguageModelAdapter(ABC):
         return output
 
     @staticmethod
-    def _raise_for_status(
+    def raise_for_status(
         response: httpx.Response,
         provider: str,
     ) -> None:
@@ -87,8 +87,8 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        return self._parse_json_output(
-            self._request(
+        return self.parse_json_output(
+            self.request(
                 model_input=model_input,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -102,9 +102,9 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         system_prompt: str,
         user_prompt: str,
     ) -> str:
-        return self._request(model_input, system_prompt, user_prompt)
+        return self.request(model_input, system_prompt, user_prompt)
 
-    def _request(
+    def request(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
@@ -143,7 +143,7 @@ class AnthropicVisionLanguageModelAdapter(VisionLanguageModelAdapter):
             json=body,
             timeout=self.timeout_seconds,
         )
-        self._raise_for_status(response, "Anthropic")
+        self.raise_for_status(response, "Anthropic")
         payload = response.json()
         try:
             text = payload["content"][0]["text"]
@@ -173,8 +173,8 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        return self._parse_json_output(
-            self._request(
+        return self.parse_json_output(
+            self.request(
                 model_input=model_input,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -188,9 +188,9 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         system_prompt: str,
         user_prompt: str,
     ) -> str:
-        return self._request(model_input, system_prompt, user_prompt)
+        return self.request(model_input, system_prompt, user_prompt)
 
-    def _request(
+    def request(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
@@ -229,7 +229,7 @@ class OpenAIVisionLanguageModelAdapter(VisionLanguageModelAdapter):
             json=body,
             timeout=self.timeout_seconds,
         )
-        self._raise_for_status(response, "OpenAI")
+        self.raise_for_status(response, "OpenAI")
         payload = response.json()
         for output in payload.get("output", []):
             for content in output.get("content", []):
@@ -259,8 +259,8 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> dict[str, object]:
-        return self._parse_json_output(
-            self._request(
+        return self.parse_json_output(
+            self.request(
                 model_input=model_input,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -274,9 +274,9 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         system_prompt: str,
         user_prompt: str,
     ) -> str:
-        return self._request(model_input, system_prompt, user_prompt)
+        return self.request(model_input, system_prompt, user_prompt)
 
-    def _request(
+    def request(
         self,
         model_input: list[dict[str, object]],
         system_prompt: str,
@@ -315,7 +315,7 @@ class GoogleVisionLanguageModelAdapter(VisionLanguageModelAdapter):
             json=body,
             timeout=self.timeout_seconds,
         )
-        self._raise_for_status(response, "Google")
+        self.raise_for_status(response, "Google")
         payload = response.json()
         for candidate in payload.get("candidates", []):
             content = candidate.get("content", {})
