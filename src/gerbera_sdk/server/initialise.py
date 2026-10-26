@@ -90,5 +90,7 @@ def controller_source(index: int, device: RegisteredDevice) -> str:
         f"microcontroller_{index} = Microcontroller(\n"
         f"    device_id={device.id!r},\n"
         f"    name='controller_{index}',\n"
+        f"    port={device.address!r},\n"
+        f"    fqbn={device.fqbn!r},\n"
         ")"
     )

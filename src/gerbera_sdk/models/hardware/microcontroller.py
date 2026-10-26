@@ -1,8 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import field
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Annotated, Any
 
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic.dataclasses import dataclass
 import yaml
 
 from gerbera_sdk.firmware.configurations import get_device_builder
@@ -13,28 +15,30 @@ from gerbera_sdk.firmware.firmware_schema import (
 from gerbera_sdk.models.hardware.connection import Connection
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
 class RuntimeWatchdogConfig:
-    heartbeat_interval_ms: int = 500
-    heartbeat_timeout_ms: int = 2500
+    heartbeat_interval_ms: Annotated[int, Field(gt=0)] = 500
+    heartbeat_timeout_ms: Annotated[int, Field(gt=0)] = 2500
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
 class RuntimeTransportConfig:
     kind: BoardTransportKind
-    port: str
-    device_name: str | None = None
+    port: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    device_name: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
 
     @classmethod
     def from_data(
         cls,
         data: dict[str, Any],
     ) -> "RuntimeTransportConfig":
-        return cls(
-            kind=BoardTransportKind(data["kind"]),
-            port=data["port"],
-            device_name=data.get("device_name"),
-        )
+        return TypeAdapter(cls).validate_json(json.dumps(data))
+
+    @model_validator(mode="after")
+    def validate_device_name(self) -> "RuntimeTransportConfig":
+        if self.kind == BoardTransportKind.BLUETOOTH_CLASSIC and self.device_name is None:
+            raise ValueError("Bluetooth transport requires device_name")
+        return self
 
     @classmethod
     def usb_serial(cls, port: str) -> "RuntimeTransportConfig":
@@ -53,32 +57,30 @@ class RuntimeTransportConfig:
         )
 
 
-@dataclass
-class Microcontroller:
-    name: str | None = None
-    port: str | None = None
-    fqbn: str | None = None
-    watchdog: RuntimeWatchdogConfig = field(default_factory=RuntimeWatchdogConfig)
-    baud_rate: int = 115200
-    description: Optional[str] = None
-    connections: list[Connection] = field(default_factory=list)
-    config_path: Path = Path(".gerbera/sdk/runtime.json")
-    hardware_system_id: str | None = None
-    device_id: str | None = None
-    upload_port: str | None = None
+class RegisteredDevice(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid", validate_default=True)
+
+    id: str = Field(min_length=1, pattern=r"\S")
+    address: str = Field(min_length=1, pattern=r"\S")
+    protocol: str = Field(min_length=1, pattern=r"\S")
+    fqbn: str = Field(min_length=1, pattern=r"\S")
     runtime_transport: RuntimeTransportConfig | None = None
 
-    def resolve_configuration(self) -> None:
-        if self.port is None or self.fqbn is None:
-            registered = self.get_registered_device()
-            if registered is None:
-                raise ValueError(f"No configured device matched ID: {self.device_id}")
-            if self.port is None:
-                self.port = registered["address"]
-            if self.fqbn is None:
-                self.fqbn = registered["fqbn"]
-        if self.name is None:
-            self.name = f"controller_{self.id[:8]}"
+
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
+class Microcontroller:
+    name: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    port: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    fqbn: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    watchdog: RuntimeWatchdogConfig = field(default_factory=RuntimeWatchdogConfig)
+    baud_rate: Annotated[int, Field(gt=0)] = 115200
+    description: str | None = None
+    connections: list[Connection] = field(default_factory=list)
+    config_path: Path = Path(".gerbera/sdk/runtime.json")
+    hardware_system_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
+    device_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
+    upload_port: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
+    runtime_transport: RuntimeTransportConfig | None = None
 
     @property
     def id(self) -> str:
@@ -96,9 +98,9 @@ class Microcontroller:
             return self.runtime_transport
         registered_device = self.get_registered_device()
         if registered_device is not None:
-            transport_data = registered_device.get("runtime_transport")
+            transport_data = registered_device.runtime_transport
             if transport_data is not None:
-                return RuntimeTransportConfig.from_data(transport_data)
+                return transport_data
         return RuntimeTransportConfig.usb_serial(self.port)
 
     def get_microcontroller_id_from_config(self) -> str:
@@ -108,12 +110,9 @@ class Microcontroller:
                 "No configured device matched port for upload: "
                 f"{self.firmware_upload_port}"
             )
-        device_id = registered_device.get("id")
-        if not device_id:
-            raise ValueError("Configured microcontroller id is missing")
-        return device_id
+        return registered_device.id
 
-    def get_registered_device(self) -> dict[str, Any] | None:
+    def get_registered_device(self) -> RegisteredDevice | None:
         if not self.config_path.exists():
             if self.device_id is not None:
                 return None
@@ -127,11 +126,12 @@ class Microcontroller:
                 return None
             raise ValueError("Devices are missing from project configuration")
         upload_port = self.firmware_upload_port
-        for device in registry.values():
+        devices = TypeAdapter(dict[str, RegisteredDevice]).validate_json(json.dumps(registry))
+        for device in devices.values():
             if self.device_id is not None:
-                if device.get("id") == self.device_id:
+                if device.id == self.device_id:
                     return device
-            elif device.get("address") == upload_port:
+            elif device.address == upload_port:
                 return device
         return None
 

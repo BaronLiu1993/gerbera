@@ -6,15 +6,8 @@ from pydantic import Field
 import yaml
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+from gerbera_sdk.models.hardware.microcontroller import RegisteredDevice
 from gerbera_sdk.utils import StrictSchema
-
-
-class RegisteredDevice(StrictSchema):
-    id: str = Field(min_length=1)
-    address: str = Field(min_length=1)
-    protocol: str = Field(default="serial", min_length=1)
-    fqbn: str = Field(min_length=1)
-    runtime_transport: dict | None = None
 
 
 class SdkSettings(StrictSchema):
@@ -42,7 +35,7 @@ class SdkSettings(StrictSchema):
                 "secrets_file": ".gerbera/secrets/secrets.json",
                 "devices": payload.get("devices", {}), **runtime,
             }
-        return cls.model_validate(payload)
+        return cls.model_validate_json(json.dumps(payload))
 
     def load_hardware(self, config_path: Path) -> HardwareSystem:
         root = (config_path.parent / self.project_root).resolve()
@@ -57,7 +50,6 @@ class SdkSettings(StrictSchema):
             raise TypeError(f"{self.hardware_variable} must be a HardwareSystem")
         for controller in hardware.microcontrollers:
             controller.config_path = config_path
-            controller.resolve_configuration()
         return hardware
 
     def load_secrets(self, config_path: Path) -> "SdkSecrets":
