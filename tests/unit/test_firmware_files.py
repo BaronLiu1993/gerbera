@@ -3,7 +3,9 @@ import subprocess
 
 import pytest
 
-from gerbera_sdk.firmware.flash import Flash
+from gerbera_sdk.firmware.firmware_compiler import FirmwareCompiler
+from gerbera_sdk.firmware.firmware_uploader import FirmwareUploader
+from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.firmware.firmware_generator import (
     FirmwareFiles,
     FirmwareGenerator,
@@ -37,6 +39,7 @@ def test_generated_firmware_is_stored_in_gerbera(
         ),
     )
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
@@ -51,10 +54,10 @@ def test_generated_firmware_is_stored_in_gerbera(
     )
     board.hardware_system_id = hardware_system.id
 
-    sketch_paths = Flash.generate_files(hardware_system)
+    sketch_path = FirmwareGenerator(board).write_files()
 
     expected_path = Path(".gerbera/firmware/board-1/board-1.ino")
-    assert sketch_paths == {"board-1": expected_path}
+    assert sketch_path == expected_path
     assert expected_path.read_text() == "// sketch"
     assert (expected_path.parent / "GerberaRuntime.h").is_file()
     assert (expected_path.parent / "GerberaRuntime.cpp").is_file()
@@ -82,58 +85,73 @@ def make_bluetooth_hardware() -> HardwareSystem:
     return hardware
 
 
-def test_flash_uploads_through_the_usb_port(tmp_path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    commands: list[list[str]] = []
+@pytest.fixture
+def firmware_board():
+    return HardwareContractCompiler.compile(make_bluetooth_hardware()).boards[0]
+
+
+def test_compiler_only_compiles_generated_source(tmp_path, monkeypatch, firmware_board) -> None:
+    sketch_path = tmp_path / "board.ino"
+    sketch_path.write_text("void setup() {} void loop() {}")
+    commands = []
     monkeypatch.setattr(
-        "gerbera_sdk.firmware.flash.subprocess.run",
+        "gerbera_sdk.firmware.firmware_compiler.subprocess.run",
         lambda command, check: commands.append(command),
     )
 
-    Flash.flash_all(make_bluetooth_hardware())
+    build_path = FirmwareCompiler(firmware_board).compile(sketch_path)
 
-    upload_command = commands[1]
-    assert upload_command[upload_command.index("-p") + 1] == "/dev/usb-esp32"
+    assert commands == [[
+        "arduino-cli", "compile", "--fqbn", firmware_board.fqbn,
+        "--build-path", str(build_path), str(tmp_path),
+    ]]
 
 
-def test_flash_skips_a_current_contract(tmp_path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    commands: list[list[str]] = []
+def test_compiler_requires_generated_source(tmp_path, firmware_board) -> None:
+    with pytest.raises(FileNotFoundError, match="sketch not found"):
+        FirmwareCompiler(firmware_board).compile(tmp_path / "missing.ino")
+
+
+def test_compiler_propagates_build_failure(tmp_path, monkeypatch, firmware_board) -> None:
+    sketch_path = tmp_path / "board.ino"
+    sketch_path.touch()
+
+    def fail_compile(command, check):
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr("gerbera_sdk.firmware.firmware_compiler.subprocess.run", fail_compile)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        FirmwareCompiler(firmware_board).compile(sketch_path)
+
+
+def test_uploader_only_uploads_existing_build_through_usb(tmp_path, monkeypatch, firmware_board) -> None:
+    build_path = tmp_path / "build"
+    build_path.mkdir()
+    commands = []
     monkeypatch.setattr(
-        "gerbera_sdk.firmware.flash.subprocess.run",
+        "gerbera_sdk.firmware.firmware_uploader.subprocess.run",
         lambda command, check: commands.append(command),
     )
-    hardware = make_bluetooth_hardware()
-    Flash.flash_all(hardware)
-    commands.clear()
 
-    Flash.flash(hardware)
+    FirmwareUploader(firmware_board).upload(build_path)
 
-    assert commands == []
+    assert commands == [[
+        "arduino-cli", "upload", "-p", "/dev/usb-esp32",
+        "--fqbn", firmware_board.fqbn, "--input-dir", str(build_path), str(tmp_path),
+    ]]
 
 
-def test_failed_upload_does_not_record_firmware_digest(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    command_count = 0
+def test_uploader_requires_existing_build(tmp_path, firmware_board) -> None:
+    with pytest.raises(FileNotFoundError, match="directory not found"):
+        FirmwareUploader(firmware_board).upload(tmp_path / "missing")
 
-    def run_command(command, check):
-        nonlocal command_count
-        command_count += 1
-        if command_count == 2:
-            raise subprocess.CalledProcessError(1, command)
 
-    monkeypatch.setattr(
-        "gerbera_sdk.firmware.flash.subprocess.run",
-        run_command,
-    )
-    hardware = make_bluetooth_hardware()
+def test_uploader_propagates_upload_failure(tmp_path, monkeypatch, firmware_board) -> None:
+    def fail_upload(command, check):
+        raise subprocess.CalledProcessError(1, command)
 
-    with pytest.raises(RuntimeError):
-        Flash.flash_all(hardware)
+    monkeypatch.setattr("gerbera_sdk.firmware.firmware_uploader.subprocess.run", fail_upload)
 
-    assert not Path(
-        ".gerbera/firmware/esp32-1/installed.json"
-    ).exists()
+    with pytest.raises(subprocess.CalledProcessError):
+        FirmwareUploader(firmware_board).upload(tmp_path)

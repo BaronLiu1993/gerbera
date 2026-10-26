@@ -74,17 +74,16 @@ generation and the live runtime consume that same plan, preventing the two
 sides from silently drifting apart.
 
 At startup, the SDK validates the declaration, prepares stream storage, and
-reconciles firmware against a live board handshake. A confirmed contract mismatch
-triggers an update before normal connections start. An unknown identity or broken
-connection fails startup rather than triggering a blind upload. First-time uploads
-require the board-specific authorization created during SDK initialization.
+verifies firmware against a live board handshake. A contract mismatch, unknown
+identity or broken connection fails startup. Generating, compiling and uploading
+firmware are explicit SDK operations; startup never changes installed firmware.
 
 ### Ownership
 
 | Component | Owns | Does not own |
 | --- | --- | --- |
 | CLI | Deployment metadata, service launch/stop, readiness polling and logs | Hardware/model validation, firmware, schemas, agent execution |
-| SDK | Hardware declarations, validation, firmware reconciliation, connections, stream schemas and hardware readiness | Harness configuration or agent workflows |
+| SDK | Hardware declarations, validation, firmware generation/compilation/upload/verification, connections, stream schemas and hardware readiness | Harness configuration or agent workflows |
 | Harness | Models, workflows, tools, connector readiness and run lifecycle | SDK imports, board connections or firmware uploads |
 | Firmware | Physical I/O, component checks and watchdog safe-stop | Host-side workflow decisions |
 | `gerbera_protocol` | Versioned JSON wire contracts | Service orchestration or runtime objects |
@@ -181,7 +180,7 @@ gerbera up
 
 The CLI starts PostgreSQL and the SDK, then waits for the SDK's `/ready` report.
 Inside SDK startup, hardware is validated, storage becomes available, stream
-tables are prepared, firmware is reconciled, and board/camera/model/event
+tables are prepared, firmware is verified, and board/camera/model/event
 runtimes start. Only then does the CLI start the optional harness and wait for its
 readiness. A failed launch rolls back only services started by that invocation;
 database volumes are retained.
@@ -344,8 +343,9 @@ MCP and can run on a different machine. See the
 | `gerbera down` | Stop managed services without deleting data |
 
 Use `gerbera --help` or `gerbera <command> --help` for the installed command
-reference. There is no manual firmware command or flash-skip flag: reconciliation
-is part of SDK startup, not an optional deployment step.
+reference. Firmware generation, compilation and uploading use the explicit
+[SDK firmware APIs](src/gerbera_sdk/firmware/README.md). Startup always verifies
+the installed firmware and fails if it does not match the hardware configuration.
 
 ## Documentation
 

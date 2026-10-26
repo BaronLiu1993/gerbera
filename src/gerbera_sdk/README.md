@@ -72,11 +72,11 @@ flowchart TD
 Use `GerberaRuntime` in [gerbera_runtime.py](/Users/jiexuanliu/Desktop/firecracker/cli/src/gerbera_sdk/gerbera_runtime.py):
 
 - `setup(...)`
-  Validates hardware and reconciles firmware using the same live-handshake policy
-  as startup. It is not a way to bypass startup preparation.
+  Validates hardware and verifies installed firmware through a live handshake.
+  It does not generate, compile or upload firmware.
 
 - `run(...)`
-  Validates hardware, constructs runtimes, prepares storage, reconciles firmware,
+  Validates hardware, constructs runtimes, prepares storage, verifies firmware,
   starts dependencies, runs the MCP app, and closes resources on exit.
 
 The independently runnable entry point owns loading and validating SDK settings

@@ -1,1 +1,1 @@
-"""Firmware generation and flashing."""
+"""Firmware generation, compilation, uploading and verification."""

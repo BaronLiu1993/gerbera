@@ -6,8 +6,11 @@ The firmware folder owns Arduino sketch generation, parsing code, command routin
 
 ```text
 configurations.py       Registry for supported devices and microcontroller packages.
-firmware_generator.py   Assembles complete Arduino sketches.
-flash.py                Compiles/uploads generated sketches.
+firmware_generator.py   Generates Arduino runtime, component and command source; writes project files.
+firmware_compiler.py    Compiles an existing generated project into a binary.
+firmware_uploader.py    Uploads an existing compiled binary to the board.
+firmware_verifier.py    Checks installed firmware through a live board handshake.
+firmware_dependencies.py Installs Arduino cores and device libraries explicitly.
 devices/                Config-driven firmware device library and YAML configs.
 ```
 
@@ -44,7 +47,7 @@ This folder does not own:
 
 ```mermaid
 flowchart TD
-    A[Microcontroller] --> B[FirmwareGenerator.build]
+    A[Microcontroller] --> B[FirmwareGenerator.generate]
     B --> C[build includes]
     B --> D[build parser helpers]
     B --> E[build device definitions]
@@ -117,20 +120,33 @@ Pin assignments are represented separately in the board contract digest. At
 startup, the runtime requires the firmware digest and board ID to exactly match
 the compiled hardware plan before registering the serial connection.
 
-SDK startup owns firmware reconciliation, including when the SDK runs without
-the CLI. It reads the live identity/protocol/digest rather than trusting
-`installed.json`. A recognized board with an outdated contract is compiled,
-uploaded and checked again before connections start. Dependencies are installed
-only when missing and an update is required.
+SDK startup verifies the live identity, protocol and digest. Any mismatch or
+handshake failure stops startup without installing dependencies, generating code,
+compiling or uploading. Verification never relies on a local installed-firmware
+manifest.
 
-A timeout is not evidence of outdated firmware. First-time SDK initialization
-records explicit permission for the selected board ID, FQBN and USB upload port in
-`provisioning.json`. That permission is consumed immediately before upload, not
-during dependency installation or compilation. Other transport/identity failures
-fail startup without uploading. After a failed upload, check the physical board
-and rerun `python -m gerbera_sdk.server initialise` on the SDK host to explicitly
-authorize another initial upload; existing source/configuration is not replaced.
-CLI firmware commands and force/skip-flash options are intentionally absent.
+Firmware updates use four separate APIs. With a validated `hardware_plan`:
+
+```python
+from gerbera_sdk.firmware.firmware_compiler import FirmwareCompiler
+from gerbera_sdk.firmware.firmware_dependencies import FirmwareDependencies
+from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
+from gerbera_sdk.firmware.firmware_uploader import FirmwareUploader
+from gerbera_sdk.firmware.firmware_verifier import FirmwareVerifier
+from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
+
+FirmwareDependencies(hardware_plan).install()
+for board in hardware_plan.boards:
+    sketch_path = FirmwareGenerator(board).write_files()
+    build_path = FirmwareCompiler(board).compile(sketch_path)
+    FirmwareUploader(board).upload(build_path)
+FirmwareVerifier(BoardRuntime(hardware_plan)).verify()
+```
+
+`generate()` returns source text without writing files. `write_files()` saves the
+generated project and returns its sketch path. Compilation does not upload, and
+uploading does not generate or compile. The uploader uses the configured upload
+port; verification uses the configured runtime transport.
 
 ## Reaction
 
