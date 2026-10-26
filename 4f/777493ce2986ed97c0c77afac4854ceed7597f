@@ -1,0 +1,19 @@
+src/gerbera_sdk/inference/models/vision_language_model/vision_language_model_adapter.py
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 20,29,90-91,105,107,146,176-177,191,193,232,262-263,277,279,318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4f777493ce2986ed97c0c77afac4854ceed7597f",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
