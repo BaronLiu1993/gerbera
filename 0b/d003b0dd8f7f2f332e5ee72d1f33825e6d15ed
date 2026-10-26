@@ -1,0 +1,71 @@
+src/gerbera_sdk/models/runtime/server/readiness.py
+  s_eb6570f5ffe476::t_330669868acb8a 1-49
+tests/unit/test_camera_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 15,128,154,159,225,255
+tests/unit/test_firmware_reconciliation.py
+  s_eb6570f5ffe476::t_330669868acb8a 9
+src/gerbera_sdk/models/runtime/boards/board_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 1-390
+tests/unit/test_service_readiness.py
+  s_eb6570f5ffe476::t_330669868acb8a 12
+tests/unit/test_board_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 10,14
+src/gerbera_sdk/models/runtime/server/server_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 1-1227
+tests/unit/test_serial_protocol.py
+  s_eb6570f5ffe476::t_330669868acb8a 3
+src/gerbera_sdk/firmware/reconciliation.py
+  s_eb6570f5ffe476::t_330669868acb8a 8
+tests/integration/test_harness_sdk_connector.py
+  s_eb6570f5ffe476::t_330669868acb8a 9
+src/gerbera_sdk/models/runtime/perception/model_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 1-348
+src/gerbera_sdk/events/event_listener.py
+  s_eb6570f5ffe476::t_330669868acb8a 16-18,21,25
+src/gerbera_sdk/firmware/source_builders.py
+  s_eb6570f5ffe476::t_330669868acb8a 23
+tests/unit/test_board_transport.py
+  s_eb6570f5ffe476::t_330669868acb8a 9
+tests/unit/test_command_acknowledgement.py
+  s_eb6570f5ffe476::t_330669868acb8a 3
+src/gerbera_sdk/models/runtime/server/runtime_lifecycle.py
+  s_eb6570f5ffe476::t_330669868acb8a 1-14,16-65,67-101
+  s_eb6570f5ffe476::t_f9ea5e2058e6fd 15,66
+src/gerbera_sdk/models/runtime/README.md
+  s_eb6570f5ffe476::t_d4e226e66d8b62 21,24-43,46-48
+  s_eb6570f5ffe476::t_f0a6599a1e3d64 49
+tests/unit/test_model_output_store.py
+  s_eb6570f5ffe476::t_330669868acb8a 22-23
+tests/unit/test_event_listener.py
+  s_eb6570f5ffe476::t_330669868acb8a 7
+tests/integration/test_runtime_lifecycle.py
+  s_eb6570f5ffe476::t_330669868acb8a 6
+  s_eb6570f5ffe476::t_67f5a3024c04e3 12
+src/gerbera_sdk/models/runtime/commands/command_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 1-310
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 41-42,45-48
+tests/unit/test_runtime_storage.py
+  s_eb6570f5ffe476::t_330669868acb8a 9,20-21,27,29,36,56,63
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 17-20,23-28
+  s_eb6570f5ffe476::t_5d450c93e6547a 29
+tests/unit/test_command_runtime.py
+  s_eb6570f5ffe476::t_330669868acb8a 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0bd003b0dd8f7f2f332e5ee72d1f33825e6d15ed",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
