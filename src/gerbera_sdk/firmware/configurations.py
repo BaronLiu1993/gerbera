@@ -51,7 +51,7 @@ class DeviceRegistry:
             ) from exc
 
 
-def _load_device_definition(component_type: str) -> DeviceDefinition:
+def load_device_definition(component_type: str) -> DeviceDefinition:
     return DeviceDefinition(
         component_type=component_type,
         config=load_device_config(component_type),
@@ -59,13 +59,13 @@ def _load_device_definition(component_type: str) -> DeviceDefinition:
 
 
 DEVICE_DEFINITIONS = (
-    _load_device_definition("dcmotor"),
-    _load_device_definition("hcsr04"),
-    _load_device_definition("hw201"),
-    _load_device_definition("ky033"),
-    _load_device_definition("led"),
-    _load_device_definition("mg996r"),
-    _load_device_definition("sg90"),
+    load_device_definition("dcmotor"),
+    load_device_definition("hcsr04"),
+    load_device_definition("hw201"),
+    load_device_definition("ky033"),
+    load_device_definition("led"),
+    load_device_definition("mg996r"),
+    load_device_definition("sg90"),
 )
 
 DEVICE_REGISTRY = DeviceRegistry(DEVICE_DEFINITIONS)
