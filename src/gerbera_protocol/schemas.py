@@ -10,8 +10,6 @@ class RuntimeManifest(BaseModel):
 
     protocol_version: Literal["1"] = PROTOCOL_VERSION
     instance_id: str
-    capabilities: tuple[str, ...]
-    resource_uris: tuple[str, ...]
 
 
 class ReadinessReport(BaseModel):
@@ -19,7 +17,10 @@ class ReadinessReport(BaseModel):
 
     protocol_version: Literal["1"] = PROTOCOL_VERSION
     service: Literal["sdk", "harness"]
-    ready: bool
     phase: Literal["starting", "ready", "degraded", "failed", "stopping"]
     reasons: tuple[str, ...] = ()
     instance_id: str | None = None
+
+    @property
+    def ready(self) -> bool:
+        return self.phase == "ready"

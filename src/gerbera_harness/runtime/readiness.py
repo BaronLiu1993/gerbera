@@ -30,6 +30,6 @@ class HarnessReadiness:
                 except Exception:
                     reasons.append("Configured SDK readiness unavailable")
         return ReadinessReport(
-            service="harness", ready=not reasons, reasons=tuple(reasons),
+            service="harness", reasons=tuple(reasons),
             phase=self.phase if self.phase != "ready" else ("degraded" if reasons else "ready"),
         )

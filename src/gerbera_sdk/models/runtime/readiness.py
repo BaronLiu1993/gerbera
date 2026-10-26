@@ -43,7 +43,7 @@ class RuntimeReadiness:
         if self.worker.thread is None or not self.worker.thread.is_alive() or self.worker.failures:
             reasons.append("Device event storage worker unavailable")
         return ReadinessReport(
-            service="sdk", ready=not reasons,
+            service="sdk",
             phase=self.phase if self.phase != "ready" else ("degraded" if reasons else "ready"),
             reasons=tuple(reasons), instance_id=self.boards.hardware_plan.hardware_system_id,
         )
