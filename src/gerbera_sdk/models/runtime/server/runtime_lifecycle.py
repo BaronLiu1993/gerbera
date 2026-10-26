@@ -36,7 +36,7 @@ class RuntimeLifecycle:
         server: FastMCP,
     ) -> AsyncGenerator[dict[str, object], None]:
         try:
-            with self._start_resources():
+            with self.start_resources():
                 if self.readiness is not None:
                     self.readiness.phase = "ready"
                 try:
@@ -56,7 +56,7 @@ class RuntimeLifecycle:
                 self.readiness.phase = "failed"
             raise
 
-    def _start_resources(
+    def start_resources(
         self,
     ) -> ExitStack:
         startup_cleanup = ExitStack()
