@@ -1,19 +1,22 @@
-from dataclasses import dataclass, field
-from typing import Literal
+from dataclasses import field
+from typing import Annotated, Literal
+
+from pydantic import ConfigDict, Field
+from pydantic.dataclasses import dataclass
 from gerbera_sdk.models.hardware.connection import Connection
 
 Axis = Literal["x", "y", "z"]
 JointType = Literal["revolute", "prismatic", "continuous", "fixed"]
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class Link:
-    name: str
+    name: Annotated[str, Field(min_length=1, pattern=r"\S")]
     description: str = ""
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class BaseJoint:
-    name: str
+    name: Annotated[str, Field(min_length=1, pattern=r"\S")]
 
     # The edge that connects it.
     parent_link: Link  # the key to the link of the parent
@@ -31,7 +34,7 @@ class BaseJoint:
     joint_type: JointType = field(init=False)
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class RevoluteJoint(BaseJoint):
     joint_type: Literal["revolute"] = field(default="revolute", init=False)
     axis: Axis
@@ -40,7 +43,7 @@ class RevoluteJoint(BaseJoint):
     motor_connection: Connection  # match with the motor name 
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class PrismaticJoint(BaseJoint):
     joint_type: Literal["prismatic"] = field(default="prismatic", init=False)
     axis: Axis
@@ -49,14 +52,14 @@ class PrismaticJoint(BaseJoint):
     motor_connection: Connection  # match with the motor
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class ContinuousJoint(BaseJoint):
     joint_type: Literal["continuous"] = field(default="continuous", init=False)
     axis: Axis
     motor_connection: Connection  # match with the motor
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class FixedJoint(BaseJoint):
     joint_type: Literal["fixed"] = field(default="fixed", init=False)
     # TODO: Add a sensor/camera attachment model later. A sensor should be able
@@ -73,8 +76,8 @@ Joint = (
 )
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, allow_inf_nan=False))
 class MovementSystem:
-    name: str
+    name: Annotated[str, Field(min_length=1, pattern=r"\S")]
     base_link: Link
     joints: list[Joint] = field(default_factory=list)
