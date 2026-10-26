@@ -1,0 +1,33 @@
+src/gerbera_sdk/models/runtime/README.md
+  s_eb6570f5ffe476::t_8744dac73fd89c 66
+tests/integration/test_runtime_lifecycle.py
+  s_eb6570f5ffe476::t_aa25a141cdeb70 10,12-13,29,86,119,181-200
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_f9ea5e2058e6fd 12-13,41
+src/gerbera_sdk/firmware/firmware_verifier.py
+  s_eb6570f5ffe476::t_e80fd18a2f04da 1-21
+src/gerbera_sdk/firmware/firmware_dependencies.py
+  s_eb6570f5ffe476::t_f9ea5e2058e6fd 1-37
+tests/unit/test_firmware_verifier.py
+  s_eb6570f5ffe476::t_aa25a141cdeb70 1-70
+src/gerbera_sdk/server/initialise.py
+  s_eb6570f5ffe476::t_f9ea5e2058e6fd 31
+src/gerbera_sdk/models/runtime/server/runtime_lifecycle.py
+  s_eb6570f5ffe476::t_c709e9fa7b9495 15,66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c514796971db5e570a841ff4b8920068c7c13a8d",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
