@@ -1,0 +1,25 @@
+src/gerbera_sdk/models/hardware/camera.py
+  s_eb6570f5ffe476::t_e1e61b827c1926 1-2,5-7,9,11,14,16,22,24,27
+src/gerbera_sdk/models/hardware/pin.py
+  s_eb6570f5ffe476::t_e1e61b827c1926 1,3-4,6-7,9-10
+src/gerbera_sdk/models/hardware/connection.py
+  s_eb6570f5ffe476::t_e1e61b827c1926 1-5,10,12-14,16
+src/gerbera_sdk/models/hardware/database.py
+  s_eb6570f5ffe476::t_e1e61b827c1926 1-4,9,11-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d216afeee7755846b1c8294fa84dec8465c39f02",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
