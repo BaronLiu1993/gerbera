@@ -1,16 +1,19 @@
-from dataclasses import dataclass, field
-from typing import Callable
+from dataclasses import field
+from typing import Annotated, Callable
+
+from pydantic import ConfigDict, Field
+from pydantic.dataclasses import dataclass
 
 from gerbera_sdk.utils import build_connection_event_name
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
 class Connection:
-    name: str
-    component_type: str
-    pins: dict[str, str]
+    name: Annotated[str, Field(min_length=1, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
+    component_type: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    pins: dict[Annotated[str, Field(min_length=1, pattern=r"\S")], Annotated[str, Field(min_length=1, pattern=r"\S")]]
     description: str
-    microcontroller_id: str | None = None
+    microcontroller_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
     stream: bool = False
     actions: dict[
         str,

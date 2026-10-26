@@ -1,15 +1,18 @@
-from dataclasses import dataclass
+from typing import Annotated
+
+from pydantic import ConfigDict, Field
+from pydantic.dataclasses import dataclass
 import psycopg
 from psycopg import sql
 
 
-@dataclass
+@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
 class Database:
-    host: str
-    port: int
-    user: str
-    password: str
-    database_name: str
+    host: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    port: Annotated[int, Field(ge=1, le=65535)]
+    user: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    password: Annotated[str, Field(min_length=1)]
+    database_name: Annotated[str, Field(min_length=1, pattern=r"\S")]
 
     def write_database_table(
         self,
