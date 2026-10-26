@@ -31,14 +31,14 @@ def test_connector_reads_sdk_resources_without_sharing_python_objects(monkeypatc
 
     manifest, snapshot = asyncio.run(scenario())
 
-    assert (manifest.instance_id, manifest.protocol_version, snapshot) == (
-        "robot-1", "1", {"led": "off"},
+    assert (manifest.model_dump(), snapshot) == (
+        {"instance_id": "robot-1", "protocol_version": "1"}, {"led": "off"},
     )
 
 
 def test_connector_reads_service_readiness_not_just_listener_health(monkeypatch):
     app = FastMCP("readiness-sdk")
-    report = ReadinessReport(service="sdk", ready=False, phase="degraded", reasons=("Camera unavailable",))
+    report = ReadinessReport(service="sdk", phase="degraded", reasons=("Camera unavailable",))
 
     @app.resource("gerbera://readiness", mime_type="application/json")
     def readiness() -> str:

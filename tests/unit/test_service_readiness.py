@@ -36,9 +36,19 @@ def sdk_readiness():
 
 def test_sdk_reports_ready_only_after_all_dependencies_started(sdk_readiness) -> None:
     assert sdk_readiness.snapshot().model_dump() == {
-        "protocol_version": "1", "service": "sdk", "ready": True,
+        "protocol_version": "1", "service": "sdk",
         "phase": "ready", "reasons": (), "instance_id": "robot",
     }
+
+
+@pytest.mark.parametrize("phase, expected_ready", [
+    ("starting", False), ("ready", True), ("degraded", False),
+    ("failed", False), ("stopping", False),
+])
+def test_readiness_is_derived_from_phase(phase, expected_ready) -> None:
+    report = ReadinessReport(service="sdk", phase=phase)
+
+    assert report.ready is expected_ready
 
 
 @pytest.mark.parametrize("phase", ["starting", "failed", "stopping"])
@@ -73,7 +83,7 @@ class Tools:
 
 def test_harness_readiness_follows_remote_sdk_readiness() -> None:
     async def dependency():
-        return ReadinessReport(service="sdk", ready=False, phase="degraded")
+        return ReadinessReport(service="sdk", phase="degraded")
 
     report = asyncio.run(HarnessReadiness(Tools(), dependency, phase="ready").snapshot())
 

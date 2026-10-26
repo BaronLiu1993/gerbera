@@ -21,7 +21,7 @@ def configured_app(monkeypatch):
         tools=SimpleNamespace(list_tools=AsyncMock(return_value=[])),
         resources=SimpleNamespace(read_resource=AsyncMock()),
         connect=AsyncMock(),
-        health=AsyncMock(return_value=ReadinessReport(service="sdk", ready=True, phase="ready")),
+        health=AsyncMock(return_value=ReadinessReport(service="sdk", phase="ready")),
     )
     connectors = []
 
@@ -51,7 +51,7 @@ def test_configured_harness_becomes_unready_when_remote_sdk_degrades(configured_
     async def scenario():
         async with configured_app.app.router.lifespan_context(configured_app.app):
             configured_app.connector.health.return_value = ReadinessReport(
-                service="sdk", ready=False, phase="degraded",
+                service="sdk", phase="degraded",
             )
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(configured_app.app), base_url="http://harness",
@@ -63,7 +63,7 @@ def test_configured_harness_becomes_unready_when_remote_sdk_degrades(configured_
 
 def test_configured_harness_refuses_startup_when_sdk_is_unready(configured_app) -> None:
     configured_app.connector.health.return_value = ReadinessReport(
-        service="sdk", ready=False, phase="starting",
+        service="sdk", phase="starting",
     )
 
     async def scenario():
