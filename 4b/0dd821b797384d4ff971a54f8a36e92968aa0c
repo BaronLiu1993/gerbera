@@ -1,0 +1,27 @@
+src/gerbera_sdk/models/hardware/microcontroller.py
+  s_eb6570f5ffe476::t_254fc1e61b7858 101
+  s_eb6570f5ffe476::t_b89aceecd170fe 1,4,6-7,18,20-21,24,27-28,35-41,60-70,72-74,76-77,80-82,103,113,115,129-130,132,134
+src/gerbera_sdk/server/configuration.py
+  s_eb6570f5ffe476::t_254fc1e61b7858 9
+  s_eb6570f5ffe476::t_a86b9ed09db62f 38
+src/gerbera_sdk/models/hardware/hardware_system.py
+  s_eb6570f5ffe476::t_e1e61b827c1926 1-2,5-7,14,16,22
+src/gerbera_sdk/server/initialise.py
+  s_eb6570f5ffe476::t_254fc1e61b7858 93-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4b0dd821b797384d4ff971a54f8a36e92968aa0c",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
