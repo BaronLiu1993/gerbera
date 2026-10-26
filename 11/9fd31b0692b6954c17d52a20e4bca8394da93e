@@ -1,0 +1,39 @@
+src/gerbera_sdk/models/runtime/server/server_runtime.py
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 36-37,91,240,257,262
+tests/unit/test_event_listener.py
+  s_eb6570f5ffe476::t_081577b0677d76 7-8,20,104
+src/gerbera_sdk/events/event_listener.py
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 18-19,66,116,154,189,214,220,223
+src/gerbera_sdk/events/README.md
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 134
+src/gerbera_sdk/models/runtime/commands/command_response.py
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 1-96
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_081577b0677d76 80,86
+tests/unit/test_command_response.py
+  s_eb6570f5ffe476::t_081577b0677d76 1-65
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_081577b0677d76 42-43,116,136-138,164,167,175,181
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 21-22,81,88,142
+src/gerbera_sdk/models/runtime/README.md
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 30
+src/gerbera_sdk/firmware/README.md
+  s_eb6570f5ffe476::t_dcfab7d5506a9b 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "119fd31b0692b6954c17d52a20e4bca8394da93e",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
