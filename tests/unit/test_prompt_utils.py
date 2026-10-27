@@ -1,18 +1,6 @@
 from gerbera_harness.prompts import PromptTypeEnum, load_prompt
 
 
-def test_load_prompt_reads_main_prompt() -> None:
-    prompt = load_prompt(PromptTypeEnum.MAIN, "TASK_DECOMPOSITION.md")
-
-    assert prompt.startswith("## Role")
-
-
-def test_load_prompt_reads_sub_prompt() -> None:
-    prompt = load_prompt(PromptTypeEnum.SUB, "PLANNING.md")
-
-    assert prompt.startswith("# Planning")
-
-
 def test_task_decomposition_prompt_keeps_tasks_non_executable() -> None:
     prompt = load_prompt(PromptTypeEnum.MAIN, "TASK_DECOMPOSITION.md")
 

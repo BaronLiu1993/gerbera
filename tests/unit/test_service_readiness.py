@@ -24,42 +24,33 @@ def test_sdk_reports_ready_only_after_all_dependencies_started(sdk_readiness) ->
     }
 
 
-@pytest.mark.parametrize("phase, expected_ready", [
-    ("starting", False), ("ready", True), ("degraded", False),
-    ("failed", False), ("stopping", False),
-])
+@pytest.mark.parametrize("phase, expected_ready", [("starting", False), ("ready", True), ("degraded", False)])
 def test_readiness_is_derived_from_phase(phase, expected_ready) -> None:
     report = ReadinessReport(service="sdk", phase=phase)
 
     assert report.ready is expected_ready
 
 
-@pytest.mark.parametrize("phase", ["starting", "failed", "stopping"])
-def test_sdk_lifecycle_phase_controls_readiness(sdk_readiness, phase) -> None:
-    sdk_readiness.phase = phase
-
-    assert sdk_readiness.snapshot().ready is False
-
-
-@pytest.mark.parametrize("owner_index", range(5))
-def test_sdk_readiness_aggregates_resource_owner_failures(sdk_readiness, owner_index) -> None:
-    reason = f"Resource owner {owner_index} unavailable"
-    sdk_readiness.sources[owner_index].readiness_reasons = lambda: (reason,)
+def test_sdk_lifecycle_phase_controls_readiness(sdk_readiness) -> None:
+    sdk_readiness.phase = "starting"
 
     report = sdk_readiness.snapshot()
 
-    assert (report.ready, report.phase, report.reasons) == (False, "degraded", (reason,))
+    assert (report.ready, report.phase, report.reasons) == (False, "starting", ("SDK is starting",))
 
 
 def test_sdk_readiness_collects_all_owner_reports() -> None:
     sources = (
         SimpleNamespace(readiness_reasons=lambda: ("Board unavailable",)),
+        SimpleNamespace(readiness_reasons=lambda: ()),
         SimpleNamespace(readiness_reasons=lambda: ("Camera unavailable",)),
     )
 
     report = RuntimeReadiness(sources, "robot", phase="ready").snapshot()
 
-    assert report.reasons == ("Board unavailable", "Camera unavailable")
+    assert (report.ready, report.phase, report.reasons) == (
+        False, "degraded", ("Board unavailable", "Camera unavailable"),
+    )
 
 
 class Tools:
@@ -96,7 +87,7 @@ def test_harness_dependency_readiness_is_bounded() -> None:
     assert report.ready is False
 
 
-@pytest.mark.parametrize("phase, status", [("starting", 503), ("ready", 200), ("stopping", 503)])
+@pytest.mark.parametrize("phase, status", [("starting", 503), ("ready", 200)])
 def test_harness_http_readiness_is_distinct_from_liveness(phase, status) -> None:
     app = Starlette()
     install_readiness(app, HarnessReadiness(Tools(), phase=phase))

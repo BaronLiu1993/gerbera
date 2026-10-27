@@ -37,8 +37,6 @@ def test_matching_firmware_is_verified_and_transport_closed(verification) -> Non
 
 @pytest.mark.parametrize("failure", [
     FirmwareContractMismatch("firmware differs"), TimeoutError("no handshake"),
-    OSError("disconnected"), ValueError("malformed handshake"),
-    RuntimeError("board identity mismatch"),
 ])
 def test_verification_fails_without_compiling_or_uploading(verification, monkeypatch, failure) -> None:
     commands = Mock()

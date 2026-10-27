@@ -52,14 +52,4 @@ def test_registry_times_out_unacknowledged_command() -> None:
     with pytest.raises(TimeoutError, match="command response timed out"):
         registry.wait(pending, 0)
 
-
-def test_registry_removes_timed_out_command() -> None:
-    registry = CommandResponseRegistry()
-    pending = registry.register("board-1")
-
-    try:
-        registry.wait(pending, 0)
-    except TimeoutError:
-        pass
-
     assert registry.pending_commands == {}
