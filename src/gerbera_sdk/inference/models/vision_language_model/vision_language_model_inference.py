@@ -34,11 +34,11 @@ class VisionLanguageModel(StrictSchema):
     name: str = Field(min_length=1)
     model_provider: VisionLanguageModelProviderEnum
     user_prompt: str = Field(min_length=1)
-    api_key: str
-    model_name: str
+    api_key: str = Field(min_length=1, pattern=r"\S", repr=False)
+    model_name: str = Field(min_length=1, pattern=r"\S")
     subscribed_camera: Camera
-    timeout_seconds: float = 120.0
-    max_tokens: int = 1024
+    timeout_seconds: float = Field(default=120.0, gt=0)
+    max_tokens: int = Field(default=1024, gt=0)
     description: str = ""
     model_type: Literal["vision_language_model"] = "vision_language_model"
     model_operations: ClassVar[tuple[
