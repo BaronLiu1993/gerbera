@@ -1,0 +1,70 @@
+src/gerbera_sdk/models/runtime/server/health_routes.py
+  s_eb6570f5ffe476::t_4785d2c588e1da 1-29
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_2c18603f361286 161
+  s_eb6570f5ffe476::t_f9d1db4a68a8fe 1,48-57,117-130,132-156,180,183,203,206,244,247,250-251,294,297,299,346,349,397,399,468,470,508,516,518,560,562-563,582,585,587-588,601,603,606,608-611,613-618
+src/gerbera_sdk/models/runtime/server/tool_registry.py
+  s_eb6570f5ffe476::t_4785d2c588e1da 1-31
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_4785d2c588e1da 1,7,10-12,14-15,18,22-23,25-26,28-33,35,37,39,45-50,53-65,67,69,71-74,78-81,83-85,87-89,91-93,95-97,100-102,105-107,109,113-115,118-119,122-150,153-154
+  s_eb6570f5ffe476::t_a44b892ec42475 51-52,75
+  s_eb6570f5ffe476::t_79c6e0f477a70f 21,108,110
+  s_eb6570f5ffe476::t_dbdb01e0a87fb9 82
+src/gerbera_sdk/models/runtime/server/server_runtime.py
+  s_eb6570f5ffe476::t_4785d2c588e1da 1,3-7,12-16,19-28
+src/gerbera_sdk/models/runtime/server/reaction_tools.py
+  s_eb6570f5ffe476::t_76ed88f4cea760 1-7,12-20,23-92
+  s_eb6570f5ffe476::t_79c6e0f477a70f 21-22
+  s_eb6570f5ffe476::t_11333c0b9690b8 8-11
+tests/unit/test_sdk_server_configuration.py
+  s_eb6570f5ffe476::t_58bad1c4709461 98-118
+src/gerbera_sdk/models/runtime/storage/database_settings.py
+  s_eb6570f5ffe476::t_4785d2c588e1da 1-25
+tests/integration/test_harness_sdk_connector.py
+  s_eb6570f5ffe476::t_f327e9ab99fd72 9,22
+src/gerbera_sdk/models/runtime/server/perception_tools.py
+  s_eb6570f5ffe476::t_76ed88f4cea760 1-10,16,23-424
+  s_eb6570f5ffe476::t_11333c0b9690b8 11-15,17-22
+src/gerbera_sdk/models/runtime/server/runtime_resources.py
+  s_eb6570f5ffe476::t_76ed88f4cea760 1-98
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_173eddf77bc2e5 123
+  s_eb6570f5ffe476::t_f09f36e66783d3 1-6,10,12-13,16-22,26-28,31-39,42,46-51,53,55,58-62,64,66,69-72,74-77,80-122,124-125
+src/gerbera_sdk/server/__main__.py
+  s_eb6570f5ffe476::t_4cb10d058353d7 8,52-58
+  s_eb6570f5ffe476::t_4507aeeb92bf94 38,40
+src/gerbera_sdk/models/hardware/README.md
+  s_eb6570f5ffe476::t_04c064fdfc53ed 3-4,19,100
+src/gerbera_sdk/README.md
+  s_eb6570f5ffe476::t_04c064fdfc53ed 82-93
+  s_eb6570f5ffe476::t_4507aeeb92bf94 114-120
+src/gerbera_sdk/models/runtime/server/movement_tools.py
+  s_eb6570f5ffe476::t_11333c0b9690b8 2
+  s_eb6570f5ffe476::t_76ed88f4cea760 1,3-110
+src/gerbera_sdk/firmware/README.md
+  s_eb6570f5ffe476::t_4507aeeb92bf94 128,131-137
+src/gerbera_sdk/models/runtime/README.md
+  s_eb6570f5ffe476::t_04c064fdfc53ed 31-32,43-49,54-56,64-65,69-76,79-80,84-86,101-104
+src/gerbera_sdk/models/runtime/server/hardware_tools.py
+  s_eb6570f5ffe476::t_dbdb01e0a87fb9 118,121,123,126,128-140,143,145-154,159,214
+  s_eb6570f5ffe476::t_76ed88f4cea760 1-8,10-11,16-17,19-25,27-117,122,141-142,144,155-158,160-213,215-216
+  s_eb6570f5ffe476::t_0990e2a6cbde8e 119-120,124-125,127
+  s_eb6570f5ffe476::t_79c6e0f477a70f 9,26
+  s_eb6570f5ffe476::t_11333c0b9690b8 12-15,18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "24ba036966d548fed697c5b5f8ae8e19ba9d4921",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
