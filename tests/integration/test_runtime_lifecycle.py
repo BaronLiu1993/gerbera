@@ -212,7 +212,6 @@ def test_movement_reset_receives_command_response_after_listener_start() -> None
     hardware = HardwareSystem(name="robot", microcontrollers=[Microcontroller(
         name="board", device_id="board-1", port="/dev/test", fqbn="arduino:avr:uno", connections=[motor],
     )])
-    GerberaRuntime.bind_connection_microcontroller_ids(hardware)
     plan = GerberaRuntime.validate_hardware(hardware)
     responses = CommandResponseRegistry()
     calls = []

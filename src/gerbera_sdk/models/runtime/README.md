@@ -28,6 +28,8 @@ boards/
 commands/
     command_runtime.py          Command compilation and response parsing.
     command_response.py  Pending command correlation and completion.
+    command_executor.py         Command execution and executable connection actions.
+    connection_control.py       State changes and stream shutdown/draining.
 perception/
     camera_runtime.py           Camera capture, latest-frame cache and lifecycle.
     model_runtime.py            Inference registration, output state and lifecycle.
@@ -38,14 +40,20 @@ state/
 storage/
     storage.py                  Stream schemas and bounded database startup wait.
 server/
-    server_runtime.py           MCP tools, resources, events and command dispatch.
+    server_runtime.py           Composes MCP capability adapters.
+    hardware_tools.py           Hardware tool registration.
+    perception_tools.py         Camera and inference tool registration.
+    movement_tools.py           Movement tool registration.
+    reaction_tools.py           Reaction tool registration.
+    runtime_resources.py        MCP resources and state tools.
+    tool_registry.py            MCP registration and reaction action exposure.
     runtime_lifecycle.py        SDK preparation, resource startup and cleanup.
     readiness.py                Live dependency readiness reports.
 ```
 
-`server` composes the runtime capabilities and owns their startup order. The other
-folders own the board, command, perception, movement, state and persistence behavior
-that the server uses. Hardware declarations remain under `models/hardware`.
+`GerberaRuntime` composes the capabilities. `RuntimeLifecycle` owns their startup
+order. MCP adapters expose services without owning their execution or persistence.
+Hardware declarations remain under `models/hardware`.
 
 ## Ownership
 
@@ -53,23 +61,29 @@ that the server uses. Hardware declarations remain under `models/hardware`.
 
 - composing the SDK-owned preparation and lifecycle
 - resolving the database and constructing one event worker for stream writes
+- building an MCP application without starting the server
+- exposing generation, compilation, uploading and verification as explicit APIs
 
 `ServerRuntime` owns:
 
-- MCP app/tool registration
-- event registration
-- building the nested runtime event catalog used by agents
-- event listener health/tool exposure (lifecycle belongs to `RuntimeLifecycle`)
-- binding executable actions onto connections
-- command dispatch through board transport
+- composing the MCP resource and tool adapters
+
+`CommandExecutor` owns binding executable connection actions, command dispatch and
+waiting for correlated responses. It works without MCP registration.
+
+`EventRegistration` creates hardware event routes and buffers. `ReactionService`
+owns reaction validation, restoration and the event catalog. `ReactionBus` owns
+trigger evaluation and execution state.
 
 `RuntimeLifecycle` owns storage preparation, firmware verification and resource
-startup/shutdown order. Every normal SDK server startup uses it, independently of
+startup/shutdown order. Event workers and response listeners start before movement
+reset sends commands. Every normal SDK server startup uses it, independently of
 the CLI. Cleanup callbacks are registered before starting dependencies so partial
 startup failures and interruptions release already-owned resources.
 
-`RuntimeReadiness` checks lifecycle phase, board sessions/listeners, cameras,
-inference failures and event-worker health. `/ready` returns 503 while unavailable
+Each resource owner provides `readiness_reasons()`. `RuntimeReadiness` aggregates
+these reports and lifecycle phase without inspecting resource internals.
+`/ready` returns 503 while unavailable
 and 200 when ready; it is distinct from HTTP liveness. The CLI polls these reports
 without reproducing SDK validation or examining device state itself.
 
@@ -84,7 +98,10 @@ without reproducing SDK validation or examining device state itself.
 - reading command specs from device builders
 - validating and serializing command parameters
 - parsing firmware response payloads
-- building command descriptions for MCP tools
+- consuming the command definitions shared with firmware generation
+
+MCP command annotations are produced by the server adapter, keeping firmware
+generation and command serialization independent of MCP.
 
 ## Runtime Flow
 

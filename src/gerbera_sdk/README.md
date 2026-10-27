@@ -79,6 +79,18 @@ Use `GerberaRuntime` in [gerbera_runtime.py](/Users/jiexuanliu/Desktop/firecrack
   Validates hardware, constructs runtimes, prepares storage, verifies firmware,
   starts dependencies, runs the MCP app, and closes resources on exit.
 
+- `build_application(hardware, database_settings)`
+  Builds the MCP application for embedding or inspection without running its server.
+  `run(hardware, database_settings, **transport_options)` uses this same path.
+
+- `generate_firmware`, `compile_firmware`, `upload_firmware`, `verify_firmware`
+  Expose the four explicit firmware operations through the facade. Each operation
+  validates the declaration; verification never generates or uploads firmware.
+
+Database credentials are supplied explicitly with `DatabaseSettings` from
+`models/runtime/storage/database_settings.py`. Configuration and environment loading
+belong to the server entry point, outside the facade.
+
 The independently runnable entry point owns loading and validating SDK settings
 and hardware code:
 
@@ -99,7 +111,13 @@ Current runtime responsibilities are split like this:
   Owns live serial connections for declared microcontrollers.
 
 - `ServerRuntime`
-  Owns event registration, tool registration, command dispatch, and MCP app interaction.
+  Coordinates the hardware, perception, movement, reaction and resource MCP adapters.
+
+- `CommandExecutor`
+  Owns command dispatch and executable connection actions independently of MCP.
+
+- `EventRegistration` and `ReactionService`
+  Own hardware event registration and reaction validation/restoration respectively.
 
 - `Database`
   Owns database connection details and insert execution. `RuntimeStorage` prepares

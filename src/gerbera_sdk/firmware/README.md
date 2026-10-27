@@ -125,22 +125,16 @@ handshake failure stops startup without installing dependencies, generating code
 compiling or uploading. Verification never relies on a local installed-firmware
 manifest.
 
-Firmware updates use four separate APIs. With a validated `hardware_plan`:
+Firmware updates use four explicit operations on the `GerberaRuntime` facade:
 
 ```python
-from gerbera_sdk.firmware.firmware_compiler import FirmwareCompiler
-from gerbera_sdk.firmware.firmware_dependencies import FirmwareDependencies
-from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
-from gerbera_sdk.firmware.firmware_uploader import FirmwareUploader
-from gerbera_sdk.firmware.firmware_verifier import FirmwareVerifier
-from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
+from gerbera_sdk.gerbera_runtime import GerberaRuntime
 
-FirmwareDependencies(hardware_plan).install()
-for board in hardware_plan.boards:
-    sketch_path = FirmwareGenerator(board).write_files()
-    build_path = FirmwareCompiler(board).compile(sketch_path)
-    FirmwareUploader(board).upload(build_path)
-FirmwareVerifier(BoardRuntime(hardware_plan)).verify()
+GerberaRuntime.install_dependencies(hardware_system)
+sketches = GerberaRuntime.generate_firmware(hardware_system)
+builds = GerberaRuntime.compile_firmware(hardware_system, sketches)
+GerberaRuntime.upload_firmware(hardware_system, builds)
+GerberaRuntime.verify_firmware(hardware_system)
 ```
 
 `generate()` returns source text without writing files. `write_files()` saves the

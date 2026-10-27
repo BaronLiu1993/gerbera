@@ -1,195 +1,154 @@
-import os
-import asyncio
+from pathlib import Path
 
 from fastmcp import FastMCP
-from starlette.requests import Request
-from starlette.responses import JSONResponse
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.event_registration import EventRegistration
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_service import ReactionService
+from gerbera_sdk.firmware.firmware_compiler import FirmwareCompiler
 from gerbera_sdk.firmware.firmware_dependencies import FirmwareDependencies
+from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
+from gerbera_sdk.firmware.firmware_uploader import FirmwareUploader
 from gerbera_sdk.firmware.firmware_verifier import FirmwareVerifier
-from gerbera_sdk.models.hardware.database import Database
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
+from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
+from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
+from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.commands.command_response import (
-    CommandResponseRegistry,
-)
-from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
-from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
-from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.movement.movement_runtime import MovementRuntime
+from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
+from gerbera_sdk.models.runtime.server.hardware_tools import HardwareTools
+from gerbera_sdk.models.runtime.server.health_routes import HealthRoutes
+from gerbera_sdk.models.runtime.server.movement_tools import MovementTools
+from gerbera_sdk.models.runtime.server.perception_tools import PerceptionTools
 from gerbera_sdk.models.runtime.server.readiness import RuntimeReadiness
+from gerbera_sdk.models.runtime.server.reaction_tools import ReactionTools
+from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
+from gerbera_sdk.models.runtime.server.runtime_resources import RuntimeResources
+from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry
+from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
+from gerbera_sdk.models.runtime.storage.database_settings import DatabaseSettings
 from gerbera_sdk.models.runtime.storage.storage import RuntimeStorage
 
 
 class GerberaRuntime:
     @staticmethod
-    def setup(
-        hardware_system: HardwareSystem,
-    ) -> None:
-        GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
-        hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
-
-        FirmwareVerifier(BoardRuntime(hardware_plan)).verify()
-
-    @staticmethod
-    def run(
-        hardware_system: HardwareSystem,
-        transport: str,
-        database_host: str,
-        database_port: int,
-        database_password: str,
-        database_schema_password: str | None = None,
-        **transport_kwargs,
-    ) -> None:
-        GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
-        hardware_plan = GerberaRuntime.validate_hardware(hardware_system)
-
-        database = GerberaRuntime.runtime_database(
-            host=database_host,
-            port=database_port,
-            password=database_password,
+    def build_application(hardware: HardwareSystem, database: DatabaseSettings) -> FastMCP:
+        plan = GerberaRuntime.validate_hardware(hardware)
+        boards = BoardRuntime(plan)
+        cameras = CameraRuntime(hardware)
+        models = ModelRuntime(hardware, cameras)
+        models.register_models()
+        writer = database.writer()
+        worker = EventWorker(database=writer)
+        state = GerberaRuntime.build_state(plan)
+        events = EventBus()
+        EventRegistration(plan, events, worker).register()
+        responses = CommandResponseRegistry()
+        commands = CommandExecutor(plan, boards, responses)
+        commands.bind_actions()
+        actions = ReactionToolRegistry()
+        reaction_bus = ReactionBus(action_executor=actions)
+        reactions = ReactionService(plan, events, reaction_bus, actions)
+        listener = EventListener(
+            hardware_plan=plan, transport_pool=boards.transport_pool,
+            event_bus=events, reaction_bus=reaction_bus, hardware_runtime=state,
+            command_responses=responses, reconnect_board=boards.reconnect_board,
         )
-        board_runtime = BoardRuntime(hardware_plan)
-        camera_runtime = CameraRuntime(hardware_system)
-        event_worker = EventWorker(database=database)
-        model_runtime = ModelRuntime(
-            hardware_system=hardware_system,
-            camera_runtime=camera_runtime,
-        )
-        hardware_runtime = HardwareRuntime()
-        movement_runtime = None
-        if hardware_system.movement_systems:
-            movement_runtime = MovementRuntime(hardware_system)
-            movement_runtime.register_movement_system()
-
-        GerberaRuntime.register_connection_states(
-            hardware_plan=hardware_plan,
-            hardware_runtime=hardware_runtime,
-        )
-
-        event_bus = EventBus()
-        reaction_bus = ReactionBus()
-        command_responses = CommandResponseRegistry()
-        event_listener = EventListener(
-            hardware_plan=hardware_plan,
-            transport_pool=board_runtime.transport_pool,
-            event_bus=event_bus,
-            reaction_bus=reaction_bus,
-            hardware_runtime=hardware_runtime,
-            command_responses=command_responses,
-            reconnect_board=board_runtime.reconnect_board,
-        )
+        movement = GerberaRuntime.build_movement(hardware)
         readiness = RuntimeReadiness(
-            sources=(board_runtime, camera_runtime, model_runtime, event_listener, event_worker),
-            instance_id=hardware_system.id,
+            sources=(boards, cameras, models, listener, worker), instance_id=hardware.id,
         )
-        schema_password = database_schema_password or os.environ.get("GERBERA_SCHEMA_PASSWORD")
-        schema_owner = None
-        if schema_password:
-            schema_owner = Database(
-                host=database_host, port=database_port, password=schema_password,
-                user="gerbera_schema_owner", database_name="gerbera",
-            )
-        runtime_lifecycle = RuntimeLifecycle(
-            board_runtime=board_runtime,
-            camera_runtime=camera_runtime,
-            event_worker=event_worker,
-            model_runtime=model_runtime,
-            event_listener=event_listener,
-            event_bus=event_bus,
-            hardware_runtime=hardware_runtime,
-            movement_runtime=movement_runtime,
-            storage=RuntimeStorage(hardware_plan, database, schema_owner),
+        lifecycle = RuntimeLifecycle(
+            board_runtime=boards, camera_runtime=cameras, model_runtime=models,
+            event_worker=worker, event_listener=listener, event_bus=events,
+            hardware_runtime=state, movement_runtime=movement,
+            storage=RuntimeStorage(plan, writer, database.schema_owner()),
             readiness=readiness,
         )
-        app = FastMCP(
-            hardware_system.description,
-            lifespan=runtime_lifecycle,
+        app = FastMCP(hardware.description or hardware.name, lifespan=lifecycle)
+        tools = McpToolRegistry(app, actions)
+        server = ServerRuntime(
+            resources=RuntimeResources(tools, app, hardware, plan, listener, state, models),
+            hardware=HardwareTools(tools, plan, state, ConnectionControl(events, worker, state)),
+            perception=PerceptionTools(tools, hardware, cameras, models),
+            movement=MovementTools(tools, movement),
+            reactions=ReactionTools(tools, reactions),
         )
-
-        @app.custom_route("/health", methods=["GET"])
-        async def health(request: Request) -> JSONResponse:
-            return JSONResponse({"service": "sdk", "status": "alive"})
-
-        @app.custom_route("/ready", methods=["GET"])
-        async def ready(request: Request) -> JSONResponse:
-            report = await asyncio.to_thread(readiness.snapshot)
-            return JSONResponse(report.model_dump(mode="json"), status_code=200 if report.ready else 503)
-
-        @app.resource("gerbera://readiness", mime_type="application/json")
-        def runtime_readiness() -> str:
-            return readiness.snapshot().model_dump_json()
-        server_runtime = ServerRuntime(
-            hardware_system=hardware_system,
-            hardware_plan=hardware_plan,
-            board_runtime=board_runtime,
-            event_bus=event_bus,
-            event_worker=event_worker,
-            app=app,
-            camera_runtime=camera_runtime,
-            model_runtime=model_runtime,
-            event_listener=event_listener,
-            reaction_bus=reaction_bus,
-            hardware_runtime=hardware_runtime,
-            command_responses=command_responses,
-            movement_runtime=movement_runtime,
-        )
-
-        server_runtime.register_events()
-        server_runtime.register_tools()
-        app.run(transport=transport, **transport_kwargs)
+        HealthRoutes(app, readiness).register()
+        server.register_tools()
+        return app
 
     @staticmethod
-    def validate_hardware(
-        hardware_system: HardwareSystem,
-    ) -> HardwarePlan:
-        return HardwareContractCompiler.compile(hardware_system)
+    def run(hardware: HardwareSystem, database: DatabaseSettings, **transport_options) -> None:
+        GerberaRuntime.build_application(hardware, database).run(**transport_options)
 
     @staticmethod
-    def bind_connection_microcontroller_ids(
-        hardware_system: HardwareSystem,
-    ) -> None:
-        hardware_system_id = hardware_system.id
-        for microcontroller in hardware_system.microcontrollers:
-            microcontroller.hardware_system_id = hardware_system_id
-            microcontroller_id = microcontroller.id
-            for connection in microcontroller.connections:
-                connection.microcontroller_id = microcontroller_id
+    def setup(hardware: HardwareSystem) -> None:
+        GerberaRuntime.verify_firmware(hardware)
 
     @staticmethod
-    def register_connection_states(
-        hardware_plan: HardwarePlan,
-        hardware_runtime: HardwareRuntime,
-    ) -> None:
-        for board in hardware_plan.boards:
+    def validate_hardware(hardware: HardwareSystem) -> HardwarePlan:
+        GerberaRuntime.bind_connection_microcontroller_ids(hardware)
+        return HardwareContractCompiler.compile(hardware)
+
+    @staticmethod
+    def bind_connection_microcontroller_ids(hardware: HardwareSystem) -> None:
+        for controller in hardware.microcontrollers:
+            controller.hardware_system_id = hardware.id
+            controller_id = controller.id
+            for connection in controller.connections:
+                connection.microcontroller_id = controller_id
+
+    @staticmethod
+    def build_state(plan: HardwarePlan) -> HardwareRuntime:
+        state = HardwareRuntime()
+        for board in plan.boards:
             for connection in board.connections:
                 for key in CommandCompiler.state_keys(connection):
-                    hardware_runtime.register_state_store(key)
+                    state.register_state_store(key)
+        return state
 
     @staticmethod
-    def runtime_database(
-        host: str,
-        port: int,
-        password: str,
-    ) -> Database:
-        return Database(
-            host=host,
-            port=port,
-            password=password,
-            user="gerbera_writer",
-            database_name="gerbera",
-        )
+    def build_movement(hardware: HardwareSystem) -> MovementRuntime | None:
+        if not hardware.movement_systems:
+            return None
+        movement = MovementRuntime(hardware)
+        movement.register_movement_system()
+        return movement
 
     @staticmethod
-    def install_dependencies(hardware_system: HardwareSystem) -> None:
-        GerberaRuntime.bind_connection_microcontroller_ids(hardware_system)
-        FirmwareDependencies(GerberaRuntime.validate_hardware(hardware_system)).install()
+    def generate_firmware(hardware: HardwareSystem) -> dict[str, Path]:
+        return {
+            board.microcontroller_id: FirmwareGenerator(board).write_files()
+            for board in GerberaRuntime.validate_hardware(hardware).boards
+        }
+
+    @staticmethod
+    def compile_firmware(hardware: HardwareSystem, sketches: dict[str, Path]) -> dict[str, Path]:
+        return {
+            board.microcontroller_id: FirmwareCompiler(board).compile(sketches[board.microcontroller_id])
+            for board in GerberaRuntime.validate_hardware(hardware).boards
+        }
+
+    @staticmethod
+    def upload_firmware(hardware: HardwareSystem, builds: dict[str, Path]) -> None:
+        for board in GerberaRuntime.validate_hardware(hardware).boards:
+            FirmwareUploader(board).upload(builds[board.microcontroller_id])
+
+    @staticmethod
+    def verify_firmware(hardware: HardwareSystem) -> None:
+        FirmwareVerifier(BoardRuntime(GerberaRuntime.validate_hardware(hardware))).verify()
+
+    @staticmethod
+    def install_dependencies(hardware: HardwareSystem) -> None:
+        FirmwareDependencies(GerberaRuntime.validate_hardware(hardware)).install()

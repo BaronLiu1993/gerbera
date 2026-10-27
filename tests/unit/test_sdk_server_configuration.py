@@ -95,3 +95,24 @@ def test_sdk_validates_port_override_before_loading_hardware(monkeypatch, tmp_pa
 
     with pytest.raises(ValidationError):
         main()
+
+
+def test_hardware_loader_resolves_registry_before_returning_declaration(tmp_path) -> None:
+    (tmp_path / "index.py").write_text(
+        "from gerbera_sdk.models.hardware.hardware_system import HardwareSystem\n"
+        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller\n"
+        "hardware_system = HardwareSystem(name='robot', microcontrollers=[Microcontroller(\n"
+        "    name='board', port='/dev/board', fqbn='arduino:avr:uno')])\n"
+    )
+    config = tmp_path / "sdk.json"
+    config.write_text(json.dumps({
+        "project_root": ".", "devices": {"board": {
+            "id": "board-1", "address": "/dev/board", "fqbn": "arduino:avr:uno", "protocol": "serial",
+        }},
+    }))
+    settings = SdkSettings.load(config)
+
+    hardware = settings.load_hardware(config)
+    config.unlink()
+
+    assert hardware.microcontrollers[0].id == "board-1"

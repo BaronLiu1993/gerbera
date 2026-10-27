@@ -1,6 +1,7 @@
 # Models
 
-READ: we will need to clean up the code for this modelling. It is messy right now and does not fully reflect the intended user experience yet. THE SOURCE OF TRUTH FOR MICROCONTROLLERS IS `config.json["devices"]`.
+Hardware declarations contain explicit values and do not read configuration files.
+The SDK loader resolves registry identity and transport before runtime construction.
 
 The models folder owns the hardware declaration graph and the database connection used by the runtime.
 
@@ -15,7 +16,7 @@ Models should stay focused on:
 
 ```text
 hardware_system.py      Top-level hardware declaration.
-microcontroller.py      Board identity resolved from config.json via port.
+microcontroller.py      Board declaration, resolved identity and transport settings.
 connection.py           One declared device connection on a board.
 database.py             PostgreSQL connection details and insert execution.
 pin.py                  Pin model support.
@@ -96,7 +97,7 @@ classDiagram
 `Microcontroller.id`
 
 - can be declared explicitly with `device_id`
-- otherwise resolves from `config.json["devices"]` using the upload port
+- otherwise resolved by the configuration loader using the upload port
 - remains stable when the runtime transport changes
 
 Upload and runtime connections are separate. `upload_port` is used only by

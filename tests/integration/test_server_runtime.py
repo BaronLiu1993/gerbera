@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -44,7 +45,16 @@ from gerbera_sdk.models.runtime.commands.command_response import (
 )
 from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
-from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
+from gerbera_sdk.events.event_registration import EventRegistration
+from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_service import ReactionService
+from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
+from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
+from gerbera_sdk.models.runtime.server.hardware_tools import HardwareTools
+from gerbera_sdk.models.runtime.server.perception_tools import PerceptionTools
+from gerbera_sdk.models.runtime.server.reaction_tools import ReactionTools
+from gerbera_sdk.models.runtime.server.runtime_resources import RuntimeResources
+from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry
 from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
 
 
@@ -104,46 +114,51 @@ def make_frame() -> Frame:
     )
 
 
-def make_server(
-    *,
-    hardware_system: HardwareSystem | None = None,
-    camera_runtime=None,
-    model_runtime=None,
-    event_bus=None,
-    event_worker=None,
-    hardware_runtime=None,
-    reaction_bus=None,
-    command_responses=None,
-) -> tuple[ServerRuntime, FakeApp]:
+@dataclass
+class ServerDependencies:
+    hardware_system: HardwareSystem | None = None
+    camera_runtime: object | None = None
+    model_runtime: object | None = None
+    event_bus: object | None = None
+    event_worker: object | None = None
+    hardware_runtime: HardwareRuntime | None = None
+    reaction_bus: ReactionBus | None = None
+    command_responses: CommandResponseRegistry | None = None
+
+
+def make_server(dependencies: ServerDependencies | None = None) -> tuple[SimpleNamespace, FakeApp]:
+    dependencies = dependencies or ServerDependencies()
     app = FakeApp()
-    system = hardware_system or HardwareSystem(name="test")
-    hardware_plan = HardwareContractCompiler.compile(system)
-    runtime = ServerRuntime(
-        hardware_system=system,
-        hardware_plan=hardware_plan,
-        board_runtime=SimpleNamespace(),
-        event_bus=event_bus or EventBus(),
-        event_worker=event_worker or SimpleNamespace(
-            write_to_db=lambda table_name, batch: None,
-            wait_until_idle=lambda: None,
-        ),
-        app=app,
-        camera_runtime=camera_runtime or SimpleNamespace(),
-        model_runtime=model_runtime or SimpleNamespace(registered_models={}),
-        event_listener=SimpleNamespace(),
-        reaction_bus=reaction_bus or ReactionBus(),
-        hardware_runtime=hardware_runtime or HardwareRuntime(),
-        command_responses=(
-            command_responses
-            or CommandResponseRegistry()
-        ),
+    system = dependencies.hardware_system or HardwareSystem(name="test")
+    plan = HardwareContractCompiler.compile(system)
+    events = dependencies.event_bus or EventBus()
+    worker = dependencies.event_worker or SimpleNamespace(
+        write_to_db=lambda table_name, batch: None, wait_until_idle=lambda: None,
+    )
+    state = dependencies.hardware_runtime or HardwareRuntime()
+    models = dependencies.model_runtime or SimpleNamespace(registered_models={})
+    cameras = dependencies.camera_runtime or SimpleNamespace()
+    responses = dependencies.command_responses or CommandResponseRegistry()
+    commands = CommandExecutor(plan, SimpleNamespace(), responses)
+    commands.bind_actions()
+    EventRegistration(plan, events, worker).register()
+    actions = ReactionToolRegistry()
+    reaction_bus = dependencies.reaction_bus or ReactionBus()
+    reaction_bus.configure_executor(actions)
+    tools = McpToolRegistry(app, actions)
+    controls = ConnectionControl(events, worker, state)
+    runtime = SimpleNamespace(
+        hardware_plan=plan, event_bus=events, reaction_bus=reaction_bus,
+        hardware_runtime=state, commands=commands,
+        hardware=HardwareTools(tools, plan, state, controls),
+        perception=PerceptionTools(tools, system, cameras, models),
+        reactions=ReactionTools(tools, ReactionService(plan, events, reaction_bus, actions)),
+        resources=RuntimeResources(tools, app, system, plan, SimpleNamespace(), state, models),
     )
     return runtime, app
 
 
-def test_listener_acknowledgement_completes_server_command(
-) -> None:
-
+def test_listener_acknowledgement_completes_server_command() -> None:
     connection = Connection(
         name="sensor",
         component_type="hw201",
@@ -162,10 +177,10 @@ def test_listener_acknowledgement_completes_server_command(
     system = HardwareSystem(name="test", microcontrollers=[board])
     board.hardware_system_id = system.id
     registry = CommandResponseRegistry()
-    runtime, _ = make_server(
+    runtime, _ = make_server(ServerDependencies(
         hardware_system=system,
         command_responses=registry,
-    )
+    ))
     listener = EventListener(
         hardware_plan=runtime.hardware_plan,
         transport_pool={},
@@ -185,11 +200,10 @@ def test_listener_acknowledgement_completes_server_command(
                 }
             )
 
-    runtime.board_runtime = SimpleNamespace(
+    runtime.commands.boards = SimpleNamespace(
         get_transport=lambda microcontroller_id: AcknowledgingTransport()
     )
-    response = runtime.send_command(
-        runtime.hardware_plan.boards[0],
+    response = runtime.commands.execute(
         runtime.hardware_plan.boards[0].connections[0],
         "READ",
         {},
@@ -227,18 +241,14 @@ def test_reaction_management_tools_create_list_and_delete(
     )
     system = HardwareSystem(name="test", microcontrollers=[board])
     board.hardware_system_id = system.id
-    runtime, app = make_server(
+    runtime, app = make_server(ServerDependencies(
         hardware_system=system,
         reaction_bus=ReactionBus(store=ReactionStore(tmp_path)),
-    )
+    ))
     resolved_board = runtime.hardware_plan.boards[0]
     resolved_connection = resolved_board.connections[0]
-    runtime.register_events()
-    runtime.register_connection_tools(
-        resolved_board,
-        resolved_connection,
-    )
-    runtime.register_reaction_tools()
+    runtime.hardware.register_connection_tools(resolved_connection)
+    runtime.reactions.register_reaction_tools()
     request = CreateReactionSchema(
         event=ReactionEventSchema(
             event_type="STREAM",
@@ -281,12 +291,12 @@ def test_camera_tool_forwards_batch_controls_and_serializes_frames() -> None:
             ]
         )
     )
-    runtime, app = make_server(
+    runtime, app = make_server(ServerDependencies(
         hardware_system=HardwareSystem(name="test", cameras=[camera]),
         camera_runtime=camera_runtime,
-    )
+    ))
 
-    runtime.register_camera_tools()
+    runtime.perception.register_camera_tools()
     result = app.tools["capture_frames_from_local_camera"](2, 0.25)
 
     assert calls == [
@@ -333,12 +343,11 @@ def test_event_registration_respects_explicit_stream_flag(
     system = HardwareSystem(name="test", microcontrollers=[board])
     board.hardware_system_id = system.id
     event_bus = EventBus()
-    runtime, _ = make_server(
+    runtime, _ = make_server(ServerDependencies(
         hardware_system=system,
         event_bus=event_bus,
-    )
+    ))
 
-    runtime.register_events()
 
     assert event_bus.get_event(
         "MCP",
@@ -385,9 +394,9 @@ def test_object_detection_tools_bridge_server_and_model_runtime() -> None:
         perform_object_detection=perform_object_detection,
         read_model_output=lambda model_id, output_name: output,
     )
-    runtime, app = make_server(model_runtime=model_runtime)
+    runtime, app = make_server(ServerDependencies(model_runtime=model_runtime))
 
-    runtime.register_object_detection_tools(inference.model_id, inference)
+    runtime.perception.register_object_detection_tools(inference.model_id, inference)
     result = app.tools["perform_single_detector"]()
 
     assert calls == [{"model_id": inference.model_id}]
@@ -456,9 +465,9 @@ def test_frame_model_tools_bridge_server_and_model_runtime(
             calls.append((model_id, "perform")) or output
         ),
     )
-    runtime, app = make_server(model_runtime=model_runtime)
+    runtime, app = make_server(ServerDependencies(model_runtime=model_runtime))
 
-    runtime.register_frame_model_tools(inference.model_id, inference)
+    runtime.perception.register_frame_model_tools(inference.model_id, inference)
     read_result = app.tools[f"read_{model_name}"]()
     perform_result = app.tools[f"perform_single_{model_name}"]()
 
@@ -496,7 +505,7 @@ def test_vision_language_tools_route_each_operation() -> None:
         calls.append(kwargs)
         return "A workshop"
 
-    runtime, app = make_server(
+    runtime, app = make_server(ServerDependencies(
         model_runtime=SimpleNamespace(
             locate_objects=locate_objects,
             analyze_scene=analyze_scene,
@@ -504,9 +513,9 @@ def test_vision_language_tools_route_each_operation() -> None:
                 "A workshop" if output_name == "scene_analysis" else objects
             ),
         )
-    )
+    ))
 
-    runtime.register_vision_language_model_tools(
+    runtime.perception.register_vision_language_model_tools(
         inference.model_id,
         inference,
     )
@@ -548,10 +557,10 @@ def test_scene_analysis_tool_hard_fails_on_non_text_output() -> None:
     def analyze_scene(**kwargs):
         raise TypeError("Scene analysis inference returned an invalid output")
 
-    runtime, app = make_server(
+    runtime, app = make_server(ServerDependencies(
         model_runtime=SimpleNamespace(analyze_scene=analyze_scene)
-    )
-    runtime.register_vision_language_model_tools(
+    ))
+    runtime.perception.register_vision_language_model_tools(
         inference.model_id,
         inference,
     )
@@ -570,13 +579,13 @@ def test_state_tools_register_runtime_bound_methods() -> None:
         camera_runtime=CameraRuntime(hardware_system),
         model_outputs={"model-key": None},
     )
-    runtime, app = make_server(
+    runtime, app = make_server(ServerDependencies(
         hardware_runtime=hardware_runtime,
         model_runtime=model_runtime,
-    )
+    ))
 
-    runtime.register_hardware_state_tool()
-    runtime.register_environment_state_tool()
+    runtime.resources.register_hardware_state_tool()
+    runtime.resources.register_environment_state_tool()
 
     assert app.tools["get_current_hardware_state"]() == {
         "board-1.sensor.value": None
@@ -589,36 +598,21 @@ def test_state_tools_register_runtime_bound_methods() -> None:
 def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
     calls: list[str] = []
     connection = SimpleNamespace(
+        name="sensor", component_type="hw201", microcontroller_id="board-1",
         event_name="stream-event",
-        perform_action=lambda action, params: (
-            calls.append("hardware.off") or {"success": True}
-        ),
+        perform_action=lambda action, params: calls.append("hardware.off") or {"success": True},
     )
     event_bus = SimpleNamespace(
-        get_event=lambda *args: SimpleNamespace(
-            flush=lambda: calls.append("stream.flush")
-        )
+        get_event=lambda *args: SimpleNamespace(flush=lambda: calls.append("stream.flush")),
     )
-    event_worker = SimpleNamespace(
-        wait_until_idle=lambda: calls.append("database.wait")
-    )
-    hardware_runtime = HardwareRuntime()
-    state_key = ("board-1", "sensor", "stream_enabled")
-    hardware_runtime.register_state_store(state_key)
-    runtime, _ = make_server(
-        event_bus=event_bus,
-        event_worker=event_worker,
-        hardware_runtime=hardware_runtime,
-    )
-    tool = runtime.build_toggle_tool_function(
-        connection=connection,
-        state=0,
-        state_key=state_key,
-        stream_board=SimpleNamespace(microcontroller_id="board-1"),
-    )
+    worker = SimpleNamespace(wait_until_idle=lambda: calls.append("database.wait"))
+    state = HardwareRuntime()
+    state.register_state_store(("board-1", "sensor", "stream_enabled"))
+    controls = ConnectionControl(event_bus, worker, state)
 
-    assert tool() == {"success": True}
-    assert calls == ["hardware.off", "stream.flush", "database.wait"]
-    assert hardware_runtime.get_state_store() == {
-        "board-1.sensor.stream_enabled": {"value": "0", "unit": None}
-    }
+    response = controls.set_stream_state(connection, 0)
+
+    assert (response, calls, state.get_state_store()) == (
+        {"success": True}, ["hardware.off", "stream.flush", "database.wait"],
+        {"board-1.sensor.stream_enabled": {"value": "0", "unit": None}},
+    )

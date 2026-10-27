@@ -6,7 +6,7 @@ from fastmcp import Client, FastMCP
 from gerbera_harness.connectors import gerbera as connector_module
 from gerbera_harness.connectors.gerbera import GerberaSdkConnector
 from gerbera_protocol import ReadinessReport, RuntimeManifest
-from gerbera_sdk.models.runtime.server.server_runtime import ServerRuntime
+from gerbera_sdk.models.runtime.server.runtime_resources import RuntimeResources
 
 
 def test_connector_reads_sdk_resources_without_sharing_python_objects(monkeypatch):
@@ -19,7 +19,7 @@ def test_connector_reads_sdk_resources_without_sharing_python_objects(monkeypatc
         model_runtime=SimpleNamespace(get_model_state=lambda: {}),
         event_listener=SimpleNamespace(get_health=lambda: {}),
     )
-    ServerRuntime.register_remote_resources(runtime)
+    RuntimeResources.register_remote_resources(runtime)
 
     monkeypatch.setattr(connector_module, "Client", lambda url: Client(app))
     connector = GerberaSdkConnector("https://remote-sdk.example/mcp")

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from gerbera_sdk.server.configuration import SdkSettings
+from gerbera_sdk.models.runtime.storage.database_settings import DatabaseSettings
 
 
 def main() -> None:
@@ -34,25 +35,27 @@ def main() -> None:
         "database_host": os.getenv("GERBERA_DATABASE_HOST"),
         "database_port": os.getenv("GERBERA_DATABASE_PORT"),
     }
-    settings = SdkSettings.model_validate(settings.model_dump() | {
+    settings = SdkSettings.model_validate_json(json.dumps(settings.model_dump(mode="json") | {
         name: value for name, value in overrides.items() if value is not None
-    })
+    }))
     project_root = (config_path.parent / settings.project_root).resolve()
     os.chdir(project_root)
     sys.path.insert(0, str(project_root))
     hardware = settings.load_hardware(config_path)
     if arguments.command == "check":
-        GerberaRuntime.bind_connection_microcontroller_ids(hardware)
         GerberaRuntime.validate_hardware(hardware)
         settings.load_secrets(config_path)
         print(json.dumps({"service": "sdk", "configuration_valid": True}))
         return
     secrets = settings.load_secrets(config_path)
     GerberaRuntime.run(
-        hardware, transport="http", host=settings.host,
-        port=settings.port, database_host=settings.database_host,
-        database_port=settings.database_port, database_password=secrets.gerbera_writer_password,
-        database_schema_password=secrets.gerbera_schema_password,
+        hardware,
+        DatabaseSettings(
+            host=settings.database_host, port=settings.database_port,
+            writer_password=secrets.gerbera_writer_password,
+            schema_password=secrets.gerbera_schema_password,
+        ),
+        transport="http", host=settings.host, port=settings.port,
     )
 
 
