@@ -1,7 +1,9 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, ClassVar, Protocol
+from typing import ClassVar, Protocol
+
+from gerbera_sdk.firmware.boards.config_schema import AvrBoardConfig, Esp32BoardConfig
 
 from gerbera_sdk.firmware.firmware_schema import (
     BoardTransportKind,
@@ -111,22 +113,16 @@ class AvrBoardDefinitionStrategy:
     )
 
     @classmethod
-    def from_data(
-        cls,
-        data: Mapping[str, Any],
-    ) -> "AvrBoardDefinitionStrategy":
+    def from_config(cls, config: AvrBoardConfig) -> "AvrBoardDefinitionStrategy":
         return cls(
-            fqbn=data["fqbn"],
-            digital_pin_count=data["digital_pin_count"],
-            analog_pin_count=data["analog_pin_count"],
-            pwm_pins=frozenset(data["pwm_pins"]),
-            interrupt_pins=frozenset(data["interrupt_pins"]),
-            includes=tuple(data["includes"]),
-            libraries=tuple(data["libraries"]),
-            supported_transports=frozenset(
-                BoardTransportKind(kind)
-                for kind in data["supported_transports"]
-            ),
+            fqbn=config.fqbn,
+            digital_pin_count=config.digital_pin_count,
+            analog_pin_count=config.analog_pin_count,
+            pwm_pins=frozenset(config.pwm_pins),
+            interrupt_pins=frozenset(config.interrupt_pins),
+            includes=config.includes,
+            libraries=config.libraries,
+            supported_transports=frozenset(config.supported_transports),
         )
 
     def build(self) -> BoardDefinition:
@@ -196,28 +192,17 @@ class Esp32DevModuleDefinitionStrategy:
     )
 
     @classmethod
-    def from_data(
-        cls,
-        data: Mapping[str, Any],
-    ) -> "Esp32DevModuleDefinitionStrategy":
+    def from_config(cls, config: Esp32BoardConfig) -> "Esp32DevModuleDefinitionStrategy":
         return cls(
-            fqbn=data["fqbn"],
-            includes=tuple(data["includes"]),
-            libraries=tuple(data["libraries"]),
-            output_pins=tuple(data["output_pins"]),
-            input_only_pins=tuple(data["input_only_pins"]),
-            analog_input_pins=frozenset(data["analog_input_pins"]),
-            reserved_pins=MappingProxyType(
-                {
-                    int(pin): reason
-                    for pin, reason in data["reserved_pins"].items()
-                }
-            ),
-            flash_pins=tuple(data["flash_pins"]),
-            supported_transports=frozenset(
-                BoardTransportKind(kind)
-                for kind in data["supported_transports"]
-            ),
+            fqbn=config.fqbn,
+            includes=config.includes,
+            libraries=config.libraries,
+            output_pins=config.output_pins,
+            input_only_pins=config.input_only_pins,
+            analog_input_pins=frozenset(config.analog_input_pins),
+            reserved_pins=MappingProxyType(dict(config.reserved_pins)),
+            flash_pins=config.flash_pins,
+            supported_transports=frozenset(config.supported_transports),
         )
 
     def build(self) -> BoardDefinition:

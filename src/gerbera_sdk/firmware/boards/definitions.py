@@ -1,8 +1,8 @@
-from collections.abc import Callable, Mapping
 from importlib import resources
-from typing import Any
 
 import yaml
+
+from gerbera_sdk.firmware.boards.config_schema import AvrBoardConfig, BoardConfigurations
 
 from gerbera_sdk.firmware.boards.strategies import (
     AvrBoardDefinitionStrategy,
@@ -13,21 +13,17 @@ from gerbera_sdk.firmware.boards.strategies import (
     Esp32DevModuleDefinitionStrategy,
 )
 
-StrategyLoader = Callable[[Mapping[str, Any]], BoardDefinitionStrategy]
-STRATEGY_LOADERS: Mapping[str, StrategyLoader] = {
-    "avr": AvrBoardDefinitionStrategy.from_data,
-    "esp32_dev_module": Esp32DevModuleDefinitionStrategy.from_data,
-}
-
 
 def load_board_strategies() -> tuple[BoardDefinitionStrategy, ...]:
     config_resource = resources.files("gerbera_sdk.firmware.boards").joinpath(
         "config.yaml"
     )
-    config = yaml.safe_load(config_resource.read_text())
+    config = BoardConfigurations.from_data(yaml.safe_load(config_resource.read_text()))
     return tuple(
-        STRATEGY_LOADERS[board["strategy"]](board)
-        for board in config["boards"]
+        AvrBoardDefinitionStrategy.from_config(board)
+        if isinstance(board, AvrBoardConfig)
+        else Esp32DevModuleDefinitionStrategy.from_config(board)
+        for board in config.boards
     )
 
 
