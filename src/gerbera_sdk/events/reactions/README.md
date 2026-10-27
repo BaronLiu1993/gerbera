@@ -54,6 +54,10 @@ support booleans and strings.
   overlaps itself.
 
 Read-only tools and the reaction management tools cannot be used as actions.
+
+The reaction executor consumes a framework-independent `ActionPolicy`. The MCP
+adapter translates tool annotations into that policy when registering actions;
+reaction validation and execution do not import MCP types.
 Action names and arguments are validated when the reaction is created.
 
 ## Persistence

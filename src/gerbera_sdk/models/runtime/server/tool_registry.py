@@ -4,7 +4,7 @@ from typing import Any, Callable
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ActionPolicy, ReactionActionRegistry
 
 
 @dataclass(frozen=True)
@@ -19,10 +19,14 @@ class ToolDefinition:
 @dataclass
 class McpToolRegistry:
     app: FastMCP
-    actions: ReactionToolRegistry
+    actions: ReactionActionRegistry
 
     def register(self, tool: ToolDefinition) -> None:
-        self.actions.register(tool.name, tool.tool_function, tool.annotations)
+        policy = ActionPolicy(
+            modifies_state=tool.annotations.readOnlyHint is False,
+            allows_reactions=tool.name not in {"create_reaction", "delete_reaction", "list_reactions"},
+        )
+        self.actions.register(tool.name, tool.tool_function, policy)
         self.app.tool(
             name=tool.name,
             description=tool.description,

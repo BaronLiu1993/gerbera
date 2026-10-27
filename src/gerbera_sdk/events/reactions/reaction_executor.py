@@ -3,24 +3,21 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from mcp.types import ToolAnnotations
 from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from gerbera_sdk.events.reactions.reaction_schema import ReactionActionSchema
 
-REACTION_MANAGEMENT_TOOLS = frozenset(
-    {
-        "create_reaction",
-        "delete_reaction",
-        "list_reactions",
-    }
-)
+
+@dataclass(frozen=True)
+class ActionPolicy:
+    modifies_state: bool = False
+    allows_reactions: bool = True
 
 
 @dataclass(frozen=True)
-class RegisteredReactionTool:
+class RegisteredAction:
     function: Callable[..., Any]
-    annotations: ToolAnnotations
+    policy: ActionPolicy
 
     def validate_arguments(self, arguments: dict[str, JsonValue]) -> None:
         signature = inspect.signature(self.function)
@@ -51,35 +48,35 @@ class RegisteredReactionTool:
 
 
 @dataclass
-class ReactionToolRegistry:
-    tools: dict[str, RegisteredReactionTool] = field(default_factory=dict)
+class ReactionActionRegistry:
+    actions: dict[str, RegisteredAction] = field(default_factory=dict)
 
     def register(
         self,
         name: str,
         function: Callable[..., Any],
-        annotations: ToolAnnotations,
+        policy: ActionPolicy,
     ) -> None:
-        self.tools[name] = RegisteredReactionTool(function, annotations)
+        self.actions[name] = RegisteredAction(function, policy)
 
     def validate_action(self, action: ReactionActionSchema) -> None:
-        tool = self.require_eligible_tool(action.tool_name)
-        tool.validate_arguments(action.arguments)
+        registered = self.require_action(action.tool_name)
+        registered.validate_arguments(action.arguments)
 
     async def execute(self, action: ReactionActionSchema) -> JsonValue:
-        tool = self.require_eligible_tool(action.tool_name)
-        return await tool.invoke(action.arguments)
+        registered = self.require_action(action.tool_name)
+        return await registered.invoke(action.arguments)
 
-    def require_eligible_tool(self, name: str) -> RegisteredReactionTool:
+    def require_action(self, name: str) -> RegisteredAction:
         try:
-            tool = self.tools[name]
+            registered = self.actions[name]
         except KeyError as exc:
-            raise ValueError(f"Unknown reaction action tool: {name}") from exc
-        if name in REACTION_MANAGEMENT_TOOLS:
-            raise ValueError(f"Tool cannot be used by a reaction: {name}")
-        if tool.annotations.readOnlyHint is not False:
+            raise ValueError(f"Unknown reaction action: {name}") from exc
+        if not registered.policy.allows_reactions:
+            raise ValueError(f"Action cannot be used by a reaction: {name}")
+        if not registered.policy.modifies_state:
             raise ValueError(
-                "Reaction action tool must explicitly modify state: "
+                "Reaction action must explicitly modify state: "
                 f"{name}"
             )
-        return tool
+        return registered

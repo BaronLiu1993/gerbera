@@ -1,12 +1,11 @@
 from types import SimpleNamespace
 
 import pytest
-from mcp.types import ToolAnnotations
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_registration import EventRegistration
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ActionPolicy, ReactionActionRegistry
 from gerbera_sdk.events.reactions.reaction_schema import (
     CreateReactionSchema, ReactionActionSchema, ReactionConditionSchema,
     ReactionEventSchema, ReactionOperator, ReactionTriggerMode,
@@ -29,8 +28,8 @@ def service_setup(tmp_path):
     plan = GerberaRuntime.validate_hardware(hardware)
     events = EventBus()
     EventRegistration(plan, events, SimpleNamespace()).register()
-    actions = ReactionToolRegistry()
-    actions.register("stop", lambda: {"success": True}, ToolAnnotations(readOnlyHint=False))
+    actions = ReactionActionRegistry()
+    actions.register("stop", lambda: {"success": True}, ActionPolicy(modifies_state=True))
     store = ReactionStore(tmp_path)
     bus = ReactionBus(action_executor=actions, store=store)
     service = ReactionService(plan, events, bus, actions)
@@ -50,7 +49,7 @@ def test_service_restores_persisted_reaction_without_mcp(service_setup) -> None:
     original = service_setup.service.create_reaction(service_setup.request)
     old = service_setup.service
     restored = ReactionService(
-        old.hardware_plan, old.event_bus, ReactionBus(store=service_setup.store), old.reaction_tool_registry,
+        old.hardware_plan, old.event_bus, ReactionBus(store=service_setup.store), old.actions,
     )
 
     restored.restore_reactions()
@@ -74,7 +73,7 @@ def test_service_rejects_unknown_action_before_persisting(service_setup) -> None
         "action": service_setup.request.action.model_copy(update={"tool_name": "missing"}),
     })
 
-    with pytest.raises(ValueError, match="Unknown reaction action tool"):
+    with pytest.raises(ValueError, match="Unknown reaction action"):
         service_setup.service.create_reaction(request)
 
     assert not service_setup.store.load()

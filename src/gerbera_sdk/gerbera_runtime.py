@@ -7,7 +7,7 @@ from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.events.event_registration import EventRegistration
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
 from gerbera_sdk.events.reactions.reaction_service import ReactionService
 from gerbera_sdk.firmware.firmware_compiler import FirmwareCompiler
 from gerbera_sdk.firmware.firmware_dependencies import FirmwareDependencies
@@ -54,7 +54,7 @@ class GerberaRuntime:
         EventRegistration(plan, events, worker).register()
         responses = CommandResponseRegistry()
         commands = CommandExecutor(plan, boards, responses)
-        actions = ReactionToolRegistry()
+        actions = ReactionActionRegistry()
         reaction_bus = ReactionBus(action_executor=actions)
         reactions = ReactionService(plan, events, reaction_bus, actions)
         listener = EventListener(

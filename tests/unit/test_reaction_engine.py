@@ -1,6 +1,5 @@
 import asyncio
 
-from mcp.types import ToolAnnotations
 from pydantic import ValidationError
 import pytest
 
@@ -13,7 +12,7 @@ from gerbera_sdk.events.reactions import (
     ReactionOperator,
     ReactionTriggerMode,
 )
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ActionPolicy, ReactionActionRegistry
 from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 
 EVENT = ReactionEventSchema(
@@ -45,11 +44,11 @@ def make_request(
 
 
 def make_bus(tmp_path, action) -> ReactionBus:
-    registry = ReactionToolRegistry()
+    registry = ReactionActionRegistry()
     registry.register(
         "turn_off_heater",
         action,
-        ToolAnnotations(readOnlyHint=False, openWorldHint=False),
+        ActionPolicy(modifies_state=True),
     )
     return ReactionBus(
         action_executor=registry,
@@ -221,11 +220,11 @@ def test_reaction_store_loads_persisted_definitions(tmp_path) -> None:
 
 
 def test_tool_registry_rejects_read_only_actions() -> None:
-    registry = ReactionToolRegistry()
+    registry = ReactionActionRegistry()
     registry.register(
         "read_temperature",
         lambda: 20,
-        ToolAnnotations(readOnlyHint=True),
+        ActionPolicy(),
     )
 
     with pytest.raises(ValueError, match="explicitly modify state"):
@@ -235,3 +234,11 @@ def test_tool_registry_rejects_read_only_actions() -> None:
                 arguments={},
             )
         )
+
+
+def test_action_policy_can_disallow_mutating_management_actions() -> None:
+    registry = ReactionActionRegistry()
+    registry.register("manage", lambda: None, ActionPolicy(modifies_state=True, allows_reactions=False))
+
+    with pytest.raises(ValueError, match="cannot be used"):
+        registry.validate_action(ReactionActionSchema(tool_name="manage", arguments={}))

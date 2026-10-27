@@ -13,7 +13,7 @@ from gerbera_sdk.events.reactions.reaction_condition import (
     parse_value_like,
     reaction_matches,
 )
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
 from gerbera_sdk.events.reactions.reaction_schema import (
     CreateReactionSchema,
     ReactionDefinitionSchema,
@@ -53,7 +53,7 @@ class RegisteredReaction:
 
 @dataclass
 class ReactionBus:
-    action_executor: ReactionToolRegistry | None = None
+    action_executor: ReactionActionRegistry | None = None
     store: ReactionStore = field(default_factory=ReactionStore)
     reactions: dict[UUID, RegisteredReaction] = field(default_factory=dict)
     reaction_ids_by_event: dict[EventKey, set[UUID]] = field(
@@ -65,7 +65,7 @@ class ReactionBus:
         repr=False,
     )
 
-    def configure_executor(self, executor: ReactionToolRegistry) -> None:
+    def configure_executor(self, executor: ReactionActionRegistry) -> None:
         self.action_executor = executor
 
     def create_reaction(

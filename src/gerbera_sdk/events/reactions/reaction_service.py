@@ -4,7 +4,7 @@ from uuid import UUID
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
 from gerbera_sdk.events.reactions.reaction_schema import CreateReactionSchema, ReactionEventSchema, ReactionSchema
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
@@ -17,7 +17,7 @@ class ReactionService:
     hardware_plan: HardwarePlan
     event_bus: EventBus
     reaction_bus: ReactionBus
-    reaction_tool_registry: ReactionToolRegistry
+    actions: ReactionActionRegistry
 
     def validate_reaction_event(self, event: ReactionEventSchema) -> None:
         try:
@@ -45,7 +45,7 @@ class ReactionService:
         definition: CreateReactionSchema,
     ) -> None:
         self.validate_reaction_event(definition.event)
-        self.reaction_tool_registry.validate_action(definition.action)
+        self.actions.validate_action(definition.action)
 
 
     def restore_reactions(self) -> None:

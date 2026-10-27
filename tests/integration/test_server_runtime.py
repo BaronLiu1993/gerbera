@@ -46,7 +46,7 @@ from gerbera_sdk.models.runtime.commands.command_response import (
 from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from gerbera_sdk.events.event_registration import EventRegistration
-from gerbera_sdk.events.reactions.reaction_executor import ReactionToolRegistry
+from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
 from gerbera_sdk.events.reactions.reaction_service import ReactionService
 from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
 from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
@@ -141,7 +141,7 @@ def make_server(dependencies: ServerDependencies | None = None) -> tuple[SimpleN
     responses = dependencies.command_responses or CommandResponseRegistry()
     commands = CommandExecutor(plan, SimpleNamespace(), responses)
     EventRegistration(plan, events, worker).register()
-    actions = ReactionToolRegistry()
+    actions = ReactionActionRegistry()
     reaction_bus = dependencies.reaction_bus or ReactionBus()
     reaction_bus.configure_executor(actions)
     tools = McpToolRegistry(app, actions)
@@ -615,3 +615,22 @@ def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
         {"success": True}, ["hardware.off", "stream.flush", "database.wait"],
         {"board-1.sensor.stream_enabled": {"value": "0", "unit": None}},
     )
+
+
+@pytest.mark.parametrize("name, read_only, allowed", [
+    ("modify", False, True), ("read", True, False), ("unspecified", None, False),
+    ("create_reaction", False, False),
+])
+def test_mcp_adapter_translates_annotations_into_domain_action_policy(name, read_only, allowed) -> None:
+    actions = ReactionActionRegistry()
+    tools = McpToolRegistry(FakeApp(), actions)
+    from gerbera_sdk.models.runtime.server.tool_registry import ToolDefinition
+
+    tools.register(ToolDefinition(name, "test", lambda: {}, ToolAnnotations(readOnlyHint=read_only)))
+    action = ReactionActionSchema(tool_name=name, arguments={})
+
+    if allowed:
+        actions.validate_action(action)
+    else:
+        with pytest.raises(ValueError):
+            actions.validate_action(action)
