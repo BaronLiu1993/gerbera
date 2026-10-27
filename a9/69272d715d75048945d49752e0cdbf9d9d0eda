@@ -1,0 +1,28 @@
+tests/unit/test_model_output_store.py
+  s_eb6570f5ffe476::t_29f6b3faf0bac6 54
+tests/unit/test_inference_contracts.py
+  s_eb6570f5ffe476::t_a45dc0c5372395 5,23-40
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_a45dc0c5372395 427
+src/gerbera_sdk/inference/models/neural_network/object_depth/object_depth_model_adapter.py
+  s_eb6570f5ffe476::t_29f6b3faf0bac6 59
+src/gerbera_sdk/inference/models/neural_network/object_depth/object_depth_schema.py
+  s_eb6570f5ffe476::t_29f6b3faf0bac6 4,48-49,52,70-78
+  s_eb6570f5ffe476::t_85ed92ec502281 79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a969272d715d75048945d49752e0cdbf9d9d0eda",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
