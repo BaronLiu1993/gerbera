@@ -11,10 +11,11 @@ from gerbera_cli.setup import LocalProjectServices, readiness_report
 def test_database_credentials_are_scoped_and_private(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     initialise_database_credentials()
-    path = Path(".gerbera/secrets/sdk.json")
+    path = Path(".gerbera/secrets/database.env")
+    names = {line.split("=", 1)[0] for line in path.read_text().splitlines()}
 
-    assert (set(json.loads(path.read_text())), path.stat().st_mode & 0o777) == (
-        {"gerbera_schema_password", "gerbera_writer_password"}, 0o600,
+    assert (names, path.stat().st_mode & 0o777, Path(".gerbera/secrets/sdk.json").exists()) == (
+        {"POSTGRES_PASSWORD", "GERBERA_READER_PASSWORD"}, 0o600, False,
     )
 
 
@@ -146,3 +147,19 @@ def test_cli_does_not_accept_readiness_from_another_service(monkeypatch) -> None
 
     with pytest.raises(TimeoutError):
         services.wait_for_server()
+
+
+def test_cli_delegates_sdk_credentials_and_mounts_its_bootstrap_file(monkeypatch, tmp_path) -> None:
+    import yaml
+    from gerbera_cli.initialise import initialise_project_files
+
+    monkeypatch.chdir(tmp_path)
+    calls = []
+    monkeypatch.setattr("gerbera_cli.initialise.subprocess.run", lambda command, check: calls.append(command))
+
+    initialise_project_files(False, None)
+
+    manifest = yaml.safe_load(Path("gerbera.yaml").read_text())
+    assert (calls[1][3], manifest["services"]["database"]["env_files"]) == (
+        "credentials", [".gerbera/secrets/database.env", ".gerbera/secrets/sdk-database.env"],
+    )

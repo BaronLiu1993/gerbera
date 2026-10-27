@@ -91,6 +91,12 @@ Database credentials are supplied explicitly with `DatabaseSettings` from
 `models/runtime/storage/database_settings.py`. Configuration and environment loading
 belong to the server entry point, outside the facade.
 
+The SDK owns writer/schema credentials and their private JSON format. Run
+`python -m gerbera_sdk.server credentials --config .gerbera/sdk/runtime.json` to
+create them and export the database bootstrap environment. The project CLI delegates
+this operation and mounts the exported file alongside its deployment credentials.
+Repeated initialization preserves credentials and rejects conflicting bootstrap files.
+
 The independently runnable entry point owns loading and validating SDK settings
 and hardware code:
 

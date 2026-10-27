@@ -10,15 +10,21 @@ from gerbera_sdk.models.runtime.storage.database_settings import DatabaseSetting
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", nargs="?", default="serve", choices=("serve", "initialise", "discover", "check"))
+    parser.add_argument("command", nargs="?", default="serve", choices=("serve", "initialise", "credentials", "discover", "check"))
     parser.add_argument("--config", type=Path, default=Path(".gerbera/sdk/runtime.json"))
     parser.add_argument("--host")
     parser.add_argument("--port", type=int)
+    parser.add_argument("--database-env", type=Path, default=Path(".gerbera/secrets/sdk-database.env"))
     arguments = parser.parse_args()
     if arguments.command == "initialise":
         from gerbera_sdk.server.initialise import initialise_sdk
 
         initialise_sdk(arguments.config)
+        return
+    if arguments.command == "credentials":
+        from gerbera_sdk.server.credentials import initialise_credentials
+
+        initialise_credentials(arguments.config.resolve(), arguments.database_env.resolve())
         return
     if arguments.command == "discover":
         from gerbera_sdk.server.initialise import discover_boards

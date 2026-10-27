@@ -1,4 +1,3 @@
-import json
 import hashlib
 from pathlib import Path
 import secrets
@@ -22,15 +21,9 @@ def initialise_database_credentials() -> None:
         credentials = dict(line.split("=", 1) for line in existing.read_text().splitlines() if line)
     else:
         credentials = {name: secrets.token_urlsafe(32) for name in (
-            "POSTGRES_PASSWORD", "GERBERA_SCHEMA_PASSWORD", "GERBERA_WRITER_PASSWORD", "GERBERA_READER_PASSWORD",
+            "POSTGRES_PASSWORD", "GERBERA_READER_PASSWORD",
         )}
         write_secret_file(existing, "\n".join(f"{name}={value}" for name, value in credentials.items()) + "\n")
-    sdk_secret = Path(".gerbera/secrets/sdk.json")
-    if not sdk_secret.exists():
-        write_secret_file(sdk_secret, json.dumps({
-            "gerbera_schema_password": credentials["GERBERA_SCHEMA_PASSWORD"],
-            "gerbera_writer_password": credentials["GERBERA_WRITER_PASSWORD"],
-        }, indent=2))
     reader_secret = Path(".gerbera/secrets/harness-database.env")
     if not reader_secret.exists():
         write_secret_file(reader_secret, f"GERBERA_READER_PASSWORD={credentials['GERBERA_READER_PASSWORD']}\n")
@@ -42,6 +35,10 @@ def initialise_project_files(with_harness: bool, provider: str | None) -> None:
         raise FileExistsError("Deployment manifest already exists; service configuration is not overwritten")
     subprocess.run([sys.executable, "-m", "gerbera_sdk.server", "initialise"], check=True)
     initialise_database_credentials()
+    subprocess.run([
+        sys.executable, "-m", "gerbera_sdk.server", "credentials",
+        "--config", ".gerbera/sdk/runtime.json", "--database-env", ".gerbera/secrets/sdk-database.env",
+    ], check=True)
     harness_command = [sys.executable, "-m", "gerbera_harness.initialise"]
     if provider is not None:
         harness_command.extend(("--provider", provider))
@@ -54,7 +51,7 @@ def initialise_project_files(with_harness: bool, provider: str | None) -> None:
                 "image": "ghcr.io/baronliu1993/gerbera-postgres:latest",
                 "url": "postgresql://127.0.0.1:6432", "container_port": 5432,
                 "environment": {"POSTGRES_DB": "gerbera", "POSTGRES_USER": "gerbera_admin"},
-                "env_files": [".gerbera/secrets/database.env"],
+                "env_files": [".gerbera/secrets/database.env", ".gerbera/secrets/sdk-database.env"],
                 "volume": f"gerbera_{hashlib.sha256(str(Path.cwd().resolve()).encode()).hexdigest()[:12]}_postgres_data",
             },
             "sdk": {
