@@ -15,6 +15,12 @@ from gerbera_sdk.server.initialise import discover_boards
         "id": "board-1", "address": "/dev/board-1",
         "protocol": "serial", "fqbn": "arduino:avr:uno",
     }}),
+    ([{
+        "port": {"address": "/dev/ambiguous", "protocol": "serial"},
+        "matching_boards": [{"fqbn": "arduino:avr:uno"}, {"fqbn": "arduino:avr:mega"}],
+    }], {"/dev/ambiguous": {
+        "id": "board-1", "address": "/dev/ambiguous", "protocol": "serial", "fqbn": None,
+    }}),
 ])
 def test_sdk_owns_board_discovery(monkeypatch, ports, expected) -> None:
     monkeypatch.setattr("gerbera_sdk.server.initialise.uuid.uuid4", lambda: "board-1")

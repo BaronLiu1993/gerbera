@@ -21,7 +21,7 @@ def discover_boards() -> dict[str, dict]:
         matches = device.get("matching_boards", [])
         detected[port["address"]] = {
             "id": str(uuid.uuid4()), "address": port["address"],
-            "protocol": port["protocol"], "fqbn": matches[0].get("fqbn") if matches else None,
+            "protocol": port["protocol"], "fqbn": matches[0]["fqbn"] if len(matches) == 1 else None,
         }
     return detected
 
