@@ -63,6 +63,17 @@ def test_arduino_inventory_uses_installed_version_not_available_releases(monkeyp
                         SimpleNamespace(stdout=json.dumps({"platforms": [
                             {"id": "arduino:avr", "installed_version": "1.8.6"},
                             {"id": "esp32:esp32", "latest_version": "3.0"},
+                            {"id": "legacy", "version": "1.0"},
                         ]})))
 
     assert FirmwareDependencies.read_inventory("core") == {"arduino:avr"}
+
+
+def test_arduino_inventory_rejects_retired_list_format(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "gerbera_sdk.firmware.firmware_dependencies.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="[]"),
+    )
+
+    with pytest.raises(ValueError, match="must be an object"):
+        FirmwareDependencies.read_inventory("core")

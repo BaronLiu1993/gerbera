@@ -29,9 +29,11 @@ class FirmwareDependencies:
             capture_output=True, text=True, check=True,
         )
         payload = json.loads(result.stdout)
+        if not isinstance(payload, dict):
+            raise ValueError("Arduino CLI inventory must be an object")
         if kind == "core":
-            entries = payload if isinstance(payload, list) else payload["platforms"]
+            entries = payload["platforms"]
             return {entry["id"] for entry in entries
-                    if entry.get("installed_version") or entry.get("installed") or entry.get("version")}
-        entries = payload if isinstance(payload, list) else payload["installed_libraries"]
+                    if entry.get("installed_version")}
+        entries = payload["installed_libraries"]
         return {entry["library"]["name"] for entry in entries}
