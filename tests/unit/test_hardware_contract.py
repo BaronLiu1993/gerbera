@@ -20,6 +20,7 @@ def build_system(
     watchdog: RuntimeWatchdogConfig | None = None,
 ) -> HardwareSystem:
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
@@ -37,8 +38,7 @@ def build_system(
     return system
 
 
-def test_contract_compiler_canonicalizes_pin_aliases(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_compiler_canonicalizes_pin_aliases() -> None:
     system = build_system(
         [Connection("status_led", "led", {"out": "D13"}, "Status LED")]
     )
@@ -49,8 +49,7 @@ def test_contract_compiler_canonicalizes_pin_aliases(device_registry) -> None:
     assert connection.pins == {"out": "13"}
 
 
-def test_contract_compiler_indexes_event_routes(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_compiler_indexes_event_routes() -> None:
     system = build_system(
         [Connection("status_led", "led", {"out": "13"}, "Status LED")]
     )
@@ -63,10 +62,7 @@ def test_contract_compiler_indexes_event_routes(device_registry) -> None:
     ] is connection
 
 
-def test_contract_digest_is_independent_of_declaration_order(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_digest_is_independent_of_declaration_order() -> None:
     first = build_system(
         [
             Connection("sensor", "hw201", {"out": "7"}, "Sensor"),
@@ -86,8 +82,7 @@ def test_contract_digest_is_independent_of_declaration_order(
     assert first_digest == second_digest
 
 
-def test_contract_digest_changes_with_pin_assignment(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_digest_changes_with_pin_assignment() -> None:
     first = build_system(
         [Connection("sensor", "hw201", {"out": "7"}, "Sensor")]
     )
@@ -101,8 +96,7 @@ def test_contract_digest_changes_with_pin_assignment(device_registry) -> None:
     assert first_digest != second_digest
 
 
-def test_contract_digest_changes_with_watchdog_timing(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_digest_changes_with_watchdog_timing() -> None:
     first = build_system(
         [],
         RuntimeWatchdogConfig(
@@ -124,8 +118,7 @@ def test_contract_digest_changes_with_watchdog_timing(device_registry) -> None:
     assert first_digest != second_digest
 
 
-def test_contract_digest_changes_with_runtime_transport(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_digest_changes_with_runtime_transport() -> None:
     usb_system = build_system([])
     bluetooth_system = build_system([])
     bluetooth_board = bluetooth_system.microcontrollers[0]
@@ -143,8 +136,7 @@ def test_contract_digest_changes_with_runtime_transport(device_registry) -> None
     assert usb_digest != bluetooth_digest
 
 
-def test_avr_board_rejects_bluetooth_transport(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_avr_board_rejects_bluetooth_transport() -> None:
     system = build_system([])
     system.microcontrollers[0].runtime_transport = (
         RuntimeTransportConfig.bluetooth_classic(
@@ -157,10 +149,7 @@ def test_avr_board_rejects_bluetooth_transport(device_registry) -> None:
         HardwareContractCompiler.compile(system)
 
 
-def test_contract_digest_changes_with_safe_stop_strategy(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_contract_digest_changes_with_safe_stop_strategy() -> None:
     system = build_system(
         [Connection("status_led", "led", {"out": "13"}, "Status LED")]
     )
@@ -208,9 +197,8 @@ def test_contract_digest_changes_with_safe_stop_strategy(
 def test_contract_compiler_rejects_invalid_watchdog(
     watchdog: RuntimeWatchdogConfig,
     error: str,
-    device_registry,
 ) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+
 
     with pytest.raises(ValueError, match=error):
         HardwareContractCompiler.compile(build_system([], watchdog))
@@ -261,9 +249,8 @@ def test_contract_compiler_rejects_invalid_watchdog(
 def test_contract_compiler_rejects_invalid_pin_assignment(
     connections: list[Connection],
     error: str,
-    device_registry,
 ) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+
 
     with pytest.raises(ValueError, match=error):
         HardwareContractCompiler.compile(build_system(connections))

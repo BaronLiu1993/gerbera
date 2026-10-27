@@ -1,18 +1,14 @@
-import json
-
 import pytest
 
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.microcontroller import (
-    BoardTransportKind,
     Microcontroller,
-    RuntimeWatchdogConfig,
 )
 
 
 def make_connection(*, stream: bool = False) -> Connection:
     return Connection(
-        name="status-led",
+        name="status_led",
         component_type="led",
         pins={"out": "13"},
         description="Status LED",
@@ -63,95 +59,16 @@ def test_connection_event_name_is_stable_for_bound_hardware() -> None:
     assert connection.event_name.startswith("status_led_")
 
 
-def test_microcontroller_resolves_id_from_its_configured_registry(
-    tmp_path,
-) -> None:
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "devices": {
-                    "board-1": {
-                        "id": "board-1",
-                        "address": "/dev/board-1",
-                    }
-                }
-            }
-        )
-    )
-    board = Microcontroller(
-        name="board",
-        port="/dev/board-1",
-        fqbn="arduino:avr:uno",
-        watchdog=RuntimeWatchdogConfig(
-            heartbeat_interval_ms=100,
-            heartbeat_timeout_ms=500,
-        ),
-        config_path=config_path,
-    )
+def test_microcontroller_requires_resolved_identity_without_reading_files(monkeypatch) -> None:
+    board = Microcontroller(name="board", port="/dev/board", fqbn="arduino:avr:uno")
+    monkeypatch.setattr("pathlib.Path.read_text", lambda *args: pytest.fail("Unexpected filesystem read"))
 
-    assert board.id == "board-1"
-
-
-def test_microcontroller_hard_fails_when_port_is_not_registered(
-    tmp_path,
-) -> None:
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "devices": {
-                    "board-1": {
-                        "id": "board-1",
-                        "address": "/dev/other",
-                    }
-                }
-            }
-        )
-    )
-    board = Microcontroller(
-        name="board",
-        port="/dev/missing",
-        fqbn="arduino:avr:uno",
-        watchdog=RuntimeWatchdogConfig(
-            heartbeat_interval_ms=100,
-            heartbeat_timeout_ms=500,
-        ),
-        config_path=config_path,
-    )
-
-    with pytest.raises(ValueError, match="matched port"):
+    with pytest.raises(ValueError, match="device_id must be resolved"):
         _ = board.id
 
 
-def test_microcontroller_loads_runtime_transport_from_config(tmp_path) -> None:
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "devices": {
-                    "esp32-1": {
-                        "id": "esp32-1",
-                        "address": "/dev/usb-esp32",
-                        "runtime_transport": {
-                            "kind": "bluetooth_classic",
-                            "port": "/dev/bluetooth-esp32",
-                            "device_name": "Gerbera-ESP32",
-                        },
-                    }
-                }
-            }
-        )
-    )
-    board = Microcontroller(
-        name="esp32",
-        port="/dev/usb-esp32",
-        fqbn="esp32:esp32:esp32",
-        watchdog=RuntimeWatchdogConfig(500, 2500),
-        config_path=config_path,
-    )
+def test_resolved_microcontroller_identity_does_not_read_files(monkeypatch) -> None:
+    board = Microcontroller(name="board", port="/dev/board", fqbn="arduino:avr:uno", device_id="board-1")
+    monkeypatch.setattr("pathlib.Path.read_text", lambda *args: pytest.fail("Unexpected filesystem read"))
 
-    transport = board.active_runtime_transport
-
-    assert transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC
-    assert transport.port == "/dev/bluetooth-esp32"
+    assert board.id == "board-1"

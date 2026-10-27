@@ -42,10 +42,7 @@ def make_fixed_joint(
     )
 
 
-def test_facade_accepts_a_valid_complete_hardware_graph(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_facade_accepts_a_valid_complete_hardware_graph() -> None:
     motor = Connection(
         name="shoulder_motor",
         component_type="sg90",
@@ -54,6 +51,7 @@ def test_facade_accepts_a_valid_complete_hardware_graph(
         microcontroller_id="board-1",
     )
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
@@ -200,10 +198,7 @@ def test_revolute_joint_boundaries_are_validated(
     assert any(error.endswith(expected_error) for error in result.errors)
 
 
-def test_motor_must_use_the_registered_connection_instance(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_motor_must_use_the_registered_connection_instance() -> None:
     registered_motor = Connection(
         name="motor",
         component_type="sg90",
@@ -219,6 +214,7 @@ def test_motor_must_use_the_registered_connection_instance(
         microcontroller_id="board-1",
     )
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",

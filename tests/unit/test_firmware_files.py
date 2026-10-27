@@ -21,9 +21,8 @@ from gerbera_sdk.models.hardware.microcontroller import (
 def test_generated_firmware_is_stored_in_gerbera(
     tmp_path,
     monkeypatch,
-    device_registry,
 ) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         FirmwareGenerator,

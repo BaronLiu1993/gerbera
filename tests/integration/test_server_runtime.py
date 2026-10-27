@@ -142,9 +142,8 @@ def make_server(
 
 
 def test_listener_acknowledgement_completes_server_command(
-    device_registry,
 ) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+
     connection = Connection(
         name="sensor",
         component_type="hw201",
@@ -153,6 +152,7 @@ def test_listener_acknowledgement_completes_server_command(
         microcontroller_id="board-1",
     )
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
@@ -204,9 +204,8 @@ def test_listener_acknowledgement_completes_server_command(
 
 def test_reaction_management_tools_create_list_and_delete(
     tmp_path,
-    device_registry,
 ) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+
     connection = Connection(
         name="sensor",
         component_type="hw201",
@@ -216,6 +215,7 @@ def test_reaction_management_tools_create_list_and_delete(
         stream=True,
     )
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",
@@ -309,9 +309,8 @@ def test_camera_tool_forwards_batch_controls_and_serializes_frames() -> None:
 @pytest.mark.parametrize("stream", [False, True])
 def test_event_registration_respects_explicit_stream_flag(
     stream: bool,
-    device_registry,
 ) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+
     connection = Connection(
         name="sensor",
         component_type="hw201",
@@ -321,6 +320,7 @@ def test_event_registration_respects_explicit_stream_flag(
         stream=stream,
     )
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",

@@ -23,10 +23,10 @@ class FakeDatabase(Database):
         self.batches.append(list(payload))
 
 
-def test_stream_payload_is_buffered_and_written(device_registry) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_stream_payload_is_buffered_and_written() -> None:
     database = FakeDatabase()
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",

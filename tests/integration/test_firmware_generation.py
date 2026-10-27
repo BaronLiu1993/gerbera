@@ -8,11 +8,9 @@ from gerbera_sdk.models.hardware.microcontroller import (
 )
 
 
-def test_models_generate_routed_firmware_for_read_and_write_components(
-    device_registry,
-) -> None:
-    device_registry({"board-1": "/dev/board-1"})
+def test_models_generate_routed_firmware_for_read_and_write_components() -> None:
     board = Microcontroller(
+        device_id="board-1",
         name="board",
         port="/dev/board-1",
         fqbn="arduino:avr:uno",

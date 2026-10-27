@@ -7,6 +7,7 @@ import yaml
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import RegisteredDevice
+from gerbera_sdk.server.hardware_loader import HardwareConfigurationResolver
 from gerbera_sdk.utils import StrictSchema
 
 
@@ -48,9 +49,7 @@ class SdkSettings(StrictSchema):
         hardware = getattr(module, self.hardware_variable)
         if not isinstance(hardware, HardwareSystem):
             raise TypeError(f"{self.hardware_variable} must be a HardwareSystem")
-        for controller in hardware.microcontrollers:
-            controller.config_path = config_path
-        return hardware
+        return HardwareConfigurationResolver(self.devices).resolve(hardware)
 
     def load_secrets(self, config_path: Path) -> "SdkSecrets":
         root = (config_path.parent / self.project_root).resolve()
