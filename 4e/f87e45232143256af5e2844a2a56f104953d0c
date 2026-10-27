@@ -1,0 +1,21 @@
+tests/unit/test_inference_contracts.py
+  s_eb6570f5ffe476::t_8a06d237fae3aa 1-21
+src/gerbera_sdk/inference/models/vision_language_model/vision_language_model_inference.py
+  s_eb6570f5ffe476::t_8a06d237fae3aa 37-38,40-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4ef87e45232143256af5e2844a2a56f104953d0c",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
