@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedConnection
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
+from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry, CommandRoute
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 
 
@@ -24,7 +24,7 @@ class CommandExecutor:
         action: str,
         params: dict[str, object],
     ) -> dict[str, object]:
-        pending = self.responses.register(connection.microcontroller_id)
+        pending = self.responses.register(CommandRoute(connection.microcontroller_id, connection.event_name))
         try:
             command = CommandCompiler.build_command(connection, action, params)
             command = CommandCompiler.attach_command_id(command, pending.command_id)

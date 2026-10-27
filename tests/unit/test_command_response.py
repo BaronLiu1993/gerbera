@@ -1,17 +1,17 @@
 import pytest
 
 from gerbera_sdk.models.runtime.commands.command_response import (
-    CommandResponseRegistry,
+    CommandResponseRegistry, CommandRoute, CommandReply,
 )
 
 
 def test_registry_resolves_commands_out_of_order() -> None:
     registry = CommandResponseRegistry()
-    first = registry.register("board-1")
-    second = registry.register("board-1")
+    first = registry.register(CommandRoute("board-1", "sensor_event"))
+    second = registry.register(CommandRoute("board-1", "sensor_event"))
 
-    registry.resolve(second.command_id, {})
-    registry.resolve(first.command_id, {"value": "first"})
+    registry.resolve(CommandReply(second.command_id, second.route, {}))
+    registry.resolve(CommandReply(first.command_id, first.route, {"value": "first"}))
 
     assert (
         registry.wait(first, 0),
@@ -24,8 +24,8 @@ def test_registry_resolves_commands_out_of_order() -> None:
 
 def test_registry_propagates_board_errors() -> None:
     registry = CommandResponseRegistry()
-    pending = registry.register("board-1")
-    registry.fail(pending.command_id, "invalid_state")
+    pending = registry.register(CommandRoute("board-1", "sensor_event"))
+    registry.resolve(CommandReply(pending.command_id, pending.route, {"error": "invalid_state"}))
 
     with pytest.raises(RuntimeError, match="invalid_state"):
         registry.wait(pending, 0)
@@ -33,8 +33,8 @@ def test_registry_propagates_board_errors() -> None:
 
 def test_registry_fails_only_disconnected_board_commands() -> None:
     registry = CommandResponseRegistry()
-    disconnected = registry.register("board-1")
-    connected = registry.register("board-2")
+    disconnected = registry.register(CommandRoute("board-1", "sensor_event"))
+    connected = registry.register(CommandRoute("board-2", "sensor_event"))
 
     registry.fail_board("board-1", "disconnected")
 
@@ -47,7 +47,7 @@ def test_registry_fails_only_disconnected_board_commands() -> None:
 
 def test_registry_times_out_unacknowledged_command() -> None:
     registry = CommandResponseRegistry()
-    pending = registry.register("board-1")
+    pending = registry.register(CommandRoute("board-1", "sensor_event"))
 
     with pytest.raises(TimeoutError, match="command response timed out"):
         registry.wait(pending, 0)
@@ -57,7 +57,7 @@ def test_registry_times_out_unacknowledged_command() -> None:
 
 def test_registry_rejects_completion_without_response_payload() -> None:
     registry = CommandResponseRegistry()
-    pending = registry.register("board-1")
+    pending = registry.register(CommandRoute("board-1", "sensor_event"))
     pending.completion.set()
 
     with pytest.raises(RuntimeError, match="without a response"):

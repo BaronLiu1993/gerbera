@@ -5,7 +5,7 @@ import pytest
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.runtime.commands.command_response import (
-    CommandResponseRegistry,
+    CommandResponseRegistry, CommandRoute,
 )
 
 
@@ -20,6 +20,19 @@ def make_listener(reconnect_board) -> EventListener:
         command_responses=CommandResponseRegistry(),
         reconnect_board=reconnect_board,
     )
+
+
+@pytest.mark.parametrize("board, target", [("board-2", "sensor_event"), ("board-1", "wrong_event")])
+def test_reply_cannot_complete_a_command_owned_by_another_route(board, target):
+    listener = make_listener(None)
+    pending = listener.command_responses.register(CommandRoute("board-1", "sensor_event"))
+    try:
+        with pytest.raises(ValueError, match="route does not match"):
+            listener.process_message(board, f"MCP,{target},command_id:{pending.command_id},value:1")
+        assert not pending.completion.is_set()
+        assert pending.command_id in listener.command_responses.pending_commands
+    finally:
+        listener.reaction_executor.shutdown(wait=True)
 
 
 def test_listener_retries_a_disconnected_board(monkeypatch) -> None:

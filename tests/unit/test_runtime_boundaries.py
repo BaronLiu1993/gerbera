@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 from fastmcp import FastMCP
 
+from gerbera_sdk.models.runtime.commands.command_response import CommandReply, CommandRoute
 from gerbera_sdk import gerbera_runtime as runtime_module
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
@@ -161,7 +162,7 @@ def test_applications_share_declarations_without_sharing_command_execution(hardw
 
         def write(command):
             message = SerialMessageCodec.decode(command)
-            executor.responses.resolve(message.fields["command_id"], {"runtime": label})
+            executor.responses.resolve(CommandReply(message.fields["command_id"], CommandRoute("board-1", hardware.microcontrollers[0].connections[0].event_name), {"runtime": label}))
 
         executor.boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=write))
         executors.append(executor)

@@ -2,12 +2,29 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 import threading
 import uuid
+from typing import Annotated
+
+from pydantic import ConfigDict, Field
+from pydantic.dataclasses import dataclass as schema_dataclass
+
+
+@schema_dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid"))
+class CommandRoute:
+    microcontroller_id: Annotated[str, Field(min_length=1)]
+    event_name: Annotated[str, Field(min_length=1)]
+
+
+@schema_dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid"))
+class CommandReply:
+    command_id: Annotated[str, Field(min_length=1)]
+    route: CommandRoute
+    payload: dict[str, str]
 
 
 @dataclass
 class PendingCommand:
     command_id: str
-    microcontroller_id: str
+    route: CommandRoute
     completion: threading.Event = field(default_factory=threading.Event)
     payload: dict[str, str] | None = None
     error: str | None = None
@@ -22,10 +39,12 @@ class CommandResponseRegistry:
         repr=False,
     )
 
-    def register(self, microcontroller_id: str) -> PendingCommand:
+    def register(self, route: CommandRoute) -> PendingCommand:
+        if not isinstance(route, CommandRoute):
+            raise TypeError("Command registration requires an explicit route")
         pending = PendingCommand(
             command_id=uuid.uuid4().hex,
-            microcontroller_id=microcontroller_id,
+            route=route,
         )
         with self.lock:
             self.pending_commands[pending.command_id] = pending
@@ -33,14 +52,20 @@ class CommandResponseRegistry:
 
     def resolve(
         self,
-        command_id: str,
-        payload: Mapping[str, str],
+        reply: CommandReply,
     ) -> bool:
-        pending = self.remove(command_id)
-        if pending is None:
-            return False
-        pending.payload = dict(payload)
-        pending.completion.set()
+        with self.lock:
+            pending = self.pending_commands.get(reply.command_id)
+            if pending is None:
+                return False
+            if reply.route != pending.route:
+                raise ValueError("Command response route does not match its owner")
+            self.pending_commands.pop(reply.command_id)
+            if "error" in reply.payload:
+                pending.error = reply.payload["error"]
+            else:
+                pending.payload = dict(reply.payload)
+            pending.completion.set()
         return True
 
     def fail(self, command_id: str, error: str) -> bool:
@@ -56,7 +81,7 @@ class CommandResponseRegistry:
             matching = [
                 pending
                 for pending in self.pending_commands.values()
-                if pending.microcontroller_id == microcontroller_id
+                if pending.route.microcontroller_id == microcontroller_id
             ]
             for pending in matching:
                 self.pending_commands.pop(pending.command_id, None)

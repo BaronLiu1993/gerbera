@@ -16,7 +16,7 @@ from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.boards.board_transport import BoardTransport
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.commands.command_response import (
-    CommandResponseRegistry,
+    CommandResponseRegistry, CommandRoute, CommandReply,
 )
 from gerbera_sdk.models.runtime.state.hardware_runtime import (
     ConnectionState,
@@ -186,7 +186,8 @@ class EventListener:
         message = SerialMessageCodec.decode(line)
         payload = dict(message.fields)
         if message.message_type == "MCP":
-            if self.resolve_command_response(payload):
+            route = CommandRoute(microcontroller_id, message.target)
+            if self.resolve_command_response(route, payload):
                 if not payload:
                     self.record_success(microcontroller_id)
                     return
@@ -211,16 +212,14 @@ class EventListener:
         )
         self.record_success(microcontroller_id)
 
-    def resolve_command_response(self, payload: dict[str, str]) -> bool:
+    def resolve_command_response(self, route: CommandRoute, payload: dict[str, str]) -> bool:
         command_id = payload.pop(COMMAND_ID_FIELD, None)
         if command_id is None:
             return False
-        error = payload.get("error")
-        if error is not None:
-            self.command_responses.fail(command_id, error)
+        if not self.command_responses.resolve(CommandReply(command_id, route, dict(payload))):
+            raise ValueError(f"Unknown command response: {command_id}")
+        if "error" in payload:
             payload.clear()
-            return True
-        self.command_responses.resolve(command_id, payload)
         return True
 
     def reconnect(self, microcontroller_id: str) -> None:

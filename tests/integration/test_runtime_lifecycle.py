@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gerbera_sdk.models.runtime.commands.command_response import CommandReply, CommandRoute
 from gerbera_sdk.models.hardware.microcontroller import RuntimeTransportConfig
 from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
 
@@ -229,7 +230,7 @@ def test_movement_reset_receives_command_response_after_listener_start() -> None
     def write_command(command):
         if "listener.start" in calls:
             message = SerialMessageCodec.decode(command)
-            responses.resolve(message.fields["command_id"], {"angle": "0"})
+            responses.resolve(CommandReply(message.fields["command_id"], CommandRoute("board-1", motor.event_name), {"angle": "0"}))
 
     boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=write_command))
     commands = CommandExecutor(plan, boards, responses, timeout_seconds=0.01)

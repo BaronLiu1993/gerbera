@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gerbera_sdk.models.runtime.commands.command_response import CommandReply, CommandRoute
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -27,7 +28,7 @@ def command_setup():
 def test_bound_action_receives_correlated_board_response_without_mcp(command_setup) -> None:
     def reply(command):
         message = SerialMessageCodec.decode(command)
-        command_setup.responses.resolve(message.fields["command_id"], {"obstacle_detected": "1"})
+        command_setup.responses.resolve(CommandReply(message.fields["command_id"], CommandRoute("board-1", command_setup.connection.event_name), {"obstacle_detected": "1"}))
 
     boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=reply))
     executor = CommandExecutor(command_setup.plan, boards, command_setup.responses)
