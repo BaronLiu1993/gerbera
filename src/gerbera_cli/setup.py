@@ -10,6 +10,7 @@ import time
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
+from gerbera_protocol import ReadinessReport
 
 from gerbera_cli.configuration import ProjectConfig
 from gerbera_cli.deployment import StartupStage
@@ -185,7 +186,7 @@ class LocalProjectServices:
                 if not running:
                     raise RuntimeError(f"{name} exited during startup; run gerbera logs")
             report = readiness_report(service.url)
-            if report.get("ready") is True:
+            if report.get("ready") is True and report.get("service") == name:
                 return
             time.sleep(POLL_INTERVAL_SECONDS)
         raise TimeoutError(f"{name} did not report readiness: {report}")
@@ -270,9 +271,11 @@ def readiness_report(url: str) -> dict:
             response = client.get(url.rstrip("/") + "/ready")
         if response.status_code not in {200, 503}:
             return {"ready": False, "status_code": response.status_code}
-        payload = response.json()
-        return payload if isinstance(payload, dict) else {"ready": False, "phase": "invalid_response"}
-    except (httpx.HTTPError, ValueError):
+        report = ReadinessReport.model_validate(response.json())
+        return report.model_dump(mode="json") | {"ready": report.ready}
+    except ValueError:
+        return {"ready": False, "phase": "invalid_response"}
+    except httpx.HTTPError:
         return {"ready": False, "phase": "unreachable"}
 
 

@@ -77,7 +77,7 @@ def test_cli_waits_for_ready_not_merely_a_successful_http_request(monkeypatch) -
     services = LocalProjectServices(ProjectConfig(services={
         "sdk": ServiceSpec(managed=False, url="http://sdk.example"),
     }))
-    reports = Mock(side_effect=[{"ready": False}, {"ready": True}])
+    reports = Mock(side_effect=[{"service": "sdk", "ready": False}, {"service": "sdk", "ready": True}])
     monkeypatch.setattr("gerbera_cli.setup.readiness_report", reports)
     monkeypatch.setattr("gerbera_cli.setup.time.sleep", lambda interval: None)
 
@@ -106,4 +106,43 @@ def test_cli_readiness_timeout_preserves_service_report(monkeypatch) -> None:
     monkeypatch.setattr("gerbera_cli.setup.readiness_report", lambda url: {"ready": False, "phase": "failed"})
 
     with pytest.raises(TimeoutError, match="failed"):
+        services.wait_for_server()
+
+
+def test_cli_accepts_current_ready_phase_contract(monkeypatch) -> None:
+    import httpx
+    from gerbera_protocol import ReadinessReport
+
+    payload = ReadinessReport(service="sdk", phase="ready").model_dump(mode="json")
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)))
+    monkeypatch.setattr("gerbera_cli.setup.httpx.Client", lambda **kwargs: client)
+    services = LocalProjectServices(ProjectConfig(services={
+        "sdk": ServiceSpec(managed=False, url="http://sdk.example"),
+    }))
+    monkeypatch.setattr("gerbera_cli.setup.time.sleep", lambda interval: pytest.fail("Ready SDK must not be polled again"))
+
+    services.wait_for_server()
+
+
+@pytest.mark.parametrize("payload", [{"phase": "ready"}, {"ready": True}, [], {"service": "sdk", "phase": "unknown"}])
+def test_cli_rejects_invalid_readiness_contract(monkeypatch, payload) -> None:
+    import httpx
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)))
+    monkeypatch.setattr("gerbera_cli.setup.httpx.Client", lambda **kwargs: client)
+
+    assert readiness_report("http://sdk.example") == {"ready": False, "phase": "invalid_response"}
+
+
+def test_cli_does_not_accept_readiness_from_another_service(monkeypatch) -> None:
+    from unittest.mock import Mock
+
+    services = LocalProjectServices(ProjectConfig(
+        services={"sdk": ServiceSpec(managed=False, url="http://sdk.example")}, startup_timeout_seconds=1,
+    ))
+    monkeypatch.setattr("gerbera_cli.setup.time.monotonic", Mock(side_effect=[0, 0, 2]))
+    monkeypatch.setattr("gerbera_cli.setup.time.sleep", lambda interval: None)
+    monkeypatch.setattr("gerbera_cli.setup.readiness_report", lambda url: {"service": "harness", "ready": True})
+
+    with pytest.raises(TimeoutError):
         services.wait_for_server()
