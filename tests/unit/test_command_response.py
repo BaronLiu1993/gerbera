@@ -10,7 +10,7 @@ def test_registry_resolves_commands_out_of_order() -> None:
     first = registry.register("board-1")
     second = registry.register("board-1")
 
-    registry.resolve(second.command_id, {"value": "second"})
+    registry.resolve(second.command_id, {})
     registry.resolve(first.command_id, {"value": "first"})
 
     assert (
@@ -18,7 +18,7 @@ def test_registry_resolves_commands_out_of_order() -> None:
         registry.wait(second, 0),
     ) == (
         {"value": "first"},
-        {"value": "second"},
+        {},
     )
 
 
@@ -53,3 +53,12 @@ def test_registry_times_out_unacknowledged_command() -> None:
         registry.wait(pending, 0)
 
     assert registry.pending_commands == {}
+
+
+def test_registry_rejects_completion_without_response_payload() -> None:
+    registry = CommandResponseRegistry()
+    pending = registry.register("board-1")
+    pending.completion.set()
+
+    with pytest.raises(RuntimeError, match="without a response"):
+        registry.wait(pending, 0)

@@ -80,7 +80,9 @@ class CommandResponseRegistry:
             )
         if pending.error is not None:
             raise RuntimeError(pending.error)
-        return pending.payload or {}
+        if pending.payload is None:
+            raise RuntimeError(f"Board command completed without a response: {pending.command_id}")
+        return pending.payload
 
     def remove(self, command_id: str) -> PendingCommand | None:
         with self.lock:
