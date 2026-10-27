@@ -56,9 +56,7 @@ class ObjectDepthAdapter(ABC):
         return DepthMapModel(
             width=depth_values.shape[1],
             height=depth_values.shape[0],
-            values=depth_values.tolist(),
-            minimum_value=float(depth_values.min()),
-            maximum_value=float(depth_values.max()),
+            values=tuple(tuple(row) for row in depth_values.tolist()),
             value_type=self.manifest.output.value_type,
             unit=self.manifest.output.unit,
         )

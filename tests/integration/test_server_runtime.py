@@ -424,9 +424,7 @@ def test_object_detection_tools_bridge_server_and_model_runtime() -> None:
                 depth_map=DepthMapModel(
                     width=1,
                     height=1,
-                    values=[[1.0]],
-                    minimum_value=1.0,
-                    maximum_value=1.0,
+                    values=((1.0,),),
                     value_type="relative_depth",
                     unit="relative",
                 ),

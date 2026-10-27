@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from gerbera_sdk.inference import VisionLanguageModel, VisionLanguageModelProviderEnum
+from gerbera_sdk.inference import DepthMapModel
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 
 
@@ -19,3 +20,21 @@ def test_vision_configuration_rejects_unusable_settings(field, value) -> None:
 
     with pytest.raises(ValidationError, match=field):
         VisionLanguageModel(**settings)
+
+
+def test_depth_extrema_are_derived_from_immutable_samples() -> None:
+    depth = DepthMapModel(
+        width=2, height=1, values=((3.0, 5.0),), value_type="relative_depth", unit="relative",
+    )
+
+    assert (depth.minimum_value, depth.maximum_value) == (3.0, 5.0)
+    with pytest.raises(ValidationError):
+        depth.values = ((100.0, 200.0),)
+
+
+def test_depth_rejects_independently_supplied_extrema() -> None:
+    with pytest.raises(ValidationError, match="minimum_value"):
+        DepthMapModel(
+            width=1, height=1, values=((3.0,),), value_type="relative_depth", unit="relative",
+            minimum_value=100.0,
+        )

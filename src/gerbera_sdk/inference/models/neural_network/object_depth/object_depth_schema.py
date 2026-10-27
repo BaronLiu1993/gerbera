@@ -1,7 +1,7 @@
 import math
 from typing import Literal
 
-from pydantic import Field, InstanceOf, model_validator
+from pydantic import ConfigDict, Field, InstanceOf, computed_field, model_validator
 
 from gerbera_sdk.inference.frame import Frame
 from gerbera_sdk.inference.model_types import ObjectDepthModelProviderEnum
@@ -45,11 +45,11 @@ class ObjectDepthModelManifestSchema(StrictSchema):
 
 
 class DepthMapModel(StrictSchema):
+    model_config = ConfigDict(frozen=True)
+
     width: int = Field(gt=0)
     height: int = Field(gt=0)
-    values: list[list[float]]
-    minimum_value: float
-    maximum_value: float
+    values: tuple[tuple[float, ...], ...]
     value_type: Literal["relative_depth", "inverse_depth", "metric_depth"]
     unit: Literal["relative", "meters"]
 
@@ -61,13 +61,21 @@ class DepthMapModel(StrictSchema):
             raise ValueError("Depth map column count must match its width")
         if not all(math.isfinite(value) for row in self.values for value in row):
             raise ValueError("Depth map contains NaN or infinite values")
-        if self.minimum_value > self.maximum_value:
-            raise ValueError("Depth map minimum cannot exceed its maximum")
         if self.value_type == "metric_depth" and self.unit != "meters":
             raise ValueError("Metric depth maps must use meters")
         if self.value_type != "metric_depth" and self.unit != "relative":
             raise ValueError("Relative depth maps must use relative units")
         return self
+
+    @computed_field
+    @property
+    def minimum_value(self) -> float:
+        return min(value for row in self.values for value in row)
+
+    @computed_field
+    @property
+    def maximum_value(self) -> float:
+        return max(value for row in self.values for value in row)
 
 
 class ObjectDepthStateModel(StrictSchema):

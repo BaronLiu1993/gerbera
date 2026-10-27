@@ -51,7 +51,7 @@ def adapter_for(kind: str) -> VisionAdapter | SimpleNamespace:
     if kind == "vision_language_model":
         return VisionAdapter()
     depth_map = DepthMapModel(
-        width=1, height=1, values=[[1.0]], minimum_value=1.0, maximum_value=1.0,
+        width=1, height=1, values=((1.0,),),
         value_type="relative_depth", unit="relative",
     )
     return SimpleNamespace(
