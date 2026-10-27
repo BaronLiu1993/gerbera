@@ -388,3 +388,12 @@ class BoardRuntime:
 
         if first_error is not None:
             raise RuntimeError("Could not stop board runtime") from first_error
+
+    def readiness_reasons(self) -> tuple[str, ...]:
+        with self.lock:
+            return tuple(
+                f"Board session unavailable: {board.microcontroller_id}"
+                for board in self.hardware_plan.boards
+                if board.microcontroller_id not in self.sessions
+                or not self.sessions[board.microcontroller_id].heartbeat_thread.is_alive()
+            )

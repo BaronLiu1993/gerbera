@@ -89,7 +89,8 @@ class GerberaRuntime:
             reconnect_board=board_runtime.reconnect_board,
         )
         readiness = RuntimeReadiness(
-            board_runtime, camera_runtime, model_runtime, event_listener, event_worker,
+            sources=(board_runtime, camera_runtime, model_runtime, event_listener, event_worker),
+            instance_id=hardware_system.id,
         )
         schema_password = database_schema_password or os.environ.get("GERBERA_SCHEMA_PASSWORD")
         schema_owner = None

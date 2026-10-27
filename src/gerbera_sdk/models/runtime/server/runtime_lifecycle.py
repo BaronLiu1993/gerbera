@@ -67,9 +67,6 @@ class RuntimeLifecycle:
             startup_cleanup.callback(self.board_runtime.close)
             self.board_runtime.start()
 
-            if self.movement_runtime is not None:
-                self.movement_runtime.reset_motors_to_standard_position()
-
             startup_cleanup.callback(self.camera_runtime.close)
             self.camera_runtime.start()
             startup_cleanup.callback(
@@ -84,6 +81,9 @@ class RuntimeLifecycle:
 
             startup_cleanup.callback(self.event_listener.stop_listeners)
             self.event_listener.create_listeners()
+
+            if self.movement_runtime is not None:
+                self.movement_runtime.reset_motors_to_standard_position()
 
             startup_cleanup.pop_all()
         except BaseException:

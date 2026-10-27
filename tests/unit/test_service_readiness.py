@@ -1,5 +1,4 @@
 import asyncio
-from threading import RLock
 from types import SimpleNamespace
 
 import pytest
@@ -12,26 +11,10 @@ from gerbera_protocol import ReadinessReport
 from gerbera_sdk.models.runtime.server.readiness import RuntimeReadiness
 
 
-def thread(alive=True):
-    return SimpleNamespace(is_alive=lambda: alive)
-
-
 @pytest.fixture
 def sdk_readiness():
-    return RuntimeReadiness(
-        boards=SimpleNamespace(
-            lock=RLock(), hardware_plan=SimpleNamespace(
-                hardware_system_id="robot", boards=[SimpleNamespace(microcontroller_id="board")],
-            ), sessions={"board": SimpleNamespace(heartbeat_thread=thread())},
-        ),
-        cameras=SimpleNamespace(
-            lock=RLock(), hardware_system=SimpleNamespace(cameras=[]), camera_registry={},
-        ),
-        models=SimpleNamespace(lock=RLock(), model_stream_failures={}, model_streams={}),
-        listener=SimpleNamespace(get_health=lambda: {"board": {"status": "running"}}),
-        worker=SimpleNamespace(thread=thread(), failures=[]),
-        phase="ready",
-    )
+    sources = tuple(SimpleNamespace(readiness_reasons=lambda: ()) for _ in range(5))
+    return RuntimeReadiness(sources=sources, instance_id="robot", phase="ready")
 
 
 def test_sdk_reports_ready_only_after_all_dependencies_started(sdk_readiness) -> None:
@@ -58,22 +41,25 @@ def test_sdk_lifecycle_phase_controls_readiness(sdk_readiness, phase) -> None:
     assert sdk_readiness.snapshot().ready is False
 
 
-@pytest.mark.parametrize("failure", ["board", "listener", "worker", "camera", "model"])
-def test_sdk_readiness_detects_failed_runtime_dependencies(sdk_readiness, failure) -> None:
-    if failure == "board":
-        sdk_readiness.boards.sessions.clear()
-    elif failure == "listener":
-        sdk_readiness.listener.get_health = lambda: {"board": {"status": "reconnecting"}}
-    elif failure == "worker":
-        sdk_readiness.worker.failures.append(RuntimeError("write failed"))
-    elif failure == "camera":
-        sdk_readiness.cameras.hardware_system.cameras.append(SimpleNamespace(camera_id="camera"))
-    else:
-        sdk_readiness.models.model_stream_failures["model"] = RuntimeError("inference failed")
+@pytest.mark.parametrize("owner_index", range(5))
+def test_sdk_readiness_aggregates_resource_owner_failures(sdk_readiness, owner_index) -> None:
+    reason = f"Resource owner {owner_index} unavailable"
+    sdk_readiness.sources[owner_index].readiness_reasons = lambda: (reason,)
 
     report = sdk_readiness.snapshot()
 
-    assert (report.ready, report.phase, bool(report.reasons)) == (False, "degraded", True)
+    assert (report.ready, report.phase, report.reasons) == (False, "degraded", (reason,))
+
+
+def test_sdk_readiness_collects_all_owner_reports() -> None:
+    sources = (
+        SimpleNamespace(readiness_reasons=lambda: ("Board unavailable",)),
+        SimpleNamespace(readiness_reasons=lambda: ("Camera unavailable",)),
+    )
+
+    report = RuntimeReadiness(sources, "robot", phase="ready").snapshot()
+
+    assert report.reasons == ("Board unavailable", "Camera unavailable")
 
 
 class Tools:

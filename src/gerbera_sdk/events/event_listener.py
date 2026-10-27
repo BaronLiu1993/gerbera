@@ -362,3 +362,11 @@ class EventListener:
             ),
         )
         return future
+
+    def readiness_reasons(self) -> tuple[str, ...]:
+        health = self.get_health()
+        return tuple(
+            f"Board listener unavailable: {board.microcontroller_id}"
+            for board in self.hardware_plan.boards
+            if health.get(board.microcontroller_id, {}).get("status") != ListenerStatus.RUNNING
+        )

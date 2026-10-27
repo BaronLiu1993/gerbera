@@ -85,11 +85,11 @@ def test_runtime_orchestrates_resources_in_dependency_order(
         "storage.prepare",
         "firmware.verify",
         "board.start",
-        "movement.reset",
         "cameras.start",
         "models.start",
         "worker.start",
         "listener.start",
+        "movement.reset",
         "server.run",
         "models.stop",
         "cameras.close",
@@ -118,7 +118,6 @@ def test_runtime_cleans_started_dependencies_when_model_start_fails() -> None:
         "storage.prepare",
         "firmware.verify",
         "board.start",
-        "movement.reset",
         "cameras.start",
         "models.start",
         "models.stop",
@@ -198,3 +197,41 @@ def test_firmware_mismatch_stops_startup_before_hardware_starts(monkeypatch) -> 
         asyncio.run(serve())
 
     assert calls == ["storage.prepare", "firmware.verify"]
+
+
+def test_movement_reset_receives_command_response_after_listener_start() -> None:
+    from gerbera_sdk.gerbera_runtime import GerberaRuntime
+    from gerbera_sdk.models.hardware.connection import Connection
+    from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+    from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+    from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
+    from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
+    from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
+
+    motor = Connection(name="motor", component_type="sg90", pins={"signal": "9"}, description="Joint motor")
+    hardware = HardwareSystem(name="robot", microcontrollers=[Microcontroller(
+        name="board", device_id="board-1", port="/dev/test", fqbn="arduino:avr:uno", connections=[motor],
+    )])
+    GerberaRuntime.bind_connection_microcontroller_ids(hardware)
+    plan = GerberaRuntime.validate_hardware(hardware)
+    responses = CommandResponseRegistry()
+    calls = []
+    lifecycle = build_lifecycle(calls)
+    results = []
+
+    def write_command(command):
+        if "listener.start" in calls:
+            message = SerialMessageCodec.decode(command)
+            responses.resolve(message.fields["command_id"], {"angle": "0"})
+
+    boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=write_command))
+    commands = CommandExecutor(plan, boards, responses, timeout_seconds=0.01)
+    commands.bind_actions()
+    lifecycle.movement_runtime.reset_motors_to_standard_position = lambda: results.append(
+        motor.perform_action("WRITE", {"angle": 0.0})
+    )
+
+    with lifecycle.start_resources():
+        pass
+
+    assert results == [{"success": True, "value": {"angle": "0"}}]

@@ -252,3 +252,13 @@ class CameraRuntime:
         with self.lock:
             self.camera_registry.clear()
             self.latest_frames.clear()
+
+    def readiness_reasons(self) -> tuple[str, ...]:
+        with self.lock:
+            reasons = []
+            for camera in self.hardware_system.cameras:
+                session = self.camera_registry.get(camera.camera_id)
+                if (session is None or session.thread is None
+                        or not session.thread.is_alive() or session.startup_error is not None):
+                    reasons.append(f"Camera unavailable: {camera.camera_id}")
+            return tuple(reasons)

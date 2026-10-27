@@ -148,3 +148,8 @@ class EventWorker:
 
         if self.failures:
             raise self.failures[0]
+
+    def readiness_reasons(self) -> tuple[str, ...]:
+        if self.thread is None or not self.thread.is_alive() or self.failures:
+            return ("Device event storage worker unavailable",)
+        return ()

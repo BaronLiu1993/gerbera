@@ -346,3 +346,10 @@ class ModelRuntime:
             model_ids = list(self.model_streams)
         for model_id in model_ids:
             self.turn_off_model_stream(model_id)
+
+    def readiness_reasons(self) -> tuple[str, ...]:
+        with self.lock:
+            failed = self.model_stream_failures or any(
+                not stream.thread.is_alive() for stream in self.model_streams.values()
+            )
+            return ("Required inference streams failed",) if failed else ()
