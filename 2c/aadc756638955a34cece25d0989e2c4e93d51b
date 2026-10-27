@@ -1,0 +1,21 @@
+tests/unit/test_package_ownership.py
+  s_eb6570f5ffe476::t_1853e9efffe891 7-10,12,15,17,28-39
+tests/unit/test_service_readiness.py
+  s_eb6570f5ffe476::t_1853e9efffe891 27,34-35,39,45,51-53,90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2caadc756638955a34cece25d0989e2c4e93d51b",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
