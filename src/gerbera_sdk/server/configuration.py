@@ -8,6 +8,7 @@ from gerbera_sdk.configuration_io import read_configuration
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import RegisteredDevice
 from gerbera_sdk.server.hardware_loader import HardwareConfigurationResolver
+from gerbera_sdk.server.hardware_registry import HardwareRegistry
 from gerbera_sdk.utils import StrictSchema
 
 
@@ -22,7 +23,7 @@ class SdkSettings(StrictSchema):
     database_host: str = Field(default="127.0.0.1", min_length=1)
     database_port: int = Field(default=6432, ge=1, le=65535)
     secrets_file: Path = Path(".gerbera/secrets/sdk.json")
-    devices: dict[str, RegisteredDevice] = Field(default_factory=dict)
+    hardware_registry: HardwareRegistry
 
     @classmethod
     def load(cls, path: Path) -> "SdkSettings":
@@ -42,7 +43,7 @@ class SdkSettings(StrictSchema):
         hardware = getattr(module, self.hardware_variable)
         if not isinstance(hardware, HardwareSystem):
             raise TypeError(f"{self.hardware_variable} must be a HardwareSystem")
-        return HardwareConfigurationResolver(self.devices).resolve(hardware)
+        return HardwareConfigurationResolver(self.hardware_registry).resolve(hardware)
 
     def load_secrets(self, config_path: Path) -> "SdkSecrets":
         root = (config_path.parent / self.project_root).resolve()

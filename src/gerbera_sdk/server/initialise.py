@@ -8,6 +8,7 @@ import questionary
 
 from gerbera_sdk.firmware.boards import BOARD_REGISTRY
 from gerbera_sdk.server.configuration import RegisteredDevice, SdkSettings
+from gerbera_sdk.server.hardware_registry import RegisteredHardwareRegistry
 
 
 def discover_boards() -> dict[str, dict]:
@@ -46,7 +47,10 @@ def initialise_sdk(path: Path) -> None:
             device["fqbn"] = questionary.select(f"Board type for {address}:", choices=supported).ask()
         devices[address] = RegisteredDevice.model_validate(device)
     root = Path.cwd()
-    settings = SdkSettings(project_root=Path(os.path.relpath(root, path.parent.resolve())), devices=devices)
+    settings = SdkSettings(
+        project_root=Path(os.path.relpath(root, path.parent.resolve())),
+        hardware_registry=RegisteredHardwareRegistry(devices=tuple(devices.values())),
+    )
     entry_point = root / settings.entry_point
     if entry_point.exists():
         raise FileExistsError(f"Hardware entry point already exists: {entry_point}; configure it explicitly")

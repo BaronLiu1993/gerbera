@@ -41,7 +41,7 @@ def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path)
     assert (
         commands, set(ProjectConfig.load().services),
         set(json.loads(Path(".gerbera/secrets/sdk.json").read_text())),
-        json.loads(Path(".gerbera/sdk/runtime.json").read_text())["devices"]["/dev/board-1"]["id"],
+        json.loads(Path(".gerbera/sdk/runtime.json").read_text())["hardware_registry"]["devices"][0]["id"],
     ) == (
         [["gerbera_sdk.server", "initialise"], [
             "gerbera_sdk.server", "credentials", "--config", ".gerbera/sdk/runtime.json",

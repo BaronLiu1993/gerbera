@@ -3,6 +3,7 @@ import pytest
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RegisteredDevice, RuntimeTransportConfig
 from gerbera_sdk.server.hardware_loader import HardwareConfigurationResolver
+from gerbera_sdk.server.hardware_registry import RegisteredHardwareRegistry, StandaloneHardwareRegistry
 
 
 @pytest.fixture
@@ -24,7 +25,7 @@ def test_loader_validates_identity_without_replacing_declared_transport(controll
     hardware = HardwareSystem(name="robot", microcontrollers=[controller])
     transport = controller.runtime_transport
 
-    HardwareConfigurationResolver({"board": registered_device}).resolve(hardware)
+    HardwareConfigurationResolver(RegisteredHardwareRegistry(devices=(registered_device,))).resolve(hardware)
 
     assert controller.id == "board-1"
     assert controller.runtime_transport is transport
@@ -34,7 +35,7 @@ def test_loader_rejects_unregistered_controller(controller, registered_device) -
     controller.device_id = "unregistered"
 
     with pytest.raises(ValueError, match="No configured device matched"):
-        HardwareConfigurationResolver({"board": registered_device}).resolve_controller(controller)
+        HardwareConfigurationResolver(RegisteredHardwareRegistry(devices=(registered_device,))).resolve_controller(controller)
 
 
 @pytest.mark.parametrize("field, value", [("upload_port", "/dev/other"), ("fqbn", "esp32:esp32:esp32")])
@@ -44,13 +45,13 @@ def test_loader_rejects_declaration_that_conflicts_with_registered_identity(
     setattr(controller, field, value)
 
     with pytest.raises(ValueError, match="does not match registered device"):
-        HardwareConfigurationResolver({"board": registered_device}).resolve_controller(controller)
+        HardwareConfigurationResolver(RegisteredHardwareRegistry(devices=(registered_device,))).resolve_controller(controller)
 
 
 def test_loader_accepts_complete_declaration_without_registry(controller) -> None:
     controller.device_id = "standalone-board"
 
-    HardwareConfigurationResolver({}).resolve_controller(controller)
+    HardwareConfigurationResolver(StandaloneHardwareRegistry()).resolve_controller(controller)
 
     assert controller.id == "standalone-board"
 
@@ -60,4 +61,4 @@ def test_registry_rejects_duplicate_identity_or_upload_address(registered_device
     other = RegisteredDevice(id=identity, address=address, fqbn="arduino:avr:uno", protocol="serial")
 
     with pytest.raises(ValueError, match="Duplicate registered"):
-        HardwareConfigurationResolver({"first": registered_device, "second": other})
+        RegisteredHardwareRegistry(devices=(registered_device, other))

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from gerbera_sdk.server.hardware_registry import StandaloneHardwareRegistry
 from gerbera_sdk.server.configuration import SdkSettings
 from gerbera_sdk.server.credentials import initialise_credentials
 
@@ -9,7 +10,7 @@ from gerbera_sdk.server.credentials import initialise_credentials
 @pytest.fixture
 def credential_paths(tmp_path):
     config = tmp_path / "sdk.json"
-    config.write_text(SdkSettings(project_root=Path("."), secrets_file=Path("sdk-secrets.json")).model_dump_json())
+    config.write_text(SdkSettings(hardware_registry=StandaloneHardwareRegistry(), project_root=Path("."), secrets_file=Path("sdk-secrets.json")).model_dump_json())
     return config, tmp_path / "sdk-database.env"
 
 
