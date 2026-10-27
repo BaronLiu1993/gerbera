@@ -21,7 +21,7 @@ from gerbera_sdk.models.hardware.hardware_plan import (
     ResolvedBoard,
     ResolvedConnection,
 )
-from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
+from gerbera_sdk.firmware.command_definitions import command_specs
 from gerbera_sdk.paths import FIRMWARE_PATH
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
@@ -764,7 +764,7 @@ void dispatchDeviceCommand(GerberaRuntime& runtime, const String& input) {{
     def dispatch_lines(self) -> str:
         lines: list[str] = []
         for connection in self.board.connections:
-            for command_spec in CommandCompiler.command_specs(connection):
+            for command_spec in command_specs(connection):
                 action = command_spec.method.strip().upper()
                 lines.extend(
                     (

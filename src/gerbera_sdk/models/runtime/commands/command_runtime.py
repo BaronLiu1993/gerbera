@@ -1,6 +1,6 @@
-from mcp.types import ToolAnnotations
-
 import math
+
+from gerbera_sdk.firmware.command_definitions import command_specs
 
 from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
 from gerbera_sdk.firmware.configurations import get_device_builder
@@ -16,18 +16,7 @@ class CommandCompiler:
     # for movement types only
     SERVO_COMPONENT_TYPES = {"sg90", "mg996r"}
 
-    @staticmethod
-    def command_specs(connection: Connection) -> list[CommandSpec]:
-        builder = get_device_builder(connection.component_type)
-        return list(builder.required_commands(connection))
-
-    @staticmethod
-    def command_annotations(
-        connection: Connection,
-        command: CommandSpec,
-    ) -> ToolAnnotations:
-        builder = get_device_builder(connection.component_type)
-        return builder.annotations(connection, command)
+    command_specs = staticmethod(command_specs)
 
     @staticmethod
     def state_unit(

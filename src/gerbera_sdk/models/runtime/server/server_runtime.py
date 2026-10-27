@@ -6,6 +6,7 @@ from typing import Annotated, Any, Callable
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from gerbera_sdk.models.runtime.server.command_annotations import command_annotations
 from pydantic import Field
 
 from gerbera_protocol import RuntimeManifest
@@ -683,7 +684,7 @@ class ServerRuntime:
         commands = CommandCompiler.command_specs(connection)
         supports_stream = self.connection_supports_stream_toggle(connection)
         for command in commands:
-            annotations = CommandCompiler.command_annotations(connection, command)
+            annotations = command_annotations(connection, command)
             self.register_connection_action(
                 board,
                 connection,
@@ -701,7 +702,7 @@ class ServerRuntime:
                 break
         else:
             raise RuntimeError("State toggle command is not registered")
-        toggle_annotations = CommandCompiler.command_annotations(
+        toggle_annotations = command_annotations(
             connection,
             toggle_command,
         )

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from importlib import resources
 
-from mcp.types import ToolAnnotations
 import yaml
 
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
@@ -47,19 +46,6 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
             if self.command_enabled(command, connection)
         ]
 
-    def annotations(
-        self,
-        connection: Connection,
-        command: CommandSpec,
-    ) -> ToolAnnotations:
-        self.validate_required_pins(connection)
-        command_config = self.command_config(command.method, connection)
-        annotations = command_config.annotations
-        return ToolAnnotations(
-            title=self.render(annotations.title, connection),
-            readOnlyHint=annotations.read_only_hint,
-            openWorldHint=annotations.open_world_hint,
-        )
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
         return {"units": self.config.state.units}

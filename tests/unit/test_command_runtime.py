@@ -1,6 +1,7 @@
 import pytest
 
 from gerbera_sdk.firmware.configurations import DEVICE_REGISTRY
+from gerbera_sdk.models.runtime.server.command_annotations import command_annotations
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 
@@ -99,7 +100,7 @@ def test_every_device_command_defines_complete_tool_annotations(
 
     assert commands
     for command in commands:
-        annotations = CommandCompiler.command_annotations(
+        annotations = command_annotations(
             connection,
             command,
         )
