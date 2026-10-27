@@ -1,0 +1,32 @@
+README.md
+  s_eb6570f5ffe476::t_e96c04877ad6fa 236,241-247
+  s_eb6570f5ffe476::t_e6ce3140613197 248
+tests/integration/test_cli_initialization.py
+  s_eb6570f5ffe476::t_01e6315b1b7116 10,25-28,42-45
+src/gerbera_cli/initialise.py
+  s_eb6570f5ffe476::t_4f054e40e2d10b 51,57,60,66,70
+src/gerbera_cli/configuration.py
+  s_eb6570f5ffe476::t_db87a95207ad99 2-4,6,10-11,14-16,18-48,50-82,84-85,87-97,103-104
+src/gerbera_cli/setup.py
+  s_eb6570f5ffe476::t_4f054e40e2d10b 14,16,53,91,93,107,116-126,134-139,213
+tests/unit/test_cli_configuration.py
+  s_eb6570f5ffe476::t_dbb19c7c91f779 6,9,12,17,33-69
+tests/unit/test_cli_setup.py
+  s_eb6570f5ffe476::t_dbb19c7c91f779 6,34-35,46,79,91,102,121,142,166-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f5099aec08834bbc64c5d6cadb753f22d05859ba",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
