@@ -54,6 +54,7 @@ def test_facade_builds_application_without_starting_external_resources(hardware,
     app = GerberaRuntime.build_application(hardware, database)
 
     assert isinstance(app, FastMCP) and start.call_count == 0
+    assert app.name == hardware.name
 
 
 def test_facade_shares_response_registry_between_execution_and_listener(hardware, database, monkeypatch) -> None:

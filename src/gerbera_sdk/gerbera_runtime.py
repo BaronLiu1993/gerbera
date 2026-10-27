@@ -73,7 +73,7 @@ class GerberaRuntime:
             storage=RuntimeStorage(plan, writer, database.schema_owner()),
             readiness=readiness, reactions=reactions,
         )
-        app = FastMCP(hardware.description or hardware.name, lifespan=lifecycle)
+        app = FastMCP(hardware.name, lifespan=lifecycle)
         tools = McpToolRegistry(app, actions)
         server = ServerRuntime(
             resources=RuntimeResources(tools, app, hardware, plan, listener, state, models),
