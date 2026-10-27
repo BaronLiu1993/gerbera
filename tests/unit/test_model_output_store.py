@@ -1,6 +1,7 @@
 from datetime import datetime
-import time
+from threading import Event
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -8,394 +9,246 @@ import pytest
 from gerbera_sdk.inference import (
     DepthMapModel,
     Frame,
+    ObjectDepthModel,
     ObjectDepthModelInference,
-    ObjectSegmentationModelInference,
-)
-from gerbera_sdk.inference.models.neural_network.object_detection.object_detection_model_inference import (
+    ObjectDetectionModel,
     ObjectDetectionModelInference,
-)
-from gerbera_sdk.inference.models.vision_language_model.vision_language_model_inference import (
+    ObjectSegmentationModel,
+    ObjectSegmentationModelInference,
+    VisionLanguageModel,
     VisionLanguageModelInference,
+    VisionLanguageModelProviderEnum,
 )
 from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 
-
-class ObjectDetectionAdapter:
-    def detect(self, frame: Frame) -> list:
-        return []
-
-
-class ObjectDepthAdapter:
-    def estimate(self, frame: Frame) -> DepthMapModel:
-        return DepthMapModel(
-            width=1,
-            height=1,
-            values=[[1.0]],
-            minimum_value=1.0,
-            maximum_value=1.0,
-            value_type="relative_depth",
-            unit="relative",
-        )
+MODEL_TYPES = {
+    "object_detection": (ObjectDetectionModel, ObjectDetectionModelInference),
+    "object_depth": (ObjectDepthModel, ObjectDepthModelInference),
+    "object_segmentation": (ObjectSegmentationModel, ObjectSegmentationModelInference),
+    "vision_language_model": (VisionLanguageModel, VisionLanguageModelInference),
+}
 
 
-class ObjectSegmentationAdapter:
-    def segment(self, frame: Frame) -> list:
-        return []
-
-
-class VisionLanguageAdapter:
+class VisionAdapter:
     def __init__(self) -> None:
-        self.user_prompts: list[str] = []
+        self.prompts: list[str] = []
 
     def convert_to_valid_input(self, frame: str) -> dict[str, str]:
         return {"frame": frame}
 
-    def predict(self, **kwargs) -> dict[str, object]:
-        self.user_prompts.append(kwargs["user_prompt"])
-        return {
-            "environment_name": "workshop",
-            "description": "A workshop",
-            "objects": [],
-        }
+    def predict(self, **arguments) -> dict[str, object]:
+        self.prompts.append(arguments["user_prompt"])
+        return {"environment_name": "workshop", "description": "A workshop", "objects": []}
 
-    def analyze_scene(self, **kwargs) -> str:
+    def analyze_scene(self, **arguments) -> str:
         return "A workshop scene"
 
 
-class ModelConfig:
-    def __init__(self, inference) -> None:
-        self.model_id = inference.model_id
-        self.inference = inference
-
-    def model_output_keys(self) -> dict[str, str]:
-        return self.inference.model_output_keys
-
-    def create_inference(self):
-        return self.inference
-
-
-def make_camera() -> Camera:
-    return Camera(
-        camera_id="camera",
-        name="camera",
-        description="Test camera",
-        source=DeviceCameraSource(device_index=0),
+def adapter_for(kind: str) -> VisionAdapter | SimpleNamespace:
+    if kind == "vision_language_model":
+        return VisionAdapter()
+    depth_map = DepthMapModel(
+        width=1, height=1, values=[[1.0]], minimum_value=1.0, maximum_value=1.0,
+        value_type="relative_depth", unit="relative",
+    )
+    return SimpleNamespace(
+        detect=Mock(return_value=[]),
+        segment=Mock(return_value=[]),
+        estimate=Mock(return_value=depth_map),
     )
 
 
-def make_frame() -> Frame:
-    return Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((2, 2, 3), dtype=np.uint8),
-    )
+@pytest.fixture
+def runtime_factory(monkeypatch):
+    runtimes = []
+
+    def build(*kinds: str) -> ModelRuntime:
+        camera = Camera(
+            name="camera", description="Test camera",
+            source=DeviceCameraSource(0), camera_id="camera",
+        )
+        declarations = []
+        inferences = {}
+        for index, kind in enumerate(kinds):
+            declaration_type, inference_type = MODEL_TYPES[kind]
+            configuration = dict(model_id=f"{kind}-{index}", name=f"model_{index}", subscribed_camera=camera)
+            extra = {"model_directory": kind}
+            if kind == "vision_language_model":
+                extra = dict(
+                    model_provider=VisionLanguageModelProviderEnum.OPENAI,
+                    user_prompt="Observe", api_key="test", model_name="test",
+                )
+            declaration = declaration_type(**configuration, **extra)
+            inference_options = (
+                {"user_prompt": declaration.user_prompt}
+                if kind == "vision_language_model" else {}
+            )
+            inference = inference_type(
+                **configuration, model=adapter_for(kind), description="Test model",
+                model_output_keys=declaration.model_output_keys(), interval_seconds=0.01, **inference_options,
+            )
+            declarations.append(declaration)
+            inferences[inference.model_id] = inference
+            monkeypatch.setattr(declaration_type, "create_inference", lambda model: inferences[model.model_id])
+        hardware = HardwareSystem(name="robot", cameras=[camera], models=declarations)
+        cameras = CameraRuntime(hardware)
+        cameras.build_camera_sessions()
+        cameras.latest_frames[camera.camera_id] = Frame(
+            timestamp=datetime.now(), image=np.zeros((2, 2, 3), dtype=np.uint8),
+        )
+        runtime = ModelRuntime(hardware, cameras)
+        runtime.register_models()
+        runtimes.append(runtime)
+        return runtime
+
+    yield build
+    for runtime in runtimes:
+        runtime.turn_off_all_model_streams()
 
 
-def make_object_detection(camera: Camera) -> ObjectDetectionModelInference:
-    return ObjectDetectionModelInference(
-        model=ObjectDetectionAdapter(),
-        name="detector",
-        description="Detect objects",
-        subscribed_camera=camera,
-        model_id="detector-id",
-        model_output_keys={"object_detection": "detection-key"},
-        interval_seconds=0.01,
-    )
+def first_model(runtime: ModelRuntime):
+    return next(iter(runtime.registered_models.values())).inference
 
 
-def make_object_depth(camera: Camera) -> ObjectDepthModelInference:
-    return ObjectDepthModelInference(
-        model=ObjectDepthAdapter(),
-        name="depth",
-        description="Estimate depth",
-        subscribed_camera=camera,
-        model_id="depth-id",
-        model_output_keys={"object_depth": "depth-key"},
-        interval_seconds=0.01,
-    )
+@pytest.mark.parametrize("kind", ["object_detection", "object_depth", "object_segmentation"])
+def test_frame_inference_persists_typed_output_for_subscribed_camera(runtime_factory, kind) -> None:
+    runtime = runtime_factory(kind)
+    model = first_model(runtime)
+    frame = runtime.camera_runtime.get_latest_frame(model.subscribed_camera.camera_id)
+
+    result = getattr(runtime, f"perform_{kind}")(model.model_id)
+
+    assert (result.camera_id, runtime.read_model_output(model.model_id, kind) is result) == ("camera", True)
+    assert result.frame is frame
+    operation = {
+        "object_detection": "detect", "object_depth": "estimate", "object_segmentation": "segment",
+    }[kind]
+    getattr(model.model, operation).assert_called_once_with(frame)
 
 
-def make_object_segmentation(
-    camera: Camera,
-) -> ObjectSegmentationModelInference:
-    return ObjectSegmentationModelInference(
-        model=ObjectSegmentationAdapter(),
-        name="segmenter",
-        description="Segment objects",
-        subscribed_camera=camera,
-        model_id="segmenter-id",
-        model_output_keys={"object_segmentation": "segmentation-key"},
-        interval_seconds=0.01,
-    )
+def test_vision_operations_persist_objects_and_scene_analysis(runtime_factory) -> None:
+    runtime = runtime_factory("vision_language_model")
+    model = first_model(runtime)
+
+    objects = runtime.locate_objects(model.model_id, ["frame"], "Locate")
+    description = runtime.analyze_scene(model.model_id, ["frame"], "Describe")
+
+    assert (
+        runtime.read_model_output(model.model_id, "locate_object") is objects,
+        runtime.read_model_output(model.model_id, "scene_analysis"),
+    ) == (True, description)
 
 
-def make_vision(camera: Camera) -> VisionLanguageModelInference:
-    return VisionLanguageModelInference(
-        model=VisionLanguageAdapter(),
-        name="vision",
-        description="Analyze scenes",
-        user_prompt="Observe the scene",
-        subscribed_camera=camera,
-        model_id="vision-id",
-        model_output_keys={
-            "locate_object": "objects-key",
-            "scene_analysis": "analysis-key",
-        },
-        interval_seconds=0.01,
-    )
-
-
-def make_runtime(*inferences) -> ModelRuntime:
-    cameras = {
-        inference.subscribed_camera.camera_id: inference.subscribed_camera
-        for inference in inferences
-    }
-    hardware_system = HardwareSystem(
-        name="test",
-        cameras=list(cameras.values()),
-        models=[ModelConfig(inference) for inference in inferences],
-    )
-    camera_runtime = CameraRuntime(hardware_system)
-    camera_runtime.build_camera_sessions()
-    for camera_id in cameras:
-        camera_runtime.latest_frames[camera_id] = make_frame()
-    runtime = ModelRuntime(hardware_system, camera_runtime)
-    runtime.register_models()
-    return runtime
-
-
-def test_register_models_creates_each_output_slot() -> None:
-    camera = make_camera()
-    runtime = make_runtime(
-        make_object_detection(camera),
-        make_vision(camera),
-    )
-
-    assert runtime.model_outputs == {
-        "detection-key": None,
-        "objects-key": None,
-        "analysis-key": None,
-    }
-
-
-def test_register_models_rejects_duplicate_model_ids() -> None:
-    camera = make_camera()
-    first = make_object_detection(camera)
-    second = make_object_detection(camera)
-    hardware_system = HardwareSystem(
-        name="test",
-        cameras=[camera],
-        models=[ModelConfig(first), ModelConfig(second)],
-    )
-    runtime = ModelRuntime(hardware_system, CameraRuntime(hardware_system))
+def test_registration_rejects_duplicate_model_identity(runtime_factory) -> None:
+    runtime = runtime_factory("object_detection")
+    runtime.hardware_system.models.append(runtime.hardware_system.models[0])
 
     with pytest.raises(ValueError, match="Duplicate model ID"):
         runtime.register_models()
 
 
-def test_register_models_rejects_registration_while_streaming() -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-    runtime.model_streams[inference.model_id] = SimpleNamespace()
+def test_output_cannot_be_read_before_prediction(runtime_factory) -> None:
+    runtime = runtime_factory("object_detection")
 
-    with pytest.raises(RuntimeError, match="streams are active"):
-        runtime.register_models()
+    with pytest.raises(RuntimeError, match="has not been produced"):
+        runtime.read_model_output(first_model(runtime).model_id, "object_detection")
 
 
-def test_read_fails_before_output_is_produced() -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-
-    with pytest.raises(RuntimeError, match="has not been produced yet"):
-        runtime.read_model_output(inference.model_id, "object_detection")
-
-
-def test_object_detection_uses_its_subscribed_camera() -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-
-    result = runtime.perform_object_detection(inference.model_id)
-
-    assert result.camera_id == camera.camera_id
-
-
-def test_depth_inference_persists_typed_output() -> None:
-    camera = make_camera()
-    inference = make_object_depth(camera)
-    runtime = make_runtime(inference)
-
-    result = runtime.perform_object_depth(inference.model_id)
-
-    assert runtime.read_model_output(
-        inference.model_id,
-        "object_depth",
-    ) is result
-
-
-def test_segmentation_inference_persists_typed_output() -> None:
-    camera = make_camera()
-    inference = make_object_segmentation(camera)
-    runtime = make_runtime(inference)
-
-    result = runtime.perform_object_segmentation(inference.model_id)
-
-    assert runtime.read_model_output(
-        inference.model_id,
-        "object_segmentation",
-    ) is result
-
-
-def test_frame_inference_rejects_vision_language_models() -> None:
-    camera = make_camera()
-    inference = make_vision(camera)
-    runtime = make_runtime(inference)
+def test_frame_operation_rejects_vision_language_model(runtime_factory) -> None:
+    runtime = runtime_factory("vision_language_model")
 
     with pytest.raises(TypeError, match="does not support frame inference"):
-        runtime.perform_frame_inference(inference.model_id)
+        runtime.perform_frame_inference(first_model(runtime).model_id)
 
 
-def test_vlm_operations_persist_their_outputs() -> None:
-    camera = make_camera()
-    inference = make_vision(camera)
-    runtime = make_runtime(inference)
-
-    objects = runtime.locate_objects(
-        inference.model_id,
-        ["encoded-frame"],
-        "Locate objects",
-    )
-    analysis = runtime.analyze_scene(
-        inference.model_id,
-        ["encoded-frame"],
-        "Describe the scene",
-    )
-
-    assert runtime.read_model_output(inference.model_id, "locate_object") is objects
-    assert (
-        runtime.read_model_output(inference.model_id, "scene_analysis")
-        == analysis
-    )
-
-
-@pytest.mark.parametrize(
-    "operation",
-    ["locate_objects", "analyze_scene"],
-)
-def test_vlm_operations_reject_empty_frame_batches(
-    operation: str,
-) -> None:
-    camera = make_camera()
-    inference = make_vision(camera)
-    runtime = make_runtime(inference)
+def test_vision_rejects_empty_frame_batch(runtime_factory) -> None:
+    runtime = runtime_factory("vision_language_model")
 
     with pytest.raises(ValueError, match="At least one frame"):
-        getattr(runtime, operation)(inference.model_id, [], "prompt")
+        runtime.locate_objects(first_model(runtime).model_id, [], "Locate")
 
 
-def test_model_stream_lifecycle_fails_on_duplicate_operations() -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-
-    runtime.turn_on_model_stream(inference.model_id)
-    with pytest.raises(RuntimeError, match="already running"):
-        runtime.turn_on_model_stream(inference.model_id)
-
-    runtime.turn_off_model_stream(inference.model_id)
-    with pytest.raises(RuntimeError, match="not running"):
-        runtime.turn_off_model_stream(inference.model_id)
-
-
-def test_turn_off_model_stream_rejects_worker_that_does_not_stop() -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-    stop_event = SimpleNamespace(set=lambda: None)
-    runtime.model_streams[inference.model_id] = SimpleNamespace(
-        stop_event=stop_event,
-        thread=SimpleNamespace(
-            join=lambda timeout: None,
-            is_alive=lambda: True,
-        ),
-    )
-
-    with pytest.raises(RuntimeError, match="did not stop"):
-        runtime.turn_off_model_stream(inference.model_id)
-
-
-def test_turn_on_all_model_streams_rolls_back_started_models(
-    monkeypatch,
+def test_stream_lifecycle_uses_configured_prompt_and_rejects_duplicate_operations(
+    runtime_factory, monkeypatch,
 ) -> None:
-    camera = make_camera()
-    first = make_object_detection(camera)
-    second = make_vision(camera)
-    runtime = make_runtime(first, second)
-    started: list[str] = []
-    stopped: list[str] = []
+    runtime = runtime_factory("vision_language_model")
+    model = first_model(runtime)
+    ready = Event()
+    write = runtime.write_model_output
 
-    def start(model_id: str, prompt: str | None = None) -> None:
-        if model_id == second.model_id:
+    def record_output(key, model_output):
+        write(key, model_output)
+        ready.set()
+
+    monkeypatch.setattr(runtime, "write_model_output", record_output)
+    runtime.turn_on_all_model_streams()
+    try:
+        assert ready.wait(1)
+        with pytest.raises(RuntimeError, match="already running"):
+            runtime.turn_on_model_stream(model.model_id, prompt="Observe")
+        with pytest.raises(RuntimeError, match="streams are active"):
+            runtime.register_models()
+    finally:
+        runtime.turn_off_all_model_streams()
+    with pytest.raises(RuntimeError, match="not running"):
+        runtime.turn_off_model_stream(model.model_id)
+    assert model.model.prompts[0] == model.user_prompt
+
+
+def test_stream_shutdown_rejects_worker_that_does_not_stop(runtime_factory) -> None:
+    runtime = runtime_factory("object_detection")
+    model = first_model(runtime)
+    runtime.model_streams[model.model_id] = SimpleNamespace(
+        stop_event=Event(), thread=SimpleNamespace(join=lambda timeout: None, is_alive=lambda: True),
+    )
+    try:
+        with pytest.raises(RuntimeError, match="did not stop"):
+            runtime.turn_off_model_stream(model.model_id)
+    finally:
+        runtime.model_streams.clear()
+
+
+def test_partial_stream_start_rolls_back_owned_streams(runtime_factory, monkeypatch) -> None:
+    runtime = runtime_factory("object_detection", "vision_language_model")
+    first, second = runtime.registered_models
+    stopped = []
+
+    def start(model_id, prompt=None):
+        if model_id == second:
             raise RuntimeError("second model failed")
-        started.append(model_id)
 
     monkeypatch.setattr(runtime, "turn_on_model_stream", start)
-    monkeypatch.setattr(
-        runtime,
-        "turn_off_model_stream",
-        lambda model_id: stopped.append(model_id),
-    )
+    monkeypatch.setattr(runtime, "turn_off_model_stream", lambda model_id: stopped.append(model_id))
 
     with pytest.raises(RuntimeError, match="second model failed"):
         runtime.turn_on_all_model_streams()
 
-    assert started == [first.model_id]
-    assert stopped == [first.model_id]
+    assert stopped == [first]
 
 
-def test_turn_on_all_model_streams_uses_configured_vlm_prompt() -> None:
-    camera = make_camera()
-    object_detection = make_object_detection(camera)
-    vision = make_vision(camera)
-    runtime = make_runtime(object_detection, vision)
+def test_prediction_failure_is_reported_without_leaking_thread(runtime_factory, monkeypatch) -> None:
+    runtime = runtime_factory("object_detection")
+    model = first_model(runtime)
+    finished = Event()
+    loop = runtime.prediction_loop
 
-    runtime.turn_on_all_model_streams()
-    for _ in range(100):
-        if (
-            runtime.model_outputs["detection-key"] is not None
-            and runtime.model_outputs["objects-key"] is not None
-        ):
-            break
-        time.sleep(0.005)
-    runtime.turn_off_all_model_streams()
-
-    assert runtime.model_outputs["detection-key"] is not None
-    assert runtime.model_outputs["objects-key"] is not None
-    assert vision.model.user_prompts[0] == vision.user_prompt
-    assert runtime.model_streams == {}
-
-
-def test_model_stream_failure_is_reported_to_callers() -> None:
-    camera = make_camera()
-    inference = make_object_detection(camera)
-    runtime = make_runtime(inference)
-
-    def fail_prediction(*args, **kwargs) -> None:
+    def fail(frame):
         raise ValueError("invalid prediction")
 
-    inference.model.detect = fail_prediction
-    runtime.turn_on_model_stream(inference.model_id)
-    for _ in range(100):
-        if inference.model_id in runtime.model_stream_failures:
-            break
-        time.sleep(0.005)
+    def run(*arguments):
+        try:
+            loop(*arguments)
+        finally:
+            finished.set()
 
-    with pytest.raises(RuntimeError, match="Model stream failed") as error:
-        runtime.read_model_output(inference.model_id, "object_detection")
-
-    assert isinstance(error.value.__cause__, ValueError)
+    model.model.detect = fail
+    monkeypatch.setattr(runtime, "prediction_loop", run)
+    runtime.turn_on_model_stream(model.model_id)
+    assert finished.wait(1)
+    with pytest.raises(RuntimeError, match="Model stream failed") as failure:
+        runtime.read_model_output(model.model_id, "object_detection")
+    assert isinstance(failure.value.__cause__, ValueError)
     assert runtime.model_streams == {}

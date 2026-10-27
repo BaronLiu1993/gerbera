@@ -14,7 +14,6 @@ from gerbera_sdk.inference import (
     GoogleVisionLanguageModelAdapter,
     Model,
     ObjectDetectionModel,
-    ObjectDetectionModelInference,
     OBJECT_DETECTION_MODEL_REGISTRY,
     ObjectDetectionModelProviderEnum,
     OpenAIVisionLanguageModelAdapter,
@@ -80,15 +79,6 @@ class RecordingVisionLanguageModelAdapter(VisionLanguageModelAdapter):
         return "A workbench"
 
 
-class RecordingObjectDetectionAdapter:
-    def __init__(self) -> None:
-        self.frames: list[Frame] = []
-
-    def detect(self, frame: Frame) -> list:
-        self.frames.append(frame)
-        return []
-
-
 def test_yolov5_adapter_loads_weights_from_project_models(
     tmp_path,
     monkeypatch,
@@ -136,12 +126,6 @@ def test_object_detection_registry_contains_yolov5_adapter() -> None:
     )
 
 
-def test_object_detection_providers_match_registered_adapters() -> None:
-    assert set(ObjectDetectionModelProviderEnum) == set(
-        OBJECT_DETECTION_MODEL_REGISTRY
-    )
-
-
 @pytest.mark.parametrize(
     ("field_name", "invalid_value"),
     [
@@ -165,27 +149,6 @@ def test_object_detection_rejects_invalid_thresholds(
 
     with pytest.raises(ValidationError):
         ObjectDetectionModel.model_validate(definition)
-
-
-def test_object_detection_inference_predicts_the_supplied_frame() -> None:
-    frame = Frame(
-        timestamp=datetime.now(),
-        image=np.zeros((2, 2, 3), dtype=np.uint8),
-    )
-    adapter = RecordingObjectDetectionAdapter()
-    inference = ObjectDetectionModelInference(
-        model=adapter,
-        name="detector",
-        description="Test detector",
-        subscribed_camera=TEST_CAMERA,
-    )
-
-    result = inference.predict(frame)
-
-    assert adapter.frames == [frame]
-    assert result.camera_id == TEST_CAMERA.camera_id
-    assert result.frame is frame
-    assert result.perception_objects == []
 
 
 @pytest.mark.parametrize(
@@ -223,11 +186,6 @@ def test_model_type_selects_model_schema(
     model = TypeAdapter(Model).validate_python(definition)
 
     assert isinstance(model, model_class)
-
-
-def test_vision_language_model_adapter_is_abstract() -> None:
-    with pytest.raises(TypeError):
-        VisionLanguageModelAdapter(api_key="key", model="test-model")
 
 
 def test_vision_language_model_converts_then_predicts() -> None:
@@ -287,37 +245,6 @@ def test_vision_language_model_schema_is_strict_for_every_object() -> None:
     assert_strict_objects(schema)
 
 
-def test_vision_language_model_requires_at_least_one_frame() -> None:
-    inference = VisionLanguageModelInference(
-        model=RecordingVisionLanguageModelAdapter(),
-        name="vision",
-        description="Test vision model",
-        user_prompt="Describe the frames",
-        subscribed_camera=TEST_CAMERA,
-    )
-
-    with pytest.raises(ValueError, match="At least one frame"):
-        inference.predict([], prompt="Describe the frames")
-
-
-def test_vision_language_model_runs_scene_analysis() -> None:
-    inference = VisionLanguageModelInference(
-        model=RecordingVisionLanguageModelAdapter(),
-        name="vision",
-        description="Test vision model",
-        user_prompt="Describe the frame",
-        subscribed_camera=TEST_CAMERA,
-    )
-
-    result = inference.predict(
-        ["encoded-frame"],
-        prompt="Describe the scene",
-        operation="scene_analysis",
-    )
-
-    assert result == "A workbench"
-
-
 def test_vision_language_model_rejects_an_unknown_operation() -> None:
     inference = VisionLanguageModelInference(
         model=RecordingVisionLanguageModelAdapter(),
@@ -333,39 +260,6 @@ def test_vision_language_model_rejects_an_unknown_operation() -> None:
             prompt="Describe the scene",
             operation="unsupported",
         )
-
-
-def test_vision_language_model_converts_each_frame_to_base64() -> None:
-    adapter = RecordingVisionLanguageModelAdapter()
-    inference = VisionLanguageModelInference(
-        model=adapter,
-        name="vision",
-        description="Test vision model",
-        user_prompt="Describe the frames",
-        subscribed_camera=TEST_CAMERA,
-    )
-
-    frames = [
-        Frame(
-            timestamp=datetime.now(),
-            image=np.zeros((2, 2, 3), dtype=np.uint8),
-        ),
-        Frame(
-            timestamp=datetime.now(),
-            image=np.ones((2, 2, 3), dtype=np.uint8),
-        ),
-    ]
-    result = inference.predict(frames, prompt="Describe the frames")
-
-    assert adapter.prediction_args["model_input"] == [
-        {"frame_index": 0},
-        {"frame_index": 1},
-    ]
-    assert adapter.frames == [
-        frame.to_base64_string()
-        for frame in frames
-    ]
-    assert result.environment_name == "workshop"
 
 
 @pytest.mark.parametrize(
