@@ -1,0 +1,43 @@
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_54356b2bfbb1f3 126-160
+src/gerbera_sdk/models/runtime/README.md
+  s_eb6570f5ffe476::t_89445eea6f0489 71-73
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_cb767d359acb32 66,81,121,124
+src/gerbera_sdk/models/hardware/connection.py
+  s_eb6570f5ffe476::t_099b2c77964a08 1
+src/gerbera_sdk/models/hardware/hardware_plan.py
+  s_eb6570f5ffe476::t_7e90df822443d2 2
+src/gerbera_sdk/models/runtime/commands/command_executor.py
+  s_eb6570f5ffe476::t_aaeff3d540874d 3,17-19
+src/gerbera_sdk/models/runtime/commands/connection_control.py
+  s_eb6570f5ffe476::t_6c57d417caea69 6,16,19,26
+src/gerbera_sdk/models/runtime/movement/movement_runtime.py
+  s_eb6570f5ffe476::t_7e0569cb9c402d 8,31,58
+src/gerbera_sdk/models/runtime/server/hardware_tools.py
+  s_eb6570f5ffe476::t_4202d04fd16c6c 9,28,39,47
+tests/integration/test_runtime_lifecycle.py
+  s_eb6570f5ffe476::t_9edaaf39099c5d 229
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_c6efbda7fb7ab7 148,152,609-610
+tests/unit/test_command_executor.py
+  s_eb6570f5ffe476::t_0d32ae71235fd9 34
+tests/unit/test_hardware_models.py
+  s_eb6570f5ffe476::t_15d4625262b93c 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6e57a4ec265d375607a4e9d0b6a3a55c7aa2002e",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
