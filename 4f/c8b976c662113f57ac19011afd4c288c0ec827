@@ -1,0 +1,83 @@
+tests/unit/test_reaction_service.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 25-26
+  s_eb6570f5ffe476::t_45885454f02747 18
+tests/unit/test_hardware_models.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 78-79
+  s_eb6570f5ffe476::t_160bda43f61705 6,51-57,60-61,65-68,71-77,80
+src/gerbera_sdk/server/initialise.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 73
+  s_eb6570f5ffe476::t_09cfb0cb12e21a 74
+  s_eb6570f5ffe476::t_09a4bc59a61b92 57
+tests/integration/test_cli_initialization.py
+  s_eb6570f5ffe476::t_66d33d2b54c0b9 11,37-39
+src/gerbera_sdk/models/hardware/validation.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 63,246,254,303,306-307,314,329-330
+tests/integration/test_firmware_generation.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 13
+  s_eb6570f5ffe476::t_462c9dc85aef21 16
+src/gerbera_sdk/server/hardware_loader.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 17-18,21-22,28
+tests/unit/test_command_executor.py
+  s_eb6570f5ffe476::t_45885454f02747 8
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 18-19
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_45885454f02747 12
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 20-21
+  s_eb6570f5ffe476::t_f5bbf831782590 19
+tests/unit/test_hardware_validation.py
+  s_eb6570f5ffe476::t_45885454f02747 10
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 55,207
+  s_eb6570f5ffe476::t_462c9dc85aef21 58,210
+tests/unit/test_hardware_loader.py
+  s_eb6570f5ffe476::t_160bda43f61705 10-13,23,25,29-30,34,40
+tests/unit/test_hardware_contract.py
+  s_eb6570f5ffe476::t_462c9dc85aef21 26
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 23
+  s_eb6570f5ffe476::t_160bda43f61705 170
+src/gerbera_sdk/models/hardware/microcontroller.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 70-71,73,82
+src/gerbera_sdk/firmware/firmware_uploader.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 17
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 170,233,335
+  s_eb6570f5ffe476::t_45885454f02747 38
+  s_eb6570f5ffe476::t_462c9dc85aef21 173,236,338
+tests/unit/test_firmware_files.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 41
+  s_eb6570f5ffe476::t_462c9dc85aef21 44
+src/gerbera_sdk/models/runtime/boards/board_transport.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 77
+tests/integration/test_runtime_lifecycle.py
+  s_eb6570f5ffe476::t_45885454f02747 6
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 220-221
+tests/integration/test_stream_database.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 27
+  s_eb6570f5ffe476::t_45885454f02747 6
+  s_eb6570f5ffe476::t_462c9dc85aef21 30
+src/gerbera_sdk/firmware/firmware_generator.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 351,362,369
+tests/unit/test_board_runtime.py
+  s_eb6570f5ffe476::t_ca267c07b6fd1f 44
+  s_eb6570f5ffe476::t_462c9dc85aef21 47
+  s_eb6570f5ffe476::t_45885454f02747 9
+src/gerbera_sdk/models/hardware/hardware_plan.py
+  s_eb6570f5ffe476::t_aa11b3c239f1cd 68-69
+tests/unit/test_sdk_server_configuration.py
+  s_eb6570f5ffe476::t_fdb3b8d3637e77 100,103,105-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4fc8b976c662113f57ac19011afd4c288c0ec827",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
