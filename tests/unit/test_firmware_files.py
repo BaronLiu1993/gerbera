@@ -38,9 +38,10 @@ def test_generated_firmware_is_stored_in_gerbera(
         ),
     )
     board = Microcontroller(
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board-1"),
         device_id="board-1",
         name="board",
-        port="/dev/board-1",
+        upload_port="/dev/board-1",
         fqbn="arduino:avr:uno",
         watchdog=RuntimeWatchdogConfig(
             heartbeat_interval_ms=100,
@@ -69,7 +70,6 @@ def test_generated_firmware_is_stored_in_gerbera(
 def make_bluetooth_hardware() -> HardwareSystem:
     board = Microcontroller(
         name="esp32",
-        port="/dev/legacy-port",
         upload_port="/dev/usb-esp32",
         device_id="esp32-1",
         runtime_transport=RuntimeTransportConfig.bluetooth_classic(

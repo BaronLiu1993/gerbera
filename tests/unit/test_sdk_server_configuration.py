@@ -97,12 +97,13 @@ def test_sdk_validates_port_override_before_loading_hardware(monkeypatch, tmp_pa
         main()
 
 
-def test_hardware_loader_resolves_registry_before_returning_declaration(tmp_path) -> None:
+def test_hardware_loader_validates_registry_before_returning_declaration(tmp_path) -> None:
     (tmp_path / "index.py").write_text(
         "from gerbera_sdk.models.hardware.hardware_system import HardwareSystem\n"
-        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller\n"
+        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeTransportConfig\n"
         "hardware_system = HardwareSystem(name='robot', microcontrollers=[Microcontroller(\n"
-        "    name='board', port='/dev/board', fqbn='arduino:avr:uno')])\n"
+        "    name='board', device_id='board-1', upload_port='/dev/board', fqbn='arduino:avr:uno',\n"
+        "    runtime_transport=RuntimeTransportConfig.usb_serial('/dev/board'))])\n"
     )
     config = tmp_path / "sdk.json"
     config.write_text(json.dumps({

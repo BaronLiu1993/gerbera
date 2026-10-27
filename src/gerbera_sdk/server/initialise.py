@@ -54,7 +54,7 @@ def initialise_sdk(path: Path) -> None:
     controller_names = ", ".join(f"microcontroller_{index}" for index in range(1, len(devices) + 1))
     entry_point.write_text(
         "from gerbera_sdk.models.hardware.hardware_system import HardwareSystem\n"
-        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller\n\n\n"
+        "from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeTransportConfig\n\n\n"
         f"{controllers}\n\n"
         "hardware_system = HardwareSystem(\n"
         '    name="gerbera-project",\n'
@@ -70,7 +70,8 @@ def controller_source(index: int, device: RegisteredDevice) -> str:
         f"microcontroller_{index} = Microcontroller(\n"
         f"    device_id={device.id!r},\n"
         f"    name='controller_{index}',\n"
-        f"    port={device.address!r},\n"
+        f"    upload_port={device.address!r},\n"
+        f"    runtime_transport=RuntimeTransportConfig.usb_serial({device.address!r}),\n"
         f"    fqbn={device.fqbn!r},\n"
         ")"
     )

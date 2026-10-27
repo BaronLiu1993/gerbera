@@ -6,7 +6,7 @@ import pytest
 
 from gerbera_sdk.firmware.board_definitions import ARDUINO_UNO
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedBoard
-from gerbera_sdk.models.hardware.microcontroller import RuntimeWatchdogConfig
+from gerbera_sdk.models.hardware.microcontroller import RuntimeWatchdogConfig, RuntimeTransportConfig
 from gerbera_sdk.models.runtime.boards.board_runtime import (
     BoardRuntime,
     BoardSession,
@@ -41,9 +41,10 @@ class ScriptedConnection:
 
 def make_board() -> ResolvedBoard:
     return ResolvedBoard(
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board-1"),
         microcontroller_id="board-1",
         name="board",
-        port="/dev/board-1",
+        upload_port="/dev/board-1",
         baud_rate=115200,
         definition=ARDUINO_UNO,
         connections=(),

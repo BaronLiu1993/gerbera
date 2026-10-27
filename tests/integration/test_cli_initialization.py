@@ -8,6 +8,7 @@ from gerbera_cli.configuration import ProjectConfig
 from gerbera_cli.main import app
 from gerbera_sdk.server.initialise import initialise_sdk
 from gerbera_sdk.server.credentials import initialise_credentials
+from gerbera_sdk.server.configuration import SdkSettings
 
 
 def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path) -> None:
@@ -33,6 +34,9 @@ def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path)
     if result.exception:
         raise result.exception
     compile(Path("index.py").read_text(), "index.py", "exec")
+    config_path = Path(".gerbera/sdk/runtime.json")
+    hardware = SdkSettings.load(config_path).load_hardware(config_path)
+    assert hardware.microcontrollers[0].runtime_transport.port == "/dev/board-1"
 
     assert (
         commands, set(ProjectConfig.load().services),

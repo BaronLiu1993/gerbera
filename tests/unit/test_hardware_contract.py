@@ -20,9 +20,10 @@ def build_system(
     watchdog: RuntimeWatchdogConfig | None = None,
 ) -> HardwareSystem:
     board = Microcontroller(
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board-1"),
         device_id="board-1",
         name="board",
-        port="/dev/board-1",
+        upload_port="/dev/board-1",
         fqbn="arduino:avr:uno",
         watchdog=watchdog
         or RuntimeWatchdogConfig(
@@ -166,7 +167,7 @@ def test_contract_digest_changes_with_safe_stop_strategy() -> None:
         microcontroller_id=board.microcontroller_id,
         baud_rate=board.baud_rate,
         definition=board.definition,
-        runtime_transport=board.active_runtime_transport,
+        runtime_transport=board.runtime_transport,
     )
 
     changed_digest = HardwareContractCompiler.calculate_board_digest(

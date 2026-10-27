@@ -5,7 +5,7 @@ import pytest
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeTransportConfig
 from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
 from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
 from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
@@ -15,7 +15,8 @@ from gerbera_sdk.models.runtime.commands.command_response import CommandResponse
 def command_setup():
     connection = Connection(name="sensor", component_type="hw201", pins={"out": "7"}, description="Sensor")
     hardware = HardwareSystem(name="robot", microcontrollers=[Microcontroller(
-        name="board", device_id="board-1", port="/dev/test", fqbn="arduino:avr:uno", connections=[connection],
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/test"),
+        name="board", device_id="board-1", upload_port="/dev/test", fqbn="arduino:avr:uno", connections=[connection],
     )])
     GerberaRuntime.bind_connection_microcontroller_ids(hardware)
     plan = GerberaRuntime.validate_hardware(hardware)

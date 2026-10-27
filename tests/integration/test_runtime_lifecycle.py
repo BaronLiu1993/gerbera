@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gerbera_sdk.models.hardware.microcontroller import RuntimeTransportConfig
 from gerbera_sdk.models.runtime.server.runtime_lifecycle import RuntimeLifecycle
 
 
@@ -216,7 +217,8 @@ def test_movement_reset_receives_command_response_after_listener_start() -> None
 
     motor = Connection(name="motor", component_type="sg90", pins={"signal": "9"}, description="Joint motor")
     hardware = HardwareSystem(name="robot", microcontrollers=[Microcontroller(
-        name="board", device_id="board-1", port="/dev/test", fqbn="arduino:avr:uno", connections=[motor],
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/test"),
+        name="board", device_id="board-1", upload_port="/dev/test", fqbn="arduino:avr:uno", connections=[motor],
     )])
     plan = GerberaRuntime.validate_hardware(hardware)
     responses = CommandResponseRegistry()

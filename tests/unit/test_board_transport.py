@@ -16,7 +16,6 @@ def make_board(transport: RuntimeTransportConfig) -> ResolvedBoard:
     return ResolvedBoard(
         microcontroller_id="esp32-1",
         name="esp32",
-        port=transport.port,
         baud_rate=115200,
         definition=ESP32_DEV_MODULE,
         connections=(),

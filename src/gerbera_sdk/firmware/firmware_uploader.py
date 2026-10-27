@@ -14,7 +14,7 @@ class FirmwareUploader:
             raise FileNotFoundError(f"Compiled firmware directory not found: {build_path}")
         subprocess.run([
             "arduino-cli", "upload",
-            "-p", self.board.firmware_upload_port,
+            "-p", self.board.upload_port,
             "--fqbn", self.board.fqbn,
             "--input-dir", str(build_path),
             str(build_path.parent),

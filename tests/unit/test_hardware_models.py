@@ -3,6 +3,7 @@ import pytest
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.microcontroller import (
     Microcontroller,
+    RuntimeTransportConfig,
 )
 
 
@@ -47,16 +48,33 @@ def test_connection_event_name_is_stable_for_bound_hardware() -> None:
     assert connection.event_name.startswith("status_led_")
 
 
-def test_microcontroller_requires_resolved_identity_without_reading_files(monkeypatch) -> None:
-    board = Microcontroller(name="board", port="/dev/board", fqbn="arduino:avr:uno")
+@pytest.mark.parametrize("missing", ["device_id", "upload_port", "runtime_transport"])
+def test_microcontroller_requires_explicit_configuration(monkeypatch, missing) -> None:
+    configuration = dict(
+        name="board", device_id="board-1", upload_port="/dev/board", fqbn="arduino:avr:uno",
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board"),
+    )
+    del configuration[missing]
     monkeypatch.setattr("pathlib.Path.read_text", lambda *args: pytest.fail("Unexpected filesystem read"))
 
-    with pytest.raises(ValueError, match="device_id must be resolved"):
-        _ = board.id
+    with pytest.raises(ValueError, match=missing):
+        Microcontroller(**configuration)
 
 
 def test_resolved_microcontroller_identity_does_not_read_files(monkeypatch) -> None:
-    board = Microcontroller(name="board", port="/dev/board", fqbn="arduino:avr:uno", device_id="board-1")
+    board = Microcontroller(
+        name="board", upload_port="/dev/board", fqbn="arduino:avr:uno", device_id="board-1",
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/runtime"),
+    )
     monkeypatch.setattr("pathlib.Path.read_text", lambda *args: pytest.fail("Unexpected filesystem read"))
 
-    assert board.id == "board-1"
+    assert (board.id, board.upload_port, board.runtime_transport.port) == ("board-1", "/dev/board", "/dev/runtime")
+
+
+def test_microcontroller_rejects_legacy_port_alias() -> None:
+    with pytest.raises(ValueError, match="port"):
+        Microcontroller(
+            name="board", device_id="board-1", upload_port="/dev/board", fqbn="arduino:avr:uno",
+            runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board"),
+            port="/dev/backup",
+        )

@@ -348,7 +348,7 @@ void GerberaRuntime::enterStoppedState(
 
     def transport_header(self) -> str:
         if (
-            self.board.active_runtime_transport.kind
+            self.board.runtime_transport.kind
             == BoardTransportKind.BLUETOOTH_CLASSIC
         ):
             return (
@@ -359,14 +359,14 @@ void GerberaRuntime::enterStoppedState(
 
     def transport_definition(self) -> str:
         if (
-            self.board.active_runtime_transport.kind
+            self.board.runtime_transport.kind
             == BoardTransportKind.BLUETOOTH_CLASSIC
         ):
             return "BluetoothSerial GERBERA_TRANSPORT;"
         return ""
 
     def transport_setup(self) -> str:
-        transport = self.board.active_runtime_transport
+        transport = self.board.runtime_transport
         if transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC:
             return (
                 "GERBERA_TRANSPORT.begin("

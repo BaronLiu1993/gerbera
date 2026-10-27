@@ -9,15 +9,16 @@ from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeTransportConfig
 from gerbera_sdk.models.runtime.storage.database_settings import DatabaseSettings
 
 
 @pytest.fixture
 def hardware():
     return HardwareSystem(
-        id="system-1", name="robot", microcontrollers=[Microcontroller(
-            name="board", device_id="board-1", port="/dev/test", fqbn="arduino:avr:uno",
+        id="system-1", name="robot", description="Robot description", microcontrollers=[Microcontroller(
+            runtime_transport=RuntimeTransportConfig.usb_serial("/dev/test"),
+            name="board", device_id="board-1", upload_port="/dev/test", fqbn="arduino:avr:uno",
             connections=[Connection(name="sensor", component_type="hw201", pins={"out": "7"}, description="Sensor")],
         )],
     )

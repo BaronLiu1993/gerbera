@@ -74,7 +74,7 @@ class SerialBoardTransport:
 class BoardTransportFactory:
     @staticmethod
     def create(board: ResolvedBoard) -> BoardTransport:
-        transport = board.active_runtime_transport
+        transport = board.runtime_transport
         boot_wait_seconds = (
             USB_BOOT_WAIT_SECONDS
             if transport.kind == BoardTransportKind.USB_SERIAL

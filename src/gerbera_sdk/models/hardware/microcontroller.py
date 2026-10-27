@@ -62,38 +62,24 @@ class RegisteredDevice(BaseModel):
     address: str = Field(min_length=1, pattern=r"\S")
     protocol: str = Field(min_length=1, pattern=r"\S")
     fqbn: str = Field(min_length=1, pattern=r"\S")
-    runtime_transport: RuntimeTransportConfig | None = None
 
 
 @dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
 class Microcontroller:
     name: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    port: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    device_id: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    upload_port: Annotated[str, Field(min_length=1, pattern=r"\S")]
     fqbn: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    runtime_transport: RuntimeTransportConfig
     watchdog: RuntimeWatchdogConfig = field(default_factory=RuntimeWatchdogConfig)
     baud_rate: Annotated[int, Field(gt=0)] = 115200
     description: str | None = None
     connections: list[Connection] = field(default_factory=list)
     hardware_system_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
-    device_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
-    upload_port: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
-    runtime_transport: RuntimeTransportConfig | None = None
 
     @property
     def id(self) -> str:
-        if self.device_id is not None:
-            return self.device_id
-        raise ValueError("Microcontroller device_id must be resolved before runtime construction")
-
-    @property
-    def firmware_upload_port(self) -> str:
-        return self.upload_port or self.port
-
-    @property
-    def active_runtime_transport(self) -> RuntimeTransportConfig:
-        if self.runtime_transport is not None:
-            return self.runtime_transport
-        return RuntimeTransportConfig.usb_serial(self.port)
+        return self.device_id
 
     def get_required_connection_libraries(self) -> list[LibrarySpec]:
         libraries: list[LibrarySpec] = []

@@ -10,9 +10,10 @@ from gerbera_sdk.models.hardware.microcontroller import (
 
 def test_models_generate_routed_firmware_for_read_and_write_components() -> None:
     board = Microcontroller(
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board-1"),
         device_id="board-1",
         name="board",
-        port="/dev/board-1",
+        upload_port="/dev/board-1",
         fqbn="arduino:avr:uno",
         watchdog=RuntimeWatchdogConfig(
             heartbeat_interval_ms=100,
@@ -64,7 +65,6 @@ def test_models_generate_routed_firmware_for_read_and_write_components() -> None
 def test_esp32_generates_bluetooth_transport_firmware() -> None:
     board = Microcontroller(
         name="esp32",
-        port="/dev/usb-esp32",
         upload_port="/dev/usb-esp32",
         device_id="esp32-1",
         runtime_transport=RuntimeTransportConfig.bluetooth_classic(

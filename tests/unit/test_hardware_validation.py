@@ -7,6 +7,7 @@ from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import (
+    RuntimeTransportConfig,
     Microcontroller,
     RuntimeWatchdogConfig,
 )
@@ -51,9 +52,10 @@ def test_facade_accepts_a_valid_complete_hardware_graph() -> None:
         microcontroller_id="board-1",
     )
     board = Microcontroller(
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board-1"),
         device_id="board-1",
         name="board",
-        port="/dev/board-1",
+        upload_port="/dev/board-1",
         fqbn="arduino:avr:uno",
         watchdog=RuntimeWatchdogConfig(
             heartbeat_interval_ms=100,
@@ -202,9 +204,10 @@ def test_motor_must_use_the_registered_connection_instance() -> None:
         microcontroller_id="board-1",
     )
     board = Microcontroller(
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/board-1"),
         device_id="board-1",
         name="board",
-        port="/dev/board-1",
+        upload_port="/dev/board-1",
         fqbn="arduino:avr:uno",
         watchdog=RuntimeWatchdogConfig(
             heartbeat_interval_ms=100,

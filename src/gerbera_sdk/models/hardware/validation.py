@@ -60,7 +60,7 @@ class BoardContractIdentity:
     microcontroller_id: str
     baud_rate: int
     definition: BoardDefinition
-    runtime_transport: RuntimeTransportConfig | None = None
+    runtime_transport: RuntimeTransportConfig
 
 
 class HardwareValidationFacade:
@@ -243,16 +243,15 @@ class HardwareContractCompiler:
             )
 
         connections = tuple(resolved_connections)
-        runtime_transport = microcontroller.active_runtime_transport
+        runtime_transport = microcontroller.runtime_transport
         return ResolvedBoard(
             microcontroller_id=microcontroller_id,
             name=microcontroller.name,
-            port=runtime_transport.port,
             baud_rate=microcontroller.baud_rate,
             definition=board_definition,
             connections=connections,
             watchdog=microcontroller.watchdog,
-            upload_port=microcontroller.firmware_upload_port,
+            upload_port=microcontroller.upload_port,
             runtime_transport=runtime_transport,
             contract_digest=HardwareContractCompiler.calculate_board_digest(
                 BoardContractIdentity(
@@ -301,19 +300,18 @@ class HardwareContractCompiler:
 
     @staticmethod
     def transport_contract_payload(
-        transport: RuntimeTransportConfig | None,
+        transport: RuntimeTransportConfig,
     ) -> dict[str, str | None]:
-        resolved_transport = transport or RuntimeTransportConfig.usb_serial("")
         return {
-            "device_name": resolved_transport.device_name,
-            "kind": resolved_transport.kind.value,
+            "device_name": transport.device_name,
+            "kind": transport.kind.value,
         }
 
     @staticmethod
     def validate_transport(
         microcontroller: Microcontroller,
     ) -> list[str]:
-        transport = microcontroller.active_runtime_transport
+        transport = microcontroller.runtime_transport
         path = f"microcontrollers[{microcontroller.id}].runtime_transport"
         if not transport.port.strip():
             return [f"{path}.port: cannot be empty"]
@@ -328,8 +326,8 @@ class HardwareContractCompiler:
             ]
 
         if transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC:
-            device_name = transport.device_name or ""
-            if not device_name.strip():
+            device_name = transport.device_name
+            if device_name is None or not device_name.strip():
                 return [f"{path}.device_name: cannot be empty"]
             if "\n" in device_name or "\r" in device_name:
                 return [f"{path}.device_name: cannot contain newlines"]

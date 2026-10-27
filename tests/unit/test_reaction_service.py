@@ -15,14 +15,15 @@ from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeTransportConfig
 
 
 @pytest.fixture
 def service_setup(tmp_path):
     sensor = Connection(name="sensor", component_type="hw201", pins={"out": "7"}, description="Sensor", stream=True)
     hardware = HardwareSystem(name="robot", microcontrollers=[Microcontroller(
-        name="board", device_id="board-1", port="/dev/test", fqbn="arduino:avr:uno", connections=[sensor],
+        runtime_transport=RuntimeTransportConfig.usb_serial("/dev/test"),
+        name="board", device_id="board-1", upload_port="/dev/test", fqbn="arduino:avr:uno", connections=[sensor],
     )])
     GerberaRuntime.bind_connection_microcontroller_ids(hardware)
     plan = GerberaRuntime.validate_hardware(hardware)
