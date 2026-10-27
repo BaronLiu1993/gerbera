@@ -1,0 +1,35 @@
+src/gerbera_sdk/inference/models/neural_network/object_depth/object_depth_model_inference.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 50
+tests/unit/test_yolov5_model_adapter.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 43
+src/gerbera_sdk/utils.py
+  s_eb6570f5ffe476::t_17ecbd375aea9f 2,4,11-17
+src/gerbera_sdk/inference/models/neural_network/object_segmentation/object_segmentation_model_inference.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 49
+src/gerbera_sdk/inference/models/neural_network/object_detection/object_detection_model_inference.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 48
+tests/unit/test_inference_models.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 99,171
+tests/unit/test_object_segmentation_model_adapter.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 16
+tests/unit/test_schema_contracts.py
+  s_eb6570f5ffe476::t_4cede8c330a374 1-17
+tests/unit/test_object_depth_model_adapter.py
+  s_eb6570f5ffe476::t_9dfdaabcee75f5 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "32942a69d99ce84f294185701e4a3c5d8577de41",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
