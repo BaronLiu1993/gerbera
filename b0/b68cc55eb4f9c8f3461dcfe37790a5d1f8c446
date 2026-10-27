@@ -1,0 +1,23 @@
+src/gerbera_sdk/models/hardware/README.md
+  s_eb6570f5ffe476::t_160bda43f61705 4,57-58,100-101,107-109
+README.md
+  s_eb6570f5ffe476::t_66d33d2b54c0b9 318-331,335
+  s_eb6570f5ffe476::t_f5bbf831782590 334
+  s_eb6570f5ffe476::t_4d3f218b5aeaa9 336
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b0b68cc55eb4f9c8f3461dcfe37790a5d1f8c446",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
