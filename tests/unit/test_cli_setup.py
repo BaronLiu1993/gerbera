@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from gerbera_cli.configuration import ProjectConfig, ServiceSpec
+from gerbera_cli.configuration import ProjectConfig, SdkProcessSpec, ExternalServiceSpec
 from gerbera_cli.initialise import initialise_database_credentials
 from gerbera_cli.setup import LocalProjectServices, readiness_report
 
@@ -31,8 +31,8 @@ def test_repeated_initialization_does_not_rotate_database_credentials(monkeypatc
 
 def test_sdk_receives_database_endpoint_without_loading_hardware() -> None:
     services = LocalProjectServices(ProjectConfig(services={
-        "sdk": ServiceSpec(config="missing.json", url="http://localhost:8001"),
-        "database": ServiceSpec(url="postgresql://db.example:6543"),
+        "sdk": SdkProcessSpec(config="missing.json", url="http://localhost:8001"),
+        "database": ExternalServiceSpec(url="postgresql://db.example:6543"),
     }))
 
     assert {name: value for name, value in services.sdk_environment().items()
@@ -43,7 +43,7 @@ def test_sdk_receives_database_endpoint_without_loading_hardware() -> None:
 
 def test_externally_managed_services_are_not_started() -> None:
     services = LocalProjectServices(ProjectConfig(services={
-        "sdk": ServiceSpec(managed=False), "database": ServiceSpec(managed=False),
+        "sdk": ExternalServiceSpec(url="http://sdk.example"), "database": ExternalServiceSpec(url="postgresql://db.example"),
     }))
 
     assert (services.start_server(), services.start_database()) == (False, False)
@@ -76,7 +76,7 @@ def test_cli_waits_for_ready_not_merely_a_successful_http_request(monkeypatch) -
     from unittest.mock import Mock
 
     services = LocalProjectServices(ProjectConfig(services={
-        "sdk": ServiceSpec(managed=False, url="http://sdk.example"),
+        "sdk": ExternalServiceSpec(url="http://sdk.example"),
     }))
     reports = Mock(side_effect=[{"service": "sdk", "ready": False}, {"service": "sdk", "ready": True}])
     monkeypatch.setattr("gerbera_cli.setup.readiness_report", reports)
@@ -88,7 +88,7 @@ def test_cli_waits_for_ready_not_merely_a_successful_http_request(monkeypatch) -
 
 
 def test_cli_stops_waiting_when_managed_sdk_exits(monkeypatch) -> None:
-    services = LocalProjectServices(ProjectConfig(services={"sdk": ServiceSpec(url="http://sdk.example")}))
+    services = LocalProjectServices(ProjectConfig(services={"sdk": SdkProcessSpec(config="sdk.json", url="http://sdk.example")}))
     monkeypatch.setattr(LocalProjectServices, "server_running", lambda self: False)
 
     with pytest.raises(RuntimeError, match="sdk exited"):
@@ -99,7 +99,7 @@ def test_cli_readiness_timeout_preserves_service_report(monkeypatch) -> None:
     from unittest.mock import Mock
 
     services = LocalProjectServices(ProjectConfig(
-        services={"sdk": ServiceSpec(managed=False, url="http://sdk.example")},
+        services={"sdk": ExternalServiceSpec(url="http://sdk.example")},
         startup_timeout_seconds=1,
     ))
     monkeypatch.setattr("gerbera_cli.setup.time.monotonic", Mock(side_effect=[0, 0, 2]))
@@ -118,7 +118,7 @@ def test_cli_accepts_current_ready_phase_contract(monkeypatch) -> None:
     client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)))
     monkeypatch.setattr("gerbera_cli.setup.httpx.Client", lambda **kwargs: client)
     services = LocalProjectServices(ProjectConfig(services={
-        "sdk": ServiceSpec(managed=False, url="http://sdk.example"),
+        "sdk": ExternalServiceSpec(url="http://sdk.example"),
     }))
     monkeypatch.setattr("gerbera_cli.setup.time.sleep", lambda interval: pytest.fail("Ready SDK must not be polled again"))
 
@@ -139,7 +139,7 @@ def test_cli_does_not_accept_readiness_from_another_service(monkeypatch) -> None
     from unittest.mock import Mock
 
     services = LocalProjectServices(ProjectConfig(
-        services={"sdk": ServiceSpec(managed=False, url="http://sdk.example")}, startup_timeout_seconds=1,
+        services={"sdk": ExternalServiceSpec(url="http://sdk.example")}, startup_timeout_seconds=1,
     ))
     monkeypatch.setattr("gerbera_cli.setup.time.monotonic", Mock(side_effect=[0, 0, 2]))
     monkeypatch.setattr("gerbera_cli.setup.time.sleep", lambda interval: None)
@@ -163,3 +163,27 @@ def test_cli_delegates_sdk_credentials_and_mounts_its_bootstrap_file(monkeypatch
     assert (calls[1][3], manifest["services"]["database"]["env_files"]) == (
         "credentials", [".gerbera/secrets/database.env", ".gerbera/secrets/sdk-database.env"],
     )
+
+
+def test_sdk_environment_files_are_loaded_with_explicit_precedence(monkeypatch, tmp_path) -> None:
+    first = tmp_path / "first.env"
+    second = tmp_path / "second.env"
+    first.write_text("SDK_FLAG=first\nFROM_FILE=available\n")
+    second.write_text("SDK_FLAG=second\n")
+    monkeypatch.setenv("SDK_FLAG", "inherited")
+    services = LocalProjectServices(ProjectConfig(services={"sdk": SdkProcessSpec(
+        url="http://sdk.example", config="sdk.json", env_files=(str(first), str(second)), environment={"SDK_FLAG": "explicit"},
+    )}))
+
+    environment = services.sdk_environment()
+
+    assert (environment["SDK_FLAG"], environment["FROM_FILE"]) == ("explicit", "available")
+
+
+def test_sdk_missing_environment_file_fails_before_launch(tmp_path) -> None:
+    services = LocalProjectServices(ProjectConfig(services={"sdk": SdkProcessSpec(
+        url="http://sdk.example", config="sdk.json", env_files=(str(tmp_path / "missing.env"),),
+    )}))
+
+    with pytest.raises(FileNotFoundError, match="environment file not found"):
+        services.sdk_environment()

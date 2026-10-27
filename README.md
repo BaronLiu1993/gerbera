@@ -233,10 +233,18 @@ process. Docker deployments receive only their scoped environment files. SDK
 credentials contain writer/schema-owner passwords, not database-admin or model
 credentials. CLI status, logs and shutdown do not load service secrets.
 
-In `gerbera.yaml`, set a service's `managed: false` and its reachable `url` to use
+In `gerbera.yaml`, set a service's `kind: external` and its reachable `url` to use
 an independently managed service. The CLI waits for external SDK/harness readiness
 but never starts or stops those services. Deployment URLs supply managed-service
 endpoints; `MCP_URL` overrides the harness connector setting.
+
+Deployment kinds are explicit: `process` is a local SDK process and requires a
+configuration path; `container` requires an image, container port and published
+URL port; `external` accepts an endpoint without local execution settings. SDK
+process environment files are loaded in order, then overridden by explicit
+`environment` entries and deployment database endpoints. Container configuration
+mounts require `config_environment`; persistent volumes require `volume_target`.
+Legacy `managed` settings must be replaced with the corresponding `kind`.
 
 Older combined project manifests must be split before using the new CLI: retain
 hardware settings in the SDK config, put model/workflow settings in the harness

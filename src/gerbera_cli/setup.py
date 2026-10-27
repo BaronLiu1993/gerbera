@@ -11,8 +11,9 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from gerbera_protocol import ReadinessReport
+from dotenv import dotenv_values
 
-from gerbera_cli.configuration import ProjectConfig
+from gerbera_cli.configuration import ContainerServiceSpec, ProjectConfig, SdkProcessSpec
 from gerbera_cli.deployment import StartupStage
 
 RUNTIME_PATH = Path(".gerbera/runtime")
@@ -49,7 +50,7 @@ class LocalProjectServices:
 
     def start_container(self, name: str) -> bool:
         service = self.config.services.get(name)
-        if service is None or not service.enabled or not service.managed:
+        if not isinstance(service, ContainerServiceSpec) or not service.enabled:
             return False
         metadata = self.container_status(name)
         if metadata is not None:
@@ -87,9 +88,9 @@ class LocalProjectServices:
         if service.config:
             config_path = Path(service.config).resolve()
             command.extend(("-v", f"{config_path.parent}:/app/service-config:ro"))
-            command.extend(("-e", f"GERBERA_HARNESS_CONFIG=/app/service-config/{config_path.name}"))
+            command.extend(("-e", f"{service.config_environment}=/app/service-config/{config_path.name}"))
         if service.volume:
-            command.extend(("-v", f"{service.volume}:/var/lib/postgresql/data"))
+            command.extend(("-v", f"{service.volume}:{service.volume_target}"))
         command.append(service.image)
         subprocess.run(command, check=True)
         return True
@@ -103,7 +104,7 @@ class LocalProjectServices:
             raise RuntimeError("Refusing to reuse a network owned by another deployment")
 
     def sdk_command(self) -> list[str]:
-        service = self.config.services["sdk"]
+        service = self.sdk_process()
         address = urlsplit(service.url)
         return [
             sys.executable, "-m", "gerbera_sdk.server", "serve",
@@ -112,13 +113,29 @@ class LocalProjectServices:
         ]
 
     def sdk_environment(self) -> dict[str, str]:
-        environment = os.environ | self.config.services["sdk"].environment
+        service = self.sdk_process()
+        environment = dict(os.environ)
+        for filename in service.env_files:
+            path = Path(filename)
+            if not path.is_file():
+                raise FileNotFoundError(f"SDK environment file not found: {path}")
+            values = dotenv_values(path, interpolate=False)
+            if any(value is None for value in values.values()):
+                raise ValueError(f"SDK environment file contains a key without a value: {path}")
+            environment.update(values)
+        environment.update(service.environment)
         database = self.config.services.get("database")
         if database is not None and database.enabled:
             address = urlsplit(database.url)
             environment["GERBERA_DATABASE_HOST"] = address.hostname or "127.0.0.1"
             environment["GERBERA_DATABASE_PORT"] = str(address.port or 5432)
         return environment
+
+    def sdk_process(self) -> SdkProcessSpec:
+        service = self.config.services["sdk"]
+        if not isinstance(service, SdkProcessSpec):
+            raise RuntimeError("The SDK is externally managed; start it on its own host")
+        return service
 
     def run_server_foreground(self) -> None:
         if not self.config.services["sdk"].managed:
@@ -193,7 +210,7 @@ class LocalProjectServices:
 
     def stop_container(self, name: str) -> None:
         service = self.config.services.get(name)
-        if service is None or not service.managed:
+        if not isinstance(service, ContainerServiceSpec):
             return
         metadata = self.container_status(name)
         if metadata is not None and metadata["State"]["Running"]:

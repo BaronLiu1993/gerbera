@@ -48,21 +48,26 @@ def initialise_project_files(with_harness: bool, provider: str | None) -> None:
         "startup_timeout_seconds": 600,
         "services": {
             "database": {
+                "kind": "container",
                 "image": "ghcr.io/baronliu1993/gerbera-postgres:latest",
                 "url": "postgresql://127.0.0.1:6432", "container_port": 5432,
                 "environment": {"POSTGRES_DB": "gerbera", "POSTGRES_USER": "gerbera_admin"},
                 "env_files": [".gerbera/secrets/database.env", ".gerbera/secrets/sdk-database.env"],
                 "volume": f"gerbera_{hashlib.sha256(str(Path.cwd().resolve()).encode()).hexdigest()[:12]}_postgres_data",
+                "volume_target": "/var/lib/postgresql/data",
             },
             "sdk": {
+                "kind": "process",
                 "url": "http://127.0.0.1:8001",
                 "bind_host": "0.0.0.0",
                 "config": ".gerbera/sdk/runtime.json",
             },
             "harness": {
+                "kind": "container",
                 "enabled": with_harness, "url": "http://127.0.0.1:8000",
                 "image": "ghcr.io/baronliu1993/gerbera:latest",
                 "config": ".gerbera/harness/harness.json", "container_port": 8000,
+                "config_environment": "GERBERA_HARNESS_CONFIG",
                 "env_files": [".gerbera/secrets/harness.env", ".gerbera/secrets/harness-database.env"],
                 "environment": {
                     "GERBERA_DATABASE_NAME": "gerbera", "GERBERA_READER_USER": "gerbera_reader",

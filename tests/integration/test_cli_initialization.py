@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 from gerbera_cli.configuration import ProjectConfig
 from gerbera_cli.main import app
 from gerbera_sdk.server.initialise import initialise_sdk
+from gerbera_sdk.server.credentials import initialise_credentials
 
 
 def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path) -> None:
@@ -21,7 +22,10 @@ def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path)
 
     def run_service(command, **kwargs):
         commands.append(command[2:])
-        initialise_sdk(Path(".gerbera/sdk/runtime.json"))
+        if command[3] == "initialise":
+            initialise_sdk(Path(".gerbera/sdk/runtime.json"))
+        else:
+            initialise_credentials(Path(".gerbera/sdk/runtime.json").resolve(), Path(".gerbera/secrets/sdk-database.env").resolve())
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr("gerbera_cli.initialise.subprocess.run", run_service)
@@ -35,7 +39,10 @@ def test_init_delegates_hardware_scaffolding_to_sdk(monkeypatch, tmp_path: Path)
         set(json.loads(Path(".gerbera/secrets/sdk.json").read_text())),
         json.loads(Path(".gerbera/sdk/runtime.json").read_text())["devices"]["/dev/board-1"]["id"],
     ) == (
-        [["gerbera_sdk.server", "initialise"]], {"sdk", "harness", "database"},
+        [["gerbera_sdk.server", "initialise"], [
+            "gerbera_sdk.server", "credentials", "--config", ".gerbera/sdk/runtime.json",
+            "--database-env", ".gerbera/secrets/sdk-database.env",
+        ]], {"sdk", "harness", "database"},
         {"gerbera_schema_password", "gerbera_writer_password"}, "board-1",
     )
 
