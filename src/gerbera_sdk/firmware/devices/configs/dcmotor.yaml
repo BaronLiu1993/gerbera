@@ -40,8 +40,8 @@ commands:
         description: PWM speed from 0 to 255.
     annotations:
       title: Set {connection.name} motor motion
-      readOnlyHint: false
-      openWorldHint: false
+      read_only_hint: false
+      open_world_hint: false
 
 verification:
   startup_timeout_ms: 100
@@ -56,6 +56,11 @@ verification:
     analogWrite({pins.enable}, 0);
 
 firmware:
+  definitions: ""
+  definitions_when_streaming: ""
+  setup: []
+  setup_when_streaming: []
+  stream_loop_when_streaming: ""
   handlers:
     default: |
       void handle_{connection.name}(const String& input) {

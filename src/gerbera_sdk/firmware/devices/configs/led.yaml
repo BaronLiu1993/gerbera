@@ -27,8 +27,8 @@ commands:
         description: 1 turns the LED on; 0 turns it off.
     annotations:
       title: Set {connection.name} LED state
-      readOnlyHint: false
-      openWorldHint: false
+      read_only_hint: false
+      open_world_hint: false
 
 verification:
   startup_timeout_ms: 100
@@ -41,6 +41,11 @@ verification:
     digitalWrite({pins.out}, LOW);
 
 firmware:
+  definitions: ""
+  definitions_when_streaming: ""
+  setup: []
+  setup_when_streaming: []
+  stream_loop_when_streaming: ""
   handlers:
     default: |
       void handle_{connection.name}(const String& input) {

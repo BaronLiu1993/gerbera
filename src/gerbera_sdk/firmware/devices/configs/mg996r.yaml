@@ -29,8 +29,8 @@ commands:
         description: Servo angle in radians.
     annotations:
       title: Set {connection.name} MG996R servo angle
-      readOnlyHint: false
-      openWorldHint: false
+      read_only_hint: false
+      open_world_hint: false
 
 verification:
   startup_timeout_ms: 100
@@ -44,6 +44,10 @@ verification:
     digitalWrite({pins.signal}, LOW);
 
 firmware:
+  definitions_when_streaming: ""
+  setup: []
+  setup_when_streaming: []
+  stream_loop_when_streaming: ""
   definitions: |
     Servo {connection.name}_servo;
   handlers:
