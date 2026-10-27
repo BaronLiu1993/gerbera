@@ -1,0 +1,41 @@
+tests/unit/test_resource_readiness.py
+  s_eb6570f5ffe476::t_58bad1c4709461 1-77
+src/gerbera_sdk/events/event_worker.py
+  s_eb6570f5ffe476::t_65c526d03ca4a1 151-155
+src/gerbera_sdk/models/runtime/perception/camera_runtime.py
+  s_eb6570f5ffe476::t_65c526d03ca4a1 255-264
+src/gerbera_sdk/events/event_listener.py
+  s_eb6570f5ffe476::t_65c526d03ca4a1 365-372
+tests/integration/test_runtime_lifecycle.py
+  s_eb6570f5ffe476::t_f327e9ab99fd72 92
+  s_eb6570f5ffe476::t_58bad1c4709461 200-237
+src/gerbera_sdk/models/runtime/server/runtime_lifecycle.py
+  s_eb6570f5ffe476::t_5f1aebdf787edd 85-86
+  s_eb6570f5ffe476::t_9c0ad898ee698d 87
+src/gerbera_sdk/models/runtime/perception/model_runtime.py
+  s_eb6570f5ffe476::t_65c526d03ca4a1 349-355
+src/gerbera_sdk/models/runtime/server/readiness.py
+  s_eb6570f5ffe476::t_5f1aebdf787edd 2,5-8,13-14,18-23,25
+tests/unit/test_service_readiness.py
+  s_eb6570f5ffe476::t_5c749e01f728f6 16-17,44-47,51-62
+src/gerbera_sdk/models/runtime/boards/board_runtime.py
+  s_eb6570f5ffe476::t_65c526d03ca4a1 391-399
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_6a7263ddd535a1 92-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45e3d91ca7d753e5e1fb336d4292465dee336954",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
