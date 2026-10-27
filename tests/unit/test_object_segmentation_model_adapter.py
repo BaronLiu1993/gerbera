@@ -13,7 +13,7 @@ from gerbera_sdk.inference.models.neural_network.object_segmentation.object_segm
 def make_manifest(
     model_format: str,
 ) -> ObjectSegmentationModelManifestSchema:
-    return ObjectSegmentationModelManifestSchema.model_validate(
+    return ObjectSegmentationModelManifestSchema.from_data(
         {
             "schema_version": 1,
             "model_format": model_format,

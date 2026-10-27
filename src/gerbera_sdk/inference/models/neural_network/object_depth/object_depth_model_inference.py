@@ -47,7 +47,7 @@ class ObjectDepthModel(StrictSchema):
         )
 
     def create_inference(self) -> "ObjectDepthModelInference":
-        manifest = ObjectDepthModelManifestSchema.model_validate(
+        manifest = ObjectDepthModelManifestSchema.from_data(
             LocalModelFiles(self.model_directory).read_manifest()
         )
         adapter_class = OBJECT_DEPTH_MODEL_REGISTRY[manifest.model_format]

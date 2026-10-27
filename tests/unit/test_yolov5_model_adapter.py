@@ -40,7 +40,7 @@ def adapter(tmp_path, monkeypatch) -> Yolov5ModelAdapter:
     manifest_path.write_text(yaml.safe_dump(manifest))
     (model_directory / "model.onnx").touch()
     monkeypatch.setattr(local_model_files, "MODELS_PATH", tmp_path)
-    validated_manifest = ObjectDetectionModelManifestSchema.model_validate(
+    validated_manifest = ObjectDetectionModelManifestSchema.from_data(
         LocalModelFiles("yolov5n").read_manifest()
     )
 

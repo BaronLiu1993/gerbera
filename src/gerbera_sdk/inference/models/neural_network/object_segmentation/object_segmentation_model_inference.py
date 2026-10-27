@@ -46,7 +46,7 @@ class ObjectSegmentationModel(StrictSchema):
         )
 
     def create_inference(self) -> "ObjectSegmentationModelInference":
-        manifest = ObjectSegmentationModelManifestSchema.model_validate(
+        manifest = ObjectSegmentationModelManifestSchema.from_data(
             LocalModelFiles(self.model_directory).read_manifest()
         )
         adapter_class = OBJECT_SEGMENTATION_MODEL_REGISTRY[

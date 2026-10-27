@@ -1,12 +1,20 @@
 import hashlib
+import json
 import re
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict
 
 MAX_EVENT_NAME_LENGTH = 63
 
 class StrictSchema(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        strict=True, extra="forbid", validate_assignment=True, allow_inf_nan=False,
+    )
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> Self:
+        return cls.model_validate_json(json.dumps(data, allow_nan=False))
 
 def build_connection_event_name(
     microcontroller_id: str,

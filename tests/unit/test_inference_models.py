@@ -96,7 +96,7 @@ def test_yolov5_adapter_loads_weights_from_project_models(
         lambda path: loaded_paths.append(path) or model,
     )
 
-    manifest = ObjectDetectionModelManifestSchema.model_validate(
+    manifest = ObjectDetectionModelManifestSchema.from_data(
         {
             "schema_version": 1,
             "model_format": "yolov5",
@@ -168,7 +168,7 @@ def test_object_detection_rejects_invalid_thresholds(
             {
                 "name": "observer",
                 "model_type": "vision_language_model",
-                "model_provider": "openai",
+                "model_provider": VisionLanguageModelProviderEnum.OPENAI,
                 "model_name": "vision-model",
                 "api_key": "test-key",
                 "subscribed_camera": TEST_CAMERA,

@@ -45,7 +45,7 @@ class ObjectDetectionModel(StrictSchema):
         )
 
     def create_inference(self) -> "ObjectDetectionModelInference":
-        manifest = ObjectDetectionModelManifestSchema.model_validate(
+        manifest = ObjectDetectionModelManifestSchema.from_data(
             LocalModelFiles(self.model_directory).read_manifest()
         )
         adapter_class = OBJECT_DETECTION_MODEL_REGISTRY[manifest.model_format]

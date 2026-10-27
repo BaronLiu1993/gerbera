@@ -17,7 +17,7 @@ from gerbera_sdk.inference.models.neural_network.object_depth.object_depth_schem
 def make_manifest(
     model_format: str = "midas",
 ) -> ObjectDepthModelManifestSchema:
-    return ObjectDepthModelManifestSchema.model_validate(
+    return ObjectDepthModelManifestSchema.from_data(
         {
             "schema_version": 1,
             "model_format": model_format,
