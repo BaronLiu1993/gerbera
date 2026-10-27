@@ -315,21 +315,24 @@ the microcontroller serial protocol.
 The ESP32 Dev Module can use Bluetooth Classic SPP for runtime commands while
 USB remains the firmware upload connection.
 
-```json
-{
-  "devices": {
-    "esp32-1": {
-      "id": "esp32-1",
-      "address": "/dev/cu.usbserial-0001",
-      "runtime_transport": {
-        "kind": "bluetooth_classic",
-        "port": "/dev/cu.Gerbera-ESP32",
-        "device_name": "Gerbera-ESP32"
-      }
-    }
-  }
-}
+Declare both endpoints in the hardware entry point:
+
+```python
+from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RuntimeTransportConfig
+
+board = Microcontroller(
+    name="esp32",
+    device_id="esp32-1",
+    fqbn="esp32:esp32:esp32",
+    upload_port="/dev/cu.usbserial-0001",
+    runtime_transport=RuntimeTransportConfig.bluetooth_classic(
+        "/dev/cu.Gerbera-ESP32", "Gerbera-ESP32",
+    ),
+)
 ```
+
+The registry verifies identity, upload address, and FQBN. Runtime
+transport belongs to the declaration and is never inferred from another port.
 
 Flash firmware over USB once, pair the ESP32 with the host, and then start the
 server using the paired serial endpoint. Bluetooth support does not provide OTA

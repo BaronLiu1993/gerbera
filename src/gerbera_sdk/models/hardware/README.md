@@ -1,7 +1,7 @@
 # Models
 
 Hardware declarations contain explicit values and do not read configuration files.
-The SDK loader resolves registry identity and transport before runtime construction.
+The SDK loader verifies registered identity before runtime construction and does not fill missing settings.
 
 The models folder owns the hardware declaration graph and the database connection used by the runtime.
 
@@ -54,7 +54,8 @@ classDiagram
     class Microcontroller {
       id
       hardware_system_id
-      port
+      upload_port
+      runtime_transport
       baud_rate
       fqbn
       connections
@@ -96,13 +97,16 @@ classDiagram
 
 `Microcontroller.id`
 
-- can be declared explicitly with `device_id`
-- otherwise resolved by the configuration loader using the upload port
+- must be declared explicitly with `device_id`
+- must match the configured device registry when a registry is supplied
 - remains stable when the runtime transport changes
 
 Upload and runtime connections are separate. `upload_port` is used only by
 Arduino tooling. `runtime_transport` selects USB serial or a board-supported
 wireless transport.
+Both values are required, including for USB boards where the ports are identical.
+The device registry does not supply a fallback transport, and the legacy `port`
+alias is rejected.
 
 `Connection.microcontroller_id`
 
