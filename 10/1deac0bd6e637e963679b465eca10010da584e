@@ -1,0 +1,35 @@
+src/gerbera_sdk/firmware/devices/configs/mg996r.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 32-33,47-50
+src/gerbera_sdk/firmware/devices/config_schema.py
+  s_eb6570f5ffe476::t_a2bc40946a9e6b 2,4-7,16,19,24,30,34-35,38,45,54,59,62,66,69-73,76,81,83-88,91,100,102,105,112-114,117
+src/gerbera_sdk/firmware/devices/configs/hcsr04.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 30-31,43-44,67-69,154-155,160-162,167-169
+src/gerbera_sdk/firmware/devices/configs/dcmotor.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 43-44,59-63
+src/gerbera_sdk/firmware/devices/configs/sg90.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 32-33,47-50
+src/gerbera_sdk/firmware/devices/configs/hw201.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 26-27,39-40,52-54,109-110,115-117,122-124
+src/gerbera_sdk/firmware/devices/configs/ky033.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 26-27,39-40,52-54,109-110,115-117,122-124
+tests/unit/test_device_configuration.py
+  s_eb6570f5ffe476::t_f5bbf831782590 1-35
+src/gerbera_sdk/firmware/devices/configs/led.yaml
+  s_eb6570f5ffe476::t_1eea83a40e8876 30-31,44-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "101deac0bd6e637e963679b465eca10010da584e",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
