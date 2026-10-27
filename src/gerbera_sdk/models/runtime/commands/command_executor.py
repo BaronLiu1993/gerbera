@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from functools import partial
 
-from gerbera_sdk.firmware.command_definitions import command_specs
+from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedConnection
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
 from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
@@ -15,14 +14,9 @@ class CommandExecutor:
     responses: CommandResponseRegistry
     timeout_seconds: float = 1.0
 
-    def bind_actions(self) -> None:
-        for board in self.hardware_plan.boards:
-            for connection in board.connections:
-                for command in command_specs(connection):
-                    connection.register_action(
-                        command.method,
-                        partial(self.execute, connection, command.method),
-                    )
+    def execute_declared(self, connection: Connection, action: str, params: dict[str, object]) -> dict[str, object]:
+        key = (connection.microcontroller_id, connection.name)
+        return self.execute(self.hardware_plan.connections_by_key[key], action, params)
 
     def execute(
         self,

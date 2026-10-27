@@ -123,3 +123,38 @@ def test_firmware_verification_propagates_mismatch(hardware, monkeypatch) -> Non
 
     with pytest.raises(RuntimeError, match="firmware mismatch"):
         GerberaRuntime.verify_firmware(hardware)
+
+
+def test_applications_share_declarations_without_sharing_command_execution(hardware, database, monkeypatch) -> None:
+    from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
+    from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
+    from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry
+
+    captured = []
+    executors = []
+    register = McpToolRegistry.register
+
+    def capture(registry, definition):
+        captured.append((registry.app, definition))
+        register(registry, definition)
+
+    def make_executor(*args):
+        executor = CommandExecutor(*args)
+        label = "first" if not executors else "second"
+
+        def write(command):
+            message = SerialMessageCodec.decode(command)
+            executor.responses.resolve(message.fields["command_id"], {"runtime": label})
+
+        executor.boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=write))
+        executors.append(executor)
+        return executor
+
+    monkeypatch.setattr(runtime_module, "CommandExecutor", make_executor)
+    monkeypatch.setattr(McpToolRegistry, "register", capture)
+    first = GerberaRuntime.build_application(hardware, database)
+    second = GerberaRuntime.build_application(hardware, database)
+    callbacks = [next(tool.tool_function for app, tool in captured if app is instance and tool.name == "read_sensor")
+                 for instance in (first, second)]
+
+    assert [callback()["value"]["runtime"] for callback in callbacks] == ["first", "second"]

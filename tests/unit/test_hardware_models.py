@@ -17,20 +17,8 @@ def make_connection(*, stream: bool = False) -> Connection:
     )
 
 
-def test_connection_runs_a_registered_action_with_normalized_name() -> None:
-    connection = make_connection()
-    connection.register_action(" write ", lambda params: params)
-
-    result = connection.perform_action("WRITE", {"state": "on"})
-
-    assert result == {"state": "on"}
-
-
-def test_connection_rejects_an_unregistered_action() -> None:
-    connection = make_connection()
-
-    with pytest.raises(RuntimeError, match="not registered"):
-        connection.perform_action("WRITE", {})
+def test_hardware_declaration_has_no_executable_action_storage() -> None:
+    assert not hasattr(make_connection(), "actions")
 
 
 @pytest.mark.parametrize(

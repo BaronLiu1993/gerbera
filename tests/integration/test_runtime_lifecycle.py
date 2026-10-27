@@ -225,9 +225,8 @@ def test_movement_reset_receives_command_response_after_listener_start() -> None
 
     boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=write_command))
     commands = CommandExecutor(plan, boards, responses, timeout_seconds=0.01)
-    commands.bind_actions()
     lifecycle.movement_runtime.reset_motors_to_standard_position = lambda: results.append(
-        motor.perform_action("WRITE", {"angle": 0.0})
+        commands.execute_declared(motor, "WRITE", {"angle": 0.0})
     )
 
     with lifecycle.start_resources():

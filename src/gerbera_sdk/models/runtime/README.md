@@ -68,8 +68,9 @@ Hardware declarations remain under `models/hardware`.
 
 - composing the MCP resource and tool adapters
 
-`CommandExecutor` owns binding executable connection actions, command dispatch and
-waiting for correlated responses. It works without MCP registration.
+`CommandExecutor` owns command dispatch and waiting for correlated responses.
+Hardware declarations and resolved plans contain no executable callbacks. Each
+application injects its own executor into its adapters, controls and movement runtime.
 
 `EventRegistration` creates hardware event routes and buffers. `ReactionService`
 owns reaction validation, restoration and the event catalog. `ReactionBus` owns

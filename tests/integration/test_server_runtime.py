@@ -140,17 +140,16 @@ def make_server(dependencies: ServerDependencies | None = None) -> tuple[SimpleN
     cameras = dependencies.camera_runtime or SimpleNamespace()
     responses = dependencies.command_responses or CommandResponseRegistry()
     commands = CommandExecutor(plan, SimpleNamespace(), responses)
-    commands.bind_actions()
     EventRegistration(plan, events, worker).register()
     actions = ReactionToolRegistry()
     reaction_bus = dependencies.reaction_bus or ReactionBus()
     reaction_bus.configure_executor(actions)
     tools = McpToolRegistry(app, actions)
-    controls = ConnectionControl(events, worker, state)
+    controls = ConnectionControl(events, worker, state, commands)
     runtime = SimpleNamespace(
         hardware_plan=plan, event_bus=events, reaction_bus=reaction_bus,
         hardware_runtime=state, commands=commands,
-        hardware=HardwareTools(tools, plan, state, controls),
+        hardware=HardwareTools(tools, plan, state, controls, commands),
         perception=PerceptionTools(tools, system, cameras, models),
         reactions=ReactionTools(tools, ReactionService(plan, events, reaction_bus, actions)),
         resources=RuntimeResources(tools, app, system, plan, SimpleNamespace(), state, models),
@@ -600,7 +599,6 @@ def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
     connection = SimpleNamespace(
         name="sensor", component_type="hw201", microcontroller_id="board-1",
         event_name="stream-event",
-        perform_action=lambda action, params: calls.append("hardware.off") or {"success": True},
     )
     event_bus = SimpleNamespace(
         get_event=lambda *args: SimpleNamespace(flush=lambda: calls.append("stream.flush")),
@@ -608,7 +606,8 @@ def test_stream_shutdown_flushes_before_waiting_and_updates_state() -> None:
     worker = SimpleNamespace(wait_until_idle=lambda: calls.append("database.wait"))
     state = HardwareRuntime()
     state.register_state_store(("board-1", "sensor", "stream_enabled"))
-    controls = ConnectionControl(event_bus, worker, state)
+    commands = SimpleNamespace(execute=lambda *args: calls.append("hardware.off") or {"success": True})
+    controls = ConnectionControl(event_bus, worker, state, commands)
 
     response = controls.set_stream_state(connection, 0)
 

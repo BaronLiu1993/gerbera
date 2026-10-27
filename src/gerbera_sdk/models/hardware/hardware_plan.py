@@ -1,6 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Callable
+from dataclasses import dataclass
 
 from gerbera_sdk.firmware.boards import BoardDefinition
 from gerbera_sdk.firmware.configurations import DeviceDefinition
@@ -9,7 +8,6 @@ from gerbera_sdk.firmware.firmware_schema import (
     PinCapability,
     PinMode,
 )
-from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.microcontroller import (
     RuntimeTransportConfig,
     RuntimeWatchdogConfig,
@@ -50,7 +48,6 @@ class ResolvedConnection:
     pin_assignments: tuple[ResolvedPinAssignment, ...]
     verification: ResolvedVerification
     device_definition: DeviceDefinition
-    source_connection: Connection = field(repr=False, compare=False)
 
     @property
     def pins(self) -> dict[str, str]:
@@ -62,20 +59,6 @@ class ResolvedConnection:
     @property
     def stream_enabled(self) -> bool:
         return self.stream
-
-    def register_action(
-        self,
-        action: str,
-        callback: Callable[[dict[str, object]], dict[str, object]],
-    ) -> None:
-        self.source_connection.register_action(action, callback)
-
-    def perform_action(
-        self,
-        action: str,
-        params: dict[str, object],
-    ) -> dict[str, object]:
-        return self.source_connection.perform_action(action, params)
 
 
 @dataclass(frozen=True)

@@ -55,7 +55,6 @@ class GerberaRuntime:
         EventRegistration(plan, events, worker).register()
         responses = CommandResponseRegistry()
         commands = CommandExecutor(plan, boards, responses)
-        commands.bind_actions()
         actions = ReactionToolRegistry()
         reaction_bus = ReactionBus(action_executor=actions)
         reactions = ReactionService(plan, events, reaction_bus, actions)
@@ -64,7 +63,7 @@ class GerberaRuntime:
             event_bus=events, reaction_bus=reaction_bus, hardware_runtime=state,
             command_responses=responses, reconnect_board=boards.reconnect_board,
         )
-        movement = GerberaRuntime.build_movement(hardware)
+        movement = GerberaRuntime.build_movement(hardware, commands)
         readiness = RuntimeReadiness(
             sources=(boards, cameras, models, listener, worker), instance_id=hardware.id,
         )
@@ -79,7 +78,7 @@ class GerberaRuntime:
         tools = McpToolRegistry(app, actions)
         server = ServerRuntime(
             resources=RuntimeResources(tools, app, hardware, plan, listener, state, models),
-            hardware=HardwareTools(tools, plan, state, ConnectionControl(events, worker, state)),
+            hardware=HardwareTools(tools, plan, state, ConnectionControl(events, worker, state, commands), commands),
             perception=PerceptionTools(tools, hardware, cameras, models),
             movement=MovementTools(tools, movement),
             reactions=ReactionTools(tools, reactions),
@@ -119,10 +118,10 @@ class GerberaRuntime:
         return state
 
     @staticmethod
-    def build_movement(hardware: HardwareSystem) -> MovementRuntime | None:
+    def build_movement(hardware: HardwareSystem, commands: CommandExecutor) -> MovementRuntime | None:
         if not hardware.movement_systems:
             return None
-        movement = MovementRuntime(hardware)
+        movement = MovementRuntime(hardware, commands)
         movement.register_movement_system()
         return movement
 

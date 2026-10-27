@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import ikpy.chain
 
 
+from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.movement_system import (
     ContinuousJoint,
@@ -27,6 +28,7 @@ class MovementSystemRuntimeRegistry:
 @dataclass
 class MovementRuntime:
     hardware_system: HardwareSystem
+    commands: CommandExecutor
     movement_system_registry: dict[
         str,
         MovementSystemRuntimeRegistry,
@@ -53,7 +55,7 @@ class MovementRuntime:
                     continue
 
                 connection = joint.motor_connection
-                response = connection.perform_action("WRITE", {"angle": 0.0})
+                response = self.commands.execute_declared(connection, "WRITE", {"angle": 0.0})
                 if not response.get("success"):
                     raise RuntimeError(
                         f"Failed to reset movement joint: {joint.name}"

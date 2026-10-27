@@ -239,7 +239,6 @@ class HardwareContractCompiler:
                         safe_stop=device_definition.config.verification.safe_stop,
                     ),
                     device_definition=device_definition,
-                    source_connection=connection,
                 )
             )
 

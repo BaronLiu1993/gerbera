@@ -30,9 +30,8 @@ def test_bound_action_receives_correlated_board_response_without_mcp(command_set
 
     boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=reply))
     executor = CommandExecutor(command_setup.plan, boards, command_setup.responses)
-    executor.bind_actions()
 
-    assert command_setup.connection.perform_action("READ", {}) == {
+    assert executor.execute_declared(command_setup.connection, "READ", {}) == {
         "success": True, "value": {"obstacle_detected": "1"},
     }
 

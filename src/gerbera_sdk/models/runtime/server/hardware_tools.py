@@ -6,6 +6,7 @@ from pydantic import Field
 
 from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry, ToolDefinition
 from inspect import Parameter, Signature
+from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
 from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
 
 from gerbera_sdk.firmware.firmware_schema import CommandSpec, ParameterSpec
@@ -24,6 +25,7 @@ class HardwareTools:
     hardware_plan: HardwarePlan
     hardware_runtime: HardwareRuntime
     controls: ConnectionControl
+    commands: CommandExecutor
 
     def build_tool_function(
         self,
@@ -34,7 +36,7 @@ class HardwareTools:
         if not command.params:
 
             def tool_function() -> dict[str, object]:
-                return connection.perform_action(action, {})
+                return self.commands.execute(connection, action, {})
 
             return tool_function
 
@@ -42,7 +44,7 @@ class HardwareTools:
             params = {
                 name: value for name, value in values.items() if value is not None
             }
-            return connection.perform_action(action, params)
+            return self.commands.execute(connection, action, params)
 
         parameters: list[Parameter] = []
         annotations: dict[str, Any] = {"return": dict[str, object]}
