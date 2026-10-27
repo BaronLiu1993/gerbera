@@ -1,0 +1,35 @@
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_38f615262c60f3 161-182
+src/gerbera_sdk/models/runtime/server/runtime_lifecycle.py
+  s_eb6570f5ffe476::t_d8049c8892de43 8,33,66,103-111
+src/gerbera_sdk/models/runtime/movement/movement_runtime.py
+  s_eb6570f5ffe476::t_d8049c8892de43 155-158
+src/gerbera_sdk/inference/model_descriptor.py
+  s_eb6570f5ffe476::t_15d0009788c303 1-23
+src/gerbera_sdk/models/runtime/README.md
+  s_eb6570f5ffe476::t_18ea87e45ab3f9 85-89
+tests/integration/test_runtime_lifecycle.py
+  s_eb6570f5ffe476::t_d8049c8892de43 43,57,88-89,123-124,205
+  s_eb6570f5ffe476::t_38f615262c60f3 242-254
+src/gerbera_sdk/gerbera_runtime.py
+  s_eb6570f5ffe476::t_d8049c8892de43 74
+src/gerbera_sdk/models/runtime/server/perception_tools.py
+  s_eb6570f5ffe476::t_38f615262c60f3 17,39,88,107,150,167,210,255,345
+  s_eb6570f5ffe476::t_d8049c8892de43 11,20-23,26-27,41,89-91,109,136,151-154,157,212,372,377,382,387,392,397
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "210679bcd743e2d4299a80bb93912faaf8ae46e4",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
