@@ -1,0 +1,30 @@
+tests/unit/test_cli_setup.py
+  s_eb6570f5ffe476::t_28ec9e7be80ec0 14-15,17-18,150-165
+src/gerbera_sdk/server/credentials.py
+  s_eb6570f5ffe476::t_0003890c915383 1-33
+tests/unit/test_sdk_credentials.py
+  s_eb6570f5ffe476::t_28ec9e7be80ec0 1-48
+src/gerbera_cli/initialise.py
+  s_eb6570f5ffe476::t_0003890c915383 24,38-41,54
+src/gerbera_sdk/server/__main__.py
+  s_eb6570f5ffe476::t_0003890c915383 13,17,24-27
+  s_eb6570f5ffe476::t_6051265f02ad3d 28
+src/gerbera_sdk/README.md
+  s_eb6570f5ffe476::t_f06b4ad41e7868 94-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "963b8568d40dd626cc0d3d3b90824e665a023897",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
