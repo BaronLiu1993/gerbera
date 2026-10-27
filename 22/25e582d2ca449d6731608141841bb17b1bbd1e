@@ -1,0 +1,21 @@
+src/gerbera_sdk/models/runtime/commands/command_runtime.py
+  s_eb6570f5ffe476::t_c3626244e4e70f 148-149,151-152,156-158
+tests/unit/test_command_runtime.py
+  s_eb6570f5ffe476::t_c3626244e4e70f 50,52-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2225e582d2ca449d6731608141841bb17b1bbd1e",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
