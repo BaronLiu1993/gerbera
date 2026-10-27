@@ -1,0 +1,22 @@
+tests/unit/test_firmware_verifier.py
+  s_eb6570f5ffe476::t_f5bbf831782590 66,70-79
+src/gerbera_sdk/firmware/firmware_dependencies.py
+  s_eb6570f5ffe476::t_a078ab60ea4e45 35,37-38
+  s_eb6570f5ffe476::t_f5bbf831782590 32-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b80ca0570295a4079eb0ae1317e388fbfd1f0687",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
