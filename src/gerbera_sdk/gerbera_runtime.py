@@ -101,11 +101,21 @@ class GerberaRuntime:
 
     @staticmethod
     def bind_connection_microcontroller_ids(hardware: HardwareSystem) -> None:
+        GerberaRuntime.validate_declared_ownership(hardware)
         for controller in hardware.microcontrollers:
             controller.hardware_system_id = hardware.id
             controller_id = controller.id
             for connection in controller.connections:
                 connection.microcontroller_id = controller_id
+
+    @staticmethod
+    def validate_declared_ownership(hardware: HardwareSystem) -> None:
+        for controller in hardware.microcontrollers:
+            if controller.hardware_system_id not in (None, hardware.id):
+                raise ValueError(f"Conflicting hardware system ownership: {controller.name}")
+            for connection in controller.connections:
+                if connection.microcontroller_id not in (None, controller.id):
+                    raise ValueError(f"Conflicting microcontroller ownership: {connection.name}")
 
     @staticmethod
     def build_state(plan: HardwarePlan) -> HardwareRuntime:

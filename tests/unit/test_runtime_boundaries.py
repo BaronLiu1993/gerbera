@@ -36,6 +36,21 @@ def test_facade_binds_declared_connections_to_resolved_identity(hardware) -> Non
     assert (board.hardware_system_id, board.connections[0].microcontroller_id) == ("system-1", "board-1")
 
 
+@pytest.mark.parametrize("owner", ["board", "connection"])
+def test_facade_rejects_conflicting_ownership_before_binding(hardware, owner):
+    board = hardware.microcontrollers[0]
+    if owner == "board":
+        board.hardware_system_id = "wrong-system"
+    else:
+        board.connections[0].microcontroller_id = "wrong-board"
+
+    with pytest.raises(ValueError, match="Conflicting"):
+        GerberaRuntime.validate_hardware(hardware)
+
+    if owner == "connection":
+        assert board.hardware_system_id is None
+
+
 def test_database_settings_build_the_writer_role() -> None:
     database = DatabaseSettings("database.internal", 5432, "secret").writer()
 
