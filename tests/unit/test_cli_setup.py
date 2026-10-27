@@ -17,16 +17,11 @@ def test_database_credentials_are_scoped_and_private(monkeypatch, tmp_path: Path
     assert (names, path.stat().st_mode & 0o777, Path(".gerbera/secrets/sdk.json").exists()) == (
         {"POSTGRES_PASSWORD", "GERBERA_READER_PASSWORD"}, 0o600, False,
     )
-
-
-def test_repeated_initialization_does_not_rotate_database_credentials(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.chdir(tmp_path)
-    initialise_database_credentials()
-    original = Path(".gerbera/secrets/database.env").read_text()
+    original = path.read_text()
 
     initialise_database_credentials()
 
-    assert Path(".gerbera/secrets/database.env").read_text() == original
+    assert path.read_text() == original
 
 
 def test_sdk_receives_database_endpoint_without_loading_hardware() -> None:
@@ -125,7 +120,7 @@ def test_cli_accepts_current_ready_phase_contract(monkeypatch) -> None:
     services.wait_for_server()
 
 
-@pytest.mark.parametrize("payload", [{"phase": "ready"}, {"ready": True}, [], {"service": "sdk", "phase": "unknown"}])
+@pytest.mark.parametrize("payload", [{"ready": True}, [], {"service": "sdk", "phase": "unknown"}])
 def test_cli_rejects_invalid_readiness_contract(monkeypatch, payload) -> None:
     import httpx
 

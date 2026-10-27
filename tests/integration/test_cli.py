@@ -4,13 +4,12 @@ from typer.testing import CliRunner
 from gerbera_cli.main import app
 
 
-@pytest.mark.parametrize("command", ["init", "up", "server", "down", "status", "logs", "doctor"])
-def test_cli_exposes_deployment_workflows(command) -> None:
-    assert command in CliRunner().invoke(app, ["--help"]).stdout
+def test_cli_exposes_deployment_workflows() -> None:
+    result = CliRunner().invoke(app, ["--help"])
 
-
-def test_cli_has_no_manual_firmware_command() -> None:
-    assert "firmware" not in CliRunner().invoke(app, ["--help"]).stdout
+    assert result.exit_code == 0
+    assert all(command in result.stdout for command in ("init", "up", "server", "down", "status", "logs", "doctor"))
+    assert "firmware" not in result.stdout
 
 
 @pytest.mark.parametrize("option", ["--skip-flash", "--force"])

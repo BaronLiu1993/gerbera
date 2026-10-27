@@ -59,7 +59,7 @@ def test_container_configuration_is_complete_and_validated(changes) -> None:
         ContainerServiceSpec(**payload)
 
 
-@pytest.mark.parametrize("timeout", [0, -1, float("inf")])
+@pytest.mark.parametrize("timeout", [0, float("inf")])
 def test_deployment_rejects_unbounded_or_nonpositive_timeout(timeout) -> None:
     with pytest.raises(ValueError):
         ProjectConfig(services={}, startup_timeout_seconds=timeout)

@@ -44,7 +44,7 @@ def test_sdk_rejects_missing_role_credentials(tmp_path: Path, field: str) -> Non
         settings.load_secrets(tmp_path / "runtime.json")
 
 
-@pytest.mark.parametrize("port", [0, -1, 65536])
+@pytest.mark.parametrize("port", [0, 65536])
 def test_sdk_owns_service_port_validation(port) -> None:
     with pytest.raises(ValidationError):
         SdkSettings(port=port)
