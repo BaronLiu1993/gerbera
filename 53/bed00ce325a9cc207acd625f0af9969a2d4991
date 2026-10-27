@@ -1,0 +1,25 @@
+tests/unit/test_cli_setup.py
+  s_eb6570f5ffe476::t_025730434dc6ac 20,24,123
+tests/integration/test_cli.py
+  s_eb6570f5ffe476::t_025730434dc6ac 7-8,10-12
+tests/unit/test_cli_configuration.py
+  s_eb6570f5ffe476::t_025730434dc6ac 62
+tests/unit/test_sdk_server_configuration.py
+  s_eb6570f5ffe476::t_025730434dc6ac 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "53bed00ce325a9cc207acd625f0af9969a2d4991",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
