@@ -7,16 +7,16 @@ from pydantic import ValidationError
 from gerbera_sdk.server.configuration import SdkSettings
 
 
-def test_sdk_reads_legacy_hardware_settings_without_harness_validation(tmp_path: Path) -> None:
+@pytest.mark.parametrize("payload", [
+    {"entry_point": "robot.py", "hardware_name": "robot", "devices": {}},
+    {"project": {"entry_point": "robot.py"}, "runtime": {"port": 8001}},
+])
+def test_sdk_rejects_retired_configuration_layouts(tmp_path: Path, payload) -> None:
     path = tmp_path / "legacy.json"
-    path.write_text(json.dumps({
-        "entry_point": "robot.py", "hardware_name": "robot", "devices": {},
-        "harness": {"provider": "not-an-sdk-concern"},
-    }))
+    path.write_text(json.dumps(payload))
 
-    settings = SdkSettings.load(path)
-
-    assert (settings.entry_point, settings.hardware_variable) == (Path("robot.py"), "robot")
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        SdkSettings.load(path)
 
 
 def test_sdk_extracts_only_its_role_credentials_from_legacy_secret_file(tmp_path: Path) -> None:
@@ -44,7 +44,7 @@ def test_sdk_rejects_missing_role_credentials(tmp_path: Path, field: str) -> Non
         settings.load_secrets(tmp_path / "runtime.json")
 
 
-@pytest.mark.parametrize("port", [0, 65536])
+@pytest.mark.parametrize("port", [0, 65536, "8001"])
 def test_sdk_owns_service_port_validation(port) -> None:
     with pytest.raises(ValidationError):
         SdkSettings(port=port)
@@ -80,6 +80,7 @@ def test_sdk_can_validate_without_cli_or_live_services(monkeypatch, tmp_path: Pa
     path = tmp_path / "sdk.json"
     path.write_text(SdkSettings(project_root=Path("."), secrets_file=Path("secrets.json")).model_dump_json())
     monkeypatch.setattr("sys.argv", ["gerbera_sdk.server", "check", "--config", str(path)])
+    monkeypatch.setenv("GERBERA_DATABASE_PORT", "6543")
 
     main()
 

@@ -2,7 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 import yaml
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
@@ -12,6 +12,8 @@ from gerbera_sdk.utils import StrictSchema
 
 
 class SdkSettings(StrictSchema):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
     project_root: Path = Path("../..")
     entry_point: Path = Path("index.py")
     hardware_variable: str = Field(default="hardware_system", min_length=1)
@@ -27,15 +29,6 @@ class SdkSettings(StrictSchema):
         payload = json.loads(path.read_text()) if path.suffix == ".json" else yaml.safe_load(path.read_text())
         if not isinstance(payload, dict):
             raise ValueError("SDK configuration must be an object")
-        if "project" in payload or "entry_point" in payload and "project_root" not in payload:
-            project = payload.get("project", {})
-            runtime = payload.get("runtime", {})
-            payload = {
-                "project_root": ".", "entry_point": project.get("entry_point", payload.get("entry_point", "index.py")),
-                "hardware_variable": project.get("hardware_variable", payload.get("hardware_name", "hardware_system")),
-                "secrets_file": ".gerbera/secrets/secrets.json",
-                "devices": payload.get("devices", {}), **runtime,
-            }
         return cls.model_validate_json(json.dumps(payload))
 
     def load_hardware(self, config_path: Path) -> HardwareSystem:

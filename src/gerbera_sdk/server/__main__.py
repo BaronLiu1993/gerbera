@@ -35,11 +35,12 @@ def main() -> None:
 
     config_path = arguments.config.resolve()
     settings = SdkSettings.load(config_path)
+    database_port = os.getenv("GERBERA_DATABASE_PORT")
     overrides = {
         "host": arguments.host,
         "port": arguments.port,
         "database_host": os.getenv("GERBERA_DATABASE_HOST"),
-        "database_port": os.getenv("GERBERA_DATABASE_PORT"),
+        "database_port": int(database_port) if database_port is not None else None,
     }
     settings = SdkSettings.model_validate_json(json.dumps(settings.model_dump(mode="json") | {
         name: value for name, value in overrides.items() if value is not None
