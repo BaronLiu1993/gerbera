@@ -145,12 +145,17 @@ class CommandCompiler:
         value: object,
         label: str,
     ) -> float:
+        if type(value) not in (int, float):
+            raise ValueError(f"Invalid numeric value for {key} on {label}: {value}")
         try:
-            return float(value)
-        except (TypeError, ValueError) as exc:
+            numeric_value = float(value)
+        except OverflowError as exc:
             raise ValueError(
                 f"Invalid numeric value for {key} on {label}: {value}"
             ) from exc
+        if not math.isfinite(numeric_value):
+            raise ValueError(f"Invalid numeric value for {key} on {label}: must be finite")
+        return numeric_value
 
     @staticmethod
     def validate_param_bounds(

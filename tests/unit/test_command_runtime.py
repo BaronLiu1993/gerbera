@@ -47,8 +47,11 @@ def test_attach_command_id_adds_protocol_metadata() -> None:
         (_connection("led"), {}, "Missing required parameter"),
         (_connection("led"), {"state": "invalid"}, "Invalid numeric value"),
         (_connection("led"), {"unknown": 1}, "Unsupported parameter"),
-        (_connection("sg90"), {"angle": "181"}, "must be <= 3.141592653589793"),
+        (_connection("sg90"), {"angle": 181.0}, "must be <= 3.141592653589793"),
         (_connection("sg90"), {"angle": "not-a-number"}, "Invalid numeric value"),
+        (_connection("led"), {"state": True}, "Invalid numeric value"),
+        (_connection("led"), {"state": "1"}, "Invalid numeric value"),
+        (_connection("led"), {"state": float("nan")}, "must be finite"),
     ],
 )
 def test_build_command_rejects_invalid_parameters(
