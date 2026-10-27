@@ -47,10 +47,12 @@ class SdkSettings(StrictSchema):
     def load_secrets(self, config_path: Path) -> "SdkSecrets":
         root = (config_path.parent / self.project_root).resolve()
         payload = json.loads((root / self.secrets_file).read_text())
-        return SdkSecrets.model_validate({name: payload.get(name) for name in SdkSecrets.model_fields})
+        return SdkSecrets.model_validate(payload)
 
 
 class SdkSecrets(StrictSchema):
+    model_config = ConfigDict(strict=True, extra="forbid", validate_default=True)
+
     gerbera_writer_password: str = Field(min_length=1, repr=False)
     gerbera_schema_password: str = Field(min_length=1, repr=False)
 

@@ -19,7 +19,7 @@ def test_sdk_rejects_retired_configuration_layouts(tmp_path: Path, payload) -> N
         SdkSettings.load(path)
 
 
-def test_sdk_extracts_only_its_role_credentials_from_legacy_secret_file(tmp_path: Path) -> None:
+def test_sdk_rejects_shared_secret_files_instead_of_ignoring_fields(tmp_path: Path) -> None:
     path = tmp_path / "secrets.json"
     path.write_text(json.dumps({
         "gerbera_writer_password": "writer", "gerbera_schema_password": "schema",
@@ -27,9 +27,8 @@ def test_sdk_extracts_only_its_role_credentials_from_legacy_secret_file(tmp_path
     }))
     settings = SdkSettings(project_root=Path("."), secrets_file=path)
 
-    assert settings.load_secrets(tmp_path / "runtime.json").model_dump() == {
-        "gerbera_writer_password": "writer", "gerbera_schema_password": "schema",
-    }
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        settings.load_secrets(tmp_path / "runtime.json")
 
 
 @pytest.mark.parametrize("field", ["gerbera_writer_password", "gerbera_schema_password"])
