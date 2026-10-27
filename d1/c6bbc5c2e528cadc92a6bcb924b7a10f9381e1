@@ -1,0 +1,25 @@
+tests/unit/test_hardware_contract.py
+  s_eb6570f5ffe476::t_4a78e9029d6685 169
+  s_eb6570f5ffe476::t_31f90bfcb89a13 182,185-186,189,193,199,203
+tests/unit/test_hardware_validation.py
+  s_eb6570f5ffe476::t_f6b384a7ba06b0 159,173-175,186
+  s_eb6570f5ffe476::t_e3d9c0f925f571 108,110,116,242-250
+tests/integration/test_stream_database.py
+  s_eb6570f5ffe476::t_38c3dca5d5d61e 11,58,61-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d1c6bbc5c2e528cadc92a6bcb924b7a10f9381e1",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
