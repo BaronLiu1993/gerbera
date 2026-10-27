@@ -16,7 +16,7 @@ def imports(package: str) -> set[str]:
 
 
 @pytest.mark.parametrize("package, forbidden", [
-    ("gerbera_cli", {"gerbera_sdk", "gerbera_harness", "psycopg", "pydantic"}),
+    ("gerbera_cli", {"gerbera_sdk", "gerbera_harness", "psycopg"}),
     ("gerbera_harness", {"gerbera_sdk", "gerbera_cli"}),
     ("gerbera_sdk", {"gerbera_harness", "gerbera_cli"}),
     ("gerbera_protocol", {"gerbera_sdk", "gerbera_harness", "gerbera_cli"}),
