@@ -1,0 +1,45 @@
+src/gerbera_sdk/models/hardware/microcontroller.py
+  s_eb6570f5ffe476::t_aa8b27f824330b 86
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_f09f36e66783d3 12-15,17
+  s_eb6570f5ffe476::t_f590edaff7674d 18-19,21
+tests/unit/test_firmware_files.py
+  s_eb6570f5ffe476::t_f327e9ab99fd72 25
+src/gerbera_sdk/server/configuration.py
+  s_eb6570f5ffe476::t_cad32d56549987 10,52
+tests/unit/test_hardware_contract.py
+  s_eb6570f5ffe476::t_f327e9ab99fd72 41,52,85,99,121,139,253
+  s_eb6570f5ffe476::t_2c18603f361286 23,65,152
+  s_eb6570f5ffe476::t_58df09cccd09e7 201
+src/gerbera_sdk/server/hardware_loader.py
+  s_eb6570f5ffe476::t_1ee02b24888b1d 1-36
+tests/integration/test_firmware_generation.py
+  s_eb6570f5ffe476::t_2c18603f361286 11,13
+tests/integration/test_stream_database.py
+  s_eb6570f5ffe476::t_f327e9ab99fd72 26
+  s_eb6570f5ffe476::t_2c18603f361286 29
+tests/unit/test_hardware_loader.py
+  s_eb6570f5ffe476::t_8dd80768f2d55a 1-68
+tests/unit/test_hardware_models.py
+  s_eb6570f5ffe476::t_8dd80768f2d55a 11,62-64,66,70-72,74
+tests/unit/test_hardware_validation.py
+  s_eb6570f5ffe476::t_2c18603f361286 45,54,201,217
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_ab9ac19006a544 146,155,208,218,313,323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2d9c76298adebaa54a0d15c93e8214f1ee345dd7",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
