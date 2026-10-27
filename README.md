@@ -249,8 +249,10 @@ Legacy `managed` settings must be replaced with the corresponding `kind`.
 Older combined project manifests must be split before using the new CLI: retain
 hardware settings in the SDK config, put model/workflow settings in the harness
 config, and leave only `services` and launch settings in `gerbera.yaml`. The SDK
-can still read a legacy hardware manifest through `--config`. Existing files and
-database volumes are never migrated or replaced automatically.
+accepts only its current flat configuration schema: `project_root`, `entry_point`,
+`hardware_variable`, service settings, `secrets_file`, and `devices`. Combined
+manifests and retired aliases are rejected. SDK secret files contain only the two
+SDK database role passwords. Existing database volumes are never replaced automatically.
 
 When working from an unreleased checkout, use container images built from the
 same revision; published `latest` images may not include the current readiness
