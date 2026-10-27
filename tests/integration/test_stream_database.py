@@ -2,18 +2,15 @@ from gerbera_sdk.events.buffer import Buffer
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.models.hardware.connection import Connection
-from gerbera_sdk.models.hardware.database import Database
 from gerbera_sdk.models.hardware.microcontroller import (
     Microcontroller,
     RuntimeWatchdogConfig,
 )
 
 
-class FakeDatabase(Database):
+class FakeDatabase:
     def __init__(self) -> None:
         self.batches = []
-
-        super().__init__("localhost", 5432, "user", "password", "gerbera")
 
     def write_database_table(
         self,
@@ -47,7 +44,6 @@ def test_stream_payload_is_buffered_and_written() -> None:
     )
     worker = EventWorker(database=database, retry_delay_seconds=0)
 
-    worker.start()
     table_name = board.connections[0].event_name
     buffer = Buffer(table_name=table_name, event_worker=worker)
     event = Event(
@@ -59,12 +55,16 @@ def test_stream_payload_is_buffered_and_written() -> None:
         streamable=True,
         table_name=table_name,
         buffer=buffer,
-        event_key=table_name,
+        event_key=("STREAM", board.id, table_name),
         latest_val=None,
     )
-    event.perform_work({"value": "1"})
-    event.flush()
-    worker.stop()
+    worker.start()
+    try:
+        event.perform_work({"value": "1"})
+        event.flush()
+        worker.wait_until_idle()
+    finally:
+        worker.stop()
 
     assert len(database.batches) == 1
     assert event.latest_val == {"value": "1"}

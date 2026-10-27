@@ -166,6 +166,7 @@ def test_contract_digest_changes_with_safe_stop_strategy() -> None:
         microcontroller_id=board.microcontroller_id,
         baud_rate=board.baud_rate,
         definition=board.definition,
+        runtime_transport=board.active_runtime_transport,
     )
 
     changed_digest = HardwareContractCompiler.calculate_board_digest(
@@ -178,30 +179,28 @@ def test_contract_digest_changes_with_safe_stop_strategy() -> None:
 
 
 @pytest.mark.parametrize(
-    ("watchdog", "error"),
+    ("timings", "error"),
     [
         (
-            RuntimeWatchdogConfig(0, 500),
-            "heartbeat_interval_ms: must be a positive integer",
+            (0, 500),
+            "greater than 0",
         ),
         (
-            RuntimeWatchdogConfig(100, 100),
+            (100, 100),
             "timeout must exceed interval",
         ),
         (
-            RuntimeWatchdogConfig(100, 150),
+            (100, 150),
             "timeout must allow at least one interval of jitter",
         ),
     ],
 )
 def test_contract_compiler_rejects_invalid_watchdog(
-    watchdog: RuntimeWatchdogConfig,
+    timings: tuple[int, int],
     error: str,
 ) -> None:
-
-
     with pytest.raises(ValueError, match=error):
-        HardwareContractCompiler.compile(build_system([], watchdog))
+        HardwareContractCompiler.compile(build_system([], RuntimeWatchdogConfig(*timings)))
 
 
 @pytest.mark.parametrize(
@@ -250,7 +249,5 @@ def test_contract_compiler_rejects_invalid_pin_assignment(
     connections: list[Connection],
     error: str,
 ) -> None:
-
-
     with pytest.raises(ValueError, match=error):
         HardwareContractCompiler.compile(build_system(connections))

@@ -105,15 +105,15 @@ def test_facade_accepts_a_valid_complete_hardware_graph() -> None:
 
 def test_facade_returns_first_error_and_hard_fails() -> None:
     system = HardwareSystem(
-        name="",
+        name="robot",
         cameras=[make_camera("duplicate"), make_camera("duplicate")],
-        movement_systems=[MovementSystem(name="", base_link=Link(""))],
+        movement_systems=[MovementSystem(name="arm", base_link=Link("base"))] * 2,
     )
 
     result = HardwareValidationFacade.validate(system)
 
     assert result.errors == (
-        "hardware_system.name: cannot be empty",
+        "cameras[duplicate].camera_id: duplicate ID: duplicate",
     )
     with pytest.raises(ValueError, match="Hardware system validation failed"):
         result.raise_for_errors()
@@ -156,19 +156,7 @@ def test_movement_cycle_is_the_first_reported_graph_error() -> None:
     assert result.errors == ("movement_systems[arm]: contains a cycle",)
 
 
-@pytest.mark.parametrize(
-    ("axis", "lower", "upper", "expected_error"),
-    [
-        ("invalid", -1.0, 1.0, ".axis: must be one of x, y, or z: invalid"),
-        ("z", 2.0, 1.0, ".limits: lower_rad cannot exceed upper_rad"),
-    ],
-)
-def test_revolute_joint_boundaries_are_validated(
-    axis: str,
-    lower: float,
-    upper: float,
-    expected_error: str,
-) -> None:
+def test_revolute_joint_rejects_reversed_limits() -> None:
     motor = Connection(
         name="motor",
         component_type="sg90",
@@ -182,9 +170,9 @@ def test_revolute_joint_boundaries_are_validated(
         Link("arm"),
         (0.0, 0.0, 0.0),
         (0.0, 0.0, 0.0),
-        axis=axis,
-        lower_rad=lower,
-        upper_rad=upper,
+        axis="z",
+        lower_rad=2.0,
+        upper_rad=1.0,
         motor_connection=motor,
     )
 
@@ -195,7 +183,7 @@ def test_revolute_joint_boundaries_are_validated(
         )
     )
 
-    assert any(error.endswith(expected_error) for error in result.errors)
+    assert any(error.endswith(".limits: lower_rad cannot exceed upper_rad") for error in result.errors)
 
 
 def test_motor_must_use_the_registered_connection_instance() -> None:
@@ -251,3 +239,12 @@ def test_motor_must_use_the_registered_connection_instance() -> None:
         "movement_systems[arm].joints[shoulder].motor_connection: "
         "must reference the registered connection object: motor",
     )
+
+
+def test_joint_schema_rejects_invalid_axis_before_graph_validation() -> None:
+    motor = Connection("motor", "sg90", {"signal": "9"}, "Motor")
+    with pytest.raises(ValueError, match="axis"):
+        RevoluteJoint(
+            "shoulder", Link("base"), Link("arm"), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0),
+            axis="invalid", lower_rad=-1.0, upper_rad=1.0, motor_connection=motor,
+        )
