@@ -1,4 +1,8 @@
 from dataclasses import dataclass, field
+from functools import partial
+from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
+from gerbera_sdk.events.event_registration import EventRegistration
+from gerbera_sdk.events.reactions.reaction_service import ReactionService
 from inspect import Parameter, Signature
 import json
 import logging
@@ -154,139 +158,29 @@ class ServerRuntime:
                 f"Unsupported inference model type: {type(model).__name__}"
             ) from error
 
-    def register_connection_event(
-        self,
-        board: ResolvedBoard,
-        connection: ResolvedConnection,
-        event_type: str,
-    ) -> None:
-        streamable = event_type == "STREAM"
-        if streamable and not connection.stream_enabled:
-            return
 
-        event_key = (
-            event_type,
-            board.microcontroller_id,
-            connection.event_name,
-        )
-        event = Event(
-            event_type=event_type,
-            microcontroller_id=board.microcontroller_id,
-            event_name=connection.event_name,
-            connection_name=connection.name,
-            component_type=connection.component_type,
-            streamable=streamable,
-            table_name=connection.event_name,
-            buffer=Buffer(
-                table_name=connection.event_name,
-                event_worker=self.event_worker,
-            ),
-            event_key=event_key,
-            latest_val=None,
-        )
-        self.event_bus.write_event(
-            event_type,
-            board.microcontroller_id,
-            connection.event_name,
-            event,
-        )
 
     def register_events(self) -> None:
-        for board in self.hardware_plan.boards:
-            for connection in board.connections:
-                self.register_connection_event(
-                    board,
-                    connection,
-                    "MCP",
-                )
-                self.register_connection_event(
-                    board,
-                    connection,
-                    "STREAM",
-                )
+        EventRegistration(self.hardware_plan, self.event_bus, self.event_worker).register()
 
-    def get_event_catalog(
-        self,
-    ) -> dict[str, dict[str, dict[str, dict[str, object]]]]:
-        catalog: dict[str, dict[str, dict[str, dict[str, object]]]] = {}
 
-        for event_key, event in self.event_bus.events.items():
-            event_type, microcontroller_id, event_name = event_key
-            connection = self.hardware_plan.connections_by_event_route[
-                (microcontroller_id, event_name)
-            ]
-            metadata: dict[str, object] = {
-                "event_type": event_type,
-                "microcontroller_id": microcontroller_id,
-                "event_name": event_name,
-                "connection_name": connection.name,
-                "component_type": connection.component_type,
-                "description": connection.description,
-                "streamable": event.streamable,
-            }
-            catalog.setdefault(event_type, {}).setdefault(
-                microcontroller_id,
-                {},
-            )[event_name] = metadata
+    def get_event_catalog(self):
+        return self.reaction_service().event_catalog()
 
-        return catalog
 
-    def send_command(
-        self,
-        board: ResolvedBoard,
-        connection: ResolvedConnection,
-        action: str,
-        params: dict[str, object],
-    ) -> dict[str, object]:
-        pending = self.command_responses.register(
-            board.microcontroller_id
+    def send_command(self, board, connection, action, params) -> dict[str, object]:
+        executor = CommandExecutor(
+            self.hardware_plan, self.board_runtime, self.command_responses, self.event_read_timeout_seconds,
         )
-        try:
-            transport = self.board_runtime.get_transport(
-                board.microcontroller_id
-            )
-            built_command = CommandCompiler.build_command(
-                connection,
-                action=action,
-                params=params,
-            )
-            correlated_command = CommandCompiler.attach_command_id(
-                built_command,
-                pending.command_id,
-            )
-            transport.write(correlated_command)
-            payload = self.command_responses.wait(
-                pending,
-                self.event_read_timeout_seconds,
-            )
-        except Exception as exc:
-            self.command_responses.fail(
-                pending.command_id,
-                str(exc),
-            )
-            return {"success": False, "error": str(exc)}
+        return executor.execute(connection, action, params)
 
-        return {"success": True, "value": payload}
 
-    def register_connection_action(
-        self,
-        board: ResolvedBoard,
-        connection: ResolvedConnection,
-        command: CommandSpec,
-    ) -> None:
-        action = command.method.strip().upper()
+    def register_connection_action(self, board, connection, command) -> None:
+        executor = CommandExecutor(
+            self.hardware_plan, self.board_runtime, self.command_responses, self.event_read_timeout_seconds,
+        )
+        connection.register_action(command.method, partial(executor.execute, connection, command.method))
 
-        def action_function(
-            params: dict[str, object],
-        ) -> dict[str, object]:
-            return self.send_command(
-                board=board,
-                connection=connection,
-                action=action,
-                params=params,
-            )
-
-        connection.register_action(action, action_function)
 
     def build_tool_function(
         self,
@@ -438,47 +332,20 @@ class ServerRuntime:
             meta=meta,
         )(tool_function)
 
-    def validate_reaction_event(self, event: ReactionEventSchema) -> None:
-        try:
-            self.event_bus.get_event(*event.event_key)
-        except RuntimeError as exc:
-            raise ValueError(
-                f"Unknown reaction event: {event.event_key}"
-            ) from exc
+    def validate_reaction_event(self, event) -> None:
+        self.reaction_service().validate_reaction_event(event)
 
-        route = (event.microcontroller_id, event.event_name)
-        connection = self.hardware_plan.connections_by_event_route[route]
-        payload_fields = {
-            state_key[2]
-            for state_key in CommandCompiler.state_keys(connection)
-        }
-        if event.payload_field not in payload_fields:
-            raise ValueError(
-                "Unknown reaction payload field: "
-                f"{event.payload_field} for {event.event_name}"
-            )
 
-    def validate_reaction_definition(
-        self,
-        definition: CreateReactionSchema,
-    ) -> None:
-        self.validate_reaction_event(definition.event)
-        self.reaction_tool_registry.validate_action(definition.action)
+    def validate_reaction_definition(self, definition) -> None:
+        self.reaction_service().validate_reaction_definition(definition)
+
 
     def restore_reactions(self) -> None:
-        for definition in self.reaction_bus.store.load():
-            try:
-                self.validate_reaction_definition(definition)
-                self.reaction_bus.register_definition(
-                    definition,
-                    persist=False,
-                )
-            except ValueError as exc:
-                LOGGER.warning(
-                    "Ignoring unusable stored reaction %s: %s",
-                    definition.reaction_id,
-                    exc,
-                )
+        self.reaction_service().restore_reactions()
+
+    def reaction_service(self) -> ReactionService:
+        return ReactionService(self.hardware_plan, self.event_bus, self.reaction_bus, self.reaction_tool_registry)
+
 
     def register_reaction_tools(self) -> None:
         self.reaction_bus.configure_executor(self.reaction_tool_registry)
