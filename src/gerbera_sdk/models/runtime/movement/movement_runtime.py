@@ -152,7 +152,10 @@ class MovementRuntime:
                     joint_path_by_target_link=joint_path_by_target_link,
                 )
             )
-            self.write_urdf(movement_system)
+
+    def prepare(self) -> None:
+        for registry in self.movement_system_registry.values():
+            self.write_urdf(registry.movement_system)
 
     def define_paths_from_base_link(self, base_link, joints):
         adj_list: dict[str, list[Joint]] = {}

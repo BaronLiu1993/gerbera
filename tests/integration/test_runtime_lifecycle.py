@@ -40,6 +40,7 @@ def build_lifecycle(
             stop=lambda: calls.append("worker.stop"),
         ),
         model_runtime=SimpleNamespace(
+            register_models=lambda: calls.append("models.prepare"),
             turn_on_all_model_streams=start_models,
             turn_off_all_model_streams=lambda: calls.append("models.stop"),
         ),
@@ -53,6 +54,7 @@ def build_lifecycle(
         hardware_runtime=SimpleNamespace(name="hardware-runtime"),
         storage=SimpleNamespace(prepare=lambda: calls.append("storage.prepare")),
         movement_runtime=SimpleNamespace(
+            prepare=lambda: calls.append("movement.prepare"),
             reset_motors_to_standard_position=lambda: calls.append(
                 "movement.reset"
             )
@@ -83,6 +85,8 @@ def test_runtime_orchestrates_resources_in_dependency_order(
 
     assert calls == [
         "storage.prepare",
+        "models.prepare",
+        "movement.prepare",
         "firmware.verify",
         "board.start",
         "cameras.start",
@@ -116,6 +120,8 @@ def test_runtime_cleans_started_dependencies_when_model_start_fails() -> None:
     assert exc.value is failure
     assert calls == [
         "storage.prepare",
+        "models.prepare",
+        "movement.prepare",
         "firmware.verify",
         "board.start",
         "cameras.start",
@@ -196,7 +202,7 @@ def test_firmware_mismatch_stops_startup_before_hardware_starts(monkeypatch) -> 
     with pytest.raises(RuntimeError, match="firmware mismatch"):
         asyncio.run(serve())
 
-    assert calls == ["storage.prepare", "firmware.verify"]
+    assert calls == ["storage.prepare", "models.prepare", "movement.prepare", "firmware.verify"]
 
 
 def test_movement_reset_receives_command_response_after_listener_start() -> None:
@@ -233,3 +239,16 @@ def test_movement_reset_receives_command_response_after_listener_start() -> None
         pass
 
     assert results == [{"success": True, "value": {"angle": "0"}}]
+
+
+def test_preparation_is_completed_before_hardware_start() -> None:
+    calls = []
+    lifecycle = build_lifecycle(calls)
+    lifecycle.reactions = SimpleNamespace(restore_reactions=lambda: calls.append("reactions.restore"))
+
+    with lifecycle.start_resources():
+        pass
+
+    assert calls[:6] == [
+        "storage.prepare", "models.prepare", "movement.prepare", "reactions.restore", "firmware.verify", "board.start",
+    ]

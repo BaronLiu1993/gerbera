@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 from fastmcp import FastMCP
 
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.reactions.reaction_service import ReactionService
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
@@ -29,6 +30,7 @@ class RuntimeLifecycle:
     movement_runtime: MovementRuntime | None = None
     storage: RuntimeStorage | None = None
     readiness: RuntimeReadiness | None = None
+    reactions: ReactionService | None = None
 
     @asynccontextmanager
     async def __call__(
@@ -61,8 +63,7 @@ class RuntimeLifecycle:
     ) -> ExitStack:
         startup_cleanup = ExitStack()
         try:
-            if self.storage is not None:
-                self.storage.prepare()
+            self.prepare_resources()
             FirmwareVerifier(self.board_runtime).verify()
             startup_cleanup.callback(self.board_runtime.close)
             self.board_runtime.start()
@@ -99,3 +100,12 @@ class RuntimeLifecycle:
         runtime_cleanup.callback(self.camera_runtime.close)
         runtime_cleanup.callback(self.model_runtime.turn_off_all_model_streams)
         return runtime_cleanup
+
+    def prepare_resources(self) -> None:
+        if self.storage is not None:
+            self.storage.prepare()
+        self.model_runtime.register_models()
+        if self.movement_runtime is not None:
+            self.movement_runtime.prepare()
+        if self.reactions is not None:
+            self.reactions.restore_reactions()

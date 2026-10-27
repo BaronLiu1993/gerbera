@@ -47,7 +47,6 @@ class GerberaRuntime:
         boards = BoardRuntime(plan)
         cameras = CameraRuntime(hardware)
         models = ModelRuntime(hardware, cameras)
-        models.register_models()
         writer = database.writer()
         worker = EventWorker(database=writer)
         state = GerberaRuntime.build_state(plan)
@@ -72,7 +71,7 @@ class GerberaRuntime:
             event_worker=worker, event_listener=listener, event_bus=events,
             hardware_runtime=state, movement_runtime=movement,
             storage=RuntimeStorage(plan, writer, database.schema_owner()),
-            readiness=readiness,
+            readiness=readiness, reactions=reactions,
         )
         app = FastMCP(hardware.description or hardware.name, lifespan=lifecycle)
         tools = McpToolRegistry(app, actions)

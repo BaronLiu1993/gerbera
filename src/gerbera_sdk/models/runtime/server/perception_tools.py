@@ -8,29 +8,23 @@ from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry, Too
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
+from gerbera_sdk.inference.model_descriptor import ModelDescriptor
 from gerbera_sdk.inference.model_types import (
     ModelCatalogEntry,
     ModelCatalogType,
     SubscribedCameraCatalogEntry,
 )
-from gerbera_sdk.inference import (
-    Inference,
-    ObjectDepthModelInference,
-    ObjectDetectionModelInference,
-    ObjectSegmentationModelInference,
-    VisionLanguageModelInference,
-    VisionLanguageModelFrameEnvironment,
-)
+from gerbera_sdk.inference import VisionLanguageModelFrameEnvironment
 
 MODEL_CATALOG_TYPES = {
-    ObjectDepthModelInference: "object_depth",
-    ObjectDetectionModelInference: "object_detection",
-    ObjectSegmentationModelInference: "object_segmentation",
-    VisionLanguageModelInference: "vision_language_model",
+    "object_depth": "object_depth",
+    "object_detection": "object_detection",
+    "object_segmentation": "object_segmentation",
+    "vision_language_model": "vision_language_model",
 }
 FRAME_MODEL_OUTPUT_NAMES = {
-    ObjectDepthModelInference: "object_depth",
-    ObjectSegmentationModelInference: "object_segmentation",
+    "object_depth": "object_depth",
+    "object_segmentation": "object_segmentation",
 }
 
 
@@ -42,9 +36,9 @@ class PerceptionTools:
     model_runtime: ModelRuntime
 
     @staticmethod
-    def model_catalog_type(model: Inference) -> ModelCatalogType:
+    def model_catalog_type(model: ModelDescriptor) -> ModelCatalogType:
         try:
-            return MODEL_CATALOG_TYPES[type(model)]
+            return MODEL_CATALOG_TYPES[model.model_type]
         except KeyError as error:
             raise ValueError(
                 f"Unsupported inference model type: {type(model).__name__}"
@@ -91,11 +85,10 @@ class PerceptionTools:
             ))
 
     def register_inference_tools(self) -> None:
-        registered_models: dict[str, tuple[str, Inference]] = {}
-        for model_id, registered_model in (
-            self.model_runtime.registered_models.items()
-        ):
-            inference = registered_model.inference
+        registered_models: dict[str, tuple[str, ModelDescriptor]] = {}
+        for declaration in self.hardware_system.models:
+            inference = ModelDescriptor.from_declaration(declaration)
+            model_id = inference.model_id
             if inference.name in registered_models:
                 raise ValueError(
                     f"Inference model name must be unique: {inference.name}"
@@ -111,9 +104,9 @@ class PerceptionTools:
     def register_inference_model_tools(
         self,
         model_id: str,
-        model: Inference,
+        model: ModelDescriptor,
     ) -> None:
-        if isinstance(model, VisionLanguageModelInference):
+        if model.model_type == "vision_language_model":
 
             def turn_on_inference(
                 prompt: Annotated[str, Field(min_length=1)],
@@ -140,7 +133,7 @@ class PerceptionTools:
             annotations=ToolAnnotations(
                 title=f"Start continuous inference for {model.name}",
                 readOnlyHint=False,
-                openWorldHint=isinstance(model, VisionLanguageModelInference),
+                openWorldHint=model.model_type == "vision_language_model",
             ),
         ))
         self.tools.register(ToolDefinition(
@@ -154,14 +147,14 @@ class PerceptionTools:
             ),
         ))
 
-        tool_registrars: dict[type, Callable[[str, Any], None]] = {
-            ObjectDepthModelInference: self.register_frame_model_tools,
-            ObjectDetectionModelInference: self.register_object_detection_tools,
-            ObjectSegmentationModelInference: self.register_frame_model_tools,
-            VisionLanguageModelInference: self.register_vision_language_model_tools,
+        tool_registrars: dict[str, Callable[[str, Any], None]] = {
+            "object_depth": self.register_frame_model_tools,
+            "object_detection": self.register_object_detection_tools,
+            "object_segmentation": self.register_frame_model_tools,
+            "vision_language_model": self.register_vision_language_model_tools,
         }
         try:
-            registrar = tool_registrars[type(model)]
+            registrar = tool_registrars[model.model_type]
         except KeyError as error:
             raise ValueError(
                 f"Unsupported inference model type: {type(model).__name__}"
@@ -171,7 +164,7 @@ class PerceptionTools:
     def register_object_detection_tools(
         self,
         model_id: str,
-        model: ObjectDetectionModelInference,
+        model: ModelDescriptor,
     ) -> None:
         def read_model_output() -> dict[str, object]:
             result = self.model_runtime.read_model_output(
@@ -214,9 +207,9 @@ class PerceptionTools:
     def register_frame_model_tools(
         self,
         model_id: str,
-        model: ObjectDepthModelInference | ObjectSegmentationModelInference,
+        model: ModelDescriptor,
     ) -> None:
-        output_name = FRAME_MODEL_OUTPUT_NAMES[type(model)]
+        output_name = FRAME_MODEL_OUTPUT_NAMES[model.model_type]
 
         def read_model_output() -> dict[str, object]:
             result = self.model_runtime.read_model_output(
@@ -259,7 +252,7 @@ class PerceptionTools:
     def register_vision_language_model_tools(
         self,
         model_id: str,
-        model: VisionLanguageModelInference,
+        model: ModelDescriptor,
     ) -> None:
         def read_scene_objects() -> VisionLanguageModelFrameEnvironment:
             return self.model_runtime.read_model_output(
@@ -349,7 +342,7 @@ class PerceptionTools:
 
     def register_model_catalog_tool(
         self,
-        registered_models: dict[str, tuple[str, Inference]],
+        registered_models: dict[str, tuple[str, ModelDescriptor]],
     ) -> None:
         def list_configured_models() -> list[ModelCatalogEntry]:
             with self.model_runtime.lock:
@@ -376,32 +369,32 @@ class PerceptionTools:
                         turn_off_tool=f"turn_off_{model.name}",
                         read_tool=(
                             f"read_scene_objects_{model.name}"
-                            if isinstance(model, VisionLanguageModelInference)
+                            if model.model_type == "vision_language_model"
                             else f"read_{model.name}"
                         ),
                         single_inference_tool=(
                             f"capture_scene_objects_{model.name}"
-                            if isinstance(model, VisionLanguageModelInference)
+                            if model.model_type == "vision_language_model"
                             else f"perform_single_{model.name}"
                         ),
                         scene_objects_read_tool=(
                             f"read_scene_objects_{model.name}"
-                            if isinstance(model, VisionLanguageModelInference)
+                            if model.model_type == "vision_language_model"
                             else None
                         ),
                         scene_objects_tool=(
                             f"capture_scene_objects_{model.name}"
-                            if isinstance(model, VisionLanguageModelInference)
+                            if model.model_type == "vision_language_model"
                             else None
                         ),
                         scene_analysis_read_tool=(
                             f"read_scene_analysis_{model.name}"
-                            if isinstance(model, VisionLanguageModelInference)
+                            if model.model_type == "vision_language_model"
                             else None
                         ),
                         scene_analysis_tool=(
                             f"analyse_scene_{model.name}"
-                            if isinstance(model, VisionLanguageModelInference)
+                            if model.model_type == "vision_language_model"
                             else None
                         ),
                     )

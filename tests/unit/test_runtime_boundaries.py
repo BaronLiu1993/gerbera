@@ -158,3 +158,25 @@ def test_applications_share_declarations_without_sharing_command_execution(hardw
                  for instance in (first, second)]
 
     assert [callback()["value"]["runtime"] for callback in callbacks] == ["first", "second"]
+
+
+def test_application_construction_defers_model_files_movement_files_and_reaction_restore(database, monkeypatch) -> None:
+    from gerbera_sdk.inference import ObjectDetectionModel
+    from gerbera_sdk.models.hardware.camera import Camera, DeviceCameraSource
+    from gerbera_sdk.models.hardware.movement_system import Link, MovementSystem
+    from gerbera_sdk.events.reactions.reaction_service import ReactionService
+
+    camera = Camera(name="camera", description="Camera", source=DeviceCameraSource(0))
+    model = ObjectDetectionModel(name="detector", model_directory="missing-model-directory", subscribed_camera=camera)
+    hardware = HardwareSystem(
+        name="robot", cameras=[camera], models=[model],
+        movement_systems=[MovementSystem(name="arm", base_link=Link(name="base"))],
+    )
+    preparation = Mock(side_effect=AssertionError("Preparation must wait for lifecycle startup"))
+    monkeypatch.setattr(ObjectDetectionModel, "create_inference", preparation)
+    monkeypatch.setattr(runtime_module.MovementRuntime, "write_urdf", preparation)
+    monkeypatch.setattr(ReactionService, "restore_reactions", preparation)
+
+    app = GerberaRuntime.build_application(hardware, database)
+
+    assert isinstance(app, FastMCP) and preparation.call_count == 0

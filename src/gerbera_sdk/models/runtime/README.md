@@ -82,6 +82,11 @@ reset sends commands. Every normal SDK server startup uses it, independently of
 the CLI. Cleanup callbacks are registered before starting dependencies so partial
 startup failures and interruptions release already-owned resources.
 
+Application construction registers tools from declaration metadata. Lifecycle
+preparation loads inference adapters, writes movement descriptions and restores
+reactions after all eligible actions have been registered. Tool registration does
+not perform preparation or persistence reads.
+
 Each resource owner provides `readiness_reasons()`. `RuntimeReadiness` aggregates
 these reports and lifecycle phase without inspecting resource internals.
 `/ready` returns 503 while unavailable

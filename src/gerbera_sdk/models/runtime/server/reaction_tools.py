@@ -18,8 +18,6 @@ class ReactionTools:
     reactions: ReactionService
 
     def register_reaction_tools(self) -> None:
-        self.reactions.restore_reactions()
-
         def create_reaction(
             reaction: CreateReactionSchema,
         ) -> ReactionSchema:
