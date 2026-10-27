@@ -24,8 +24,10 @@ commands:
     params:
       angle:
         required: true
-        min: 0
-        max: 3.141592653589793
+        domain:
+          kind: range
+          minimum: 0
+          maximum: 3.141592653589793
         description: Servo angle in radians.
     annotations:
       title: Set {connection.name} MG996R servo angle

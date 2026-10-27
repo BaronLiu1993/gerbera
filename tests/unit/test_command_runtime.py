@@ -52,6 +52,7 @@ def test_attach_command_id_adds_protocol_metadata() -> None:
         (_connection("led"), {"state": True}, "Invalid numeric value"),
         (_connection("led"), {"state": "1"}, "Invalid numeric value"),
         (_connection("led"), {"state": float("nan")}, "must be finite"),
+        (_connection("led"), {"state": 0.5}, "must be one of"),
     ],
 )
 def test_build_command_rejects_invalid_parameters(

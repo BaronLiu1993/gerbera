@@ -12,6 +12,7 @@ from gerbera_sdk.firmware.firmware_schema import (
     PinCapability,
     PinMode,
 )
+from gerbera_sdk.firmware.parameter_schema import ParameterDomain
 
 DEVICE_SCHEMA_CONFIG = ConfigDict(strict=True, extra="forbid", validate_default=True)
 
@@ -31,8 +32,7 @@ class LibraryConfig:
 class ParameterConfig:
     required: bool
     description: str
-    min: int | float | None
-    max: int | float | None
+    domain: ParameterDomain
 
 
 @dataclass(frozen=True, config=DEVICE_SCHEMA_CONFIG)

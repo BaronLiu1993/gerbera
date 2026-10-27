@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from gerbera_sdk.models.hardware.connection import Connection
 from enum import Enum
+from gerbera_sdk.firmware.parameter_schema import ParameterDomain
 
 GERBERA_PROTOCOL_VERSION = 1
 GERBERA_HANDSHAKE_TARGET = "__gerbera__"
@@ -21,10 +22,9 @@ class BoardTransportKind(str, Enum):
 
 @dataclass(frozen=True)
 class ParameterSpec:
-    required: bool = True
-    description: str = ""
-    min: int | float | None = None
-    max: int | float | None = None
+    required: bool
+    description: str
+    domain: ParameterDomain
 
 
 @dataclass(frozen=True)

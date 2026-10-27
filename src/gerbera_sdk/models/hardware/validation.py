@@ -346,8 +346,7 @@ class HardwareContractCompiler:
                     "method": command.method,
                     "params": {
                         name: {
-                            "max": parameter.max,
-                            "min": parameter.min,
+                            "domain": parameter.domain.model_dump(mode="json"),
                             "required": parameter.required,
                         }
                         for name, parameter in sorted(command.params.items())

@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Callable
 
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import AfterValidator, Field
+from gerbera_sdk.firmware.parameter_schema import NumericChoice
 
 from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry, ToolDefinition
 from inspect import Parameter, Signature
@@ -78,9 +79,11 @@ class HardwareTools:
             float,
             Field(
                 description=parameter.description or None,
-                ge=parameter.min,
-                le=parameter.max,
+                strict=True,
+                allow_inf_nan=False,
+                json_schema_extra=parameter.domain.json_constraints(),
             ),
+            AfterValidator(parameter.domain.validate_value),
         ]
 
     def register_connection_tool(
@@ -167,7 +170,10 @@ class HardwareTools:
             return False
 
         state = command.params.get("state")
-        return state is not None and state.min == 0 and state.max == 1
+        return (
+            state is not None and isinstance(state.domain, NumericChoice)
+            and set(state.domain.values) == {0.0, 1.0}
+        )
 
     @classmethod
     def connection_supports_state_toggle(

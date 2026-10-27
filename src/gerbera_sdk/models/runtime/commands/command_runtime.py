@@ -164,15 +164,10 @@ class CommandCompiler:
         param_spec: ParameterSpec,
         label: str,
     ) -> None:
-        if param_spec.min is not None and value < param_spec.min:
-            raise ValueError(
-                f"Value for {key} on {label} must be >= {param_spec.min}"
-            )
-
-        if param_spec.max is not None and value > param_spec.max:
-            raise ValueError(
-                f"Value for {key} on {label} must be <= {param_spec.max}"
-            )
+        try:
+            param_spec.domain.validate_value(value)
+        except ValueError as exc:
+            raise ValueError(f"Invalid {key} on {label}: {exc}") from exc
 
     @staticmethod
     def command_param_parts(

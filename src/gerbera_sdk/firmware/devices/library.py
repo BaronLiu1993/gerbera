@@ -136,8 +136,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
                 name: ParameterSpec(
                     required=parameter.required,
                     description=parameter.description,
-                    min=parameter.min,
-                    max=parameter.max,
+                    domain=parameter.domain,
                 )
                 for name, parameter in command.params.items()
             },

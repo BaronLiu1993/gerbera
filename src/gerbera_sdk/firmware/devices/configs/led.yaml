@@ -22,8 +22,9 @@ commands:
     params:
       state:
         required: true
-        min: 0
-        max: 1
+        domain:
+          kind: choice
+          values: [0, 1]
         description: 1 turns the LED on; 0 turns it off.
     annotations:
       title: Set {connection.name} LED state
