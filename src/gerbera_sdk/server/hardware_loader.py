@@ -1,12 +1,18 @@
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller, RegisteredDevice
+from gerbera_sdk.server.hardware_registry import index_devices
 
 
 @dataclass(frozen=True)
 class HardwareConfigurationResolver:
     devices: dict[str, RegisteredDevice]
+    devices_by_id: Mapping[str, RegisteredDevice] = field(init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "devices_by_id", index_devices(self.devices.values()))
 
     def resolve(self, hardware: HardwareSystem) -> HardwareSystem:
         for controller in hardware.microcontrollers:
@@ -24,7 +30,4 @@ class HardwareConfigurationResolver:
             raise ValueError(f"Controller declaration does not match registered device: {registered.id}")
 
     def find_device(self, controller: Microcontroller) -> RegisteredDevice | None:
-        for device in self.devices.values():
-            if device.id == controller.device_id:
-                return device
-        return None
+        return self.devices_by_id.get(controller.device_id)

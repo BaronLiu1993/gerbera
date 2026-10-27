@@ -56,7 +56,7 @@ class RuntimeTransportConfig:
 
 
 class RegisteredDevice(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", validate_default=True)
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True, validate_default=True)
 
     id: str = Field(min_length=1, pattern=r"\S")
     address: str = Field(min_length=1, pattern=r"\S")

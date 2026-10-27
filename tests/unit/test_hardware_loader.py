@@ -53,3 +53,11 @@ def test_loader_accepts_complete_declaration_without_registry(controller) -> Non
     HardwareConfigurationResolver({}).resolve_controller(controller)
 
     assert controller.id == "standalone-board"
+
+
+@pytest.mark.parametrize("identity, address", [("board-1", "/dev/other"), ("other", "/dev/board-1")])
+def test_registry_rejects_duplicate_identity_or_upload_address(registered_device, identity, address):
+    other = RegisteredDevice(id=identity, address=address, fqbn="arduino:avr:uno", protocol="serial")
+
+    with pytest.raises(ValueError, match="Duplicate registered"):
+        HardwareConfigurationResolver({"first": registered_device, "second": other})
