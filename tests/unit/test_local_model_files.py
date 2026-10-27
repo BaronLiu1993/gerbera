@@ -62,7 +62,7 @@ def test_manifest_must_be_a_mapping(models_path: Path) -> None:
     model_directory.mkdir()
     (model_directory / "model.yaml").write_text("- invalid\n- manifest\n")
 
-    with pytest.raises(ValueError, match="must contain a mapping"):
+    with pytest.raises(ValueError, match="must be an object"):
         LocalModelFiles("detector").read_manifest()
 
 

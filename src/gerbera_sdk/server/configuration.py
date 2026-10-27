@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from pydantic import ConfigDict, Field
-import yaml
+from gerbera_sdk.configuration_io import read_configuration
 
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.microcontroller import RegisteredDevice
@@ -26,7 +26,7 @@ class SdkSettings(StrictSchema):
 
     @classmethod
     def load(cls, path: Path) -> "SdkSettings":
-        payload = json.loads(path.read_text()) if path.suffix == ".json" else yaml.safe_load(path.read_text())
+        payload = read_configuration(path)
         if not isinstance(payload, dict):
             raise ValueError("SDK configuration must be an object")
         return cls.model_validate_json(json.dumps(payload))
@@ -46,7 +46,7 @@ class SdkSettings(StrictSchema):
 
     def load_secrets(self, config_path: Path) -> "SdkSecrets":
         root = (config_path.parent / self.project_root).resolve()
-        payload = json.loads((root / self.secrets_file).read_text())
+        payload = read_configuration(root / self.secrets_file)
         return SdkSecrets.model_validate(payload)
 
 

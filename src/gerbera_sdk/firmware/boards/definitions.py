@@ -1,6 +1,6 @@
 from importlib import resources
 
-import yaml
+from gerbera_sdk.configuration_io import decode_yaml
 
 from gerbera_sdk.firmware.boards.config_schema import AvrBoardConfig, BoardConfigurations
 
@@ -18,7 +18,7 @@ def load_board_strategies() -> tuple[BoardDefinitionStrategy, ...]:
     config_resource = resources.files("gerbera_sdk.firmware.boards").joinpath(
         "config.yaml"
     )
-    config = BoardConfigurations.from_data(yaml.safe_load(config_resource.read_text()))
+    config = BoardConfigurations.from_data(decode_yaml(config_resource.read_text()))
     return tuple(
         AvrBoardDefinitionStrategy.from_config(board)
         if isinstance(board, AvrBoardConfig)

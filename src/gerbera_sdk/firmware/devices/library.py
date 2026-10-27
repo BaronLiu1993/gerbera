@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from importlib import resources
 
-import yaml
+from gerbera_sdk.configuration_io import decode_yaml
 
 from gerbera_sdk.firmware.devices.base import BaseFirmwareBuilder
 from gerbera_sdk.firmware.devices.config_schema import (
@@ -222,7 +222,7 @@ def load_device_config(component_type: str) -> DeviceConfig:
         raise ValueError(f"Unsupported component type: {component_type}")
 
     with config_ref.open("r", encoding="utf-8") as config_file:
-        data = yaml.safe_load(config_file)
+        data = decode_yaml(config_file.read())
 
     config = DeviceConfig.from_data(data)
     if config.component_type != component_type:

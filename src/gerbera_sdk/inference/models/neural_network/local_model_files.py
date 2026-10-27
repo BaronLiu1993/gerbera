@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
+from gerbera_sdk.configuration_io import decode_yaml
 
 from gerbera_sdk.paths import MODELS_PATH
 
@@ -43,12 +43,7 @@ class LocalModelFiles:
         return path
 
     def read_manifest(self) -> dict[str, Any]:
-        manifest = yaml.safe_load(self.manifest_path.read_text())
-        if not isinstance(manifest, dict):
-            raise ValueError(
-                f"Model manifest must contain a mapping: {self.manifest_path}"
-            )
-        return manifest
+        return decode_yaml(self.manifest_path.read_text())
 
     def weights_path(self, filename: str) -> Path:
         relative_path = Path(filename)
