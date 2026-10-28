@@ -344,6 +344,7 @@ class HardwareContractCompiler:
                 {
                     "enabled_when": command.enabled_when,
                     "method": command.method,
+                    "response_fields": command.response_fields,
                     "params": {
                         name: {
                             "domain": parameter.domain.model_dump(mode="json"),
@@ -355,6 +356,11 @@ class HardwareContractCompiler:
                 for command in config.commands
             ],
             "component_type": connection.component_type,
+            "state_fields": {
+                name: {"unit": field.unit, "domain": field.domain.model_dump(mode="json")}
+                for name, field in config.state.fields.items()
+            },
+            "stream_payload_fields": config.stream.payload_fields,
             "firmware": {
                 "definitions": firmware.definitions,
                 "definitions_when_streaming": (
