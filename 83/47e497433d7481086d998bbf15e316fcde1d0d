@@ -1,0 +1,27 @@
+tests/integration/test_server_runtime.py
+  s_eb6570f5ffe476::t_6a7332da33aeef 197-199
+tests/unit/test_command_response.py
+  s_eb6570f5ffe476::t_bfd1db68eada81 3-6,14-15,18,24,31,40-41,54,64,69-84
+tests/unit/test_event_listener.py
+  s_eb6570f5ffe476::t_bfd1db68eada81 2,6,30,40-51
+  s_eb6570f5ffe476::t_e2d66f4fc3048e 52-54
+  s_eb6570f5ffe476::t_0ad9fdc7880a31 55
+tests/unit/test_runtime_boundaries.py
+  s_eb6570f5ffe476::t_66fa1a60993a64 161,165,178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8347e497433d7481086d998bbf15e316fcde1d0d",
+  "prompts": {},
+  "sessions": {
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
