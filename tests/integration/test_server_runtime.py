@@ -194,11 +194,9 @@ def test_listener_acknowledgement_completes_server_command() -> None:
     class AcknowledgingTransport:
         def write(self, command: str) -> None:
             message = SerialMessageCodec.decode(command)
-            listener.resolve_command_response(
-                {
-                    "command_id": message.fields["command_id"],
-                    "obstacle_detected": "1",
-                }
+            target = runtime.hardware_plan.boards[0].connections[0].event_name
+            listener.process_message(
+                "board-1", f"MCP,{target},command_id:{message.fields['command_id']},obstacle_detected:1",
             )
 
     runtime.commands.boards = SimpleNamespace(

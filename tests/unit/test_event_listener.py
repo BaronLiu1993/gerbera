@@ -1,7 +1,9 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
+from gerbera_sdk.models.runtime.commands.payload_contract import PayloadContract
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.runtime.commands.command_response import (
@@ -25,12 +27,28 @@ def make_listener(reconnect_board) -> EventListener:
 @pytest.mark.parametrize("board, target", [("board-2", "sensor_event"), ("board-1", "wrong_event")])
 def test_reply_cannot_complete_a_command_owned_by_another_route(board, target):
     listener = make_listener(None)
-    pending = listener.command_responses.register(CommandRoute("board-1", "sensor_event"))
+    pending = listener.command_responses.register(CommandRoute("board-1", "sensor_event"), PayloadContract({}))
     try:
         with pytest.raises(ValueError, match="route does not match"):
             listener.process_message(board, f"MCP,{target},command_id:{pending.command_id},value:1")
         assert not pending.completion.is_set()
         assert pending.command_id in listener.command_responses.pending_commands
+    finally:
+        listener.reaction_executor.shutdown(wait=True)
+
+
+def test_invalid_wire_payload_cannot_update_event_storage_or_state():
+    listener = make_listener(None)
+    connection = Connection("status", "led", {"out": "13"}, "LED", microcontroller_id="board-1")
+    handler = SimpleNamespace(component_type="led", perform_work=Mock())
+    listener.hardware_plan.connections_by_event_route = {("board-1", "led_event"): connection}
+    listener.event_bus.get_event = lambda *args: handler
+    listener.hardware_runtime.update_state = Mock()
+    try:
+        with pytest.raises(ValueError):
+            listener.process_message("board-1", "MCP,led_event,led_state:0.5")
+        handler.perform_work.assert_not_called()
+        listener.hardware_runtime.update_state.assert_not_called()
     finally:
         listener.reaction_executor.shutdown(wait=True)
 

@@ -158,11 +158,11 @@ def test_applications_share_declarations_without_sharing_command_execution(hardw
 
     def make_executor(*args):
         executor = CommandExecutor(*args)
-        label = "first" if not executors else "second"
+        label = "1" if not executors else "0"
 
         def write(command):
             message = SerialMessageCodec.decode(command)
-            executor.responses.resolve(CommandReply(message.fields["command_id"], CommandRoute("board-1", hardware.microcontrollers[0].connections[0].event_name), {"runtime": label}))
+            executor.responses.resolve(CommandReply(message.fields["command_id"], CommandRoute("board-1", hardware.microcontrollers[0].connections[0].event_name), {"obstacle_detected": label}))
 
         executor.boards = SimpleNamespace(get_transport=lambda board_id: SimpleNamespace(write=write))
         executors.append(executor)
@@ -175,7 +175,7 @@ def test_applications_share_declarations_without_sharing_command_execution(hardw
     callbacks = [next(tool.tool_function for app, tool in captured if app is instance and tool.name == "read_sensor")
                  for instance in (first, second)]
 
-    assert [callback()["value"]["runtime"] for callback in callbacks] == ["first", "second"]
+    assert [callback()["value"]["obstacle_detected"] for callback in callbacks] == ["1", "0"]
 
 
 def test_application_construction_defers_model_files_movement_files_and_reaction_restore(database, monkeypatch) -> None:
