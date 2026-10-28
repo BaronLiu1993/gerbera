@@ -1,0 +1,21 @@
+src/gerbera_sdk/firmware/boards/config.yaml
+  s_8f2d7120c0538f::t_43880d30af4147 2,6-68,70,74-286,288,292-401
+src/gerbera_sdk/firmware/boards/config_schema.py
+  s_8f2d7120c0538f::t_22e6b74bc2d2c8 1,5,9-15,23,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d88addb036ec63670952737a8d5d7f99f52e070c",
+  "prompts": {},
+  "sessions": {
+    "s_8f2d7120c0538f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1807d-d5a7-7ce2-b619-6c219cc6ac86",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
