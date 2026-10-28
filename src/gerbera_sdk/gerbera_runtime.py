@@ -60,7 +60,7 @@ class GerberaRuntime:
         listener = EventListener(
             hardware_plan=plan, transport_pool=boards.transport_pool,
             event_bus=events, reaction_bus=reaction_bus, hardware_runtime=state,
-            command_responses=responses, reconnect_board=boards.reconnect_board,
+            command_responses=responses,
         )
         movement = GerberaRuntime.build_movement(hardware, commands)
         readiness = RuntimeReadiness(
