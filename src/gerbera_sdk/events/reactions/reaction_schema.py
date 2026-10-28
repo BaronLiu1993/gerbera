@@ -91,26 +91,20 @@ class CreateReactionSchema(BaseModel):
     cooldown_seconds: FiniteFloat = Field(default=0, ge=0)
 
 
-class ReactionDefinitionSchema(CreateReactionSchema):
+class ReactionSchema(CreateReactionSchema):
+    model_config = ConfigDict(extra="forbid")
+
     schema_version: Literal[1] = 1
     reaction_id: UUID
     created_at: datetime
-
-
-class ReactionRuntimeSchema(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
     latest_value: ReactionValue | None = None
     trigger_count: int = Field(default=0, ge=0)
     last_triggered_at: datetime | None = None
     last_completed_at: datetime | None = None
     last_result: JsonValue | None = None
     last_error: str | None = None
-
-
-class ReactionSchema(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    definition: ReactionDefinitionSchema
-    runtime: ReactionRuntimeSchema
+    last_triggered_monotonic: float | None = Field(default=None, exclude=True)
+    is_executing: bool = Field(default=False, exclude=True)
 
 
 class DeleteReactionSchema(BaseModel):
@@ -120,4 +114,4 @@ class DeleteReactionSchema(BaseModel):
 
 class DeleteReactionResultSchema(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    deleted: ReactionDefinitionSchema
+    deleted: ReactionSchema
