@@ -5,8 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
 import threading
-import time
-from typing import Callable
 
 from serial import SerialException
 
@@ -26,15 +24,12 @@ from gerbera_sdk.models.runtime.state.hardware_runtime import (
 )
 from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
 
-RECONNECT_ATTEMPTS = 3
-RECONNECT_BACKOFF_SECONDS = 0.25
 COMMAND_ID_FIELD = "command_id"
 
 
 class ListenerStatus(StrEnum):
     STARTING = "starting"
     RUNNING = "running"
-    RECONNECTING = "reconnecting"
     FAILED = "failed"
     STOPPED = "stopped"
 
@@ -45,7 +40,6 @@ class BoardListenerHealth:
     last_error: str | None = None
     last_successful_message_at: str | None = None
     malformed_message_count: int = 0
-    reconnect_attempt_count: int = 0
 
     def snapshot(self) -> dict[str, object]:
         return {
@@ -53,7 +47,6 @@ class BoardListenerHealth:
             "last_error": self.last_error,
             "last_successful_message_at": self.last_successful_message_at,
             "malformed_message_count": self.malformed_message_count,
-            "reconnect_attempt_count": self.reconnect_attempt_count,
         }
 
 
@@ -66,7 +59,6 @@ class EventListener:
     reaction_bus: ReactionBus
     hardware_runtime: HardwareRuntime
     command_responses: CommandResponseRegistry
-    reconnect_board: Callable[[str], None] | None = None
 
     reaction_executor: ThreadPoolExecutor = field(
         default_factory=lambda: ThreadPoolExecutor(
@@ -157,15 +149,8 @@ class EventListener:
                     microcontroller_id,
                     f"Board transport disconnected: {exc}",
                 )
-                try:
-                    self.reconnect(microcontroller_id)
-                except RuntimeError as reconnect_error:
-                    self.record_terminal_failure(
-                        microcontroller_id,
-                        reconnect_error,
-                    )
-                    return
-                continue
+                self.record_terminal_failure(microcontroller_id, exc)
+                return
 
             if not line:
                 continue
@@ -223,27 +208,6 @@ class EventListener:
         if "error" in payload:
             payload.clear()
         return True
-
-    def reconnect(self, microcontroller_id: str) -> None:
-        self.set_status(microcontroller_id, ListenerStatus.RECONNECTING)
-        if self.reconnect_board is None:
-            raise RuntimeError(
-                f"Board transport disconnected: {microcontroller_id}"
-            )
-        for attempt in range(RECONNECT_ATTEMPTS):
-            self.record_reconnect_attempt(microcontroller_id)
-            if self.stop_event.is_set():
-                return
-            try:
-                self.reconnect_board(microcontroller_id)
-                self.set_status(microcontroller_id, ListenerStatus.RUNNING)
-                return
-            except Exception as exc:
-                if attempt == RECONNECT_ATTEMPTS - 1:
-                    raise RuntimeError(
-                        f"Could not reconnect board: {microcontroller_id}"
-                    ) from exc
-                time.sleep(RECONNECT_BACKOFF_SECONDS * (attempt + 1))
 
     def dispatch_to_event_bus(
         self,
@@ -330,14 +294,6 @@ class EventListener:
             )
             board_health.last_error = str(error)
             board_health.malformed_message_count += 1
-
-    def record_reconnect_attempt(self, microcontroller_id: str) -> None:
-        with self.health_lock:
-            board_health = self.health.setdefault(
-                microcontroller_id,
-                BoardListenerHealth(),
-            )
-            board_health.reconnect_attempt_count += 1
 
     def record_terminal_failure(
         self,
