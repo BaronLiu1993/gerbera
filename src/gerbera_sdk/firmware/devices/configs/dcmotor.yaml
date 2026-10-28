@@ -20,11 +20,16 @@ pins:
     assignment: exclusive
 
 state:
-  units:
-    motor_state: null
+  fields:
+    motor_state:
+      unit: null
+      domain:
+        kind: choice
+        values: [-1, 0, 1]
 
 commands:
   - method: WRITE
+    response_fields: [motor_state]
     enabled_when: always
     description: Set brushed DC motor direction and speed. Use direction 1 for forward, -1 for reverse, and 0 for stop.
     params:
@@ -116,4 +121,5 @@ firmware:
       }
 
 stream:
+  payload_fields: []
   schema: {}

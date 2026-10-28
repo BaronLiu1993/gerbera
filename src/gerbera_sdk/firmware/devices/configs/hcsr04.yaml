@@ -16,12 +16,22 @@ pins:
     assignment: exclusive
 
 state:
-  units:
-    distance: cm
-    stream_enabled: null
+  fields:
+    distance:
+      unit: cm
+      domain:
+        kind: range
+        minimum: 0
+        maximum: null
+    stream_enabled:
+      unit: null
+      domain:
+        kind: choice
+        values: [0, 1]
 
 commands:
   - method: READ
+    response_fields: [distance]
     enabled_when: always
     description: Read distance from the HC-SR04 ultrasonic sensor.
     params: {}
@@ -30,6 +40,7 @@ commands:
       read_only_hint: true
       open_world_hint: false
   - method: WRITE
+    response_fields: [stream_enabled]
     enabled_when: stream_enabled
     description: Set continuous HC-SR04 streaming. Use state 1 for on and 0 for off.
     params:
@@ -146,6 +157,7 @@ firmware:
       }
 
 stream:
+  payload_fields: [distance]
   schema:
     id:
       type: INTEGER
