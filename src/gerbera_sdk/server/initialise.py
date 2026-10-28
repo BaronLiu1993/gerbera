@@ -39,7 +39,7 @@ def initialise_sdk(path: Path) -> None:
         addresses = questionary.checkbox("Select boards:", choices=addresses).ask()
     if not addresses:
         raise RuntimeError("SDK initialization cancelled")
-    supported = [definition.fqbn for definition in BOARD_REGISTRY.definitions]
+    supported = list(BOARD_REGISTRY.definitions)
     devices = {}
     for address in addresses:
         device = detected[address]
