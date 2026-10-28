@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import logging
 from uuid import UUID
 
 from gerbera_sdk.events.event_bus import EventBus
@@ -8,9 +7,6 @@ from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistr
 from gerbera_sdk.events.reactions.reaction_schema import CreateReactionSchema, ReactionEventSchema, ReactionSchema
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-
-LOGGER = logging.getLogger(__name__)
-
 
 @dataclass
 class ReactionService:
@@ -56,12 +52,8 @@ class ReactionService:
                     definition,
                     persist=False,
                 )
-            except ValueError as exc:
-                LOGGER.warning(
-                    "Ignoring unusable stored reaction %s: %s",
-                    definition.reaction_id,
-                    exc,
-                )
+            except ValueError:
+                continue
 
 
     def event_catalog(
@@ -98,5 +90,5 @@ class ReactionService:
     def list_reactions(self) -> list[ReactionSchema]:
         return self.reaction_bus.list_reactions()
 
-    def delete_reaction(self, reaction_id: UUID) -> bool:
+    def delete_reaction(self, reaction_id: UUID) -> ReactionSchema:
         return self.reaction_bus.delete_reaction(reaction_id)
