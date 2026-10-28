@@ -1,0 +1,19 @@
+src/gerbera_sdk/events/reactions/reaction_store.py
+  s_8f2d7120c0538f::t_207b57514682ae 11-12,21,27-30,40,44,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "721f4e83d3652442ca98255a00398999bc87d692",
+  "prompts": {},
+  "sessions": {
+    "s_8f2d7120c0538f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1807d-d5a7-7ce2-b619-6c219cc6ac86",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
