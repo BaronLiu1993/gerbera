@@ -1,0 +1,30 @@
+src/gerbera_sdk/events/event_listener.py
+  s_eb6570f5ffe476::t_fae2e9ec874843 19,255-268,285-288
+  s_8f2d7120c0538f::t_94abe921449910 18,269
+src/gerbera_sdk/events/event.py
+  s_eb6570f5ffe476::t_fae2e9ec874843 27-28,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "17485ed0cd662ce70ba29eff9a5332bda766526e",
+  "prompts": {},
+  "sessions": {
+    "s_8f2d7120c0538f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1807d-d5a7-7ce2-b619-6c219cc6ac86",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    },
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
