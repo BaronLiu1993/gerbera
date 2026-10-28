@@ -1,12 +1,18 @@
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import Field, model_validator
 
-from gerbera_sdk.firmware.firmware_schema import BoardTransportKind
+from gerbera_sdk.firmware.firmware_schema import BoardTransportKind, PinCapability
 from gerbera_sdk.utils import StrictSchema
 
 NonemptyString = Annotated[str, Field(min_length=1, pattern=r"\S")]
-PinNumber = Annotated[int, Field(ge=0)]
+
+
+class PinConfig(StrictSchema):
+    canonical_name: NonemptyString
+    aliases: tuple[NonemptyString, ...] = Field(min_length=1)
+    capabilities: tuple[PinCapability, ...] = Field(min_length=1)
+    reserved_by: str | None = None
 
 
 class BoardConfig(StrictSchema):
@@ -14,6 +20,7 @@ class BoardConfig(StrictSchema):
     includes: tuple[NonemptyString, ...]
     libraries: tuple[NonemptyString, ...]
     supported_transports: tuple[BoardTransportKind, ...] = Field(min_length=1)
+    pins: tuple[PinConfig, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_transports(self):
@@ -22,44 +29,8 @@ class BoardConfig(StrictSchema):
         return self
 
 
-class AvrBoardConfig(BoardConfig):
-    strategy: Literal["avr"]
-    digital_pin_count: int = Field(gt=0)
-    analog_pin_count: int = Field(ge=0)
-    pwm_pins: tuple[PinNumber, ...]
-    interrupt_pins: tuple[PinNumber, ...]
-
-    @model_validator(mode="after")
-    def validate_pin_numbers(self):
-        for pins in (self.pwm_pins, self.interrupt_pins):
-            if len(set(pins)) != len(pins) or any(pin >= self.digital_pin_count for pin in pins):
-                raise ValueError("AVR pin lists must contain unique declared digital pins")
-        return self
-
-
-class Esp32BoardConfig(BoardConfig):
-    strategy: Literal["esp32_dev_module"]
-    output_pins: tuple[PinNumber, ...]
-    input_only_pins: tuple[PinNumber, ...]
-    analog_input_pins: tuple[PinNumber, ...]
-    reserved_pins: dict[int, NonemptyString]
-    flash_pins: tuple[PinNumber, ...]
-
-    @model_validator(mode="after")
-    def validate_pin_numbers(self):
-        groups = (self.output_pins, self.input_only_pins, self.analog_input_pins, self.flash_pins)
-        if any(len(set(pins)) != len(pins) for pins in groups):
-            raise ValueError("Duplicate ESP32 pin")
-        if set(self.output_pins) & set(self.input_only_pins):
-            raise ValueError("ESP32 output and input-only pins must be distinct")
-        return self
-
-
-BoardStrategyConfig = Annotated[AvrBoardConfig | Esp32BoardConfig, Field(discriminator="strategy")]
-
-
 class BoardConfigurations(StrictSchema):
-    boards: tuple[BoardStrategyConfig, ...] = Field(min_length=1)
+    boards: tuple[BoardConfig, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_identities(self):
