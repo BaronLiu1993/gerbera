@@ -321,16 +321,6 @@ class BoardRuntime:
             )
         return connection
 
-    def reconnect_board(self, microcontroller_id: str) -> None:
-        self.close_board(microcontroller_id)
-        try:
-            board = self.hardware_plan.boards_by_id[microcontroller_id]
-        except KeyError as exc:
-            raise RuntimeError(
-                f"Unknown microcontroller: {microcontroller_id}"
-            ) from exc
-        self.start_board(board)
-
     def close_board(self, microcontroller_id: str) -> None:
         with self.lock:
             session = self.sessions.pop(microcontroller_id, None)
