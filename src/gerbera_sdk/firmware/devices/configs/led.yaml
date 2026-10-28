@@ -12,11 +12,16 @@ pins:
     assignment: exclusive
 
 state:
-  units:
-    led_state: null
+  fields:
+    led_state:
+      unit: null
+      domain:
+        kind: choice
+        values: [0, 1]
 
 commands:
   - method: WRITE
+    response_fields: [led_state]
     enabled_when: always
     description: Set the LED state.
     params:
@@ -75,4 +80,5 @@ firmware:
       }
 
 stream:
+  payload_fields: []
   schema: {}

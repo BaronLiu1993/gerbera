@@ -12,12 +12,21 @@ pins:
     assignment: exclusive
 
 state:
-  units:
-    line_detected: null
-    stream_enabled: null
+  fields:
+    line_detected:
+      unit: null
+      domain:
+        kind: choice
+        values: [0, 1]
+    stream_enabled:
+      unit: null
+      domain:
+        kind: choice
+        values: [0, 1]
 
 commands:
   - method: READ
+    response_fields: [line_detected]
     enabled_when: always
     description: Read the current KY-033 line tracking sensor value.
     params: {}
@@ -26,6 +35,7 @@ commands:
       read_only_hint: true
       open_world_hint: false
   - method: WRITE
+    response_fields: [stream_enabled]
     enabled_when: stream_enabled
     description: Set continuous KY-033 streaming. Use state 1 for on and 0 for off.
     params:
@@ -101,6 +111,7 @@ firmware:
       }
 
 stream:
+  payload_fields: [line_detected]
   schema:
     id:
       type: INTEGER

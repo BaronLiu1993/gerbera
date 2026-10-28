@@ -14,11 +14,17 @@ pins:
     assignment: exclusive
 
 state:
-  units:
-    angle: radians
+  fields:
+    angle:
+      unit: radians
+      domain:
+        kind: range
+        minimum: 0
+        maximum: 180
 
 commands:
   - method: WRITE
+    response_fields: [angle]
     enabled_when: always
     description: Set servo angle.
     params:
@@ -71,4 +77,5 @@ firmware:
       }
 
 stream:
+  payload_fields: []
   schema: {}
