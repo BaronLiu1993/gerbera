@@ -24,13 +24,15 @@ class Event:
     )
 
     def perform_work(self, payload: dict[str, str]) -> None:
+        if self.streamable and len(payload) != 1:
+            raise ValueError("Stream payload must contain exactly one field")
         normalized_payload = dict(payload)
 
         with self.lock:
             self.latest_val = normalized_payload
 
         if self.streamable:
-            stream_value = next(iter(normalized_payload.values()), "")
+            stream_value = next(iter(normalized_payload.values()))
             stream_payload = {"value": stream_value}
             stream_payload["created_at"] = datetime.now(timezone.utc)
             self.buffer.write(stream_payload)

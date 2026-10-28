@@ -15,6 +15,8 @@ from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.boards.board_transport import BoardTransport
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
+from gerbera_sdk.models.runtime.commands.payload_contract import validate_payload
+from gerbera_sdk.firmware.configurations import get_device_builder
 from gerbera_sdk.models.runtime.commands.command_response import (
     CommandResponseRegistry, CommandRoute, CommandReply,
 )
@@ -250,6 +252,21 @@ class EventListener:
         event_name: str,
         payload: Mapping[str, str],
     ) -> None:
+        connection = self.hardware_plan.connections_by_event_route[(microcontroller_id, event_name)]
+        builder = get_device_builder(connection.component_type)
+        config = builder.config
+        if event_type == "STREAM":
+            if not connection.stream_enabled:
+                raise ValueError("Streaming is not enabled for this connection")
+            field_names = config.stream.payload_fields
+        elif event_type == "MCP":
+            allowed_fields = {frozenset(command.response_fields) for command in builder.required_commands(connection)}
+            if frozenset(payload) not in allowed_fields:
+                raise ValueError("Undeclared command event payload fields")
+            field_names = tuple(payload)
+        else:
+            raise ValueError(f"Unsupported hardware event type: {event_type}")
+        validate_payload(payload, {name: config.state.fields[name] for name in field_names})
         handler = self.event_bus.get_event(
             event_type,
             microcontroller_id,
@@ -265,19 +282,10 @@ class EventListener:
         }
         handler.perform_work(runtime_payload)
 
-        payload_field, value = next(iter(runtime_payload.items()))
-        state_key = CommandCompiler.state_key(
-            self.hardware_plan.connections_by_event_route[
-                (microcontroller_id, event_name)
-            ],
-            payload_field,
-        )
-        unit = CommandCompiler.state_unit(handler.component_type, payload_field)
-
-        self.hardware_runtime.update_state(
-            state_key,
-            ConnectionState(value=value, unit=unit),
-        )
+        for payload_field, value in runtime_payload.items():
+            state_key = CommandCompiler.state_key(connection, payload_field)
+            unit = CommandCompiler.state_unit(handler.component_type, payload_field)
+            self.hardware_runtime.update_state(state_key, ConnectionState(value=value, unit=unit))
 
     def get_health(self) -> dict[str, dict[str, object]]:
         with self.health_lock:
