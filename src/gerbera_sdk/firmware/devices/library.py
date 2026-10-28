@@ -48,7 +48,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
 
 
     def state_definitions(self) -> dict[str, dict[str, str | None]]:
-        return {"units": self.config.state.units}
+        return {"units": {name: field.unit for name, field in self.config.state.fields.items()}}
 
     def stream_schema(self, connection: Connection) -> dict[str, ColumnSpec]:
         _ = connection
@@ -131,6 +131,7 @@ class ConfigFirmwareBuilder(BaseFirmwareBuilder):
     def command_spec(self, command: CommandConfig) -> CommandSpec:
         return CommandSpec(
             method=command.method,
+            response_fields=command.response_fields,
             description=command.description,
             params={
                 name: ParameterSpec(

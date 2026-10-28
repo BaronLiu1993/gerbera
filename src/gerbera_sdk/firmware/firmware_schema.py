@@ -30,6 +30,7 @@ class ParameterSpec:
 @dataclass(frozen=True)
 class CommandSpec:
     method: str
+    response_fields: tuple[str, ...]
     params: dict[str, ParameterSpec] = field(default_factory=dict)
     description: str = ""
 

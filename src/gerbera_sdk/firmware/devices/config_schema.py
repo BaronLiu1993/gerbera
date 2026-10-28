@@ -3,7 +3,7 @@ import json
 from types import MappingProxyType
 from typing import Annotated, Any
 
-from pydantic import ConfigDict, Field, TypeAdapter
+from pydantic import ConfigDict, Field, TypeAdapter, model_validator
 from pydantic.dataclasses import dataclass
 
 from gerbera_sdk.firmware.firmware_schema import (
@@ -49,11 +49,21 @@ class CommandConfig:
     params: dict[str, ParameterConfig]
     annotations: AnnotationConfig
     enabled_when: str
+    response_fields: Annotated[tuple[str, ...], Field(min_length=1)]
+
+
+@dataclass(frozen=True, config=DEVICE_SCHEMA_CONFIG)
+class StateFieldConfig:
+    unit: str | None
+    domain: ParameterDomain
 
 
 @dataclass(frozen=True, config=DEVICE_SCHEMA_CONFIG)
 class StateConfig:
-    units: dict[str, str | None]
+    fields: Mapping[str, StateFieldConfig]
+
+    def __post_init__(self):
+        object.__setattr__(self, "fields", MappingProxyType(dict(self.fields)))
 
 
 @dataclass(frozen=True, config=DEVICE_SCHEMA_CONFIG)
@@ -76,6 +86,7 @@ class ColumnConfig:
 @dataclass(frozen=True, config=DEVICE_SCHEMA_CONFIG)
 class StreamConfig:
     schema: dict[str, ColumnConfig]
+    payload_fields: tuple[str, ...]
 
 
 @dataclass(frozen=True, config=DEVICE_SCHEMA_CONFIG)
@@ -111,6 +122,22 @@ class DeviceConfig:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "pins", MappingProxyType(dict(self.pins)))
+
+    @model_validator(mode="after")
+    def validate_payload_contracts(self):
+        for command in self.commands:
+            if len(set(command.response_fields)) != len(command.response_fields):
+                raise ValueError("Duplicate command response field")
+            if not set(command.response_fields) <= self.state.fields.keys():
+                raise ValueError("Command response references an undeclared state field")
+        if self.capabilities.streaming:
+            if len(self.stream.payload_fields) != 1:
+                raise ValueError("Stream storage requires exactly one declared payload field")
+        elif self.stream.payload_fields:
+            raise ValueError("Non-streaming devices cannot declare stream payload fields")
+        if not set(self.stream.payload_fields) <= self.state.fields.keys():
+            raise ValueError("Stream references an undeclared state field")
+        return self
 
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> "DeviceConfig":
