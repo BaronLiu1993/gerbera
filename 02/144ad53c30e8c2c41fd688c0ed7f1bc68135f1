@@ -1,0 +1,34 @@
+src/gerbera_sdk/models/runtime/commands/command_executor.py
+  s_eb6570f5ffe476::t_6d53776e6d2df0 8,28,31-32,39-40
+  s_8f2d7120c0538f::t_94abe921449910 33-34
+src/gerbera_sdk/models/runtime/commands/command_response.py
+  s_eb6570f5ffe476::t_6d53776e6d2df0 67-70
+  s_8f2d7120c0538f::t_94abe921449910 9-10,30,45,51,71
+src/gerbera_sdk/models/runtime/commands/payload_contract.py
+  s_eb6570f5ffe476::t_0a60e270e36bb3 1-5
+  s_8f2d7120c0538f::t_94abe921449910 6-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "02144ad53c30e8c2c41fd688c0ed7f1bc68135f1",
+  "prompts": {},
+  "sessions": {
+    "s_8f2d7120c0538f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1807d-d5a7-7ce2-b619-6c219cc6ac86",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    },
+    "s_eb6570f5ffe476": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17927-1dd8-74f0-ad16-74f83ae31582",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
