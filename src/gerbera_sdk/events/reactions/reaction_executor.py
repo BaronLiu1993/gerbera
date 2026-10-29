@@ -9,15 +9,8 @@ from gerbera_sdk.events.reactions.reaction_schema import ReactionActionSchema
 
 
 @dataclass(frozen=True)
-class ActionPolicy:
-    modifies_state: bool = False
-    allows_reactions: bool = True
-
-
-@dataclass(frozen=True)
 class RegisteredAction:
     function: Callable[..., Any]
-    policy: ActionPolicy
 
     def validate_arguments(self, arguments: dict[str, JsonValue]) -> None:
         signature = inspect.signature(self.function)
@@ -55,9 +48,8 @@ class ReactionActionRegistry:
         self,
         name: str,
         function: Callable[..., Any],
-        policy: ActionPolicy,
     ) -> None:
-        self.actions[name] = RegisteredAction(function, policy)
+        self.actions[name] = RegisteredAction(function)
 
     def validate_action(self, action: ReactionActionSchema) -> None:
         registered = self.require_action(action.tool_name)
@@ -72,11 +64,4 @@ class ReactionActionRegistry:
             registered = self.actions[name]
         except KeyError as exc:
             raise ValueError(f"Unknown reaction action: {name}") from exc
-        if not registered.policy.allows_reactions:
-            raise ValueError(f"Action cannot be used by a reaction: {name}")
-        if not registered.policy.modifies_state:
-            raise ValueError(
-                "Reaction action must explicitly modify state: "
-                f"{name}"
-            )
         return registered
