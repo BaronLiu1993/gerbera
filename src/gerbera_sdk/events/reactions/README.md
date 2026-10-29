@@ -55,10 +55,26 @@ support booleans and strings.
 
 Read-only tools and the reaction management tools cannot be used as actions.
 
-The reaction executor consumes a framework-independent `ActionPolicy`. The MCP
-adapter translates tool annotations into that policy when registering actions;
-reaction validation and execution do not import MCP types.
-Action names and arguments are validated when the reaction is created.
+The MCP tool registry only registers eligible state-changing tools as reaction
+actions. Action names and arguments are validated when the reaction is created.
+The executor invokes the registered function directly and awaits async results.
+
+## Event flow
+
+The listener passes each incoming event key and payload to `ReactionBus`.
+The bus stores one `ReactionSchema` per reaction, checks the configured payload
+field against its condition, and invokes the action when it matches.
+Creation validation and restoration are handled by the bus.
+
+One worker processes reaction events from a queue of at most 128 pending events.
+Serial listeners enqueue without waiting for actions to finish. When the queue
+is full, the oldest pending event is dropped in favor of the newest; brief
+threshold crossings can therefore be lost during overload. The listener tracks
+these drops in `dropped_reaction_event_count`. Shutdown discards pending events
+and waits for the current reaction work to finish.
+
+`list_reactions` returns reaction configuration and runtime observations as
+fields on the same object.
 
 ## Persistence
 
