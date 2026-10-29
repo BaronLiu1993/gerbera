@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from mcp.types import ToolAnnotations
 
 from gerbera_sdk.models.runtime.server.tool_registry import McpToolRegistry, ToolDefinition
-from gerbera_sdk.events.reactions.reaction_service import ReactionService
+from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
+from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.events.reactions.reaction_schema import (
     CreateReactionSchema,
     DeleteReactionResultSchema,
@@ -15,7 +17,9 @@ from gerbera_sdk.events.reactions.reaction_schema import (
 @dataclass
 class ReactionTools:
     tools: McpToolRegistry
-    reactions: ReactionService
+    reactions: ReactionBus
+    event_bus: EventBus
+    hardware_plan: HardwarePlan
 
     def register_reaction_tools(self) -> None:
         def create_reaction(
@@ -69,11 +73,38 @@ class ReactionTools:
             ),
         ))
 
+    def event_catalog(
+        self,
+    ) -> dict[str, dict[str, dict[str, dict[str, object]]]]:
+        catalog: dict[str, dict[str, dict[str, dict[str, object]]]] = {}
+
+        for event_key, event in self.event_bus.events.items():
+            event_type, microcontroller_id, event_name = event_key
+            connection = self.hardware_plan.connections_by_event_route[
+                (microcontroller_id, event_name)
+            ]
+            metadata: dict[str, object] = {
+                "event_type": event_type,
+                "microcontroller_id": microcontroller_id,
+                "event_name": event_name,
+                "connection_name": connection.name,
+                "component_type": connection.component_type,
+                "description": connection.description,
+                "streamable": event.streamable,
+            }
+            catalog.setdefault(event_type, {}).setdefault(
+                microcontroller_id,
+                {},
+            )[event_name] = metadata
+
+        return catalog
+
+
     def register_reaction_catalog_tool(self) -> None:
         def list_reaction_events() -> (
             dict[str, dict[str, dict[str, dict[str, object]]]]
         ):
-            return self.reactions.event_catalog()
+            return self.event_catalog()
 
         self.tools.register(ToolDefinition(
             name="list_reaction_events",

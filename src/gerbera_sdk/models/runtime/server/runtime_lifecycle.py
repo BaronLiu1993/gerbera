@@ -5,7 +5,7 @@ from typing import AsyncGenerator
 from fastmcp import FastMCP
 
 from gerbera_sdk.events.event_bus import EventBus
-from gerbera_sdk.events.reactions.reaction_service import ReactionService
+from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.event_listener import EventListener
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
@@ -30,7 +30,7 @@ class RuntimeLifecycle:
     movement_runtime: MovementRuntime | None = None
     storage: RuntimeStorage | None = None
     readiness: RuntimeReadiness | None = None
-    reactions: ReactionService | None = None
+    reactions: ReactionBus | None = None
 
     @asynccontextmanager
     async def __call__(

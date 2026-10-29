@@ -8,7 +8,6 @@ from gerbera_sdk.events.event_registration import EventRegistration
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
-from gerbera_sdk.events.reactions.reaction_service import ReactionService
 from gerbera_sdk.firmware.firmware_compiler import FirmwareCompiler
 from gerbera_sdk.firmware.firmware_dependencies import FirmwareDependencies
 from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
@@ -55,11 +54,10 @@ class GerberaRuntime:
         responses = CommandResponseRegistry()
         commands = CommandExecutor(plan, boards, responses)
         actions = ReactionActionRegistry()
-        reaction_bus = ReactionBus(action_executor=actions)
-        reactions = ReactionService(plan, events, reaction_bus, actions)
+        reactions = ReactionBus(plan, events, actions)
         listener = EventListener(
             hardware_plan=plan, transport_pool=boards.transport_pool,
-            event_bus=events, reaction_bus=reaction_bus, hardware_runtime=state,
+            event_bus=events, reaction_bus=reactions, hardware_runtime=state,
             command_responses=responses,
         )
         movement = GerberaRuntime.build_movement(hardware, commands)
@@ -80,7 +78,7 @@ class GerberaRuntime:
             hardware=HardwareTools(tools, plan, state, ConnectionControl(events, worker, state, commands), commands),
             perception=PerceptionTools(tools, hardware, cameras, models),
             movement=MovementTools(tools, movement),
-            reactions=ReactionTools(tools, reactions),
+            reactions=ReactionTools(tools, reactions, events, plan),
         )
         HealthRoutes(app, readiness).register()
         server.register_tools()
