@@ -1,9 +1,10 @@
 from collections.abc import Mapping
 import asyncio
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
+from queue import Queue
 import threading
 
 from serial import SerialException
@@ -25,6 +26,7 @@ from gerbera_sdk.models.runtime.state.hardware_runtime import (
 from gerbera_sdk.models.runtime.boards.serial_protocol import SerialMessageCodec
 
 COMMAND_ID_FIELD = "command_id"
+REACTION_QUEUE_CAPACITY = 128
 
 
 class ListenerStatus(StrEnum):
@@ -66,6 +68,14 @@ class EventListener:
             thread_name_prefix="gerbera-reaction-callback",
         )
     )
+    reaction_queue: Queue[tuple[tuple[str, str, str], dict[str, str]]] = field(
+        default_factory=lambda: Queue(maxsize=REACTION_QUEUE_CAPACITY),
+        init=False,
+        repr=False,
+    )
+    reaction_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    reaction_worker_running: bool = field(default=False, init=False)
+    dropped_reaction_event_count: int = field(default=0, init=False)
     threads: dict[str, threading.Thread] = field(
         default_factory=dict
     )
@@ -106,6 +116,10 @@ class EventListener:
         with self.lifecycle_lock:
             self.stop_event.set()
             threads = list(self.threads.items())
+
+        with self.reaction_lock:
+            while not self.reaction_queue.empty():
+                self.reaction_queue.get_nowait()
 
         self.command_responses.fail_all(
             "Event listeners are stopping"
@@ -314,17 +328,29 @@ class EventListener:
         microcontroller_id: str,
         event_name: str,
         payload: Mapping[str, str],
-    ) -> Future[object | None]:
-        future = self.reaction_executor.submit(
-            asyncio.run,
-            self.reaction_bus.update_reaction_value(
-                event_type,
-                microcontroller_id,
-                event_name,
-                payload,
-            ),
-        )
-        return future
+    ) -> None:
+        with self.reaction_lock:
+            if self.stop_event.is_set():
+                return
+            if self.reaction_queue.full():
+                self.reaction_queue.get_nowait()
+                self.dropped_reaction_event_count += 1
+            self.reaction_queue.put_nowait(((event_type, microcontroller_id, event_name), dict(payload)))
+            if not self.reaction_worker_running:
+                self.reaction_executor.submit(self.process_reaction_queue)
+                self.reaction_worker_running = True
+
+    def process_reaction_queue(self) -> None:
+        while True:
+            with self.reaction_lock:
+                if self.stop_event.is_set() or self.reaction_queue.empty():
+                    self.reaction_worker_running = False
+                    return
+                event_key, payload = self.reaction_queue.get_nowait()
+            try:
+                asyncio.run(self.reaction_bus.update_reaction_value(event_key, payload))
+            except Exception as exc:
+                self.record_rejected_message(event_key[1], exc)
 
     def readiness_reasons(self) -> tuple[str, ...]:
         health = self.get_health()
