@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 
 from pydantic import JsonValue
 
+from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
+from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 from gerbera_sdk.events.reactions.reaction_condition import (
     parse_value_like,
     reaction_matches,
@@ -15,6 +18,7 @@ from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistr
 from gerbera_sdk.events.reactions.reaction_schema import (
     CreateReactionSchema,
     ReactionSchema,
+    ReactionEventSchema,
     ReactionTriggerMode,
 )
 from gerbera_sdk.events.reactions.reaction_store import ReactionStore
@@ -22,7 +26,9 @@ from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 
 @dataclass
 class ReactionBus:
-    action_executor: ReactionActionRegistry | None = None
+    hardware_plan: HardwarePlan
+    event_bus: EventBus
+    action_executor: ReactionActionRegistry
     store: ReactionStore = field(default_factory=ReactionStore)
     reactions: dict[UUID, ReactionSchema] = field(default_factory=dict)
     lock: threading.RLock = field(
@@ -31,13 +37,52 @@ class ReactionBus:
         repr=False,
     )
 
-    def configure_executor(self, executor: ReactionActionRegistry) -> None:
-        self.action_executor = executor
+    def validate_reaction_event(self, event: ReactionEventSchema) -> None:
+        try:
+            self.event_bus.get_event(*event.event_key)
+        except RuntimeError as exc:
+            raise ValueError(
+                f"Unknown reaction event: {event.event_key}"
+            ) from exc
+
+        route = (event.microcontroller_id, event.event_name)
+        connection = self.hardware_plan.connections_by_event_route[route]
+        payload_fields = {
+            state_key[2]
+            for state_key in CommandCompiler.state_keys(connection)
+        }
+        if event.payload_field not in payload_fields:
+            raise ValueError(
+                "Unknown reaction payload field: "
+                f"{event.payload_field} for {event.event_name}"
+            )
+
+
+    def validate_reaction_definition(
+        self,
+        definition: CreateReactionSchema,
+    ) -> None:
+        self.validate_reaction_event(definition.event)
+        self.action_executor.validate_action(definition.action)
+
+
+    def restore_reactions(self) -> None:
+        for definition in self.store.load():
+            try:
+                self.validate_reaction_definition(definition)
+                self.register_definition(
+                    definition,
+                    persist=False,
+                )
+            except ValueError:
+                continue
+
 
     def create_reaction(
         self,
         request: CreateReactionSchema,
     ) -> ReactionSchema:
+        self.validate_reaction_definition(request)
         definition = ReactionSchema(
             **request.model_dump(),
             reaction_id=uuid4(),
@@ -99,12 +144,9 @@ class ReactionBus:
 
     async def update_reaction_value(
         self,
-        event_type: str,
-        microcontroller_id: str,
-        event_name: str,
+        event_key: tuple[str, str, str],
         payload: Mapping[str, object],
     ) -> list[JsonValue]:
-        event_key = (event_type, microcontroller_id, event_name)
         with self.lock:
             reaction_ids = [
                 reaction_id
@@ -173,8 +215,6 @@ class ReactionBus:
         reaction: ReactionSchema,
     ) -> JsonValue | None:
         try:
-            if self.action_executor is None:
-                raise RuntimeError("Reaction action executor is not configured")
             result = await self.action_executor.execute(
                 reaction.action
             )
