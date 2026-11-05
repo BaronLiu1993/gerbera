@@ -71,18 +71,6 @@ class LocalProjectServices:
         for env_file in service.env_files:
             command.extend(("--env-file", str(Path(env_file).resolve())))
         environment = dict(service.environment)
-        if name == "harness":
-            environment["MCP_URL"] = container_sdk_url(self.config.services["sdk"].url) + "/mcp"
-            database = self.config.services.get("database")
-            if database is not None and database.enabled:
-                database_address = urlsplit(database.url)
-                environment["GERBERA_DATABASE_HOST"] = (
-                    "gerbera-database" if database.managed else
-                    urlsplit(container_sdk_url(database.url)).hostname
-                )
-                environment["GERBERA_DATABASE_PORT"] = str(
-                    database.container_port if database.managed else database_address.port or 5432
-                )
         for key, value in environment.items():
             command.extend(("-e", f"{key}={value}"))
         if service.config:
@@ -178,19 +166,6 @@ class LocalProjectServices:
     def wait_for_server(self) -> None:
         self.wait_for_service("sdk")
 
-    def start_harness(self) -> bool:
-        created = self.start_container("harness")
-        service = self.config.services.get("harness")
-        if service is None or not service.enabled:
-            return False
-        try:
-            self.wait_for_service("harness")
-        except BaseException:
-            if created:
-                self.stop_container("harness")
-            raise
-        return created
-
     def wait_for_service(self, name: str) -> None:
         service = self.config.services[name]
         deadline = time.monotonic() + self.config.startup_timeout_seconds
@@ -235,7 +210,6 @@ class LocalProjectServices:
                 self.stop_container(stage.value)
 
     def stop(self) -> None:
-        self.stop_container("harness")
         self.stop_server()
         self.stop_container("database")
 
@@ -257,7 +231,7 @@ class LocalProjectServices:
             print(log_path.read_text(), end="")
         processes = []
         try:
-            for name in ("database", "harness"):
+            for name in ("database",):
                 service = self.config.services.get(name)
                 if service is not None and service.managed and self.container_status(name) is not None:
                     command = ["docker", "logs", "--tail", "100"]
@@ -295,9 +269,3 @@ def readiness_report(url: str) -> dict:
     except httpx.HTTPError:
         return {"ready": False, "phase": "unreachable"}
 
-
-def container_sdk_url(url: str) -> str:
-    address = urlsplit(url)
-    if address.hostname in {"127.0.0.1", "localhost", "0.0.0.0", "::"}:
-        return urlunsplit((address.scheme, f"host.docker.internal:{address.port or 80}", address.path, "", ""))
-    return url.rstrip("/")

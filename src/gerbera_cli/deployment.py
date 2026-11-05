@@ -6,19 +6,12 @@ from typing import Protocol
 class StartupStage(str, Enum):
     DATABASE = "database"
     SERVER = "sdk"
-    HARNESS = "harness"
-
-
-@dataclass(frozen=True)
-class StartupOptions:
-    start_harness: bool = True
 
 
 class ProjectServices(Protocol):
     def start_database(self) -> bool: ...
     def start_server(self) -> bool: ...
     def wait_for_server(self) -> None: ...
-    def start_harness(self) -> bool: ...
     def rollback(self, stages: tuple[StartupStage, ...]) -> None: ...
     def stop(self) -> None: ...
     def status(self) -> dict[str, object]: ...
@@ -30,7 +23,7 @@ class ProjectServices(Protocol):
 class ProjectRuntime:
     services: ProjectServices
 
-    def start(self, options: StartupOptions = StartupOptions()) -> None:
+    def start(self) -> None:
         started = []
         try:
             if self.services.start_database():
@@ -38,8 +31,6 @@ class ProjectRuntime:
             if self.services.start_server():
                 started.append(StartupStage.SERVER)
             self.services.wait_for_server()
-            if options.start_harness and self.services.start_harness():
-                started.append(StartupStage.HARNESS)
         except BaseException as error:
             try:
                 self.services.rollback(tuple(reversed(started)))
