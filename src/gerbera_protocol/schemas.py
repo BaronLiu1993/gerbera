@@ -14,7 +14,7 @@ class RuntimeManifest(BaseModel):
 class ReadinessReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     protocol_version: Literal["1"] = PROTOCOL_VERSION
-    service: Literal["sdk", "harness"]
+    service: Literal["sdk"]
     phase: Literal["starting", "ready", "degraded", "failed", "stopping"]
     reasons: tuple[str, ...] = ()
     instance_id: str | None = None

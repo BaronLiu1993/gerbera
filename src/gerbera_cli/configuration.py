@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 import yaml
 
 PROJECT_CONFIG_PATH = Path("gerbera.yaml")
-ServiceName = Literal["sdk", "database", "harness"]
+ServiceName = Literal["sdk", "database"]
 NonemptyString = Annotated[str, Field(min_length=1, pattern=r"\S")]
 
 
