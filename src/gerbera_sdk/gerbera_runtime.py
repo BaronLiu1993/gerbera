@@ -21,12 +21,10 @@ from gerbera_sdk.models.runtime.commands.connection_control import ConnectionCon
 from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
 from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.movement.movement_runtime import MovementRuntime
 from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from gerbera_sdk.models.runtime.server.hardware_tools import HardwareTools
 from gerbera_sdk.models.runtime.server.health_routes import HealthRoutes
-from gerbera_sdk.models.runtime.server.movement_tools import MovementTools
 from gerbera_sdk.models.runtime.server.perception_tools import PerceptionTools
 from gerbera_sdk.models.runtime.server.readiness import RuntimeReadiness
 from gerbera_sdk.models.runtime.server.reaction_tools import ReactionTools
@@ -60,14 +58,13 @@ class GerberaRuntime:
             event_bus=events, reaction_bus=reactions, hardware_runtime=state,
             command_responses=responses,
         )
-        movement = GerberaRuntime.build_movement(hardware, commands)
         readiness = RuntimeReadiness(
             sources=(boards, cameras, models, listener, worker), instance_id=hardware.id,
         )
         lifecycle = RuntimeLifecycle(
             board_runtime=boards, camera_runtime=cameras, model_runtime=models,
             event_worker=worker, event_listener=listener, event_bus=events,
-            hardware_runtime=state, movement_runtime=movement,
+            hardware_runtime=state,
             storage=RuntimeStorage(plan, writer, database.schema_owner()),
             readiness=readiness, reactions=reactions,
         )
@@ -77,7 +74,6 @@ class GerberaRuntime:
             resources=RuntimeResources(tools, app, hardware, plan, listener, state, models),
             hardware=HardwareTools(tools, plan, state, ConnectionControl(events, worker, state, commands), commands),
             perception=PerceptionTools(tools, hardware, cameras, models),
-            movement=MovementTools(tools, movement),
             reactions=ReactionTools(tools, reactions, events, plan),
         )
         HealthRoutes(app, readiness).register()
@@ -123,14 +119,6 @@ class GerberaRuntime:
                 for key in CommandCompiler.state_keys(connection):
                     state.register_state_store(key)
         return state
-
-    @staticmethod
-    def build_movement(hardware: HardwareSystem, commands: CommandExecutor) -> MovementRuntime | None:
-        if not hardware.movement_systems:
-            return None
-        movement = MovementRuntime(hardware, commands)
-        movement.register_movement_system()
-        return movement
 
     @staticmethod
     def generate_firmware(hardware: HardwareSystem) -> dict[str, Path]:

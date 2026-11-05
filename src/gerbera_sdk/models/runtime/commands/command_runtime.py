@@ -13,7 +13,6 @@ from gerbera_sdk.models.runtime.boards.serial_protocol import (
 
 
 class CommandCompiler:
-    # for movement types only
     SERVO_COMPONENT_TYPES = {"sg90", "mg996r"}
 
     command_specs = staticmethod(command_specs)
