@@ -20,30 +20,18 @@ WITH
     NOCREATEDB
     NOCREATEROLE;
 
-CREATE USER gerbera_reader
-WITH
-    PASSWORD '${GERBERA_READER_PASSWORD}'
-    NOSUPERUSER
-    NOCREATEDB
-    NOCREATEROLE;
-
 GRANT CONNECT ON DATABASE gerbera
 TO gerbera_schema_owner,
-   gerbera_writer,
-   gerbera_reader;
+   gerbera_writer;
 
 GRANT CREATE, USAGE ON SCHEMA public
 TO gerbera_schema_owner;
 
 GRANT USAGE ON SCHEMA public
-TO gerbera_writer,
-   gerbera_reader;
+TO gerbera_writer;
 
 GRANT INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public
 TO gerbera_writer;
-
-GRANT SELECT ON ALL TABLES IN SCHEMA public
-TO gerbera_reader;
 
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public
 TO gerbera_writer;
@@ -53,12 +41,6 @@ FOR ROLE gerbera_schema_owner
 IN SCHEMA public
 GRANT INSERT, UPDATE, DELETE, TRUNCATE ON TABLES
 TO gerbera_writer;
-
-ALTER DEFAULT PRIVILEGES
-FOR ROLE gerbera_schema_owner
-IN SCHEMA public
-GRANT SELECT ON TABLES
-TO gerbera_reader;
 
 ALTER DEFAULT PRIVILEGES
 FOR ROLE gerbera_schema_owner
