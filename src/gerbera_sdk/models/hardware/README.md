@@ -148,7 +148,7 @@ Streaming support is device-specific.
 
 - Not every connection should stream data.
 - Connections express intent with `stream=True`.
-- Harness provisions stream tables from compiled stream contracts.
+- SDK provisions stream tables from compiled stream contracts.
 - `Database` only writes stream data to already-provisioned tables.
 
 This area is still in flux and should be simplified later.

@@ -46,9 +46,8 @@ inference all share the same validated contract.
   estimation, vision-language models, and movement run alongside the hardware
   server.
 - **Local automation.** Persistent reactions connect hardware events to Gerbera
-  tools without requiring a particular agent harness.
-- **Replaceable clients.** The included harness is optional; the SDK remains a
-  standalone MCP server.
+  tools through the SDK.
+- **Replaceable clients.** The SDK is a standalone MCP server for any compatible client.
 
 ## How it works
 
@@ -65,7 +64,6 @@ flowchart LR
     Runtime <--> Transport[USB serial or Bluetooth SPP]
     Transport <--> Board
     Runtime <--> Client[Any MCP client]
-    Runtime <--> Harness[Optional Gerbera harness]
 ```
 
 `HardwareContractCompiler` resolves board definitions, device definitions,
@@ -83,15 +81,11 @@ firmware are explicit SDK operations; startup never changes installed firmware.
 | Component | Owns | Does not own |
 | --- | --- | --- |
 | CLI | Deployment metadata, service launch/stop, readiness polling and logs | Hardware/model validation, firmware, schemas, agent execution |
-| SDK | Hardware declarations, validation, firmware generation/compilation/upload/verification, connections, stream schemas and hardware readiness | Harness configuration or agent workflows |
-| Harness | Models, workflows, tools, connector readiness and run lifecycle | SDK imports, board connections or firmware uploads |
+| SDK | Hardware declarations, validation, firmware generation/compilation/upload/verification, connections, stream schemas and hardware readiness | Agent workflows |
 | Firmware | Physical I/O, component checks and watchdog safe-stop | Host-side workflow decisions |
 | `gerbera_protocol` | Versioned JSON wire contracts | Service orchestration or runtime objects |
 
-The harness talks to the SDK over MCP, including when they run on different
-machines. The CLI is not in the command path after service startup. Legacy agent
-orchestration lives under `gerbera_harness/runtime/`; memory only stores state and
-runtime projections rebuild derived views.
+MCP clients connect directly to the SDK. The CLI is not in the command path after service startup.
 
 ## Requirements
 
@@ -107,7 +101,7 @@ Required by the standard local deployment:
 - Docker
 - Docker access to GitHub Container Registry
 
-Docker runs PostgreSQL and the optional agent harness. The standalone SDK can
+Docker runs PostgreSQL. The standalone SDK can
 instead be embedded with `GerberaRuntime`, provided a compatible PostgreSQL
 database is supplied.
 
@@ -146,7 +140,7 @@ a deployment-only `gerbera.yaml`, scoped service credentials, and a local
 `.gerbera/` workspace. The SDK creates `index.py` and
 `.gerbera/sdk/runtime.json`, retaining each selected board's identity and explicit
 watchdog settings. If more than one board is connected, the SDK asks which boards
-to include. Harness setup, when selected, is handled by the harness itself.
+to include.
 
 ### 2. Declare the hardware
 
@@ -166,12 +160,6 @@ status_led = Connection(
 controller_1.connections.append(status_led)
 ```
 
-To include the optional agent harness during initialization, run:
-
-```bash
-gerbera init --with-harness
-```
-
 ### 3. Start Gerbera
 
 ```bash
@@ -181,14 +169,11 @@ gerbera up
 The CLI starts PostgreSQL and the SDK, then waits for the SDK's `/ready` report.
 Inside SDK startup, hardware is validated, storage becomes available, stream
 tables are prepared, firmware is verified, and board/camera/model/event
-runtimes start. Only then does the CLI start the optional harness and wait for its
-readiness. A failed launch rolls back only services started by that invocation;
+runtimes start. A failed launch rolls back only services started by that invocation;
 database volumes are retained.
 
 `/health` means the service is alive; `/ready` means its configured dependencies
-are usable. The SDK also publishes readiness as `gerbera://readiness`. The harness
-checks this report over MCP instead of inferring hardware readiness from an open
-port. Neither liveness nor readiness asserts that external model credentials have
+are usable. The SDK also publishes readiness as `gerbera://readiness`. Neither liveness nor readiness asserts that external model credentials have
 been accepted by a model provider.
 
 Use the lifecycle commands to inspect and stop the stack:
@@ -203,7 +188,6 @@ gerbera down
 Advanced commands remain available when only one layer is needed:
 
 ```bash
-gerbera up --no-harness
 gerbera server
 ```
 
@@ -220,23 +204,14 @@ python -m gerbera_sdk.server serve --config .gerbera/sdk/runtime.json
 ```
 
 Its `check` subcommand validates SDK configuration and hardware without starting
-connections or uploading firmware. The optional harness has its own entry point:
-
-```bash
-GERBERA_HARNESS_CONFIG=.gerbera/harness/harness.json \\
-MCP_URL=http://localhost:8001/mcp \\
-uvicorn gerbera_harness.bootstrap:create_server_app --factory --port 8000
-```
-
-For API models, provide the configured API-key environment variable to the harness
-process. Docker deployments receive only their scoped environment files. SDK
+connections or uploading firmware. Docker deployments receive only their scoped environment files. SDK
 credentials contain writer/schema-owner passwords, not database-admin or model
 credentials. CLI status, logs and shutdown do not load service secrets.
 
 In `gerbera.yaml`, set a service's `kind: external` and its reachable `url` to use
-an independently managed service. The CLI waits for external SDK/harness readiness
+an independently managed service. The CLI waits for external SDK readiness
 but never starts or stops those services. Deployment URLs supply managed-service
-endpoints; `MCP_URL` overrides the harness connector setting.
+endpoints.
 
 Deployment kinds are explicit: `process` is a local SDK process and requires a
 configuration path; `container` requires an image, container port and published
@@ -247,8 +222,7 @@ mounts require `config_environment`; persistent volumes require `volume_target`.
 Legacy `managed` settings must be replaced with the corresponding `kind`.
 
 Older combined project manifests must be split before using the new CLI: retain
-hardware settings in the SDK config, put model/workflow settings in the harness
-config, and leave only `services` and launch settings in `gerbera.yaml`. The SDK
+hardware settings in the SDK config and leave only `services` and launch settings in `gerbera.yaml`. The SDK
 accepts only its current flat configuration schema: `project_root`, `entry_point`,
 `hardware_variable`, service settings, `secrets_file`, and `devices`. Combined
 manifests and retired aliases are rejected. SDK secret files contain only the two
@@ -256,8 +230,7 @@ SDK database role passwords. Existing database volumes are never replaced automa
 
 When working from an unreleased checkout, use container images built from the
 same revision; published `latest` images may not include the current readiness
-contract. The harness image can be rebuilt with
-`docker build -f .docker/harness/Dockerfile -t ghcr.io/baronliu1993/gerbera:latest .`.
+contract.
 
 ## Supported hardware
 
@@ -340,11 +313,6 @@ firmware updates.
 
 ## CLI
 
-The optional harness uses JSON-defined workflows with replaceable node strategies,
-fixed entry and exit boundaries, and a REST run API. It connects to the SDK over
-MCP and can run on a different machine. See the
-[harness guide](src/gerbera_harness/README.md) for configuration and extension examples.
-
 | Command | Purpose |
 | --- | --- |
 | `gerbera init` | Create the project configuration and `.gerbera/` workspace |
@@ -368,7 +336,6 @@ the installed firmware and fails if it does not match the hardware configuration
 - [Firmware generation](src/gerbera_sdk/firmware/README.md)
 - [Events and persistence](src/gerbera_sdk/events/README.md)
 - [Reactions](src/gerbera_sdk/events/reactions/README.md)
-- [Optional agent harness](src/gerbera_harness/README.md)
 - [Test organization](tests/README.md)
 
 ## Development
@@ -387,7 +354,7 @@ The same test command runs in GitHub Actions on every push and pull request.
 Issues and pull requests are welcome while the public contribution guide is
 being prepared. Before submitting a change:
 
-1. Keep SDK hardware behavior independent from the optional harness.
+1. Keep SDK hardware behavior independent from agent clients.
 2. Add or update tests for behavior that changes.
 3. Run `python -m pytest` locally.
 4. Explain user-visible contract or firmware changes in the pull request.

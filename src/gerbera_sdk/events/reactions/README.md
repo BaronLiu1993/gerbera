@@ -1,8 +1,7 @@
 # Reactions
 
 Reactions let any MCP client configure hardware-event automation through the
-standalone Gerbera MCP server. They do not depend on `gerbera_harness` and do
-not make an HTTP request back to the server.
+standalone Gerbera MCP server. They invoke tools directly within the server.
 
 The server exposes three reaction management tools:
 

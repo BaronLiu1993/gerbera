@@ -39,10 +39,10 @@ The SDK does not own:
 - dashboards or UI presentation
 - cloud/database provisioning outside the declared connection info
 - application-specific business logic on top of device events
-- harness model/workflow configuration or agent lifecycle
+- agent workflow configuration or lifecycle
 
 Wire contracts shared with remote clients live in the neutral `gerbera_protocol`
-package. The SDK does not import the CLI or harness. The CLI launches it as a
+package. The SDK does not import the CLI. The CLI launches it as a
 separate process and waits for service-owned readiness.
 
 ## High-Level Flow
@@ -107,7 +107,7 @@ python -m gerbera_sdk.server check --config .gerbera/sdk/runtime.json
 
 `check` does not connect to hardware, upload firmware or require the CLI. SDK
 configuration and writer/schema-owner credentials remain on the hardware host.
-The harness can run remotely with only the SDK MCP endpoint and its own secrets.
+MCP clients can connect remotely through the SDK MCP endpoint.
 
 ## Runtime Shape
 
