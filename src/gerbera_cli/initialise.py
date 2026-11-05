@@ -18,18 +18,11 @@ def write_secret_file(path: Path, content: str) -> None:
 def initialise_database_credentials() -> None:
     existing = Path(".gerbera/secrets/database.env")
     if existing.exists():
-        credentials = dict(line.split("=", 1) for line in existing.read_text().splitlines() if line)
-    else:
-        credentials = {name: secrets.token_urlsafe(32) for name in (
-            "POSTGRES_PASSWORD", "GERBERA_READER_PASSWORD",
-        )}
-        write_secret_file(existing, "\n".join(f"{name}={value}" for name, value in credentials.items()) + "\n")
-    reader_secret = Path(".gerbera/secrets/harness-database.env")
-    if not reader_secret.exists():
-        write_secret_file(reader_secret, f"GERBERA_READER_PASSWORD={credentials['GERBERA_READER_PASSWORD']}\n")
+        return
+    write_secret_file(existing, f"POSTGRES_PASSWORD={secrets.token_urlsafe(32)}\n")
 
 
-def initialise_project_files(with_harness: bool, provider: str | None) -> None:
+def initialise_project_files() -> None:
     manifest = Path("gerbera.yaml")
     if manifest.exists():
         raise FileExistsError("Deployment manifest already exists; service configuration is not overwritten")
@@ -39,11 +32,6 @@ def initialise_project_files(with_harness: bool, provider: str | None) -> None:
         sys.executable, "-m", "gerbera_sdk.server", "credentials",
         "--config", ".gerbera/sdk/runtime.json", "--database-env", ".gerbera/secrets/sdk-database.env",
     ], check=True)
-    harness_command = [sys.executable, "-m", "gerbera_harness.initialise"]
-    if provider is not None:
-        harness_command.extend(("--provider", provider))
-    if with_harness:
-        subprocess.run(harness_command, check=True)
     manifest.write_text(yaml.safe_dump({
         "startup_timeout_seconds": 600,
         "services": {
@@ -61,17 +49,6 @@ def initialise_project_files(with_harness: bool, provider: str | None) -> None:
                 "url": "http://127.0.0.1:8001",
                 "bind_host": "0.0.0.0",
                 "config": ".gerbera/sdk/runtime.json",
-            },
-            "harness": {
-                "kind": "container",
-                "enabled": with_harness, "url": "http://127.0.0.1:8000",
-                "image": "ghcr.io/baronliu1993/gerbera:latest",
-                "config": ".gerbera/harness/harness.json", "container_port": 8000,
-                "config_environment": "GERBERA_HARNESS_CONFIG",
-                "env_files": [".gerbera/secrets/harness.env", ".gerbera/secrets/harness-database.env"],
-                "environment": {
-                    "GERBERA_DATABASE_NAME": "gerbera", "GERBERA_READER_USER": "gerbera_reader",
-                },
             },
         },
     }, sort_keys=False))

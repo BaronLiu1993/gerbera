@@ -3,7 +3,7 @@ import json
 import typer
 
 from gerbera_cli.configuration import ProjectConfig
-from gerbera_cli.deployment import ProjectRuntime, StartupOptions
+from gerbera_cli.deployment import ProjectRuntime
 from gerbera_cli.setup import LocalProjectServices
 from gerbera_cli.initialise import initialise_project_files
 
@@ -11,19 +11,16 @@ app = typer.Typer(no_args_is_help=True)
 
 
 @app.command(name="init")
-def initialise_project(
-    with_harness: bool = typer.Option(False, "--with-harness"),
-    provider: str | None = typer.Option(None, "--provider"),
-) -> None:
+def initialise_project() -> None:
     """Delegate service scaffolding and create a deployment manifest."""
-    initialise_project_files(with_harness, provider)
+    initialise_project_files()
     typer.echo("Project created. Run: gerbera up")
 
 
 @app.command(name="up")
-def up(no_harness: bool = typer.Option(False, "--no-harness")) -> None:
+def up() -> None:
     runtime = build_project_runtime()
-    runtime.start(StartupOptions(start_harness=not no_harness))
+    runtime.start()
     print_status(runtime.status())
 
 
