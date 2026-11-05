@@ -33,8 +33,6 @@ commands/
 perception/
     camera_runtime.py           Camera capture, latest-frame cache and lifecycle.
     model_runtime.py            Inference registration, output state and lifecycle.
-movement/
-    movement_runtime.py         Joint state, kinematics and motor coordination.
 state/
     hardware_runtime.py         Connection state storage and snapshots.
 storage/
@@ -43,7 +41,6 @@ server/
     server_runtime.py           Composes MCP capability adapters.
     hardware_tools.py           Hardware tool registration.
     perception_tools.py         Camera and inference tool registration.
-    movement_tools.py           Movement tool registration.
     reaction_tools.py           Reaction tool registration.
     runtime_resources.py        MCP resources and state tools.
     tool_registry.py            MCP registration and reaction action exposure.
@@ -70,20 +67,19 @@ Hardware declarations remain under `models/hardware`.
 
 `CommandExecutor` owns command dispatch and waiting for correlated responses.
 Hardware declarations and resolved plans contain no executable callbacks. Each
-application injects its own executor into its adapters, controls and movement runtime.
+application injects its own executor into its adapters and controls.
 
 `EventRegistration` creates hardware event routes and buffers. `ReactionService`
 owns reaction validation, restoration and the event catalog. `ReactionBus` owns
 trigger evaluation and execution state.
 
 `RuntimeLifecycle` owns storage preparation, firmware verification and resource
-startup/shutdown order. Event workers and response listeners start before movement
-reset sends commands. Every normal SDK server startup uses it, independently of
+startup/shutdown order. Every normal SDK server startup uses it, independently of
 the CLI. Cleanup callbacks are registered before starting dependencies so partial
 startup failures and interruptions release already-owned resources.
 
 Application construction registers tools from declaration metadata. Lifecycle
-preparation loads inference adapters, writes movement descriptions and restores
+preparation loads inference adapters and restores
 reactions after all eligible actions have been registered. Tool registration does
 not perform preparation or persistence reads.
 

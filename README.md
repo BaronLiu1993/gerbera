@@ -35,7 +35,7 @@ inference all share the same validated contract.
 ## Why Gerbera
 
 - **One source of truth.** A typed `HardwareSystem` describes boards, wiring,
-  cameras, models, and movement systems.
+  cameras and models.
 - **Generated firmware.** Gerbera validates pin capabilities and creates an
   Arduino sketch for each configured microcontroller.
 - **Generated MCP tools.** Declared device commands become tools that any MCP
@@ -43,7 +43,7 @@ inference all share the same validated contract.
 - **Confirmed commands.** State-changing calls wait for acknowledgements from
   the board instead of reporting success after a transport write.
 - **Host-side intelligence.** Cameras, object detection, segmentation, depth
-  estimation, vision-language models, and movement run alongside the hardware
+  estimation and vision-language models run alongside the hardware
   server.
 - **Local automation.** Persistent reactions connect hardware events to Gerbera
   tools through the SDK.

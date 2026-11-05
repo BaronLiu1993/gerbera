@@ -117,7 +117,7 @@ Current runtime responsibilities are split like this:
   Owns live serial connections for declared microcontrollers.
 
 - `ServerRuntime`
-  Coordinates the hardware, perception, movement, reaction and resource MCP adapters.
+  Coordinates the hardware, perception, reaction and resource MCP adapters.
 
 - `CommandExecutor`
   Owns command dispatch and executable connection actions independently of MCP.
