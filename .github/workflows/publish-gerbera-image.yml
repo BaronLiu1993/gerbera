@@ -22,12 +22,8 @@ jobs:
     strategy:
       matrix:
         image:
-          - name: gerbera
-            dockerfile: .docker/harness/Dockerfile
           - name: gerbera-postgres
             dockerfile: .docker/postgres/Dockerfile
-          - name: gerbera-sandbox
-            dockerfile: .docker/sandbox/Dockerfile
 
     steps:
       - name: Check out repository
