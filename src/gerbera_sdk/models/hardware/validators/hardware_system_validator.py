@@ -31,7 +31,6 @@ class HardwareSystemValidator:
         errors.extend(cls.validate_microcontrollers(hardware_system))
         errors.extend(cls.validate_cameras(hardware_system))
         errors.extend(cls.validate_models(hardware_system))
-        errors.extend(cls.validate_movement_system_names(hardware_system))
         return errors
 
     @staticmethod
@@ -223,22 +222,3 @@ class HardwareSystemValidator:
 
         return errors
 
-    @staticmethod
-    def validate_movement_system_names(
-        hardware_system: HardwareSystem,
-    ) -> list[str]:
-        errors: list[str] = []
-        movement_system_names: set[str] = set()
-
-        for movement_system in hardware_system.movement_systems:
-            name = movement_system.name.strip()
-            normalized_name = name.casefold()
-            path = f"movement_systems[{name or '<empty>'}]"
-            if not name:
-                errors.append(f"{path}.name: cannot be empty")
-            elif normalized_name in movement_system_names:
-                errors.append(f"{path}.name: duplicate movement system name")
-            else:
-                movement_system_names.add(normalized_name)
-
-        return errors

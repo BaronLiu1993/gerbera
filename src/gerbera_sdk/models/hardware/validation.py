@@ -28,7 +28,6 @@ from gerbera_sdk.utils import build_connection_event_name
 from gerbera_sdk.models.hardware.validators import (
     DefinitionValidator,
     HardwareSystemValidator,
-    MovementSystemValidator,
     PinAssignmentValidator,
 )
 
@@ -94,18 +93,6 @@ class HardwareValidationFacade:
         )
         if errors:
             return ValidationResult.from_errors(errors)
-
-        registered_connections = (
-            HardwareSystemValidator.registered_connections(hardware_system)
-        )
-
-        for movement_system in hardware_system.movement_systems:
-            errors = MovementSystemValidator.validate(
-                movement_system,
-                registered_connections,
-            )
-            if errors:
-                return ValidationResult.from_errors(errors)
 
         return ValidationResult(errors=())
 

@@ -9,13 +9,11 @@ from gerbera_sdk.inference import Model
 from gerbera_sdk.models.hardware.camera import Camera
 from gerbera_sdk.firmware.boards import BOARD_REGISTRY
 from gerbera_sdk.models.hardware.microcontroller import Microcontroller
-from gerbera_sdk.models.hardware.movement_system import MovementSystem
 
 @dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True, arbitrary_types_allowed=True))
 class HardwareSystem:
     name: Annotated[str, Field(min_length=1, pattern=r"\S")]
     description: str = ""
-    movement_systems: list[MovementSystem] = field(default_factory=list)
     microcontrollers: list[Microcontroller] = field(default_factory=list)
     cameras: list[Camera] = field(default_factory=list)
     models: list[Model] = field(default_factory=list)
