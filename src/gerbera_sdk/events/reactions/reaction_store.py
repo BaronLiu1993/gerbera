@@ -5,8 +5,6 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
-from gerbera_sdk.configuration_io import decode_json
-
 from gerbera_sdk.events.reactions.reaction_schema import (
     CreateReactionSchema,
     ReactionSchema,
@@ -45,9 +43,7 @@ class ReactionStore:
         for path in sorted(self.root.glob("*.json")):
             try:
                 definitions.append(
-                    ReactionSchema.model_validate_json(
-                        json.dumps(decode_json(path.read_text()))
-                    )
+                    ReactionSchema.model_validate_json(path.read_text())
                 )
             except (OSError, ValidationError, json.JSONDecodeError):
                 continue

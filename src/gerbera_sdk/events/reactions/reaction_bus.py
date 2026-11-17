@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from pydantic import JsonValue
 
 from gerbera_sdk.events.event_bus import EventBus
+from gerbera_sdk.events.event_schema import EventKey
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 from gerbera_sdk.events.reactions.reaction_condition import (
@@ -39,7 +40,9 @@ class ReactionBus:
 
     def validate_reaction_event(self, event: ReactionEventSchema) -> None:
         try:
-            self.event_bus.get_event(*event.event_key)
+            self.event_bus.get_event(
+                event.event_type, event.microcontroller_id, event.event_name
+            )
         except RuntimeError as exc:
             raise ValueError(
                 f"Unknown reaction event: {event.event_key}"
@@ -144,7 +147,7 @@ class ReactionBus:
 
     async def update_reaction_value(
         self,
-        event_key: tuple[str, str, str],
+        event_key: EventKey,
         payload: Mapping[str, object],
     ) -> list[JsonValue]:
         with self.lock:

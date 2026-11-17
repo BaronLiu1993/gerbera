@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID
 
+from gerbera_sdk.events.event_schema import EventKey
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -41,8 +43,8 @@ class ReactionEventSchema(BaseModel):
     payload_field: str = Field(min_length=1)
 
     @property
-    def event_key(self) -> tuple[str, str, str]:
-        return (
+    def event_key(self) -> EventKey:
+        return EventKey(
             self.event_type,
             self.microcontroller_id,
             self.event_name,
