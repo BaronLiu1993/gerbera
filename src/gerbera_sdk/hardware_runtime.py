@@ -1,8 +1,7 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from gerbera_sdk.models.hardware.hardware_plan import StateKey
-
+from gerbera_sdk.utils import StateKey
 
 @dataclass
 class ConnectionState:
@@ -27,16 +26,19 @@ class HardwareRuntime:
         key: StateKey,
         state: ConnectionState,
     ) -> None:
+        if key not in self.state_store:
+            raise ValueError("Key does not exist in state store")
         self.state_store[key] = state
 
     def get_state_store(self) -> dict[str, Any]:
-        return {
-            self.state_key_label(key): (
-                asdict(value) if value is not None else None
-            )
-            for key, value in self.state_store.items()
-        }
+        states: dict[str, Any] = {}
+        for key, value in self.state_store.items():
+            label = self.state_key_label(key)
+            if value is None:
+                states[label] = None
+            else:
+                states[label] = asdict(value)
+        return states
 
-    @staticmethod
-    def state_key_label(key: StateKey) -> str:
+    def get_state_key_label(key: StateKey) -> str:
         return ".".join(key)

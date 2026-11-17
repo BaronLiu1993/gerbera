@@ -1,11 +1,14 @@
 import hashlib
 import json
 import re
-from typing import Self
+from typing import Self, TypeAlias
 
 from pydantic import BaseModel, ConfigDict
 
 MAX_EVENT_NAME_LENGTH = 63
+
+# Identifies a state field by (microcontroller_id, connection_name, field_name).
+StateKey: TypeAlias = tuple[str, str, str]
 
 class StrictSchema(BaseModel):
     model_config = ConfigDict(
