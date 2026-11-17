@@ -1,0 +1,130 @@
+#include <Arduino.h>
+$includes
+
+$transport_definition
+
+$definitions
+
+
+String tokenAt(const String& input, int tokenIndex) {
+  int start = 0;
+  int currentIndex = 0;
+  while (start <= input.length()) {
+    int commaIndex = input.indexOf(',', start);
+    String token;
+    if (commaIndex == -1) {
+      token = input.substring(start);
+      start = input.length() + 1;
+    } else {
+      token = input.substring(start, commaIndex);
+      start = commaIndex + 1;
+    }
+    token.trim();
+    if (currentIndex == tokenIndex) {
+      return token;
+    }
+    currentIndex++;
+  }
+  return "";
+}
+
+int tokenCount(const String& input) {
+  if (input.length() == 0) {
+    return 0;
+  }
+  int count = 1;
+  for (unsigned int index = 0; index < input.length(); index++) {
+    if (input.charAt(index) == ',') {
+      count++;
+    }
+  }
+  return count;
+}
+
+String actionOf(const String& input) {
+  return tokenAt(input, 0);
+}
+
+String commandNameOf(const String& input) {
+  return tokenAt(input, 1);
+}
+
+String parameterValue(const String& input, const String& parameterName) {
+  for (int index = 2; index < tokenCount(input); index++) {
+    String token = tokenAt(input, index);
+    int colonIndex = token.indexOf(':');
+    if (colonIndex == -1) {
+      continue;
+    }
+    String key = token.substring(0, colonIndex);
+    key.trim();
+    if (key == parameterName) {
+      String value = token.substring(colonIndex + 1);
+      value.trim();
+      return value;
+    }
+  }
+  return "";
+}
+
+void sendMcpResponse(
+  const String& input,
+  const String& eventName,
+  const String& fieldName,
+  const String& value
+) {
+  GERBERA_TRANSPORT.print("MCP,");
+  GERBERA_TRANSPORT.print(eventName);
+  String commandId = parameterValue(input, "command_id");
+  if (commandId.length() > 0) {
+    GERBERA_TRANSPORT.print(",command_id:");
+    GERBERA_TRANSPORT.print(commandId);
+  }
+  GERBERA_TRANSPORT.print(",");
+  GERBERA_TRANSPORT.print(fieldName);
+  GERBERA_TRANSPORT.print(":");
+  GERBERA_TRANSPORT.println(value);
+}
+
+$handlers
+
+void dispatchCommand(const String& input) {
+  String action = actionOf(input);
+  String commandName = commandNameOf(input);
+$dispatch
+  sendMcpResponse(input, commandName, "error", "unknown_command");
+}
+
+void setup() {
+$transport_setup
+$setup
+}
+
+void loop() {
+$streams
+
+  static String input;
+  static bool oversized = false;
+
+  while (GERBERA_TRANSPORT.available()) {
+    char character = GERBERA_TRANSPORT.read();
+    if (character == '\r') {
+      continue;
+    }
+
+    if (character != '\n') {
+      if (input.length() < $max_message_bytes) {
+        input += character;
+      } else {
+        oversized = true;
+      }
+      continue;
+    }
+
+    if (!oversized) {
+      dispatchCommand(input);
+    }
+    input = "";
+    oversized = false;
+  }
+}

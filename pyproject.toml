@@ -37,6 +37,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
+"gerbera_sdk.firmware" = ["*.template"]
 "gerbera_sdk.firmware.boards" = ["*.yaml"]
 "gerbera_sdk.firmware.devices.configs" = ["*.yaml"]
 
