@@ -1,11 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
-from functools import partial
 import threading
-from typing import Any, Callable
-
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias
 
 from gerbera_sdk.inference import (
     Inference,
@@ -20,7 +15,7 @@ from gerbera_sdk.inference.model_runtime_strategies import (
     VisionLanguageRuntimeStrategy,
 )
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.models.runtime.vision_runtimes.camera_runtime import CameraRuntime
 
 ModelOutput: TypeAlias = (
     ObjectDepthStateModel
@@ -32,7 +27,7 @@ ModelOutput: TypeAlias = (
 
 
 @dataclass
-class ModelStream:
+class ModelSession:
     stop_event: threading.Event
     thread: threading.Thread
 
@@ -49,7 +44,7 @@ class ModelRuntime:
     camera_runtime: CameraRuntime
     model_outputs: dict[str, ModelOutput | None] = field(default_factory=dict)
     registered_models: dict[str, RegisteredModel] = field(default_factory=dict)
-    model_streams: dict[str, ModelStream] = field(default_factory=dict)
+    model_streams: dict[str, ModelSession] = field(default_factory=dict)
     model_stream_failures: dict[str, Exception] = field(default_factory=dict)
     lock: threading.RLock = field(
         default_factory=threading.RLock,
@@ -99,6 +94,26 @@ class ModelRuntime:
                 raise KeyError(f"Model output is not registered: {key}")
             self.model_outputs[key] = model_output
 
+    @staticmethod
+    def serialize_model_output(
+        model_output: ModelOutput | None,
+    ) -> Any:
+        if model_output is None or isinstance(model_output, str):
+            return model_output
+        return model_output.model_dump(mode="json", exclude={"frame"})
+
+    def get_model_state(self) -> dict[str, Any]:
+        with self.lock:
+            return {
+                key: self.serialize_model_output(model_output)
+                for key, model_output in self.model_outputs.items()
+            }
+
+    def raise_model_stream_failure(self, model_id: str) -> None:
+        failure = self.model_stream_failures.get(model_id)
+        if failure is not None:
+            raise RuntimeError(f"Model stream failed: {model_id}") from failure
+
     def read_model_output(
         self,
         model_id: str,
@@ -116,20 +131,26 @@ class ModelRuntime:
             raise TypeError(f"Model output has invalid type: {key}")
         return model_output
 
-    @staticmethod
-    def serialize_model_output(
-        model_output: ModelOutput | None,
-    ) -> Any:
-        if model_output is None or isinstance(model_output, str):
-            return model_output
-        return model_output.model_dump(mode="json", exclude={"frame"})
-
-    def get_model_state(self) -> dict[str, Any]:
+    def perform_frame_inference(self, model_id: str) -> ModelOutput:
         with self.lock:
-            return {
-                key: self.serialize_model_output(model_output)
-                for key, model_output in self.model_outputs.items()
-            }
+            registered_model = self.registered_models[model_id]
+        if isinstance(
+            registered_model.strategy,
+            VisionLanguageRuntimeStrategy,
+        ):
+            raise TypeError(
+                f"Model does not support frame inference: {model_id}"
+            )
+        inference = registered_model.inference
+        camera_id = inference.subscribed_camera.camera_id
+        frame = self.camera_runtime.get_latest_frame(camera_id)
+        result = registered_model.strategy.perform(inference, frame)
+        output_name = registered_model.strategy.stream_output_name
+        self.write_model_output(
+            key=inference.model_output_keys[output_name],
+            model_output=result,
+        )
+        return result
 
     def perform_object_detection(
         self,
@@ -158,27 +179,6 @@ class ModelRuntime:
             raise TypeError(
                 f"Model is not an object segmentation model: {model_id}"
             )
-        return result
-
-    def perform_frame_inference(self, model_id: str) -> ModelOutput:
-        with self.lock:
-            registered_model = self.registered_models[model_id]
-        if isinstance(
-            registered_model.strategy,
-            VisionLanguageRuntimeStrategy,
-        ):
-            raise TypeError(
-                f"Model does not support frame inference: {model_id}"
-            )
-        inference = registered_model.inference
-        camera_id = inference.subscribed_camera.camera_id
-        frame = self.camera_runtime.get_latest_frame(camera_id)
-        result = registered_model.strategy.perform(inference, frame)
-        output_name = registered_model.strategy.stream_output_name
-        self.write_model_output(
-            key=inference.model_output_keys[output_name],
-            model_output=result,
-        )
         return result
 
     def locate_objects(
@@ -223,45 +223,6 @@ class ModelRuntime:
         )
         return result
 
-    def turn_on_model_stream(
-        self,
-        model_id: str,
-        prompt: str | None = None,
-    ) -> None:
-        with self.lock:
-            registered_model = self.registered_models[model_id]
-            self.model_stream_failures.pop(model_id, None)
-            stream = self.model_streams.get(model_id)
-            if stream is not None and stream.thread.is_alive():
-                raise RuntimeError(f"Model stream is already running: {model_id}")
-            resolved_prompt = registered_model.strategy.resolve_stream_prompt(
-                registered_model.inference,
-                prompt,
-            )
-            prediction = partial(
-                self.predict_latest_model,
-                registered_model,
-                resolved_prompt,
-            )
-            stop_event = threading.Event()
-            thread = threading.Thread(
-                target=self.prediction_loop,
-                args=(
-                    model_id,
-                    registered_model.inference.interval_seconds,
-                    stop_event,
-                    prediction,
-                ),
-                name=f"model.{model_id}",
-                daemon=False,
-            )
-            self.model_streams[model_id] = ModelStream(stop_event, thread)
-            try:
-                thread.start()
-            except RuntimeError:
-                self.model_streams.pop(model_id)
-                raise
-
     def predict_latest_model(
         self,
         registered_model: RegisteredModel,
@@ -282,16 +243,14 @@ class ModelRuntime:
             model_output=result,
         )
 
-    def prediction_loop(
-        self,
-        model_id: str,
-        interval_seconds: float,
-        stop_event: threading.Event,
-        prediction: Callable[[], None],
-    ) -> None:
+    def prediction_loop(self, model_id: str, prompt: str | None) -> None:
+        with self.lock:
+            registered_model = self.registered_models[model_id]
+            stop_event = self.model_streams[model_id].stop_event
+        interval_seconds = registered_model.inference.interval_seconds
         try:
             while not stop_event.is_set():
-                prediction()
+                self.predict_latest_model(registered_model, prompt)
                 stop_event.wait(interval_seconds)
         except Exception as error:
             with self.lock:
@@ -304,6 +263,35 @@ class ModelRuntime:
                         f"Model stream ownership changed while running: {model_id}"
                     )
                 self.model_streams.pop(model_id)
+
+    def turn_on_model_stream(
+        self,
+        model_id: str,
+        prompt: str | None = None,
+    ) -> None:
+        with self.lock:
+            registered_model = self.registered_models[model_id]
+            self.model_stream_failures.pop(model_id, None)
+            stream = self.model_streams.get(model_id)
+            if stream is not None and stream.thread.is_alive():
+                raise RuntimeError(f"Model stream is already running: {model_id}")
+            resolved_prompt = registered_model.strategy.resolve_stream_prompt(
+                registered_model.inference,
+                prompt,
+            )
+            stop_event = threading.Event()
+            thread = threading.Thread(
+                target=self.prediction_loop,
+                args=(model_id, resolved_prompt),
+                name=f"model.{model_id}",
+                daemon=False,
+            )
+            self.model_streams[model_id] = ModelSession(stop_event, thread)
+            try:
+                thread.start()
+            except RuntimeError:
+                self.model_streams.pop(model_id)
+                raise
 
     def turn_off_model_stream(self, model_id: str) -> None:
         with self.lock:
@@ -318,11 +306,6 @@ class ModelRuntime:
         if stream.thread.is_alive():
             raise RuntimeError(f"Model stream did not stop: {model_id}")
         self.raise_model_stream_failure(model_id)
-
-    def raise_model_stream_failure(self, model_id: str) -> None:
-        failure = self.model_stream_failures.get(model_id)
-        if failure is not None:
-            raise RuntimeError(f"Model stream failed: {model_id}") from failure
 
     def turn_on_all_model_streams(self) -> None:
         with self.lock:
