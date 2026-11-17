@@ -1,19 +1,21 @@
-from typing import Annotated
-
-from pydantic import ConfigDict, Field
-from pydantic.dataclasses import dataclass
+from dataclasses import dataclass
+from typing import ClassVar
 
 from gerbera_sdk.utils import build_connection_event_name
 
 
-@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
+@dataclass(kw_only=True)
 class Connection:
-    name: Annotated[str, Field(min_length=1, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
-    component_type: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    pins: dict[Annotated[str, Field(min_length=1, pattern=r"\S")], Annotated[str, Field(min_length=1, pattern=r"\S")]]
-    description: str
-    microcontroller_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
+    name: str
+    description: str = ""
+    microcontroller_id: str | None = None
     stream: bool = False
+    component_type: ClassVar[str]
+
+    @property
+    def pins(self) -> dict[str, str]:
+        raise NotImplementedError
+
     @property
     def stream_enabled(self) -> bool:
         return self.stream
