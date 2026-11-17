@@ -5,10 +5,10 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 from pydantic.dataclasses import dataclass
 
-from gerbera_sdk.firmware.configurations import get_device_builder
+from gerbera_sdk.firmware.devices.config_schema import LibraryConfig
+from gerbera_sdk.firmware.devices.library import get_device_builder
 from gerbera_sdk.firmware.firmware_schema import (
     BoardTransportKind,
-    LibrarySpec,
 )
 from gerbera_sdk.models.hardware.connection import Connection
 
@@ -81,8 +81,8 @@ class Microcontroller:
     def id(self) -> str:
         return self.device_id
 
-    def get_required_connection_libraries(self) -> list[LibrarySpec]:
-        libraries: list[LibrarySpec] = []
+    def get_required_connection_libraries(self) -> list[LibraryConfig]:
+        libraries: list[LibraryConfig] = []
         normalized_library_names: set[str] = set()
 
         for connection in self.connections:
