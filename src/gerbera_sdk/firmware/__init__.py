@@ -1,1 +1,1 @@
-"""Firmware generation, compilation, uploading and verification."""
+"""Explicit firmware generation, compilation, uploading, and dependency installation."""
