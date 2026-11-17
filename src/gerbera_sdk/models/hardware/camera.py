@@ -5,20 +5,18 @@ import uuid
 from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 
-# Camera Sources
+# Camera Sources + Types
 @dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
 class DeviceCameraSource:
     device_index: Annotated[int, Field(ge=0)]
-
 
 @dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
 class MJPEGSource:
     stream_url: Annotated[str, Field(min_length=1, pattern=r"\S")]
 
-
 CameraSource = DeviceCameraSource | MJPEGSource
 
-
+# Camera class model
 @dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
 class Camera:
     name: Annotated[str, Field(min_length=1, pattern=r"\S")]
