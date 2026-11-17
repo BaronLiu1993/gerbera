@@ -1,131 +1,20 @@
 # Firmware
 
-The firmware folder owns Arduino sketch generation, parsing code, command routing, setup generation, and flashing.
+Firmware operations are explicit and independent:
 
-## Files
+- `FirmwareGenerator`: renders a microcontroller declaration into a sketch and serial helpers.
+- `FirmwareUploader`: installs dependencies, compiles sketches, and uploads builds through Arduino CLI.
 
-```text
-configurations.py       Registry for supported devices and microcontroller packages.
-firmware_generator.py   Generates Arduino runtime, component and command source; writes project files.
-firmware_compiler.py    Compiles an existing generated project into a binary.
-firmware_uploader.py    Uploads an existing compiled binary to the board.
-firmware_verifier.py    Checks installed firmware through a live board handshake.
-firmware_dependencies.py Installs Arduino cores and device libraries explicitly.
-devices/                Config-driven firmware device library and YAML configs.
-```
+Device-specific pin setup, commands, and streaming remain in the device YAML files.
+`devices/library.py` owns rendering and device lookup; `boards/definitions.py` owns
+board definitions and lookup. There are no separate factory, abstract builder, or
+forwarding modules in the firmware pipeline.
+The shared sketch template, including serial parsing and response helpers, lives
+in `sketch.ino.template`.
 
-Each microcontroller gets one firmware root in the project-local Gerbera
-workspace:
-
-```text
-.gerbera/
-└── firmware/
-    └── <microcontroller-id>/
-        ├── <microcontroller-id>.ino
-        └── build/
-```
-
-## Ownership
-
-This folder owns:
-
-- mapping `component_type` to a firmware config-backed builder
-- generated Arduino includes
-- generated global definitions
-- generated handlers
-- generated setup and loop code
-- flashing firmware through Arduino tooling
-
-This folder does not own:
-
-- serial runtime connections
-- MCP tool registration
-- database write buffering
-- event listener threads
-
-## Generation Flow
-
-```mermaid
-flowchart TD
-    A[Microcontroller] --> B[FirmwareGenerator.generate]
-    B --> C[build includes]
-    B --> D[build parser helpers]
-    B --> E[build device definitions]
-    B --> F[build device handlers]
-    B --> G[build setup]
-    B --> H[build loop]
-    E --> J[load device YAML configs]
-    F --> J
-    G --> J
-    H --> J
-    C --> I[Arduino sketch]
-    D --> I
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-```
-
-## Device Configs
-
-Each supported component has one complete YAML config under:
-
-```text
-devices/configs/<component_type>.yaml
-```
-
-Configs are intentionally self-contained. They do not inherit from, include, or
-reference other component configs. The generic device library loads each config
-and renders its firmware templates for a concrete connection.
-
-## Wire Protocol
-
-Generated firmware writes this protocol through `GERBERA_TRANSPORT`. USB
-firmware binds it to `Serial`; ESP32 Bluetooth Classic firmware binds it to
-`BluetoothSerial`. Device templates must not write directly to `Serial`.
-
-Commands sent to Arduino:
-
-```text
-HANDSHAKE,__gerbera__,challenge:<nonce>
-READ,<connection.name>,command_id:<id>
-WRITE,<connection.name>,key:value,key:value,command_id:<id>
-```
-
-Responses emitted by Arduino:
-
-```text
-HANDSHAKE,__gerbera__,protocol:<version>,board:<id>,digest:<digest>,challenge:<nonce>
-MCP,<connection.event_name>,command_id:<id>,key:value
-STREAM,<connection.event_name>,key:value
-```
-
-Every command response echoes the host-generated `command_id`. The runtime uses
-it to match concurrent command responses and removes it before updating hardware
-state or evaluating reactions. Stream events are unsolicited and therefore do
-not include a command ID.
-
-`connection.event_name` is the runtime-safe internal identifier. It is generated from:
-
-- the connection name
-- a stable hash of `microcontroller_id` and the connection name
-
-This same identifier is reused for:
-
-- firmware serial output
-- event bus routing
-- stream table naming
-
-Pin assignments are represented separately in the board contract digest. At
-startup, the runtime requires the firmware digest and board ID to exactly match
-the compiled hardware plan before registering the serial connection.
-
-SDK startup verifies the live identity, protocol and digest. Any mismatch or
-handshake failure stops startup without installing dependencies, generating code,
-compiling or uploading. Verification never relies on a local installed-firmware
-manifest.
-
-Firmware updates use four explicit operations on the `GerberaRuntime` facade:
+Generated firmware initializes devices and inactive outputs, then accepts commands
+and emits sensor streams. It has no handshake, contract digest, component checks,
+sessions, or heartbeat watchdog. Disconnecting the host does not stop actuators.
 
 ```python
 from gerbera_sdk.gerbera_runtime import GerberaRuntime
@@ -134,14 +23,15 @@ GerberaRuntime.install_dependencies(hardware_system)
 sketches = GerberaRuntime.generate_firmware(hardware_system)
 builds = GerberaRuntime.compile_firmware(hardware_system, sketches)
 GerberaRuntime.upload_firmware(hardware_system, builds)
-GerberaRuntime.verify_firmware(hardware_system)
 ```
 
-`generate()` returns source text without writing files. `write_files()` saves the
-generated project and returns its sketch path. Compilation does not upload, and
-uploading does not generate or compile. The uploader uses the configured upload
-port; verification uses the configured runtime transport.
+Each board produces one `.gerbera/firmware/<board-id>/<board-id>.ino` file. Compilation writes a `build` directory alongside the sketch.
+Generation replaces the obsolete generated runtime/component/command files.
 
-## Reaction
+Commands and responses retain command IDs:
 
-Keep generated firmware thin. It should parse command strings, touch hardware, and emit structured serial lines.
+```text
+WRITE,status_led,state:1,command_id:<id>
+MCP,<event_name>,command_id:<id>,led_state:1
+STREAM,<event_name>,distance:12.4
+```
