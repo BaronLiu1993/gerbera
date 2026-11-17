@@ -12,6 +12,7 @@ Before making code edits, restate the exact requested scope in one short sentenc
 
 ## Repo Preferences
 
+- Do not use `from __future__ import annotations`. Order class and function definitions so referenced types are defined before use; use quoted annotations for unavoidable forward references.
 - Do not create new `domain/` modules.
 - Runtime orchestration belongs under `src/gerbera_harness/runtime/`.
 - Memory should stay thin and should not call MCP, construct rich events, or decide workflow lifecycle transitions.
