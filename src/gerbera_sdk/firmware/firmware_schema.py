@@ -1,38 +1,12 @@
-from dataclasses import dataclass, field
-from gerbera_sdk.models.hardware.connection import Connection
+from dataclasses import dataclass
 from enum import Enum
-from gerbera_sdk.firmware.parameter_schema import ParameterDomain
 
-GERBERA_PROTOCOL_VERSION = 1
-GERBERA_HANDSHAKE_TARGET = "__gerbera__"
-GERBERA_HANDSHAKE = "HANDSHAKE"
-GERBERA_CHECK = "CHECK"
-GERBERA_START = "START"
-GERBERA_HEARTBEAT = "HEARTBEAT"
-GERBERA_STOP = "STOP"
-GERBERA_STATE_CHECKING = "CHECKING"
-GERBERA_STATE_READY = "READY"
-GERBERA_STATE_STOPPED = "STOPPED"
 MAX_SERIAL_MESSAGE_BYTES = 1024
 
 
 class BoardTransportKind(str, Enum):
     USB_SERIAL = "usb_serial"
     BLUETOOTH_CLASSIC = "bluetooth_classic"
-
-@dataclass(frozen=True)
-class ParameterSpec:
-    required: bool
-    description: str
-    domain: ParameterDomain
-
-
-@dataclass(frozen=True)
-class CommandSpec:
-    method: str
-    response_fields: tuple[str, ...]
-    params: dict[str, ParameterSpec] = field(default_factory=dict)
-    description: str = ""
 
 
 class PinMode(str, Enum):
@@ -47,11 +21,6 @@ class PinCapability(str, Enum):
     ANALOG_INPUT = "analog_input"
     INTERRUPT_INPUT = "interrupt_input"
 
-
-class PinAssignmentMode(str, Enum):
-    EXCLUSIVE = "exclusive"
-
-
 class ColumnType(str, Enum):
     INTEGER = "INTEGER"
     FLOAT = "DOUBLE PRECISION"
@@ -64,27 +33,3 @@ class ColumnType(str, Enum):
 class PinModeSpec:
     pin: str
     mode: PinMode
-
-
-@dataclass(frozen=True)
-class LibrarySpec:
-    include: str
-    install: str
-
-
-@dataclass(frozen=True)
-class ColumnSpec:
-    type: ColumnType
-    idx: bool = False
-    primary_key: bool = False
-    nullable: bool = True
-    default: str | None = None
-    sql_suffix: str | None = None
-
-
-@dataclass(frozen=True)
-class StreamContract:
-    event_name: str
-    table_name: str
-    schema: dict[str, ColumnSpec]
-    connection: "Connection"
