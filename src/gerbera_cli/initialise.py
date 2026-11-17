@@ -28,10 +28,6 @@ def initialise_project_files() -> None:
         raise FileExistsError("Deployment manifest already exists; service configuration is not overwritten")
     subprocess.run([sys.executable, "-m", "gerbera_sdk.server", "initialise"], check=True)
     initialise_database_credentials()
-    subprocess.run([
-        sys.executable, "-m", "gerbera_sdk.server", "credentials",
-        "--config", ".gerbera/sdk/runtime.json", "--database-env", ".gerbera/secrets/sdk-database.env",
-    ], check=True)
     manifest.write_text(yaml.safe_dump({
         "startup_timeout_seconds": 600,
         "services": {
