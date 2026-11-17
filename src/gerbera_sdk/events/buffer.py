@@ -17,14 +17,14 @@ class Buffer:
         repr=False,
     )
 
-    def write(self, payload: dict[str, str]) -> None:
+    def write_to_buffer(self, payload: dict[str, str]) -> None:
         with self.lock:
             self.items.append(dict(payload))
             if len(self.items) >= self.max_size:
                 self.flush()
 
-    # Flush now, lets call this when server is shutting down
-    def flush(self) -> None:
+    # Flush now and also lets call this when server is shutting down
+    def flush_to_worker(self) -> None:
         with self.lock:
             batch = list(self.items)
             self.items.clear()

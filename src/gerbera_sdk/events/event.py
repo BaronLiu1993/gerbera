@@ -3,33 +3,27 @@ from datetime import datetime, timezone
 import threading
 
 from gerbera_sdk.events.buffer import Buffer
+from gerbera_sdk.events.event_schema import EventKey
 
 
 @dataclass
 class Event:
-    event_type: str
-    microcontroller_id: str
-    event_name: str
-    connection_name: str
-    component_type: str
-    streamable: bool
-    table_name: str
+    event_key: EventKey
     buffer: Buffer
-    event_key: tuple[str, str, str]
-    latest_val: dict[str, str] | None = None
     lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
         repr=False,
     )
 
-    def perform_work(self, payload: dict[str, str]) -> None:
+    @property
+    def streamable(self) -> bool:
+        return self.event_key.event_type == "STREAM"
+
+    def stream_data(self, payload: dict[str, str]) -> None:
         if self.streamable and len(payload) != 1:
             raise ValueError("Stream payload must contain exactly one field")
         normalized_payload = dict(payload)
-
-        with self.lock:
-            self.latest_val = normalized_payload
 
         if self.streamable:
             stream_value = next(iter(normalized_payload.values()))
@@ -37,10 +31,6 @@ class Event:
             stream_payload["created_at"] = datetime.now(timezone.utc)
             self.buffer.write(stream_payload)
             return
-        
-    def read_latest(self) -> dict[str, str] | None:
-        with self.lock:
-            return self.latest_val
 
     def flush(self) -> list[dict[str, str]]:
         return self.buffer.flush()
