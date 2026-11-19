@@ -1,0 +1,22 @@
+src/gerbera_sdk/models/hardware/microcontroller.py
+  s_799c6fc964bc79::t_6b4947eb0c272c 9,13,19-20,47-50,55,62,67-68,70
+  s_799c6fc964bc79::t_34db3aa2cb902e 2,4
+README.md
+  s_799c6fc964bc79::t_34db3aa2cb902e 85,141-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dc5145ba2cc87e9fd45a1fcf7886d84e5de286d9",
+  "prompts": {},
+  "sessions": {
+    "s_799c6fc964bc79": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f179-c70c-78a0-971b-5a79305af5d2",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
