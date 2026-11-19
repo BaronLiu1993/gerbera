@@ -1,8 +1,4 @@
-from dataclasses import field
-from typing import Annotated
-
-from pydantic import ConfigDict, Field, model_validator
-from pydantic.dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gerbera_sdk.firmware.devices.config_schema import LibraryConfig
 from gerbera_sdk.firmware.devices.library import get_device_builder
@@ -10,20 +6,11 @@ from gerbera_sdk.firmware.firmware_schema import BoardTransportKind
 from gerbera_sdk.models.hardware.connection import Connection
 
 
-NonBlankString = Annotated[str, Field(min_length=1, pattern=r"\S")]
-
-
-@dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
+@dataclass(frozen=True)
 class RuntimeTransportConfig:
     kind: BoardTransportKind
-    port: NonBlankString
-    device_name: NonBlankString | None = None
-
-    @model_validator(mode="after")
-    def validate_device_name(self) -> "RuntimeTransportConfig":
-        if self.kind == BoardTransportKind.BLUETOOTH_CLASSIC and self.device_name is None:
-            raise ValueError("Bluetooth transport requires device_name")
-        return self
+    port: str
+    device_name: str | None = None
 
     @classmethod
     def usb_serial(cls, port: str) -> "RuntimeTransportConfig":
@@ -42,17 +29,17 @@ class RuntimeTransportConfig:
         )
 
 
-@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
+@dataclass
 class Microcontroller:
-    name: NonBlankString
-    device_id: NonBlankString
-    upload_port: NonBlankString
-    fqbn: NonBlankString
+    name: str
+    device_id: str
+    upload_port: str
+    fqbn: str
     runtime_transport: RuntimeTransportConfig
-    baud_rate: Annotated[int, Field(gt=0)] = 115200
+    baud_rate: int = 115200
     description: str | None = None
     connections: list[Connection] = field(default_factory=list)
-    hardware_system_id: NonBlankString | None = None
+    hardware_system_id: str | None = None
 
     @property
     def id(self) -> str:
