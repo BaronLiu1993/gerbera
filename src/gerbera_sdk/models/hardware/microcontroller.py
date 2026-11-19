@@ -1,36 +1,23 @@
 from dataclasses import field
-import json
-from typing import Annotated, Any
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import ConfigDict, Field, model_validator
 from pydantic.dataclasses import dataclass
 
 from gerbera_sdk.firmware.devices.config_schema import LibraryConfig
 from gerbera_sdk.firmware.devices.library import get_device_builder
-from gerbera_sdk.firmware.firmware_schema import (
-    BoardTransportKind,
-)
+from gerbera_sdk.firmware.firmware_schema import BoardTransportKind
 from gerbera_sdk.models.hardware.connection import Connection
 
 
-@dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
-class RuntimeWatchdogConfig:
-    heartbeat_interval_ms: Annotated[int, Field(gt=0)] = 500
-    heartbeat_timeout_ms: Annotated[int, Field(gt=0)] = 2500
+NonBlankString = Annotated[str, Field(min_length=1, pattern=r"\S")]
 
 
 @dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
 class RuntimeTransportConfig:
     kind: BoardTransportKind
-    port: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    device_name: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
-
-    @classmethod
-    def from_data(
-        cls,
-        data: dict[str, Any],
-    ) -> "RuntimeTransportConfig":
-        return TypeAdapter(cls).validate_json(json.dumps(data))
+    port: NonBlankString
+    device_name: NonBlankString | None = None
 
     @model_validator(mode="after")
     def validate_device_name(self) -> "RuntimeTransportConfig":
@@ -55,43 +42,29 @@ class RuntimeTransportConfig:
         )
 
 
-class RegisteredDevice(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True, validate_default=True)
-
-    id: str = Field(min_length=1, pattern=r"\S")
-    address: str = Field(min_length=1, pattern=r"\S")
-    protocol: str = Field(min_length=1, pattern=r"\S")
-    fqbn: str = Field(min_length=1, pattern=r"\S")
-
-
 @dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
 class Microcontroller:
-    name: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    device_id: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    upload_port: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    fqbn: Annotated[str, Field(min_length=1, pattern=r"\S")]
+    name: NonBlankString
+    device_id: NonBlankString
+    upload_port: NonBlankString
+    fqbn: NonBlankString
     runtime_transport: RuntimeTransportConfig
-    watchdog: RuntimeWatchdogConfig = field(default_factory=RuntimeWatchdogConfig)
     baud_rate: Annotated[int, Field(gt=0)] = 115200
     description: str | None = None
     connections: list[Connection] = field(default_factory=list)
-    hardware_system_id: Annotated[str, Field(min_length=1, pattern=r"\S")] | None = None
+    hardware_system_id: NonBlankString | None = None
 
     @property
     def id(self) -> str:
         return self.device_id
 
     def get_required_connection_libraries(self) -> list[LibraryConfig]:
-        libraries: list[LibraryConfig] = []
-        normalized_library_names: set[str] = set()
+        libraries_by_name: dict[str, LibraryConfig] = {}
 
         for connection in self.connections:
             builder = get_device_builder(connection.component_type)
             for library in builder.required_libraries():
-                install_name = library.install.strip()
-                normalized_install_name = install_name.lower()
+                install_name = library.install.strip().lower()
+                libraries_by_name.setdefault(install_name, library)
 
-                if normalized_install_name not in normalized_library_names:
-                    libraries.append(library)
-                    normalized_library_names.add(normalized_install_name)
-        return libraries
+        return list(libraries_by_name.values())

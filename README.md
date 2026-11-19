@@ -82,7 +82,7 @@ firmware are explicit SDK operations; startup never changes installed firmware.
 | --- | --- | --- |
 | CLI | Deployment metadata, service launch/stop, readiness polling and logs | Hardware/model validation, firmware, schemas, agent execution |
 | SDK | Hardware declarations, validation, firmware generation/compilation/upload/verification, connections, stream schemas and hardware readiness | Agent workflows |
-| Firmware | Physical I/O, component checks and watchdog safe-stop | Host-side workflow decisions |
+| Firmware | Physical I/O and component checks | Host-side workflow decisions |
 | `gerbera_protocol` | Versioned JSON wire contracts | Service orchestration or runtime objects |
 
 MCP clients connect directly to the SDK. The CLI is not in the command path after service startup.
@@ -138,9 +138,8 @@ gerbera init
 The CLI delegates board discovery and hardware scaffolding to the SDK. It creates
 a deployment-only `gerbera.yaml`, scoped service credentials, and a local
 `.gerbera/` workspace. The SDK creates `index.py` and
-`.gerbera/sdk/runtime.json`, retaining each selected board's identity and explicit
-watchdog settings. If more than one board is connected, the SDK asks which boards
-to include.
+`.gerbera/sdk/runtime.json`, retaining each selected board's identity.
+If more than one board is connected, the SDK asks which boards to include.
 
 ### 2. Declare the hardware
 
