@@ -1,57 +1,44 @@
 from dataclasses import dataclass, field
+import json
 
-from gerbera_sdk.firmware.devices.config_schema import LibraryConfig
-from gerbera_sdk.firmware.devices.library import get_device_builder
-from gerbera_sdk.firmware.firmware_schema import BoardTransportKind
 from gerbera_sdk.models.hardware.connection import Connection
 
-
-@dataclass(frozen=True)
-class RuntimeTransportConfig:
-    kind: BoardTransportKind
-    port: str
-    device_name: str | None = None
-
-    @classmethod
-    def usb_serial(cls, port: str) -> "RuntimeTransportConfig":
-        return cls(kind=BoardTransportKind.USB_SERIAL, port=port)
-
-    @classmethod
-    def bluetooth_classic(
-        cls,
-        port: str,
-        device_name: str,
-    ) -> "RuntimeTransportConfig":
-        return cls(
-            kind=BoardTransportKind.BLUETOOTH_CLASSIC,
-            port=port,
-            device_name=device_name,
-        )
+CONFIG = json.loads("config.json")
 
 
 @dataclass
 class Microcontroller:
-    name: str
-    device_id: str
-    upload_port: str
-    fqbn: str
-    runtime_transport: RuntimeTransportConfig
-    baud_rate: int = 115200
-    description: str | None = None
+    microcontroller_id: str
     connections: list[Connection] = field(default_factory=list)
-    hardware_system_id: str | None = None
+
 
     @property
-    def id(self) -> str:
-        return self.device_id
+    def upload_port(self):
+        return CONFIG[self.microcontroller_id]["upload_port"]
 
-    def get_required_connection_libraries(self) -> list[LibraryConfig]:
-        libraries_by_name: dict[str, LibraryConfig] = {}
+    @property
+    def fqbn(self):
+        return CONFIG[self.microcontroller_id]["fqbn"]
 
-        for connection in self.connections:
-            builder = get_device_builder(connection.component_type)
-            for library in builder.required_libraries():
-                install_name = library.install.strip().lower()
-                libraries_by_name.setdefault(install_name, library)
 
-        return list(libraries_by_name.values())
+class ArduinoUno(Microcontroller):
+    includes = "Arduino.h"
+    library = "Arduino"
+    pins = frozenset(
+        {
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+            "10", "11", "12", "13", "A0", "A1", "A2", "A3", "A4", "A5",
+        }
+    )
+
+
+class ESP32(Microcontroller):
+    includes = "Arduino.h"
+    library = "ESP32"
+    pins = frozenset(
+        {
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11",
+            "12", "13", "14", "15", "16", "17", "18", "19", "21", "22",
+            "23", "25", "26", "27", "32", "33", "34", "35", "36", "39",
+        }
+    )
