@@ -1,33 +1,70 @@
 from dataclasses import dataclass
-from typing import ClassVar
-
-from gerbera_sdk.utils import build_connection_event_name
 
 
-@dataclass(kw_only=True)
+@dataclass
 class Connection:
-    name: str
-    description: str = ""
-    microcontroller_id: str | None = None
-    stream: bool = False
-    component_type: ClassVar[str]
+    connection_id: str
+    microcontroller_id: str
 
-    @property
-    def pins(self) -> dict[str, str]:
-        raise NotImplementedError
 
-    @property
-    def stream_enabled(self) -> bool:
-        return self.stream
+@dataclass
+class DCMotor(Connection):
+    in1: str
+    in2: str
+    enable: str
 
-    @property
-    def event_name(self) -> str:
-        if self.microcontroller_id is None:
-            raise RuntimeError(
-                f"Connection is not bound to a microcontroller: {self.name}"
-            )
+    component_type = "dcmotor"
+    supports_streaming = False
 
-        return build_connection_event_name(
-            microcontroller_id=self.microcontroller_id,
-            connection_name=self.name,
-        )
+
+@dataclass
+class HCSR04(Connection):
+    trig: str
+    echo: str
+
+    component_type = "hcsr04"
+    supports_streaming = True
+
+
+@dataclass
+class HW201(Connection):
+    out: str
+
+    component_type = "hw201"
+    supports_streaming = True
+
+
+@dataclass
+class KY033(Connection):
+    out: str
+
+    component_type = "ky033"
+    supports_streaming = True
+
+
+@dataclass
+class LED(Connection):
+    out: str
+
+    component_type = "led"
+    supports_streaming = False
+
+
+@dataclass
+class MG996R(Connection):
+    signal: str
+
+    component_type = "mg996r"
+    supports_streaming = False
+    include = "Servo.h"
+    library = "Servo"
+
+
+@dataclass
+class SG90(Connection):
+    signal: str
+
+    component_type = "sg90"
+    supports_streaming = False
+    include = "Servo.h"
+    library = "Servo"
