@@ -1,25 +1,16 @@
-from dataclasses import field
-from typing import Annotated
-import uuid
+from dataclasses import dataclass
+from datetime import datetime
 
-from pydantic import ConfigDict, Field
-from pydantic.dataclasses import dataclass
+import numpy as np
+from numpy.typing import NDArray
 
-# Camera Sources + Types
-@dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
-class DeviceCameraSource:
-    device_index: Annotated[int, Field(ge=0)]
-
-@dataclass(frozen=True, config=ConfigDict(strict=True, extra="forbid", validate_default=True))
-class MJPEGSource:
-    stream_url: Annotated[str, Field(min_length=1, pattern=r"\S")]
-
-CameraSource = DeviceCameraSource | MJPEGSource
-
-# Camera class model
-@dataclass(config=ConfigDict(strict=True, extra="forbid", validate_assignment=True, validate_default=True))
+@dataclass
 class Camera:
-    name: Annotated[str, Field(min_length=1, pattern=r"\S")]
-    description: str
-    source: CameraSource
-    camera_id: Annotated[str, Field(min_length=1, pattern=r"\S")] = field(default_factory=lambda: str(uuid.uuid4()))
+    camera_id: str
+    camera_source: int | str
+
+
+@dataclass
+class Frame:
+    image: NDArray[np.uint8]
+    timestamp: datetime
