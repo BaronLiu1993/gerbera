@@ -1,0 +1,33 @@
+src/gerbera_sdk/camera_runtime.py
+  s_5ea950b1930211::t_32fc1b37c5df4c 32,56
+  s_5ea950b1930211::t_c3a6cd10774944 12-13,33-34,47
+  s_5ea950b1930211::t_fcabe5386efe2e 35-41
+  s_5ea950b1930211::t_ab4c821164d18a 2,5,14,20,22,25-27,30-31,44,48,55,61,63-65,67-71,73-75,78,80-84,86
+  s_5ea950b1930211::t_8d9be2d096a63f 45-46
+  s_5ea950b1930211::t_af56721a5f6893 49-51
+  s_5ea950b1930211::t_94fb66c7c61c81 54
+  s_5ea950b1930211::t_87b18a1800c019 57-58
+  s_5ea950b1930211::t_45f1a5fdee994e 52
+src/gerbera_sdk/models/hardware/camera.py
+  s_5ea950b1930211::t_1b9fe936fcca17 7,13,15
+  s_5ea950b1930211::t_a7b15b2e4e0c41 10
+  s_5ea950b1930211::t_95e84cb07e7036 8-9
+  s_5ea950b1930211::t_f02db339f2d9d2 14
+  s_5ea950b1930211::t_8581f1c0abd9c0 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b1c1191e0178e05d36b2ce9921d07f0c8db785b2",
+  "prompts": {},
+  "sessions": {
+    "s_5ea950b1930211": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fcbb-4192-7dd2-87e7-0819cafeadd9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
