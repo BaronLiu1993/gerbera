@@ -1,0 +1,21 @@
+src/gerbera_sdk/camera_runtime.py
+  s_af6d6e1bac7cc2::t_89c3b686d10614 75-76
+src/gerbera_sdk/models/hardware/camera.py
+  s_af6d6e1bac7cc2::t_89c3b686d10614 3,8-25,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9be4bd18eca823f678df4d9bf353442faaeaa5ba",
+  "prompts": {},
+  "sessions": {
+    "s_af6d6e1bac7cc2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2098f-c65f-7db2-ae2f-8de60c22b6aa",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
