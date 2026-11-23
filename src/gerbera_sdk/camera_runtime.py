@@ -72,7 +72,8 @@ class CameraRuntime:
 
     def capture_loop(self, camera_id: str) -> None:
         session = self.get_camera_session(camera_id)
-        capture = cv2.VideoCapture(session.camera.camera_source)
+        camera = session.camera
+        capture = cv2.VideoCapture(camera.camera_source.capture_address)
         try:
             if not capture.isOpened():
                 raise RuntimeError(f"Could not open camera: {camera_id}")
@@ -81,6 +82,11 @@ class CameraRuntime:
                 success, image = capture.read()
                 if not success:
                     raise RuntimeError(f"Could not read camera frame: {camera_id}")
-                session.latest_frame = Frame(image=image, timestamp=datetime.now())
+                frame = Frame(image=image, timestamp=datetime.now())
+                session.latest_frame = frame.normalise_frame(
+                    output_height=camera.output_height,
+                    output_width=camera.output_width,
+                    output_format=camera.output_format,
+                )
         finally:
             capture.release()
