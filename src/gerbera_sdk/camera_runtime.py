@@ -82,6 +82,11 @@ class CameraRuntime:
                 success, image = capture.read()
                 if not success:
                     raise RuntimeError(f"Could not read camera frame: {camera_id}")
-                session.latest_frame = Frame(image=image, timestamp=datetime.now())
+                frame = Frame(image=image, timestamp=datetime.now())
+                session.latest_frame = frame.normalise_frame(
+                    output_height=camera.output_height,
+                    output_width=camera.output_width,
+                    output_format=camera.output_format,
+                )
         finally:
             capture.release()
