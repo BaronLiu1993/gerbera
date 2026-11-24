@@ -1,0 +1,47 @@
+src/gerbera_sdk/config/firmware/led.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-23
+src/gerbera_sdk/config/firmware/hcsr04.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-22
+src/gerbera_sdk/database_runtime.py
+  s_af6d6e1bac7cc2::t_61c95467dd8e9d 40-44,46
+  s_af6d6e1bac7cc2::t_cfb1e2dc1d1a73 33
+  s_af6d6e1bac7cc2::t_59b8de439944e5 23,45
+  s_af6d6e1bac7cc2::t_748947d1835bbf 24-25
+  s_af6d6e1bac7cc2::t_de231a06ea99c7 31-32
+  s_af6d6e1bac7cc2::t_1a94e83f07ca67 47-49
+  s_af6d6e1bac7cc2::t_8a84318828fa2a 3,8,13,35-36,50-54,56,71-73,75
+src/gerbera_sdk/config/database_config.py
+  s_af6d6e1bac7cc2::t_4c2cdc14fd14eb 1-16
+src/gerbera_sdk/config/firmware/dcmotor.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-40
+src/gerbera_sdk/config/firmware/hw201.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-7
+src/gerbera_sdk/config/firmware/ky033.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-7
+src/gerbera_sdk/config/firmware/mg996r.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-26
+src/gerbera_sdk/config/firmware/sg90.yaml
+  s_af6d6e1bac7cc2::t_7f2576b445f5fb 1-26
+src/gerbera_sdk/config/firmware_config.py
+  s_af6d6e1bac7cc2::t_c5d873fdfe1d71 1-20
+src/gerbera_sdk/config/sql/continuous.sql
+  s_af6d6e1bac7cc2::t_7aa1eeb70f658c 1-8
+src/gerbera_sdk/config/sql/discrete.sql
+  s_af6d6e1bac7cc2::t_dccdc13522907d 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "604d117a38ba2c50d0d897f7e613e6d7c63dd4e0",
+  "prompts": {},
+  "sessions": {
+    "s_af6d6e1bac7cc2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2098f-c65f-7db2-ae2f-8de60c22b6aa",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
