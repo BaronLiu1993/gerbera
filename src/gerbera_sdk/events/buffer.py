@@ -1,14 +1,15 @@
 from dataclasses import dataclass, field
 import threading
-import uuid
+from typing import TYPE_CHECKING
 
-from gerbera_sdk.events.event_worker import EventWorker
+if TYPE_CHECKING:
+    from gerbera_sdk.events.event_worker import EventWorker
 
 
 @dataclass
 class Buffer:
     table_name: str
-    event_worker: EventWorker = field(repr=False)
+    event_worker: "EventWorker" = field(repr=False)
     max_size: int = 50
     items: list[dict[str, str]] = field(default_factory=list)
     lock: threading.RLock = field(
@@ -21,7 +22,7 @@ class Buffer:
         with self.lock:
             self.items.append(dict(payload))
             if len(self.items) >= self.max_size:
-                self.flush()
+                self.flush_to_worker()
 
     # Flush now and also lets call this when server is shutting down
     def flush_to_worker(self) -> None:

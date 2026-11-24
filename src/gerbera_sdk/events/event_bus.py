@@ -1,55 +1,60 @@
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from gerbera_sdk.events.buffer import Buffer
 from gerbera_sdk.events.event import Event
 from gerbera_sdk.events.event_schema import EventKey
-from gerbera_sdk.events.event_worker import EventWorker
+from gerbera_sdk.config.firmware_config import load_firmware_config
+
+if TYPE_CHECKING:
+    from gerbera_sdk.events.event_worker import EventWorker
+    from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+
 
 @dataclass
 class EventBus:
     events: dict[EventKey, Event] = field(default_factory=dict)
 
-    def register(self, worker: EventWorker) -> None:
-        for board in plan.boards:
+    def register(self, hardware: "HardwareSystem", worker: "EventWorker") -> None:
+        for board in hardware.microcontrollers:
             for connection in board.connections:
-                self.register_connection(connection, "MCP", worker)
-                if connection.stream_enabled:
-                    self.register_connection(connection, "STREAM", worker)
+                board_id = board.microcontroller_id
+                connection_id = connection.connection_id
+                config = load_firmware_config(connection.component_type)
+                reply_fields = {}
+                write = config.get("write")
+                if write is not None:
+                    response_field = write["response_field"]
+                    response_settings = write["params"].get(response_field, {})
+                    reply_fields[response_field] = response_settings.get("unit")
 
-    def register_connection(
-        self, connection: ResolvedConnection, event_type: str, worker: EventWorker
-    ) -> None:
-        event_key = EventKey(event_type, connection.microcontroller_id, connection.event_name)
-        event = Event(
-            event_key=event_key,
-            buffer=Buffer(table_name=connection.event_name, event_worker=worker),
-        )
-        self.write_event(event_type, connection.microcontroller_id, connection.event_name, event)
+                stream = config.get("stream")
+                if connection.supports_streaming and stream is not None:
+                    reply_fields["stream_enabled"] = None
+                    reading_field = stream["field"]
+                    self.register_event(Event(
+                        event_key=EventKey("STREAM", board_id, connection_id),
+                        buffer=Buffer(table_name=connection_id, event_worker=worker),
+                        payload_fields={reading_field: stream.get("unit")},
+                    ))
 
-    def write_event(
-        self,
-        event_type: str,
-        microcontroller_id: str,
-        event_name: str,
-        event: Event,
-    ) -> None:
-        event_key = EventKey(event_type, microcontroller_id, event_name)
-        if event_key in self.events:
+                if reply_fields:
+                    self.register_event(Event(
+                        event_key=EventKey("MCP", board_id, connection_id),
+                        payload_fields=reply_fields,
+                    ))
+
+    def register_event(self, event: Event) -> None:
+        if event.event_key in self.events:
             raise RuntimeError("Event already exists")
+        self.events[event.event_key] = event
 
-        self.events[event_key] = event
-
-    def get_event(
-        self,
-        event_type: str,
-        microcontroller_id: str,
-        event_name: str,
-    ) -> Event:
-        event_key = EventKey(event_type, microcontroller_id, event_name)
-        if event_key not in self.events:
-            raise RuntimeError("Event does not exist")
-
-        return self.events[event_key]
+    def get_event(self, event_type: str, microcontroller_id: str, event_name: str) -> Event:
+        key = EventKey(event_type, microcontroller_id, event_name)
+        try:
+            return self.events[key]
+        except KeyError as error:
+            raise RuntimeError(f"Event does not exist: {key}") from error
 
     def flush_event_buffers(self) -> None:
         for event in self.events.values():

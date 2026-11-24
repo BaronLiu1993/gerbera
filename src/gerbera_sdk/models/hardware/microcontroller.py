@@ -11,7 +11,6 @@ class Microcontroller:
     microcontroller_id: str
     connections: list[Connection] = field(default_factory=list)
 
-
     @property
     def upload_port(self):
         return CONFIG[self.microcontroller_id]["upload_port"]
@@ -19,6 +18,10 @@ class Microcontroller:
     @property
     def fqbn(self):
         return CONFIG[self.microcontroller_id]["fqbn"]
+
+    @property
+    def baud_rate(self):
+        return CONFIG[self.microcontroller_id]['baud_rate']
 
 
 class ArduinoUno(Microcontroller):

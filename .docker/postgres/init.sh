@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL
-REVOKE TEMPORARY ON DATABASE gerbera FROM PUBLIC;
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set=database_name="$POSTGRES_DB" <<SQL
+REVOKE TEMPORARY ON DATABASE :"database_name" FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 
@@ -20,7 +20,7 @@ WITH
     NOCREATEDB
     NOCREATEROLE;
 
-GRANT CONNECT ON DATABASE gerbera
+GRANT CONNECT ON DATABASE :"database_name"
 TO gerbera_schema_owner,
    gerbera_writer;
 

@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import threading
 import cv2
+
 from gerbera_sdk.models.hardware.camera import Camera, Frame
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
@@ -49,7 +50,7 @@ class CameraRuntime:
                 session.thread.start()
             except Exception:
                 self.close_camera_sessions()
-                break
+                raise ValueError("Camera failed to start")
 
     def close_camera_sessions(self) -> None:
         for camera_id in self.sessions:

@@ -9,8 +9,6 @@ from pydantic import JsonValue
 
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_schema import EventKey
-from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
-from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 from gerbera_sdk.events.reactions.reaction_condition import (
     parse_value_like,
     reaction_matches,
@@ -27,7 +25,6 @@ from gerbera_sdk.events.reactions.reaction_store import ReactionStore
 
 @dataclass
 class ReactionBus:
-    hardware_plan: HardwarePlan
     event_bus: EventBus
     action_executor: ReactionActionRegistry
     store: ReactionStore = field(default_factory=ReactionStore)
@@ -40,7 +37,7 @@ class ReactionBus:
 
     def validate_reaction_event(self, event: ReactionEventSchema) -> None:
         try:
-            self.event_bus.get_event(
+            registered_event = self.event_bus.get_event(
                 event.event_type, event.microcontroller_id, event.event_name
             )
         except RuntimeError as exc:
@@ -48,13 +45,7 @@ class ReactionBus:
                 f"Unknown reaction event: {event.event_key}"
             ) from exc
 
-        route = (event.microcontroller_id, event.event_name)
-        connection = self.hardware_plan.connections_by_event_route[route]
-        payload_fields = {
-            state_key[2]
-            for state_key in CommandCompiler.state_keys(connection)
-        }
-        if event.payload_field not in payload_fields:
+        if event.payload_field not in registered_event.payload_fields:
             raise ValueError(
                 "Unknown reaction payload field: "
                 f"{event.payload_field} for {event.event_name}"

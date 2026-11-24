@@ -1,1 +1,0 @@
-"""Firmware device configuration files."""

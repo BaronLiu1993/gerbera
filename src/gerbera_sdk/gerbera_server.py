@@ -1,19 +1,15 @@
 import base64
+from collections import Counter
 from dataclasses import dataclass
 from inspect import Parameter, Signature
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any, Callable, Literal
 
 from fastmcp import FastMCP
 from gerbera_protocol import RuntimeManifest
-from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedConnection
-from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
-from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
-from gerbera_sdk.camera_runtime import CameraRuntime
-from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from mcp.types import ToolAnnotations
-from pydantic import AfterValidator, Field
+from pydantic import Field, TypeAdapter
 
+from gerbera_sdk.camera_runtime import CameraRuntime
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
@@ -23,9 +19,8 @@ from gerbera_sdk.events.reactions.reaction_schema import (
     DeleteReactionSchema,
     ReactionSchema,
 )
-from gerbera_sdk.firmware.devices.config_schema import CommandConfig, ParameterConfig
-from gerbera_sdk.firmware.devices.library import get_device_builder
-from gerbera_sdk.firmware.parameter_schema import NumericChoice
+from gerbera_sdk.config.firmware_config import load_firmware_config
+from gerbera_sdk.latest_runtime import HardwareRuntime
 from gerbera_sdk.inference import VisionLanguageModelFrameEnvironment
 from gerbera_sdk.inference.model_descriptor import ModelDescriptor
 from gerbera_sdk.inference.model_types import (
@@ -35,20 +30,9 @@ from gerbera_sdk.inference.model_types import (
 )
 from gerbera_sdk.models.hardware.camera import Frame
 from gerbera_sdk.models.hardware.connection import Connection
+from gerbera_sdk.models.hardware.camera import Frame
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
-
-MODEL_CATALOG_TYPES = {
-    "object_depth": "object_depth",
-    "object_detection": "object_detection",
-    "object_segmentation": "object_segmentation",
-    "vision_language_model": "vision_language_model",
-}
-
-FRAME_MODEL_OUTPUT_NAMES = {
-    "object_depth": "object_depth",
-    "object_segmentation": "object_segmentation",
-}
+from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
 
 def encode_camera_frame(frame: Frame) -> str:
     return base64.b64encode(frame.encode()).decode("ascii")
@@ -60,8 +44,7 @@ import json
 class GerberaServer:
     hardware_plan: HardwarePlan
     hardware_runtime: HardwareRuntime
-    controls: ConnectionControl
-    commands: CommandExecutor
+    board_runtime: BoardRuntime
     hardware_system: HardwareSystem
     camera_runtime: CameraRuntime
     model_runtime: ModelRuntime
@@ -104,211 +87,91 @@ class GerberaServer:
             meta=meta,
         )(tool_function)
 
-    def build_tool_function(
-        self,
-        connection: ResolvedConnection,
-        command: CommandConfig,
-    ) -> Callable[..., dict[str, object]]:
-        action = command.method.strip().upper()
-        if not command.params:
-
-            def tool_function() -> dict[str, object]:
-                return self.commands.execute(connection, action, {})
-
-            return tool_function
-
-        def tool_function(**values: Any) -> dict[str, object]:
-            params = {}
-            for name, value in values.items():
-                if value is not None:
-                    params[name] = value
-            return self.commands.execute(connection, action, params)
-
-        parameters: list[Parameter] = []
-        annotations: dict[str, Any] = {"return": dict[str, object]}
-        for name, parameter in command.params.items():
-            annotation = self.build_parameter_annotation(parameter)
-            if parameter.required:
-                default = Parameter.empty
-            else:
-                default = None
-                annotation |= None
-            annotations[name] = annotation
-            parameters.append(
-                Parameter(
-                    name=name,
-                    kind=Parameter.KEYWORD_ONLY,
-                    default=default,
-                    annotation=annotation,
-                )
-            )
-
-        tool_function.__annotations__ = annotations
-        tool_function.__signature__ = Signature(
-            parameters=parameters,
-            return_annotation=dict[str, object],
-        )
-        return tool_function
-
-    def build_parameter_annotation(
-        self,
-        parameter: ParameterConfig,
-    ) -> Any:
-        return Annotated[
-            float,
-            Field(
-                description=parameter.description or None,
-                strict=True,
-                allow_inf_nan=False,
-                json_schema_extra=parameter.domain.json_constraints(),
-            ),
-            AfterValidator(parameter.domain.validate_value),
-        ]
-
-    def register_connection_tool(
-        self,
-        connection: ResolvedConnection,
-        command: CommandConfig,
-        annotations: ToolAnnotations,
-    ) -> None:
-        description = command.description.strip()
-        if not description:
-            raise ValueError(
-                f"Command description is required: {command.method},{connection.name}"
-            )
-        if connection.stream_enabled:
-            description += (
-                f" Collected data is stored in table `{connection.event_name}`."
-            )
-
-        action = command.method.strip().lower()
-        tool_name = f"{action}_{connection.name}"
-        state_key = CommandCompiler.state_keys(connection)[0]
-        tool_function = self.build_tool_function(
-            connection,
-            command,
-        )
-        self.register_tool(
-            name=tool_name,
-            description=description,
-            tool_function=tool_function,
-            annotations=annotations,
-            meta={"key": self.hardware_runtime.state_key_label(state_key)},
-        )
-
-    def state_toggle(
-        self, connection: ResolvedConnection, state: int
-    ) -> Callable[[], dict[str, object]]:
-        def tool_function() -> dict[str, object]:
-            return self.controls.set_state(connection, state)
-
-        return tool_function
-
-    def stream_toggle(
-        self, connection: ResolvedConnection, state: int
-    ) -> Callable[[], dict[str, object]]:
-        def tool_function() -> dict[str, object]:
-            return self.controls.set_stream_state(connection, state)
-
-        return tool_function
-
-    def register_state_toggle_tools(
-        self,
-        connection: ResolvedConnection,
-        annotations: ToolAnnotations,
-    ) -> None:
-        state_key = CommandCompiler.state_keys(connection)[0]
-        for state, verb in ((1, "on"), (0, "off")):
-            description = f"Turn {verb} {connection.name}."
-            self.register_tool(
-                name=f"turn_{verb}_{connection.name}",
-                description=description,
-                tool_function=self.state_toggle(connection, state),
-                annotations=annotations.model_copy(
-                    update={"title": description.rstrip(".")}
-                ),
-                meta={"key": self.hardware_runtime.state_key_label(state_key)},
-            )
-
-    def register_stream_toggle_tools(
-        self,
-        connection: ResolvedConnection,
-        annotations: ToolAnnotations,
-    ) -> None:
-        state_key = CommandCompiler.state_key(connection, "stream_enabled")
-        for state, verb in ((1, "on"), (0, "off")):
-            description = f"Turn {verb} continuous streaming for {connection.name}."
-            self.register_tool(
-                name=f"turn_{verb}_{connection.name}_stream",
-                description=description,
-                tool_function=self.stream_toggle(connection, state),
-                annotations=annotations.model_copy(
-                    update={"title": description.rstrip(".")}
-                ),
-                meta={"key": self.hardware_runtime.state_key_label(state_key)},
-            )
-
     def register_hardware_tools(self) -> None:
-        for board in self.hardware_plan.boards:
+        boards = self.hardware_system.microcontrollers
+        connection_ids = Counter(
+            connection.connection_id
+            for board in boards
+            for connection in board.connections
+        )
+        for board in boards:
             for connection in board.connections:
-                self.register_connection_tools(connection)
+                tool_id = connection.connection_id
+                if connection_ids[tool_id] > 1:
+                    tool_id = f"{board.microcontroller_id}_{tool_id}"
+                self.register_connection_tools(connection, f"write_{tool_id}")
 
-    @staticmethod
-    def command_is_state_toggle(command: CommandConfig) -> bool:
-        if command.method.strip().upper() != "WRITE":
-            return False
-
-        state = command.params.get("state")
-        return (
-            state is not None
-            and isinstance(state.domain, NumericChoice)
-            and set(state.domain.values) == {0.0, 1.0}
-        )
-
-    @classmethod
-    def connection_supports_state_toggle(
-        cls,
-        connection: ResolvedConnection,
-    ) -> bool:
-        for command in CommandCompiler.command_specs(connection):
-            if cls.command_is_state_toggle(command):
-                return True
-        return False
-
-    @classmethod
-    def connection_supports_stream_toggle(
-        cls,
-        connection: ResolvedConnection,
-    ) -> bool:
-        return connection.stream_enabled and cls.connection_supports_state_toggle(
-            connection
-        )
-
-    def register_connection_tools(
-        self,
-        connection: ResolvedConnection,
-    ) -> None:
-        commands = CommandCompiler.command_specs(connection)
-        supports_stream = self.connection_supports_stream_toggle(connection)
-        for command in commands:
-            annotations = self.command_annotations(connection, command)
-            if not (supports_stream and self.command_is_state_toggle(command)):
-                self.register_connection_tool(connection, command, annotations)
-
-        if not self.connection_supports_state_toggle(connection):
+    def register_connection_tools(self, connection: Connection, tool_name: str | None = None) -> None:
+        config = load_firmware_config(connection.component_type)
+        write = config.get("write")
+        supports_stream = connection.supports_streaming and "stream" in config
+        if write is None and not supports_stream:
             return
 
-        for command in commands:
-            if self.command_is_state_toggle(command):
-                toggle_command = command
-                break
-        else:
-            raise RuntimeError("State toggle command is not registered")
-        toggle_annotations = self.command_annotations(connection, toggle_command)
+        specs = dict(write["params"]) if write is not None else {}
+        required = [name for name, spec in specs.items() if spec["required"]]
         if supports_stream:
-            self.register_stream_toggle_tools(connection, toggle_annotations)
-        else:
-            self.register_state_toggle_tools(connection, toggle_annotations)
+            specs["stream_enabled"] = {"choices": [0, 1], "required": write is None}
+
+        parameters = []
+        adapters = {}
+        for name, spec in specs.items():
+            annotation: Any
+            if "choices" in spec:
+                annotation = Literal[tuple(spec["choices"])]
+            else:
+                annotation = Annotated[
+                    int, Field(strict=True, ge=spec.get("minimum"), le=spec.get("maximum"))
+                ]
+            adapters[name] = TypeAdapter(annotation)
+
+            default = Parameter.empty
+            if not spec["required"] or (supports_stream and write is not None):
+                default = None
+                annotation |= None
+            parameters.append(
+                Parameter(name, Parameter.KEYWORD_ONLY, default=default, annotation=annotation)
+            )
+        signature = Signature(parameters, return_annotation=dict[str, bool])
+
+        def write_tool(**values: int | None) -> dict[str, bool]:
+            arguments = signature.bind(**values).arguments
+            fields = {}
+            for name, value in arguments.items():
+                if value is not None:
+                    fields[name] = adapters[name].validate_python(value, strict=True)
+
+            if "stream_enabled" in fields:
+                if len(fields) != 1:
+                    raise ValueError("Send stream control as its own write")
+            elif not fields or any(name not in fields for name in required):
+                raise ValueError("Supply the required device settings")
+
+            self.board_runtime.write_connection(connection, fields)
+            return {"sent": True}
+
+        write_tool.__signature__ = signature
+        write_tool.__annotations__ = {
+            parameter.name: parameter.annotation for parameter in parameters
+        }
+        write_tool.__annotations__["return"] = signature.return_annotation
+        description = f"Write settings for {connection.connection_id}."
+        if supports_stream:
+            description += " Set stream_enabled to 1 to start streaming or 0 to stop."
+
+        result_field = write["response_field"] if write is not None else "stream_enabled"
+        state_key = (connection.microcontroller_id, connection.connection_id, result_field)
+        self.register_tool(
+            name=tool_name or f"write_{connection.connection_id}",
+            description=description,
+            tool_function=write_tool,
+            annotations=ToolAnnotations(
+                title=f"Write {connection.connection_id}",
+                readOnlyHint=False,
+                openWorldHint=False,
+            ),
+            meta={"key": self.hardware_runtime.get_state_key_label(state_key)},
+        )
 
     @staticmethod
     def model_catalog_type(model: ModelDescriptor) -> ModelCatalogType:
@@ -627,7 +490,7 @@ class GerberaServer:
                         model_type=self.model_catalog_type(model),
                         subscribed_camera=SubscribedCameraCatalogEntry(
                             camera_id=camera.camera_id,
-                            name=camera.name,
+                            name=camera.camera_id,
                         ),
                         is_running=model_id in running_model_ids,
                         turn_on_tool=f"turn_on_{model.name}",
@@ -777,7 +640,7 @@ class GerberaServer:
                         }
                         for board in self.hardware_plan.boards
                     ],
-                    "cameras": [camera.name for camera in self.hardware_system.cameras],
+                    "cameras": [camera.camera_id for camera in self.hardware_system.cameras],
                 }
             )
 
@@ -799,16 +662,4 @@ class GerberaServer:
             annotations=ToolAnnotations(
                 title="Get current environment state", readOnlyHint=True
             ),
-        )
-
-    def command_annotations(
-        self, connection: Connection, command: CommandConfig
-    ) -> ToolAnnotations:
-        builder = get_device_builder(connection.component_type)
-        builder.validate_required_pins(connection)
-        annotations = builder.command_config(command.method, connection).annotations
-        return ToolAnnotations(
-            title=builder.render(annotations.title, connection),
-            readOnlyHint=annotations.read_only_hint,
-            openWorldHint=annotations.open_world_hint,
         )

@@ -252,7 +252,7 @@ Gerbera currently includes configuration-driven support for:
 - SG90 and MG996R servos
 
 Device behavior is defined in
-[`src/gerbera_sdk/firmware/devices/configs/`](src/gerbera_sdk/firmware/devices/configs/).
+[`components_config.yaml`](src/gerbera_sdk/firmware/config/components_config.yaml).
 Adding a device definition supplies its pin contract, commands, state, firmware
 handlers, and validation rules.
 
@@ -294,7 +294,6 @@ from gerbera_sdk.models.hardware.microcontroller import Microcontroller, Runtime
 
 board = Microcontroller(
     name="esp32",
-    device_id="esp32-1",
     fqbn="esp32:esp32:esp32",
     upload_port="/dev/cu.usbserial-0001",
     runtime_transport=RuntimeTransportConfig.bluetooth_classic(

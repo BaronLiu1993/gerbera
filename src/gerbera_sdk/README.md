@@ -79,16 +79,16 @@ Use `GerberaRuntime` in [gerbera_runtime.py](/Users/jiexuanliu/Desktop/firecrack
   Validates hardware, constructs runtimes, prepares storage, verifies firmware,
   starts dependencies, runs the MCP app, and closes resources on exit.
 
-- `build_application(hardware, database_settings)`
+- `build_application(hardware, database)`
   Builds the MCP application for embedding or inspection without running its server.
-  `run(hardware, database_settings, **transport_options)` uses this same path.
+  `run(hardware, database, **transport_options)` uses this same path.
 
 - `generate_firmware`, `compile_firmware`, `upload_firmware`, `verify_firmware`
   Expose the four explicit firmware operations through the facade. Each operation
   validates the declaration; verification never generates or uploads firmware.
 
-Database credentials are supplied explicitly with `DatabaseSettings` from
-`models/runtime/storage/database_settings.py`. Configuration and environment loading
+Supply database credentials directly on `DatabaseRuntime` from `database_runtime.py`.
+Configuration and environment loading
 belong to the server entry point, outside the facade.
 
 The independently runnable entry point owns loading and validating SDK settings

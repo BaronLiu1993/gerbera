@@ -56,7 +56,6 @@ class Frame:
             interpolation = cv2.INTER_AREA
         else:
             interpolation = cv2.INTER_LINEAR
-
         resized_image = cv2.resize(
             self.image, (resized_width, resized_height), interpolation=interpolation
         )

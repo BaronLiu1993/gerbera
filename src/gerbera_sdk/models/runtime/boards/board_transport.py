@@ -1,7 +1,5 @@
 from dataclasses import dataclass, field
 import threading
-import time
-
 import serial
 
 SERIAL_READ_TIMEOUT_SECONDS = 2.0
@@ -10,7 +8,7 @@ SERIAL_READ_TIMEOUT_SECONDS = 2.0
 class BoardTransport:
     port: str
     baud_rate: int
-    connection: serial.Serial = field(default=None, init=False, repr=False)
+    connection: serial.Serial | None = field(default=None, init=False, repr=False)
     lock: threading.RLock = field(
         default_factory=threading.RLock,
         init=False,
@@ -18,12 +16,26 @@ class BoardTransport:
     )
 
     def connect(self) -> None:
-        self.connection = serial.Serial(
+        connection = serial.Serial(
             self.port,
             self.baud_rate,
             timeout=SERIAL_READ_TIMEOUT_SECONDS,
         )
-        self.connection.reset_input_buffer()
+        try:
+            connection.reset_input_buffer()
+        except BaseException as error:
+            try:
+                connection.close()
+            except Exception as cleanup_error:
+                error.add_note(f"Serial connection cleanup failed: {cleanup_error}")
+            raise
+        self.connection = connection
+
+    def get_connection(self) -> serial.Serial:
+        connection = self.connection
+        if connection is None or not connection.is_open:
+            raise RuntimeError("Board transport is not connected")
+        return connection
 
     def write(self, command: str) -> None:
         with self.lock:
@@ -35,12 +47,6 @@ class BoardTransport:
         return self.get_connection().readline()
 
     def close(self) -> None:
-        with self.lock:
-            if self.connection is not None and self.connection.is_open:
-                self.connection.close()
-
-    def get_connection(self) -> serial.Serial:
-        if self.connection is None or not self.connection.is_open:
-            raise RuntimeError("Board transport is not connected")
-        return self.connection
-
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None

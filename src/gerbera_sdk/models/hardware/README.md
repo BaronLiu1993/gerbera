@@ -52,8 +52,7 @@ classDiagram
     }
 
     class Microcontroller {
-      id
-      hardware_system_id
+      name
       upload_port
       runtime_transport
       baud_rate
@@ -95,10 +94,10 @@ classDiagram
 
 - identifies the top-level declared system
 
-`Microcontroller.id`
+`Microcontroller.name`
 
-- must be declared explicitly with `device_id`
-- must match the configured device registry when a registry is supplied
+- must be unique within the hardware system
+- identifies the board for event routing and firmware output
 - remains stable when the runtime transport changes
 
 Upload and runtime connections are separate. `upload_port` is used only by
@@ -110,7 +109,7 @@ alias is rejected.
 
 `Connection.microcontroller_id`
 
-- must match the owning microcontroller
+- must match the owning microcontroller's name
 - is filled during connection registration if omitted
 
 ## Connection Event Name

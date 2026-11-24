@@ -1,56 +1,54 @@
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Mapping
 from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 
 from fastmcp import FastMCP
 
+from gerbera_sdk.camera_runtime import CameraRuntime
 from gerbera_sdk.events.event_bus import EventBus
 from gerbera_sdk.events.event_listener import EventListener
+from gerbera_sdk.events.event_schema import EventKey
 from gerbera_sdk.events.event_worker import EventWorker
 from gerbera_sdk.events.reactions.reaction_bus import ReactionBus
 from gerbera_sdk.events.reactions.reaction_executor import ReactionActionRegistry
 from gerbera_sdk.firmware.firmware_generator import FirmwareGenerator
 from gerbera_sdk.firmware.firmware_uploader import FirmwareUploader
+from gerbera_sdk.latest_runtime import HardwareRuntime
 from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.hardware.validation import HardwareContractCompiler
 from gerbera_sdk.models.runtime.boards.board_runtime import BoardRuntime
-from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
-from gerbera_sdk.models.runtime.commands.command_response import CommandResponseRegistry
-from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
-from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
-from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from gerbera_sdk.gerbera_server import GerberaServer
-from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
-from gerbera_sdk.database_runtime import DatabaseRuntime, DatabaseSettings
+from gerbera_sdk.database_runtime import DatabaseRuntime
 
 
 class GerberaRuntime:
     @staticmethod
-    def build_application(hardware: HardwareSystem, database: DatabaseSettings) -> FastMCP:
+    def build_application(hardware: HardwareSystem, database: DatabaseRuntime) -> FastMCP:
         plan = GerberaRuntime.validate_hardware(hardware)
         boards = BoardRuntime(hardware)
         cameras = CameraRuntime(hardware)
         models = ModelRuntime(hardware, cameras)
-        storage = DatabaseRuntime(hardware, database)
-        worker = EventWorker(database=storage)
-        state = GerberaRuntime.build_state(plan)
+        worker = EventWorker(database=database)
         events = EventBus()
-        events.register(plan, worker)
-        responses = CommandResponseRegistry()
-        commands = CommandExecutor(plan, boards, responses)
+        events.register(hardware, worker)
+        state = GerberaRuntime.build_state(events)
         actions = ReactionActionRegistry()
-        reactions = ReactionBus(plan, events, actions)
-        listener = EventListener(
-            hardware_plan=plan, transport_pool=boards.transport_pool,
-            event_bus=events, reaction_bus=reactions, hardware_runtime=state,
-            command_responses=responses,
-        )
+        reactions = ReactionBus(events, actions)
 
         @asynccontextmanager
         async def lifespan(server: FastMCP) -> AsyncIterator[dict[str, object]]:
-            storage.prepare()
+            loop = asyncio.get_running_loop()
+
+            def notify_reactions(event_key: EventKey, payload: Mapping[str, str]) -> None:
+                asyncio.run_coroutine_threadsafe(
+                    reactions.update_reaction_value(event_key, payload), loop
+                )
+
+            listener = EventListener(boards, events, state, on_event=notify_reactions)
+            database.prepare(hardware)
             models.register_models()
             reactions.restore_reactions()
             with ExitStack() as cleanup:
@@ -82,8 +80,7 @@ class GerberaRuntime:
             hardware_system=hardware,
             hardware_plan=plan,
             hardware_runtime=state,
-            controls=ConnectionControl(events, worker, state, commands),
-            commands=commands,
+            board_runtime=boards,
             camera_runtime=cameras,
             model_runtime=models,
             reactions=reactions,
@@ -93,7 +90,7 @@ class GerberaRuntime:
         return app
 
     @staticmethod
-    def run(hardware: HardwareSystem, database: DatabaseSettings, **transport_options) -> None:
+    def run(hardware: HardwareSystem, database: DatabaseRuntime, **transport_options) -> None:
         GerberaRuntime.build_application(hardware, database).run(**transport_options)
 
     @staticmethod
@@ -105,48 +102,48 @@ class GerberaRuntime:
     def bind_connection_microcontroller_ids(hardware: HardwareSystem) -> None:
         GerberaRuntime.validate_declared_ownership(hardware)
         for controller in hardware.microcontrollers:
-            controller.hardware_system_id = hardware.id
-            controller_id = controller.id
             for connection in controller.connections:
-                connection.microcontroller_id = controller_id
+                connection.microcontroller_id = controller.microcontroller_id
 
     @staticmethod
     def validate_declared_ownership(hardware: HardwareSystem) -> None:
         for controller in hardware.microcontrollers:
-            if controller.hardware_system_id not in (None, hardware.id):
-                raise ValueError(f"Conflicting hardware system ownership: {controller.name}")
             for connection in controller.connections:
-                if connection.microcontroller_id not in (None, controller.id):
+                if connection.microcontroller_id not in (
+                    None,
+                    controller.microcontroller_id,
+                ):
                     raise ValueError(f"Conflicting microcontroller ownership: {connection.name}")
 
     @staticmethod
-    def build_state(plan: HardwarePlan) -> HardwareRuntime:
+    def build_state(events: EventBus) -> HardwareRuntime:
         state = HardwareRuntime()
-        for board in plan.boards:
-            for connection in board.connections:
-                for key in CommandCompiler.state_keys(connection):
-                    state.register_state_store(key)
+        for key, event in events.events.items():
+            for name in event.payload_fields:
+                state.register_state_store((key.microcontroller_id, key.event_name, name))
         return state
 
     @staticmethod
     def generate_firmware(hardware: HardwareSystem) -> dict[str, Path]:
         GerberaRuntime.bind_connection_microcontroller_ids(hardware)
         return {
-            board.id: FirmwareGenerator(board).write_files()
+            board.microcontroller_id: FirmwareGenerator(board).write_files()
             for board in hardware.microcontrollers
         }
 
     @staticmethod
     def compile_firmware(hardware: HardwareSystem, sketches: dict[str, Path]) -> dict[str, Path]:
         return {
-            board.id: FirmwareUploader(board).compile(sketches[board.id])
+            board.microcontroller_id: FirmwareUploader(board).compile(
+                sketches[board.microcontroller_id]
+            )
             for board in hardware.microcontrollers
         }
 
     @staticmethod
     def upload_firmware(hardware: HardwareSystem, builds: dict[str, Path]) -> None:
         for board in hardware.microcontrollers:
-            FirmwareUploader(board).upload(builds[board.id])
+            FirmwareUploader(board).upload(builds[board.microcontroller_id])
 
     @staticmethod
     def install_dependencies(hardware: HardwareSystem) -> None:

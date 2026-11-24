@@ -1,84 +1,94 @@
-import json
 from dataclasses import dataclass
-from importlib import resources
+from importlib.resources import files
+import json
 from pathlib import Path
 from string import Template
+from textwrap import indent
+from typing import TYPE_CHECKING
 
-from gerbera_sdk.firmware.boards import BOARD_REGISTRY
-from gerbera_sdk.firmware.devices.library import get_device_builder
-from gerbera_sdk.firmware.firmware_schema import BoardTransportKind, MAX_SERIAL_MESSAGE_BYTES
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from gerbera_sdk.config.firmware_config import load_firmware_config
+from gerbera_sdk.firmware.firmware_schema import MAX_SERIAL_MESSAGE_BYTES
 from gerbera_sdk.paths import FIRMWARE_PATH
 
-
-@dataclass(frozen=True)
-class FirmwareFiles:
-    sketch: str
-
-    def named_files(self, sketch_name: str) -> dict[str, str]:
-        return {
-            f"{sketch_name}.ino": self.sketch,
-        }
+if TYPE_CHECKING:
+    from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
 
 @dataclass(frozen=True)
 class FirmwareGenerator:
-    board: Microcontroller
+    board: "Microcontroller"
 
-    def generate(self) -> FirmwareFiles:
-        board_definition = BOARD_REGISTRY.get_definition(self.board.fqbn)
-        includes = list(board_definition.includes)
+    def generate(self) -> str:
+        firmware = files("gerbera_sdk.firmware")
+        includes = {}
         definitions = []
         setup = []
-        streams = []
         handlers = []
         dispatch = []
+        streams = []
+        max_message_fields = 1
 
-        for connection in self.board.connections:
-            builder = get_device_builder(connection.component_type)
-            includes.extend(library.include for library in builder.required_libraries())
-            definitions.append(builder.build_definitions(connection))
-            setup.extend(f"  pinMode({pin.pin}, {pin.mode.value});" for pin in builder.pin_modes(connection))
-            setup.extend(builder.build_setup_lines(connection))
-            inactive_output = builder.render(builder.config.verification.safe_stop, connection)
-            setup.extend(f"  {line}" for line in inactive_output.splitlines())
-            streams.extend(builder.build_stream_lines(connection))
-            handlers.append(builder.build_handler(connection))
-            for command in builder.required_commands(connection):
-                dispatch.append(
-                    f'  if (action == "{command.method.upper()}" && commandName == "{connection.name}") '
-                    f'{{ handle_{connection.name}(input); return; }}'
+        for index, connection in enumerate(self.board.connections):
+            config = load_firmware_config(connection.component_type)
+            symbol = f"device_{index}"
+            target = json.dumps(connection.connection_id, ensure_ascii=False)
+            values = {"symbol": symbol, "target": target}
+
+            if connection.include is not None:
+                includes[connection.include] = None
+            for pin_name, mode in config["pin_modes"].items():
+                pin = getattr(connection, pin_name)
+                values[pin_name] = pin
+                setup.append(f"pinMode({pin}, {mode});")
+
+            definitions.append(Template(config.get("definitions", "")).substitute(values))
+            setup.append(Template(config.get("setup", "")).substitute(values))
+
+            routes = []
+            stream = config.get("stream")
+            if connection.supports_streaming and stream is not None:
+                definitions.append(f"bool {symbol}_streaming = false;")
+                body = Template(stream["body"]).substitute(
+                    values, response_field=json.dumps(stream["field"])
+                ).strip()
+                streams.append(f"if ({symbol}_streaming) {{\n{indent(body, '  ')}\n}}")
+                routes.append(
+                    'if (command.field("stream_enabled").length() > 0) {\n'
+                    f"  setStreamEnabled(command, {symbol}_streaming);\n  return;\n}}"
                 )
 
-        transport_definition = "#define GERBERA_TRANSPORT Serial"
-        transport_setup = f"  GERBERA_TRANSPORT.begin({self.board.baud_rate});"
-        if self.board.runtime_transport.kind == BoardTransportKind.BLUETOOTH_CLASSIC:
-            includes.append("BluetoothSerial.h")
-            transport_definition = "BluetoothSerial GERBERA_TRANSPORT;"
-            device_name = json.dumps(self.board.runtime_transport.device_name)
-            transport_setup = f"  GERBERA_TRANSPORT.begin({device_name});"
+            write = config.get("write")
+            if write is not None:
+                name = f"{symbol}_write"
+                max_message_fields = max(max_message_fields, len(write["params"]))
+                body = Template(write["body"]).substitute(
+                    values, response_field=json.dumps(write["response_field"])
+                ).strip()
+                handlers.append(
+                    f"void {name}(const SerialMessage& command) {{\n{indent(body, '  ')}\n}}"
+                )
+                routes.append(f"{name}(command);\nreturn;")
 
-        package = resources.files("gerbera_sdk.firmware")
-        template = Template(package.joinpath("sketch.ino.template").read_text())
-        sketch = template.substitute(
-            includes="\n".join(f"#include <{name}>" for name in dict.fromkeys(includes)),
-            transport_definition=transport_definition,
-            transport_setup=transport_setup,
+            if routes:
+                route = indent("\n".join(routes), "  ")
+                dispatch.append(f"if (command.target == {target}) {{\n{route}\n}}")
+
+        sketch = firmware.joinpath("sketch.ino.template")
+        return Template(sketch.read_text(encoding="utf-8")).substitute(
+            includes="\n".join(f"#include <{name}>" for name in includes),
             definitions="\n".join(definitions),
-            setup="\n".join(setup),
-            streams="\n".join(streams),
+            setup=indent("\n".join(setup), "  "),
             handlers="\n\n".join(handlers),
-            dispatch="\n".join(dispatch),
+            dispatch=indent("\n".join(dispatch), "    "),
+            streams=indent("\n".join(streams), "  "),
+            baud_rate=self.board.baud_rate,
+            max_message_fields=max_message_fields,
             max_message_bytes=MAX_SERIAL_MESSAGE_BYTES,
         )
-        return FirmwareFiles(sketch)
 
     def write_files(self) -> Path:
-        directory = FIRMWARE_PATH / self.board.id
-        directory.mkdir(parents=True, exist_ok=True)
-        for name in ("GerberaRuntime.h", "GerberaRuntime.cpp", "Components.h", "Components.cpp",
-                     "DeviceCommands.h", "DeviceCommands.cpp", "SerialCommands.h"):
-            (directory / name).unlink(missing_ok=True)
-        for name, source in self.generate().named_files(self.board.id).items():
-            (directory / name).write_text(source)
-        return directory / f"{self.board.id}.ino"
+        board_id = self.board.microcontroller_id
+        path = FIRMWARE_PATH / board_id / f"{board_id}.ino"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.generate(), encoding="utf-8")
+        return path

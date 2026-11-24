@@ -4,13 +4,16 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 
-from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
-from gerbera_sdk.models.hardware.microcontroller import Microcontroller
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
+    from gerbera_sdk.models.hardware.microcontroller import Microcontroller
 
 
 @dataclass(frozen=True)
 class FirmwareUploader:
-    board: Microcontroller
+    board: "Microcontroller"
 
     def compile(self, sketch_path: Path) -> Path:
         if not sketch_path.is_file():
@@ -39,18 +42,20 @@ class FirmwareUploader:
         ], check=True)
 
     @staticmethod
-    def install_dependencies(hardware_system: HardwareSystem) -> None:
+    def install_dependencies(hardware_system: "HardwareSystem") -> None:
+        required_cores: set[str] = set()
+        required_libraries: set[str] = set()
+        for board in hardware_system.microcontrollers:
+            required_cores.add(":".join(board.fqbn.split(":")[:2]))
+            for connection in board.connections:
+                if connection.library is not None:
+                    required_libraries.add(connection.library)
+
         cores = FirmwareUploader.read_inventory("core")
         libraries = FirmwareUploader.read_inventory("lib")
-        required_cores = set(hardware_system.get_required_microcontroller_libraries())
-        required_libraries = {
-            library.install
-            for board in hardware_system.microcontrollers
-            for library in board.get_required_connection_libraries()
-            if library.install.strip()
-        }
         for name in sorted(required_cores - cores):
             subprocess.run(["arduino-cli", "core", "install", name], check=True)
+
         for name in sorted(required_libraries - libraries):
             subprocess.run(["arduino-cli", "lib", "install", name], check=True)
 
@@ -58,14 +63,17 @@ class FirmwareUploader:
     def read_inventory(kind: str) -> set[str]:
         result = subprocess.run(
             ["arduino-cli", kind, "list", "--format", "json"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
-        payload = json.loads(result.stdout)
-        if not isinstance(payload, dict):
-            raise ValueError("Arduino CLI inventory must be an object")
+        inventory = json.loads(result.stdout)
         if kind == "core":
-            entries = payload["platforms"]
-            return {entry["id"] for entry in entries
-                    if entry.get("installed_version")}
-        entries = payload["installed_libraries"]
-        return {entry["library"]["name"] for entry in entries}
+            return {
+                platform["id"]
+                for platform in inventory["platforms"]
+                if platform.get("installed_version")
+            }
+        return {
+            entry["library"]["name"] for entry in inventory["installed_libraries"]
+        }

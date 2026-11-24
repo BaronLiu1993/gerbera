@@ -6,6 +6,8 @@ import sys
 
 import yaml
 
+from gerbera_sdk.config.database_config import DATABASE_NAME
+
 
 def write_secret_file(path: Path, content: str) -> None:
     if path.exists():
@@ -35,7 +37,7 @@ def initialise_project_files() -> None:
                 "kind": "container",
                 "image": "ghcr.io/baronliu1993/gerbera-postgres:latest",
                 "url": "postgresql://127.0.0.1:6432", "container_port": 5432,
-                "environment": {"POSTGRES_DB": "gerbera", "POSTGRES_USER": "gerbera_admin"},
+                "environment": {"POSTGRES_DB": DATABASE_NAME, "POSTGRES_USER": "gerbera_admin"},
                 "env_files": [".gerbera/secrets/database.env", ".gerbera/secrets/sdk-database.env"],
                 "volume": f"gerbera_{hashlib.sha256(str(Path.cwd().resolve()).encode()).hexdigest()[:12]}_postgres_data",
                 "volume_target": "/var/lib/postgresql/data",

@@ -19,7 +19,6 @@ dependencies = [
     "PyYAML>=6.0,<7.0",
     "pyserial>=3.5,<4.0",
     "questionary>=2.0,<3.0",
-    "starlette>=0.37,<1.0",
     "typer>=0.12,<1.0",
 ]
 
@@ -37,9 +36,8 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
+"gerbera_sdk.config" = ["sql/*.sql", "firmware/*.yaml"]
 "gerbera_sdk.firmware" = ["*.template"]
-"gerbera_sdk.firmware.boards" = ["*.yaml"]
-"gerbera_sdk.firmware.devices.configs" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

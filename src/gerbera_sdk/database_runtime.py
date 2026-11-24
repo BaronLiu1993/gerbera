@@ -1,11 +1,9 @@
-import time
 from dataclasses import dataclass, field
-from importlib.resources import files
 
 import psycopg
 from psycopg import sql
 
-from gerbera_sdk.config.database_tables import DATABASE_NAME, TABLE_CONFIGURATION
+from gerbera_sdk.config.database_config import DATABASE_NAME, load_table_sql
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 
 
@@ -33,20 +31,12 @@ class DatabaseRuntime:
                 ) from None
 
     def prepare(self, hardware: HardwareSystem) -> None:
-        if self.schema_password is None:
-            raise RuntimeError(
-                "SDK stream schema preparation requires GERBERA_SCHEMA_PASSWORD"
-            )
-
-        sql_directory = files("gerbera_sdk.config").joinpath("sql")
-
         for board in hardware.microcontrollers:
             for connection in board.connections:
                 if connection.supports_streaming:
                     with self.connect("gerbera_schema_owner", self.schema_password) as database:
-                        filename = TABLE_CONFIGURATION[connection.component_type]
                         table_name = connection.connection_id
-                        template = sql_directory.joinpath(filename).read_text(encoding="utf-8")
+                        template = load_table_sql(connection.component_type)
                         database.execute(
                             sql.SQL(template).format(
                                 table=sql.Identifier(table_name),
@@ -57,7 +47,7 @@ class DatabaseRuntime:
 
     def write_batch(self, table_name: str, batch: list[dict[str, str]]) -> None:
         if not batch:
-            raise ValueError(f"Database write payload is empty: {table_name}")
+            return
 
         keys = batch[0].keys()
         query = sql.SQL(
