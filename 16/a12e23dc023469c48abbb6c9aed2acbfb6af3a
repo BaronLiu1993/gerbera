@@ -1,0 +1,106 @@
+src/gerbera_sdk/gerbera_server.py
+  s_5ea950b1930211::t_7117de49fb32db 33,493,643
+  s_af6d6e1bac7cc2::t_2df25959a39c4c 22
+  s_af6d6e1bac7cc2::t_01e70a1d5f6cf2 2,5,10,23,35,47,90-103,105-109,111-121,123-129,133,135,137-141,144-148,150-151,153-163,167-173
+  s_5ea950b1930211::t_9125cd2258f60c 12
+  s_af6d6e1bac7cc2::t_832a25ad2a9fbc 104,142,165
+src/gerbera_sdk/firmware/README.md
+  s_af6d6e1bac7cc2::t_2469ea5ebbecda 9-10,27-28,32-37
+  s_af6d6e1bac7cc2::t_09bef8792b628e 31
+  s_af6d6e1bac7cc2::t_2df25959a39c4c 8
+src/gerbera_sdk/models/runtime/boards/board_runtime.py
+  s_af6d6e1bac7cc2::t_3100512929cdef 1,4,7-11,16,46-54
+  s_af6d6e1bac7cc2::t_856612ce78ac64 2,22-28,31-33,36-39,42-45
+  s_af6d6e1bac7cc2::t_8b1dda54a6841e 20-21
+src/gerbera_sdk/events/event_listener.py
+  s_af6d6e1bac7cc2::t_f3ac7d73db3ef9 3,5,9,12-17,21,23,29,33-35,37,39,50,55,61,65-67,70,72-77,81-87
+  s_af6d6e1bac7cc2::t_f46268e169e78f 78-79
+  s_af6d6e1bac7cc2::t_966af375c6f7ad 1,8,24,88-89
+src/gerbera_sdk/events/event_bus.py
+  s_af6d6e1bac7cc2::t_2df25959a39c4c 7
+  s_af6d6e1bac7cc2::t_f3ac7d73db3ef9 2,9-12,18-19,21-27,30-33,35-48,50-57
+  s_af6d6e1bac7cc2::t_f46268e169e78f 28-29
+  s_af6d6e1bac7cc2::t_ccef8176dad1d7 34
+  s_af6d6e1bac7cc2::t_ddf569d0ba6a3d 8
+src/gerbera_sdk/gerbera_runtime.py
+  s_af6d6e1bac7cc2::t_e38f732cbed20d 39,46-48
+  s_af6d6e1bac7cc2::t_f46268e169e78f 17,36-37,83,119,121-123
+  s_799c6fc964bc79::t_a1ea8ec36226fa 112-115,139
+  s_af6d6e1bac7cc2::t_966af375c6f7ad 1-2,11,43-45,49-50
+  s_5ea950b1930211::t_9125cd2258f60c 8
+  s_af6d6e1bac7cc2::t_cfb1e2dc1d1a73 24,29,34,51,93
+  s_799c6fc964bc79::t_2005c185b383d7 137-138
+pyproject.toml
+  s_af6d6e1bac7cc2::t_ccef8176dad1d7 39
+src/gerbera_sdk/firmware/firmware_generator.py
+  s_af6d6e1bac7cc2::t_c1c4f3eef992fa 2-3,6-7,13-14,21-23,28-31,33-51,53-58,60-68,70,72-74,76-78,80,82-85,90-94
+  s_799c6fc964bc79::t_0716900f28f9e8 19
+  s_af6d6e1bac7cc2::t_2df25959a39c4c 9
+  s_af6d6e1bac7cc2::t_09bef8792b628e 10
+  s_af6d6e1bac7cc2::t_ccef8176dad1d7 32,52
+src/gerbera_sdk/README.md
+  s_af6d6e1bac7cc2::t_cfb1e2dc1d1a73 82,84,90-91
+src/gerbera_sdk/firmware/firmware_uploader.py
+  s_af6d6e1bac7cc2::t_c1c4f3eef992fa 7-11,16,45-53,58,66-68,70,72-79
+src/gerbera_sdk/models/hardware/README.md
+  s_799c6fc964bc79::t_a1ea8ec36226fa 55,97,99-100,112
+src/gerbera_sdk/events/buffer.py
+  s_af6d6e1bac7cc2::t_3100512929cdef 3,5-6,12,25
+src/gerbera_sdk/models/hardware/connection.py
+  s_af6d6e1bac7cc2::t_34b3f63440d3d1 2,9-13
+  s_af6d6e1bac7cc2::t_59b8de439944e5 1
+src/gerbera_cli/initialise.py
+  s_af6d6e1bac7cc2::t_59b8de439944e5 40
+  s_af6d6e1bac7cc2::t_2df25959a39c4c 9
+  s_af6d6e1bac7cc2::t_c8ed4e5ff0597e 10
+.docker/postgres/init.sh
+  s_af6d6e1bac7cc2::t_59b8de439944e5 4-5,23
+src/gerbera_sdk/events/reactions/reaction_bus.py
+  s_af6d6e1bac7cc2::t_e38f732cbed20d 40,48
+src/gerbera_sdk/camera_runtime.py
+  s_af6d6e1bac7cc2::t_60a0d388866529 5,53
+src/gerbera_sdk/database_runtime.py
+  s_af6d6e1bac7cc2::t_4c2cdc14fd14eb 6
+src/gerbera_sdk/events/event.py
+  s_af6d6e1bac7cc2::t_f3ac7d73db3ef9 1,12-13,19-22,25-28,30-32
+README.md
+  s_799c6fc964bc79::t_94f1cf57b7860a 255
+src/gerbera_sdk/models/runtime/boards/board_transport.py
+  s_af6d6e1bac7cc2::t_856612ce78ac64 11,19,24-38,50-52
+src/gerbera_sdk/firmware/sketch.ino.template
+  s_af6d6e1bac7cc2::t_c1c4f3eef992fa 12-13,16-18,26,32,35,44,46-48,53,64,67-68,77,81-85,87-88,91,95-96,98-99,103,112-113
+  s_af6d6e1bac7cc2::t_3100512929cdef 73-74,78
+  s_af6d6e1bac7cc2::t_09bef8792b628e 4-11,14-15,19-23,25,27-30,33-34,36-43,50-52,54-57,60-63,65,70,110,118-119,127-130,132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "16a12e23dc023469c48abbb6c9aed2acbfb6af3a",
+  "prompts": {},
+  "sessions": {
+    "s_5ea950b1930211": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fcbb-4192-7dd2-87e7-0819cafeadd9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    },
+    "s_799c6fc964bc79": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f179-c70c-78a0-971b-5a79305af5d2",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    },
+    "s_af6d6e1bac7cc2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2098f-c65f-7db2-ae2f-8de60c22b6aa",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
