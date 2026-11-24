@@ -1,3 +1,4 @@
+import base64
 from dataclasses import dataclass
 from inspect import Parameter, Signature
 from typing import Annotated, Any, Callable
@@ -8,7 +9,7 @@ from gerbera_sdk.models.hardware.hardware_plan import HardwarePlan, ResolvedConn
 from gerbera_sdk.models.runtime.commands.command_executor import CommandExecutor
 from gerbera_sdk.models.runtime.commands.command_runtime import CommandCompiler
 from gerbera_sdk.models.runtime.commands.connection_control import ConnectionControl
-from gerbera_sdk.models.runtime.perception.camera_runtime import CameraRuntime
+from gerbera_sdk.camera_runtime import CameraRuntime
 from gerbera_sdk.models.runtime.perception.model_runtime import ModelRuntime
 from mcp.types import ToolAnnotations
 from pydantic import AfterValidator, Field
@@ -32,6 +33,7 @@ from gerbera_sdk.inference.model_types import (
     ModelCatalogType,
     SubscribedCameraCatalogEntry,
 )
+from gerbera_sdk.models.hardware.camera import Frame
 from gerbera_sdk.models.hardware.connection import Connection
 from gerbera_sdk.models.hardware.hardware_system import HardwareSystem
 from gerbera_sdk.models.runtime.state.hardware_runtime import HardwareRuntime
@@ -47,6 +49,9 @@ FRAME_MODEL_OUTPUT_NAMES = {
     "object_depth": "object_depth",
     "object_segmentation": "object_segmentation",
 }
+
+def encode_camera_frame(frame: Frame) -> str:
+    return base64.b64encode(frame.encode()).decode("ascii")
 
 import json
 
@@ -327,23 +332,28 @@ class GerberaServer:
                     ] = 0.0,
                 ) -> list[str]:
                     frames = self.camera_runtime.capture_frames(
-                        camera_key=camera_key,
+                        camera_id=camera_key,
                         image_count=image_count,
                         interval_seconds=interval_seconds,
                     )
                     encoded_frames: list[str] = []
                     for frame in frames:
-                        encoded_frames.append(frame.to_base64_string())
+                        encoded_frames.append(encode_camera_frame(frame))
                     return encoded_frames
 
                 return capture_frames_from_camera
 
             self.register_tool(
-                name=f"capture_frames_from_{camera.name}",
-                description=f"Capture one or more current images from {camera.name}. image_count controls the batch size and interval_seconds controls the delay between images. Returns the images as Base64 strings for precise vision inference.",
+                name=f"capture_frames_from_{camera.camera_id}",
+                description=(
+                    f"Capture one or more current images from {camera.camera_id}. "
+                    "image_count controls the batch size and interval_seconds controls "
+                    "the delay between images. Returns Base64-encoded "
+                    f"{camera.output_format.removeprefix('.').upper()} images."
+                ),
                 tool_function=build_capture_frames_tool(camera_key),
                 annotations=ToolAnnotations(
-                    title=f"Capture frames from {camera.name}",
+                    title=f"Capture frames from {camera.camera_id}",
                     readOnlyHint=True,
                     openWorldHint=False,
                 ),
