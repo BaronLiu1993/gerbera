@@ -32,14 +32,14 @@ class Camera:
     camera_source: CameraSource
     output_height: int = 360
     output_width: int = 640
-    output_format: CameraOutputFormat = ".jpg"
+    output_format: CameraOutputFormat = "jpg"
 
 
 @dataclass
 class Frame:
     image: NDArray[np.uint8]
     timestamp: datetime
-    output_format: CameraOutputFormat = ".jpg"
+    output_format: CameraOutputFormat = "jpg"
 
     def normalise_frame(
         self,
@@ -74,8 +74,8 @@ class Frame:
             cv2.BORDER_CONSTANT,
             value=0,
         )
-        return replace(self, image=framed_image, output_format=output_format)
+        return replace(self, image=framed_image, output_format=f".{output_format}")
 
     def encode(self) -> bytes:
-        _, encoded_image = cv2.imencode(self.output_format, self.image)
+        _, encoded_image = cv2.imencode(f".{self.output_format}", self.image)
         return encoded_image.tobytes()
