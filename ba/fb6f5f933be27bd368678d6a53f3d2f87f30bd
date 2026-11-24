@@ -1,0 +1,16 @@
+src/gerbera_sdk/latest_runtime.py
+  h_27eeabff8eaa99 1-39
+src/gerbera_sdk/models/hardware/camera.py
+  h_27eeabff8eaa99 35,42,77,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bafb6f5f933be27bd368678d6a53f3d2f87f30bd",
+  "prompts": {},
+  "humans": {
+    "h_27eeabff8eaa99": {
+      "author": "Jie Xuan Liu <baronliu1993@gmail.com>"
+    }
+  }
+}
