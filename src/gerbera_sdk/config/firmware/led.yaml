@@ -1,0 +1,23 @@
+setup: digitalWrite($out, LOW);
+pin_modes:
+  out: OUTPUT
+write:
+  response_field: led_state
+  body: |
+    String state = command.field("state");
+    if (state.length() == 0) {
+      sendMessage("MCP", $target, "error", "invalid_arg");
+      return;
+    }
+    if (state != "0" && state != "1") {
+      sendMessage("MCP", $target, "error", "invalid_state");
+      return;
+    }
+    digitalWrite($out, state == "1" ? HIGH : LOW);
+    sendMessage("MCP", $target, $response_field, state);
+  params:
+    state:
+      required: true
+      choices:
+      - 0
+      - 1

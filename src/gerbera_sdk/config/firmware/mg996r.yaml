@@ -1,0 +1,26 @@
+definitions: Servo ${symbol}_servo;
+setup: |
+  ${symbol}_servo.detach();
+  digitalWrite($signal, LOW);
+pin_modes:
+  signal: OUTPUT
+write:
+  response_field: angle
+  body: |
+    String value = command.field("angle");
+    if (value.length() == 0) {
+      sendMessage("MCP", $target, "error", "invalid_arg");
+      return;
+    }
+    int angle = value.toInt();
+    if (!${symbol}_servo.attached()) {
+      ${symbol}_servo.attach($signal);
+    }
+    ${symbol}_servo.write(angle);
+    sendMessage("MCP", $target, $response_field, String(angle));
+  params:
+    angle:
+      required: true
+      minimum: 0
+      maximum: 180
+      unit: degrees

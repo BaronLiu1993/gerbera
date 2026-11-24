@@ -1,0 +1,7 @@
+pin_modes:
+  out: INPUT
+stream:
+  field: obstacle_detected
+  body: |
+    sendMessage("STREAM", $target, $response_field, String(digitalRead($out)));
+    delay(100);
